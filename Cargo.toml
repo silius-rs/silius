@@ -8,7 +8,20 @@ default-run = "bundler"
 
 [dependencies]
 anyhow = "1"
+async-trait = "0.1"
+bytes = { version = "1", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+ethereum-types = { version = "0.14", features = ["codec"] }
+jsonrpsee = { version = "0.15", features = ["server", "macros"] }
+serde = "1"
+tokio = { version = "1.18", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 [[bin]]
 path = "bin/bundler.rs"
 name = "bundler"
+
+[[bin]]
+path = "bin/bundler-rpc.rs"
+name = "bundler-rpc"
