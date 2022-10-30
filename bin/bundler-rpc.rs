@@ -7,9 +7,12 @@ use tracing_subscriber;
 use aa_bundler::rpc::{eth::EthApiServerImpl, eth_api::EthApiServer};
 
 #[derive(Parser)]
-#[clap(name = "Bundler RPC", about = "RPC server for Bundler")]
+#[clap(
+    name = "AA - Bundler RPC",
+    about = "RPC server for EIP-4337 Account Abstraction Bundler"
+)]
 pub struct Opt {
-    #[clap(long, default_value = "127.0.0.1:3000")]
+    #[clap(long, default_value = "127.0.0.1:3001")]
     pub rpc_listen_address: String,
 }
 
