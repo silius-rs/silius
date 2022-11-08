@@ -11,6 +11,7 @@ anyhow = "1"
 async-trait = "0.1"
 bytes = { version = "1", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
+ethereum-interfaces = { git = "https://github.com/ledgerwatch/interfaces" }
 ethereum-types = { version = "0.14", features = ["codec"] }
 ethers = "1.0.0"
 expanded-pathbuf = "0.1"
@@ -18,6 +19,11 @@ jsonrpsee = { version = "0.15", features = ["server", "macros"] }
 ron = "0.8"
 serde = "1"
 tokio = { version = "1.18", features = ["full"] }
+tonic = { version = "0.8", default-features = false, features = [
+  "codegen",
+  "prost",
+  "transport",
+] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 

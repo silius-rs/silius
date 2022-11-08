@@ -22,12 +22,18 @@ pub struct Opt {
     pub mnemonic_folder: ExpandedPathBuf,
 
     #[clap(long, default_value = "127.0.0.1:3000")]
-    pub bundler_listen_address: String,
+    pub grpc_listen_address: String,
+
+    #[clap(long)]
+    pub no_uopool: bool,
+
+    #[clap(long, default_value = "127.0.0.1:3001")]
+    pub uopool_listen_address: String,
 
     #[clap(long)]
     pub no_rpc: bool,
 
-    #[clap(long, default_value = "127.0.0.1:3001")]
+    #[clap(long, default_value = "127.0.0.1:4337")]
     pub rpc_listen_address: String,
 }
 
