@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "types/types.proto";
+
+package bundler;
+
+message ChainIdResponse {
+    uint64 chain_id = 1;
+}
+
+message SupportedEntryPointsResponse {
+    repeated types.SupportedEntryPoint supported_entry_points = 1;
+}
+
+service Bundler {
+    rpc ChainId(google.protobuf.Empty) returns (ChainIdResponse);
+    rpc SupportedEntryPoints(google.protobuf.Empty) returns (SupportedEntryPointsResponse);
+}

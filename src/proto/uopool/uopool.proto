@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+import "types/types.proto";
+
+package uopool;
+
+message AddRequest {
+    types.UserOperation uo = 1;
+}
+
+enum AddResult {
+    ADDED = 0;
+    NOT_ADDED = 1;
+}
+
+message AddResponse {
+    AddResult result = 1;
+    string error = 2;
+}
+
+message RemoveRequest {
+    types.H256 hash = 1;
+}
+
+enum RemoveResult {
+    REMOVED = 0;
+    NOT_REMOVED = 1;
+}
+
+message RemoveResponse {
+    RemoveResult result = 1;
+    string error = 2;
+}
+
+message AllRequest {}
+
+message AllResponse {
+    repeated types.UserOperation uos = 1;
+}
+
+service UoPool {
+    rpc Add(AddRequest) returns (AddResponse);
+    rpc Remove(RemoveRequest) returns (RemoveResponse);
+    rpc All(AllRequest) returns (AllResponse);
+}

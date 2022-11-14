@@ -1,16 +1,17 @@
 use anyhow::Result;
 use clap::Parser;
-use jsonrpsee::tracing::info;
+use educe::Educe;
 use std::future::pending;
 
-#[derive(Parser)]
+#[derive(Educe, Parser)]
 #[clap(
-    name = "AA - Bundler UoPool",
+    name = "aa-bundler-uopool",
     about = "User operation pool for EIP-4337 Account Abstraction Bundler"
 )]
+#[educe(Debug)]
 pub struct Opt {
-    #[clap(long, default_value = "127.0.0.1:3001")]
-    pub grpc_listen_address: String,
+    #[clap(flatten)]
+    pub uopool_opts: aa_bundler::uopool::Opts,
 }
 
 #[tokio::main]
@@ -19,18 +20,7 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt::init();
 
-    let mut builder = tonic::transport::Server::builder();
+    aa_bundler::uopool::run(opt.uopool_opts).await?;
 
-    #[cfg(feature = "grpc-reflection")]
-    builder.add_service(
-        tonic_reflection::server::Builder::configure()
-            .register_encoded_file_descriptor_set(ethereum_interfaces::FILE_DESCRIPTOR_SET)
-            .build()
-            .unwrap(),
-    );
-
-    println!("{:?}", builder);
-
-    info!("gRPC server listening on {}", opt.grpc_listen_address);
     pending().await
 }

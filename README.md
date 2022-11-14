@@ -8,6 +8,8 @@
 
 <p align="center"><a href="https://huggingface.co/spaces/stabilityai/stable-diffusion">Stable Diffusion</a> prompt: ethereum bundler account abstraction rust vector logo<p>
 
+For more information: https://hackmd.io/@Vid201/aa-bundler-rust
+
 ## How to run?
 
 Bundler: 

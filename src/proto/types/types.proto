@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package types;
+
+message H128 {
+    uint64 hi = 1;
+    uint64 lo = 2;
+}
+
+message H160 {
+    types.H128 hi = 1;
+    uint32 lo = 2;
+}
+
+message H256 {
+    types.H128 hi = 1;
+    types.H128 lo = 2;
+}
+
+message SupportedEntryPoint {
+    types.H160 entry_point = 1;
+}
+
+message UserOperation {
+    types.H160 sender = 1;
+    uint64 nonce = 2;
+    bytes init_code = 3;
+    bytes call_data = 4;
+    uint64 call_gas_limit = 5;
+    uint64 verification_gas_limit = 6;
+    uint64 pre_verification_gas = 7;
+    uint64 max_fee_per_gas = 8;
+    uint64 max_priority_fee_per_gas = 9;
+    bytes paymaster_and_data = 10;
+    bytes signature = 11;
+}

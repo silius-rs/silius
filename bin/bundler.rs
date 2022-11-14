@@ -6,12 +6,12 @@ use ethers::{
     signers::{coins_bip39::English, MnemonicBuilder},
 };
 use expanded_pathbuf::ExpandedPathBuf;
-use jsonrpsee::{core::server::rpc_module::Methods, http_server::HttpServerBuilder, tracing::info};
+use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
 use std::{future::pending, panic};
 
 #[derive(Parser)]
 #[clap(
-    name = "AA - Bundler",
+    name = "aa-bundler",
     about = "Bundler for EIP-4337 Account Abstraction"
 )]
 pub struct Opt {
@@ -21,14 +21,13 @@ pub struct Opt {
     #[clap(long, default_value = "./src/res/bundler")]
     pub mnemonic_folder: ExpandedPathBuf,
 
-    #[clap(long, default_value = "127.0.0.1:3000")]
-    pub grpc_listen_address: String,
-
+    // #[clap(long, default_value = "127.0.0.1:3000")]
+    // pub grpc_listen_address: String,
     #[clap(long)]
     pub no_uopool: bool,
 
-    #[clap(long, default_value = "127.0.0.1:3001")]
-    pub uopool_listen_address: String,
+    #[clap(flatten)]
+    pub uopool_opts: aa_bundler::uopool::Opts,
 
     #[clap(long)]
     pub no_rpc: bool,
@@ -53,6 +52,7 @@ fn main() -> Result<()> {
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
 
+                // TODO: move this to bundler package
                 let wallet = if let Some(mnemonic_file) = opt.mnemonic_file {
                     MnemonicBuilder::<English>::default()
                         .phrase(mnemonic_file.to_path_buf())
@@ -66,10 +66,14 @@ fn main() -> Result<()> {
 
                 println!("{:?}", wallet);
 
+                if !opt.no_uopool {
+                    aa_bundler::uopool::run(opt.uopool_opts).await?;
+                }
+
                 if !opt.no_rpc {
                     tokio::spawn({
                         async move {
-                            let http_server = HttpServerBuilder::default()
+                            let jsonrpc_server = ServerBuilder::default()
                                 .build(&opt.rpc_listen_address)
                                 .await
                                 .unwrap();
@@ -83,8 +87,8 @@ fn main() -> Result<()> {
                             )
                             .unwrap();
 
-                            let _http_server_handle = http_server.start(api.clone()).unwrap();
-                            info!("HTTP server listening on {}", opt.rpc_listen_address);
+                            let _jsonrpc_server_handle = jsonrpc_server.start(api.clone()).unwrap();
+                            info!("JSONRPC server listening on {}", opt.rpc_listen_address);
 
                             pending::<()>().await
                         }
