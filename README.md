@@ -12,19 +12,25 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 ## How to run?
 
-Bundler: 
+Create wallet for bundler:
 
 ```bash
-cargo run -- --mnemonic-folder ./src/res/bundler
+cargo run --bin create-wallet -- --output-folder ./src/res/bundler
 ```
 
-User operation pool:
+Run bundler (with user operation pool and JSON-RPC API): 
+
+```bash
+cargo run -- --mnemonic-file ./src/res/bundler/0xF78bB01dFd478608F5738fB0560642b2806D295E
+```
+
+Run only user operation pool:
 
 ```bash
 cargo run --bin bundler-uopool
 ```
 
-Bundler RPC: 
+Run only JSON-RPC API: 
 
 ```bash
 cargo run --bin bundler-rpc

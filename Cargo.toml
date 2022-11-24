@@ -45,3 +45,7 @@ name = "bundler-uopool"
 [[bin]]
 path = "bin/bundler-rpc.rs"
 name = "bundler-rpc"
+
+[[bin]]
+path = "bin/create-wallet.rs"
+name = "create-wallet"
