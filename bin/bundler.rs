@@ -1,10 +1,10 @@
-use aa_bundler::rpc::{eth::EthApiServerImpl, eth_api::EthApiServer};
+use aa_bundler::{
+    bundler::bundler::Bundler,
+    models::wallet::Wallet,
+    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+};
 use anyhow::Result;
 use clap::Parser;
-use ethers::{
-    prelude::rand,
-    signers::{coins_bip39::English, MnemonicBuilder},
-};
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
 use std::{future::pending, panic};
@@ -16,10 +16,7 @@ use std::{future::pending, panic};
 )]
 pub struct Opt {
     #[clap(long)]
-    pub mnemonic_file: Option<ExpandedPathBuf>,
-
-    #[clap(long, default_value = "./src/res/bundler")]
-    pub mnemonic_folder: ExpandedPathBuf,
+    pub mnemonic_file: ExpandedPathBuf,
 
     // #[clap(long, default_value = "127.0.0.1:3000")]
     // pub grpc_listen_address: String,
@@ -52,19 +49,10 @@ fn main() -> Result<()> {
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
 
-                // TODO: move this to bundler package
-                let wallet = if let Some(mnemonic_file) = opt.mnemonic_file {
-                    MnemonicBuilder::<English>::default()
-                        .phrase(mnemonic_file.to_path_buf())
-                        .build()?
-                } else {
-                    let mut rng = rand::thread_rng();
-                    MnemonicBuilder::<English>::default()
-                        .write_to(opt.mnemonic_folder.to_path_buf())
-                        .build_random(&mut rng)?
-                };
+                let wallet = Wallet::from_file(opt.mnemonic_file);
+                info!("{:?}", wallet.signer);
 
-                println!("{:?}", wallet);
+                let bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
                     aa_bundler::uopool::run(opt.uopool_opts).await?;
@@ -88,7 +76,7 @@ fn main() -> Result<()> {
                             .unwrap();
 
                             let _jsonrpc_server_handle = jsonrpc_server.start(api.clone()).unwrap();
-                            info!("JSONRPC server listening on {}", opt.rpc_listen_address);
+                            info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
 
                             pending::<()>().await
                         }

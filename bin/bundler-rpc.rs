@@ -9,7 +9,7 @@ use aa_bundler::rpc::{eth::EthApiServerImpl, eth_api::EthApiServer};
 #[derive(Parser)]
 #[clap(
     name = "aa-bundler-rpc",
-    about = "RPC server for EIP-4337 Account Abstraction Bundler"
+    about = "JSON-RPC server for EIP-4337 Account Abstraction Bundler"
 )]
 pub struct Opt {
     #[clap(long, default_value = "127.0.0.1:4337")]
@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     .unwrap();
 
     let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
-    info!("JSONRPC server listening on {}", opt.rpc_listen_address);
+    info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
 
     pending().await
 }
