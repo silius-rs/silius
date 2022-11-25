@@ -3,6 +3,7 @@ use ethers::{
     signers::{coins_bip39::English, MnemonicBuilder},
 };
 use expanded_pathbuf::ExpandedPathBuf;
+use std::fs;
 
 pub struct Wallet {
     pub signer: ethers::signers::Wallet<SigningKey>,
@@ -11,6 +12,8 @@ pub struct Wallet {
 impl Wallet {
     pub fn new(output_path: ExpandedPathBuf) -> Self {
         let mut rng = rand::thread_rng();
+
+        fs::create_dir_all(output_path.to_path_buf()).unwrap();
 
         Self {
             signer: MnemonicBuilder::<English>::default()

@@ -1,5 +1,2 @@
 # Rust
 /target
-
-# bundler wallets
-/src/res/bundler/0x*

@@ -50,7 +50,7 @@ fn main() -> Result<()> {
                 info!("Starting AA - Bundler");
 
                 let wallet = Wallet::from_file(opt.mnemonic_file);
-                println!("{:?}", wallet.signer);
+                info!("{:?}", wallet.signer);
 
                 let bundler = Bundler::new(wallet);
 

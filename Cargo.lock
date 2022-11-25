@@ -20,6 +20,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "clap",
+ "dirs",
  "educe",
  "ethereum-interfaces",
  "ethereum-types 0.14.0",

@@ -1,7 +1,7 @@
 use crate::{rpc::eth_api::EthApiServer, types::user_operation::UserOperation};
 use async_trait::async_trait;
 use ethereum_types::{Address, U64};
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::{core::RpcResult, tracing::info};
 
 pub struct EthApiServerImpl {
     pub call_gas_limit: u64,
@@ -22,8 +22,8 @@ impl EthApiServer for EthApiServerImpl {
         user_operation: UserOperation,
         entry_point: Address,
     ) -> RpcResult<bool> {
-        println!("{:?}", user_operation);
-        println!("{:?}", entry_point);
+        info!("{:?}", user_operation);
+        info!("{:?}", entry_point);
         Ok(true)
     }
 }

@@ -11,6 +11,7 @@ anyhow = "1"
 async-trait = "0.1"
 bytes = { version = "1", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
+dirs = "4.0"
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethereum-interfaces = { git = "https://github.com/ledgerwatch/interfaces" }
 ethereum-types = { version = "0.14", features = ["codec"] }
