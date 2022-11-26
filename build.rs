@@ -23,7 +23,7 @@ fn compile_aa_interfaces() -> anyhow::Result<()> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("thirdparty/account-abstraction");
     let target_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let build_path_config = ProjectPathsConfig::builder()
-        // current only interfaces are what we need
+        // only interfaces are needed
         .sources(root.join("contracts").join("interfaces"))
         .artifacts(target_path)
         .build_infos(root.join("contracts").join("build-info"))
@@ -34,7 +34,7 @@ fn compile_aa_interfaces() -> anyhow::Result<()> {
     let compiled = project.compile()?;
     assert!(
         !compiled.has_compiler_errors(),
-        "Compiling abstract account interfaces failed: {:?}",
+        "Compiling EIP-4337 interfaces failed: {:?}",
         compiled.output().errors
     );
     Ok(())
@@ -51,5 +51,5 @@ fn main() {
 
     make_protos(&protos);
 
-    compile_aa_interfaces().expect("Compiling abstract account interfaces should pass.");
+    compile_aa_interfaces().expect("Compiling EIP-4337 interfaces should pass.");
 }
