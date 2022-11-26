@@ -1,4 +1,9 @@
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
+
+use ethers::solc::{Project, ProjectPathsConfig};
 
 fn config() -> prost_build::Config {
     let mut config = prost_build::Config::new();
@@ -14,6 +19,27 @@ fn make_protos(protos: &[&str]) {
         .unwrap();
 }
 
+fn compile_aa_interfaces() -> anyhow::Result<()> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("thirdparty/account-abstraction");
+    let target_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let build_path_config = ProjectPathsConfig::builder()
+        // current only interfaces are what we need
+        .sources(root.join("contracts").join("interfaces"))
+        .artifacts(target_path)
+        .build_infos(root.join("contracts").join("build-info"))
+        .root(root)
+        .build()?;
+    let project = Project::builder().paths(build_path_config).build()?;
+    project.rerun_if_sources_changed();
+    let compiled = project.compile()?;
+    assert!(
+        !compiled.has_compiler_errors(),
+        "Compiling abstract account interfaces failed: {:?}",
+        compiled.output().errors
+    );
+    Ok(())
+}
+
 fn main() {
     std::env::set_var("PROTOC", protobuf_src::protoc());
 
@@ -24,4 +50,6 @@ fn main() {
     ];
 
     make_protos(&protos);
+
+    compile_aa_interfaces().expect("Compiling abstract account interfaces should pass.");
 }
