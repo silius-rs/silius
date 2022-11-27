@@ -10,6 +10,10 @@
 
 For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
+## Prerequisites
+
+1. [install solc](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12
+
 ## How to run?
 
 Create wallet for bundler:
