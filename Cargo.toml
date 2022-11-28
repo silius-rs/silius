@@ -18,6 +18,7 @@ ethereum-types = { version = "0.14", features = ["codec"] }
 ethers = "1.0.0"
 expanded-pathbuf = "0.1"
 jsonrpsee = { version = "0.16", features = ["server", "macros"] }
+parking_lot = "0.12"
 prost = "0.11"
 ron = "0.8"
 serde = "1"

@@ -27,6 +27,7 @@ dependencies = [
  "ethers",
  "expanded-pathbuf",
  "jsonrpsee",
+ "parking_lot 0.12.1",
  "prost",
  "prost-build",
  "protobuf-src",

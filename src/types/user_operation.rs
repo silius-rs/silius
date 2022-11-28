@@ -1,6 +1,8 @@
 use bytes::Bytes;
-use ethereum_types::{Address, U256};
+use ethereum_types::{Address, H512, U256};
 use serde::{Deserialize, Serialize};
+
+pub type UoId = H512;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
