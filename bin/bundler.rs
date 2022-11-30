@@ -31,6 +31,9 @@ pub struct Opt {
 
     #[clap(long, default_value = "127.0.0.1:4337")]
     pub rpc_listen_address: String,
+
+    #[clap(flatten)]
+    pub bundler_opts: aa_bundler::bundler::bundler::BundlerOpts,
 }
 
 fn main() -> Result<()> {
