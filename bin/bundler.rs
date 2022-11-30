@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
-use std::{future::pending, panic};
+use std::{future::pending, net::SocketAddr, panic};
 
 #[derive(Parser)]
 #[clap(
@@ -31,6 +31,10 @@ pub struct Opt {
 
     #[clap(long, default_value = "127.0.0.1:4337")]
     pub rpc_listen_address: String,
+
+    // execution client rpc endpoint
+    #[clap(long)]
+    pub network: SocketAddr,
 
     #[clap(flatten)]
     pub bundler_opts: aa_bundler::bundler::bundler::BundlerOpts,
