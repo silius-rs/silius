@@ -13,5 +13,8 @@ run-create-wallet:
 cargo-fmt:
 	cargo fmt --all
 
+cargo-test:
+	cargo test 
+
 fetch-thirdparty:
 	git submodule update --init

@@ -1,15 +1,22 @@
-use crate::uopool::server::server::{
-    uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
-    RemoveResponse,
+use std::sync::Arc;
+
+use crate::uopool::{
+    server::server::{
+        uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
+        RemoveResponse,
+    },
+    UserOperationPool,
 };
 use async_trait::async_trait;
 use tonic::Response;
 
-pub struct UoPoolService {}
+pub struct UoPoolService {
+    uo_pool: Arc<UserOperationPool>,
+}
 
 impl UoPoolService {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(uo_pool: Arc<UserOperationPool>) -> Self {
+        Self { uo_pool }
     }
 }
 

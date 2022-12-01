@@ -1,6 +1,6 @@
 use crate::{rpc::eth_api::EthApiServer, types::user_operation::UserOperation};
 use async_trait::async_trait;
-use ethereum_types::{Address, U64};
+use ethers::types::{Address, U64};
 use jsonrpsee::{core::RpcResult, tracing::info};
 
 pub struct EthApiServerImpl {
