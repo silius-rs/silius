@@ -34,10 +34,10 @@ pub struct Opt {
 
     // execution client rpc endpoint
     #[clap(long)]
-    pub network: SocketAddr,
+    pub eth_client_address: SocketAddr,
 
     #[clap(flatten)]
-    pub bundler_opts: aa_bundler::bundler::bundler::BundlerOpts,
+    pub bundler_opts: aa_bundler::bundler::Opts,
 }
 
 fn main() -> Result<()> {
