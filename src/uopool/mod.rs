@@ -1,5 +1,5 @@
 use crate::{
-    types::user_operation::{UoId, UserOperation},
+    types::user_operation::{UserOperation, UserOperationHash},
     uopool::{server::server::uo_pool_server::UoPoolServer, services::UoPoolService},
 };
 use anyhow::Result;
@@ -15,7 +15,7 @@ pub mod services;
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct UserOperationPool {
-    pub pool: Arc<RwLock<HashMap<UoId, UserOperation>>>,
+    pub pool: Arc<RwLock<HashMap<UserOperationHash, UserOperation>>>,
 }
 
 impl UserOperationPool {

@@ -1,4 +1,4 @@
-use ethereum_types::{Address, U64};
+use ethers::types::{Address, U64};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 use crate::types::user_operation::UserOperation;
