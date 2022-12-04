@@ -11,7 +11,7 @@ use std::future::pending;
 #[educe(Debug)]
 pub struct Opt {
     #[clap(flatten)]
-    pub uopool_opts: aa_bundler::uopool::Opts,
+    pub uopool_opts: aa_bundler::uopool::UoPoolOpts,
 }
 
 #[tokio::main]

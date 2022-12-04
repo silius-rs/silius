@@ -18,13 +18,11 @@ pub struct Opt {
     #[clap(long)]
     pub mnemonic_file: ExpandedPathBuf,
 
-    // #[clap(long, default_value = "127.0.0.1:3000")]
-    // pub grpc_listen_address: String,
     #[clap(long)]
     pub no_uopool: bool,
 
     #[clap(flatten)]
-    pub uopool_opts: aa_bundler::uopool::Opts,
+    pub uopool_opts: aa_bundler::uopool::UoPoolOpts,
 
     #[clap(long)]
     pub no_rpc: bool,
@@ -33,11 +31,11 @@ pub struct Opt {
     pub rpc_listen_address: String,
 
     // execution client rpc endpoint
-    #[clap(long)]
+    #[clap(long, default_value = "127.0.0.1:8545")]
     pub eth_client_address: SocketAddr,
 
     #[clap(flatten)]
-    pub bundler_opts: aa_bundler::bundler::Opts,
+    pub bundler_opts: aa_bundler::bundler::BundlerOpts,
 }
 
 fn main() -> Result<()> {
@@ -59,7 +57,7 @@ fn main() -> Result<()> {
                 let wallet = Wallet::from_file(opt.mnemonic_file);
                 info!("{:?}", wallet.signer);
 
-                let bundler = Bundler::new(wallet);
+                let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
                     aa_bundler::uopool::run(opt.uopool_opts).await?;

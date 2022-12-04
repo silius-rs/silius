@@ -28,24 +28,24 @@ impl UserOperationPool {
 
 #[derive(Educe, Parser)]
 #[educe(Debug)]
-pub struct Opts {
+pub struct UoPoolOpts {
     #[clap(long, default_value = "127.0.0.1:3001")]
-    pub grpc_listen_address: SocketAddr,
+    pub uopool_grpc_listen_address: SocketAddr,
 }
 
-pub async fn run(opts: Opts) -> Result<()> {
+pub async fn run(opts: UoPoolOpts) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = UoPoolServer::new(UoPoolService::new(Arc::new(UserOperationPool::new())));
 
         info!(
             "UoPool gRPC server starting on {}",
-            opts.grpc_listen_address
+            opts.uopool_grpc_listen_address
         );
 
         builder
             .add_service(svc)
-            .serve(opts.grpc_listen_address)
+            .serve(opts.uopool_grpc_listen_address)
             .await
             .unwrap();
     });
