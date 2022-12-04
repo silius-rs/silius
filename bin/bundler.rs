@@ -5,9 +5,10 @@ use aa_bundler::{
 };
 use anyhow::Result;
 use clap::Parser;
+use ethers::providers::{Provider, Http};
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
-use std::{future::pending, net::SocketAddr, panic};
+use std::{future::pending, panic, sync::Arc};
 
 #[derive(Parser)]
 #[clap(
@@ -32,7 +33,7 @@ pub struct Opt {
 
     // execution client rpc endpoint
     #[clap(long, default_value = "127.0.0.1:8545")]
-    pub eth_client_address: SocketAddr,
+    pub eth_client_address: String,
 
     #[clap(flatten)]
     pub bundler_opts: aa_bundler::bundler::BundlerOpts,
@@ -57,10 +58,12 @@ fn main() -> Result<()> {
                 let wallet = Wallet::from_file(opt.mnemonic_file);
                 info!("{:?}", wallet.signer);
 
+                let eth_provider = Arc::new(Provider::<Http>::try_from(opt.eth_client_address)?);
+
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
-                    aa_bundler::uopool::run(opt.uopool_opts).await?;
+                    aa_bundler::uopool::run(opt.uopool_opts, eth_provider).await?;
                 }
 
                 if !opt.no_rpc {
