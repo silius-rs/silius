@@ -1,7 +1,7 @@
-use ethers::prelude::*;
+use ethers::contract::abigen;
 
 abigen!(
-    AggregatedWallet,
+    AggregatedAccount,
     "$OUT_DIR/IAggregatedAccount.sol/IAggregatedAccount.json"
 );
 
@@ -21,7 +21,7 @@ abigen!(
     "$OUT_DIR/IStakeManager.sol/IStakeManager.json"
 );
 
-abigen!(Wallet, "$OUT_DIR/IAccount.sol/IAccount.json");
+abigen!(Account, "$OUT_DIR/IAccount.sol/IAccount.json");
 
 abigen!(
     UserOperation,

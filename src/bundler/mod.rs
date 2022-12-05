@@ -6,7 +6,7 @@ use clap::Parser;
 use ethers::types::{Address, U256};
 
 #[derive(Debug, Parser, PartialEq)]
-pub struct Opts {
+pub struct BundlerOpts {
     #[clap(long, value_parser=parse_address)]
     pub beneficiary: Address,
 
@@ -21,6 +21,9 @@ pub struct Opts {
 
     #[clap(long, value_parser=parse_address)]
     pub helper: Address,
+
+    #[clap(long, default_value = "127.0.0.1:3000")]
+    pub bundler_grpc_listen_address: String,
 }
 
 fn parse_address(s: &str) -> Result<Address, String> {
@@ -33,10 +36,7 @@ fn parse_u256(s: &str) -> Result<U256, String> {
 
 #[cfg(test)]
 mod test {
-    use super::Opts;
-    use clap::Parser;
-    use ethereum_types::{Address, U256};
-    use std::str::FromStr;
+    use super::*;
 
     #[test]
     fn bundle_opt() {
@@ -52,17 +52,20 @@ mod test {
             "0x0000000000000000000000000000000000000000",
             "--helper",
             "0x0000000000000000000000000000000000000000",
+            "--bundler-grpc-listen-address",
+            "127.0.0.1:3000",
         ];
         assert_eq!(
-            Opts {
+            BundlerOpts {
                 beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
                     .unwrap(),
                 gas_factor: U256::from(600),
                 min_balance: U256::from(1),
                 entry_point: Address::from([0; 20]),
-                helper: Address::from([0; 20])
+                helper: Address::from([0; 20]),
+                bundler_grpc_listen_address: String::from("127.0.0.1:3000")
             },
-            Opts::try_parse_from(args).unwrap()
+            BundlerOpts::try_parse_from(args).unwrap()
         );
     }
 }

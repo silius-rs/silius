@@ -11,12 +11,12 @@ use async_trait::async_trait;
 use tonic::Response;
 
 pub struct UoPoolService {
-    uo_pool: Arc<UserOperationPool>,
+    _uo_pool: Arc<UserOperationPool>,
 }
 
 impl UoPoolService {
     pub fn new(uo_pool: Arc<UserOperationPool>) -> Self {
-        Self { uo_pool }
+        Self { _uo_pool: uo_pool }
     }
 }
 
