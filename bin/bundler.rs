@@ -1,11 +1,15 @@
 use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
+    parse_address, parse_u256,
     rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
 };
 use anyhow::Result;
 use clap::Parser;
-use ethers::providers::{Provider, Http};
+use ethers::{
+    providers::{Http, Provider},
+    types::{Address, U256},
+};
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
 use std::{future::pending, panic, sync::Arc};
@@ -19,8 +23,14 @@ pub struct Opt {
     #[clap(long)]
     pub mnemonic_file: ExpandedPathBuf,
 
+    #[clap(long, value_parser=parse_address)]
+    pub entry_point: Address,
+
     #[clap(long)]
     pub no_uopool: bool,
+
+    #[clap(long, value_parser=parse_u256)]
+    pub max_verification_gas: U256,
 
     #[clap(flatten)]
     pub uopool_opts: aa_bundler::uopool::UoPoolOpts,
@@ -63,7 +73,13 @@ fn main() -> Result<()> {
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
-                    aa_bundler::uopool::run(opt.uopool_opts, eth_provider).await?;
+                    aa_bundler::uopool::run(
+                        opt.uopool_opts,
+                        eth_provider,
+                        opt.entry_point,
+                        opt.max_verification_gas,
+                    )
+                    .await?;
                 }
 
                 if !opt.no_rpc {

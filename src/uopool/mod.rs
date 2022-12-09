@@ -5,7 +5,10 @@ use crate::{
 use anyhow::Result;
 use clap::Parser;
 use educe::Educe;
-use ethers::providers::{Http, Provider};
+use ethers::{
+    providers::{Http, Provider},
+    types::{Address, U256},
+};
 use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
@@ -40,12 +43,19 @@ pub struct UoPoolOpts {
     pub uopool_grpc_listen_address: SocketAddr,
 }
 
-pub async fn run(opts: UoPoolOpts, eth_provider: Arc<Provider<Http>>) -> Result<()> {
+pub async fn run(
+    opts: UoPoolOpts,
+    eth_provider: Arc<Provider<Http>>,
+    entry_point: Address,
+    max_verification_gas: U256,
+) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(UserOperationPool::new()),
             eth_provider,
+            entry_point,
+            max_verification_gas,
         ));
 
         info!(
