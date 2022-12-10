@@ -2,6 +2,15 @@ use crate::types::user_operation::UserOperation;
 use ethers::types::{u256_from_f64_saturating, U256};
 use std::ops::Deref;
 
+pub const WARM_STORAGE_READ_COST: u64 = 100; // EIP 2929
+pub const CALL_VALUE_TRANSFER_GAS: u64 = 9000; // Ethereum yellow paper
+pub const CALL_GAS: u64 = 700; // EIP 150
+pub const CALL_STIPEND: u64 = 2300; // Ethereum yellow paper
+
+pub fn non_zero_value_call() -> U256 {
+    U256::from(CALL_VALUE_TRANSFER_GAS + WARM_STORAGE_READ_COST + CALL_GAS + CALL_STIPEND)
+}
+
 pub struct Overhead {
     pub fixed: U256,
     pub per_user_op: U256,

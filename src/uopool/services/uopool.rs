@@ -3,7 +3,7 @@ use crate::{uopool::{
         uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
         RemoveResponse,
     }, UserOperationPool,
-}, types::user_operation::UserOperation, chain::gas::Overhead};
+}, types::user_operation::UserOperation, chain::gas::{Overhead, self}};
 use async_trait::async_trait;
 use ethers::{
     providers::{Http, Middleware, Provider, ProviderError},
@@ -14,9 +14,20 @@ use tonic::Response;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BadUserOperationError {
-    SenderOrInitCode { sender: Address, init_code: Bytes },
-    HighVerificationGasLimit { verification_gas_limit: U256 },
-    LowPreVerificationGas { pre_verification_gas: U256 },
+    SenderOrInitCode {
+        sender: Address,
+        init_code: Bytes,
+    },
+    HighVerificationGasLimit {
+        verification_gas_limit: U256,
+    },
+    LowPreVerificationGas {
+        pre_verification_gas: U256,
+    },
+    LowCallGasLimit {
+        call_gas_limit: U256,
+        non_zero_call_value: U256,
+    },
 }
 
 #[derive(Debug)]
@@ -107,6 +118,14 @@ impl UoPoolService {
 
         // condition 4
         // The callgas is at least the cost of a CALL with non-zero value.
+        if user_operation.call_gas_limit < gas::non_zero_value_call() {
+            return Err(UserOperationValidationError::Validation(
+                BadUserOperationError::LowCallGasLimit {
+                    call_gas_limit: user_operation.call_gas_limit,
+                    non_zero_call_value: gas::non_zero_value_call(),
+                },
+            ));
+        }
 
         // condition 5
         // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
@@ -224,7 +243,7 @@ mod tests {
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
-                    nonce: U256::from(1),
+                    verification_gas_limit: U256::from(2000000),
                     ..user_operation_valid.clone()
                 })
                 .await
@@ -232,6 +251,30 @@ mod tests {
             UserOperationValidationError::Validation(
                 BadUserOperationError::HighVerificationGasLimit { .. },
             )
+        ));
+        assert!(matches!(
+            uo_pool_service
+                .validate_user_operation(&UserOperation {
+                    pre_verification_gas: U256::from(25000),
+                    ..user_operation_valid.clone()
+                })
+                .await
+                .unwrap_err(),
+            UserOperationValidationError::Validation(
+                BadUserOperationError::LowPreVerificationGas { .. },
+            )
+        ));
+
+        // condition 4
+        assert!(matches!(
+            uo_pool_service
+                .validate_user_operation(&UserOperation {
+                    call_gas_limit: U256::from(12000),
+                    ..user_operation_valid.clone()
+                })
+                .await
+                .unwrap_err(),
+            UserOperationValidationError::Validation(BadUserOperationError::LowCallGasLimit { .. },)
         ));
     }
 }
