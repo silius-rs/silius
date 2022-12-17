@@ -1,3 +1,4 @@
+use crate::contracts::gen::entry_point_api;
 use ethers::abi::AbiEncode;
 use ethers::prelude::{EthAbiCodec, EthAbiType};
 use ethers::types::{Address, Bytes, TransactionReceipt, H256, U256};
@@ -22,6 +23,24 @@ pub struct UserOperation {
     pub max_priority_fee_per_gas: U256,
     pub paymaster_and_data: Bytes,
     pub signature: Bytes,
+}
+
+impl From<UserOperation> for entry_point_api::UserOperation {
+    fn from(user_operation: UserOperation) -> Self {
+        Self {
+            sender: user_operation.sender,
+            nonce: user_operation.nonce,
+            init_code: user_operation.init_code,
+            call_data: user_operation.call_data,
+            call_gas_limit: user_operation.call_gas_limit,
+            verification_gas_limit: user_operation.verification_gas_limit,
+            pre_verification_gas: user_operation.pre_verification_gas,
+            max_fee_per_gas: user_operation.max_fee_per_gas,
+            max_priority_fee_per_gas: user_operation.max_priority_fee_per_gas,
+            paymaster_and_data: user_operation.paymaster_and_data,
+            signature: user_operation.signature,
+        }
+    }
 }
 
 impl UserOperation {

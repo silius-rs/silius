@@ -1,4 +1,4 @@
 mod entrypoint;
-mod gen;
+pub mod gen;
 
 pub use entrypoint::*;

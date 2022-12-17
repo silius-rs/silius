@@ -3,7 +3,7 @@ use crate::{uopool::{
         uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
         RemoveResponse,
     }, UserOperationPool,
-}, types::user_operation::UserOperation, chain::gas::{Overhead, self}};
+}, types::user_operation::UserOperation, chain::gas::{Overhead, self}, contracts::gen::EntryPointAPI};
 use async_trait::async_trait;
 use ethers::{
     providers::{Http, Provider},
@@ -15,7 +15,7 @@ use tonic::Response;
 pub struct UoPoolService {
     pub uo_pool: Arc<UserOperationPool>,
     pub eth_provider: Arc<Provider<Http>>,
-    pub entry_point: Address,
+    pub entry_point: EntryPointAPI<Provider<Http>>,
     pub max_verification_gas: U256,
 }
 
@@ -28,8 +28,8 @@ impl UoPoolService {
     ) -> Self {
         Self {
             uo_pool,
+            entry_point: EntryPointAPI::new(entry_point, Arc::clone(&eth_provider)),
             eth_provider,
-            entry_point,
             max_verification_gas,
         }
     }

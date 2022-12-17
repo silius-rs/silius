@@ -173,13 +173,13 @@ impl UoPoolService {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use ethers::providers::Provider;
-
     use crate::uopool::UserOperationPool;
+    use ethers::providers::Provider;
+    use std::{str::FromStr, sync::Arc};
 
     use super::*;
-    use std::{str::FromStr, sync::Arc};
 
     #[tokio::test]
     async fn user_operation_validation() {

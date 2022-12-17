@@ -34,7 +34,7 @@ regex = "1"
 
 [build-dependencies]
 anyhow = "1"
-ethers = {version = "1.0.0", features = ["ethers-solc"]}
+ethers = { version = "1.0.0", features = ["ethers-solc"] }
 protobuf-src = "1.1.0"
 prost-build = "0.11"
 tonic-build = "0.8"
