@@ -61,19 +61,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             })
     }
 
-    pub async fn get_user_op_hash<U: Into<UserOperation>>(
-        &self,
-        user_operation: U,
-    ) -> Result<[u8; 32], EntryPointErr> {
-        let res: Result<[u8; 32], ContractError<M>> =
-            self.api.get_user_op_hash(user_operation.into()).await;
-        res.map_err(|e| EntryPointErr::UnknownErr(format!("Get user op hash error with {:?}", e)))
-    }
-
     pub async fn simulate_validation<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<SimulateResult, EntryPointErr> {
+    ) -> Result<SimulateValidationResult, EntryPointErr> {
         let request_result = self.api.simulate_validation(user_operation.into()).await;
         match request_result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
@@ -86,10 +77,12 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
                     entry_point_api::EntryPointAPIErrors::SimulationResult(res) => {
-                        Ok(SimulateResult::SimulationResult(res))
+                        Ok(SimulateValidationResult::SimulationResult(res))
                     }
                     entry_point_api::EntryPointAPIErrors::SimulationResultWithAggregation(res) => {
-                        Ok(SimulateResult::SimulationResultWithAggregation(res))
+                        Ok(SimulateValidationResult::SimulationResultWithAggregation(
+                            res,
+                        ))
                     }
                     _ => Err(EntryPointErr::UnknownErr(format!(
                         "Simulate validation with invalid error: {:?}",
@@ -166,7 +159,7 @@ pub enum EntryPointErr {
 }
 
 #[derive(Debug)]
-pub enum SimulateResult {
+pub enum SimulateValidationResult {
     SimulationResult(entry_point_api::SimulationResult),
     SimulationResultWithAggregation(entry_point_api::SimulationResultWithAggregation),
 }
@@ -203,14 +196,13 @@ impl FromStr for JsonRpcError {
 }
 
 #[cfg(test)]
-mod test {
-    use ethers::types::Bytes;
+mod tests {
 
     use super::JsonRpcError;
     use std::str::FromStr;
 
     #[test]
-    fn json_rpc_errpr_parse() {
+    fn json_rpc_err_parse() {
         let some_data =
             "(code: 3, message: execution reverted: , data: Some(String(\"0x00fa072b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000001941413230206163636f756e74206e6f74206465706c6f79656400000000000000\")))";
         let err = JsonRpcError::from_str(some_data);
