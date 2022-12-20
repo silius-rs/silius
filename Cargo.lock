@@ -30,6 +30,7 @@ dependencies = [
  "prost",
  "prost-build",
  "protobuf-src",
+ "regex",
  "ron",
  "serde",
  "tokio",
