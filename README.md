@@ -12,6 +12,7 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 ## Prerequisites
 
+1. Ethereum JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall) (currently implemented only in [Geth](https://github.com/ethereum/go-ethereum) and [Erigon](https://github.com/ledgerwatch/erigon)). For testing purposes, you can setup [private Geth node](https://github.com/krzkaczor/geth-private-node).  
 1. [solc](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12
 
 ## How to run?
