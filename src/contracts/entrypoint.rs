@@ -157,7 +157,7 @@ pub enum EntryPointErr {
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SimulateValidationResult {
     SimulationResult(entry_point_api::SimulationResult),
     SimulationResultWithAggregation(entry_point_api::SimulationResultWithAggregation),
@@ -196,7 +196,6 @@ impl FromStr for JsonRpcError {
 
 #[cfg(test)]
 mod tests {
-
     use super::JsonRpcError;
     use std::str::FromStr;
 
