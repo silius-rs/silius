@@ -1,7 +1,15 @@
-use ethers::types::{Address, U64};
+use ethers::types::{Address, U256, U64};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use serde::{Deserialize, Serialize};
 
-use crate::types::user_operation::UserOperation;
+use crate::types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt};
+
+#[derive(Serialize, Deserialize)]
+pub struct EstimateUserOperationGasResponse {
+    pub pre_verification_gas: U256,
+    pub verification_gas_limit: U256,
+    pub call_gas_limit: U256,
+}
 
 #[rpc(server, namespace = "eth")]
 pub trait EthApi {
@@ -14,5 +22,16 @@ pub trait EthApi {
         &self,
         user_operation: UserOperation,
         entry_point: Address,
-    ) -> RpcResult<bool>;
+    ) -> RpcResult<UserOperationHash>;
+    #[method(name = "estimateUserOperationGas")]
+    async fn estimate_user_operation_gas(
+        &self,
+        user_operation: UserOperation,
+        entry_point: Address,
+    ) -> RpcResult<EstimateUserOperationGasResponse>;
+    #[method(name = "getUserOperationReceipt")]
+    async fn get_user_operation_receipt(
+        &self,
+        user_operation_hash: UserOperationHash,
+    ) -> RpcResult<Option<UserOperationReceipt>>;
 }

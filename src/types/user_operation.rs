@@ -1,6 +1,6 @@
 use ethers::abi::AbiEncode;
 use ethers::prelude::{EthAbiCodec, EthAbiType};
-use ethers::types::{Address, Bytes, H256, U256};
+use ethers::types::{Address, Bytes, H256, U256, TransactionReceipt};
 use ethers::utils::keccak256;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -54,6 +54,20 @@ impl UserOperation {
             .as_slice(),
         )
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserOperationReceipt {
+    pub user_op_hash: UserOperationHash,
+    pub sender: Address,
+    pub nonce: U256,
+    pub paymaster: Address,
+    pub actual_gas_cost: U256,
+    pub actual_gas_used: U256,
+    pub success: bool,
+    pub reason: String,
+    pub logs: Vec<String>,
+    pub receipt: TransactionReceipt,
 }
 
 #[cfg(test)]
