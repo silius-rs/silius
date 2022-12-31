@@ -1,8 +1,5 @@
 use crate::{
-    contracts::{
-        gen::entry_point_api,
-        EntryPointErr, SimulateValidationResult,
-    },
+    contracts::{gen::entry_point_api, EntryPointErr, SimulateValidationResult},
     types::user_operation::UserOperation,
     uopool::services::uopool::UoPoolService,
 };
@@ -45,12 +42,25 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(simulation_response)
     }
 
+    async fn entry_point_simulate_validation_trace(
+        &self,
+        user_operation: &UserOperation,
+    ) -> Result<(), UserOperationSimulationError> {
+        let simulation_trace = self
+            .entry_point
+            .simulate_validation_trace(entry_point_api::UserOperation::from(user_operation.clone()))
+            .await?;
+        println!("{simulation_trace:?}");
+        Ok(())
+    }
+
     async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
     ) -> Result<SimulateValidationResult, UserOperationSimulationError> {
         let simulation_result = self.entry_point_simulate_validation(user_operation).await?;
-
+        self.entry_point_simulate_validation_trace(user_operation)
+            .await?;
         Ok(simulation_result)
     }
 }
@@ -59,6 +69,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 mod tests {
     use crate::uopool::UserOperationPool;
     use ethers::{
+        prelude::Abigen,
         providers::Provider,
         types::{Bytes, U256},
     };
@@ -76,6 +87,8 @@ mod tests {
                 .unwrap(),
             U256::from(1500000),
         );
+
+        // Abigen::new("EntryPoint", "$OUT_DIR/IEntryPoint.sol/IEntryPoint.json").unwrap().generate().unwrap().write_to_file("entry_point.rs").unwrap();
 
         let user_operation_valid = UserOperation {
             sender: "0x751ba0ccc3ad1392e325f8c3b9b197b7bdb61402".parse().unwrap(),

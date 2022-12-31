@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use anyhow;
 use ethers::abi::AbiDecode;
-use ethers::providers::Middleware;
-use ethers::types::{Address, Bytes};
+use ethers::providers::{Middleware, ProviderError};
+use ethers::types::{Address, Bytes, GethDebugTracingCallOptions, GethTrace};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -92,6 +92,19 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         }
     }
 
+    pub async fn simulate_validation_trace<U: Into<UserOperation>>(
+        &self,
+        user_operation: U,
+    ) -> Result<GethTrace, EntryPointErr> {
+        let call = self.api.simulate_validation(user_operation.into());
+        let options: GethDebugTracingCallOptions = GethDebugTracingCallOptions::default();
+        let request_result = self
+            .provider
+            .debug_trace_call(call.tx, None, options)
+            .await?;
+        Ok(request_result)
+    }
+
     pub async fn handle_ops<U: Into<UserOperation>>(
         &self,
         ops: Vec<U>,
@@ -152,9 +165,16 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 #[derive(Debug)]
 pub enum EntryPointErr {
     FailedOp(entry_point_api::FailedOp),
+    ProviderErr(ProviderError),
     NetworkErr, // TODO
     DecodeErr(String),
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
+}
+
+impl From<ProviderError> for EntryPointErr {
+    fn from(e: ProviderError) -> Self {
+        EntryPointErr::ProviderErr(e)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
