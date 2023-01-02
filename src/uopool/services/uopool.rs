@@ -5,27 +5,30 @@ use crate::uopool::{
         uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
         RemoveResponse,
     },
-    UserOperationPool,
+    Mempool,
 };
 use async_trait::async_trait;
 use tonic::Response;
 
-pub struct UoPoolService {
-    _uo_pool: Arc<UserOperationPool>,
+pub struct UoPoolService<M: Mempool> {
+    pool: Arc<M>,
 }
 
-impl UoPoolService {
-    pub fn new(uo_pool: Arc<UserOperationPool>) -> Self {
-        Self { _uo_pool: uo_pool }
+impl<M: Mempool> UoPoolService<M> {
+    pub fn new(pool: Arc<M>) -> Self {
+        Self { pool }
     }
 }
 
 #[async_trait]
-impl UoPool for UoPoolService {
+impl<M: Mempool> UoPool for UoPoolService<M> {
     async fn add(
         &self,
         _request: tonic::Request<AddRequest>,
     ) -> Result<Response<AddResponse>, tonic::Status> {
+        // let req = request.into_inner();
+        // TODO: sanity checks
+        // TODO: simulation
         Err(tonic::Status::unimplemented("todo"))
     }
 
