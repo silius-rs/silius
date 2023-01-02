@@ -17,6 +17,9 @@ lint:
 	cargo fmt --all -- --check
 	cargo clippy -- -D warnings -A clippy::derive_partial_eq_without_eq
 
+build:
+	cargo build
+
 cargo-test:
 	cargo test 
 

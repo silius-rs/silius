@@ -1,10 +1,14 @@
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 name: CI
 
 jobs:
   build_and_test:
-    name: Rust project
+    name: Rust Abstract Account Bundler Project
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -15,6 +19,15 @@ jobs:
       - name: Setup
         run: |
           make fetch-thirdparty
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum
+          sudo add-apt-repository ppa:ethereum/ethereum-dev
+          sudo apt-get update
+          sudo apt-get install solc
+      - name: Build
+        run: |
+          make build
       - name: Lint
         run: |
           make lint
