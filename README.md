@@ -17,6 +17,7 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 ## How to run?
 
+
 Create wallet for bundler:
 
 ```bash
