@@ -1,5 +1,5 @@
 use aa_bundler::{
-    bundler::bundler::Bundler,
+    bundler::Bundler,
     models::wallet::Wallet,
     rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
 };

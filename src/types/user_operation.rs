@@ -1,6 +1,6 @@
 use ethers::abi::AbiEncode;
 use ethers::prelude::{EthAbiCodec, EthAbiType};
-use ethers::types::{Address, Bytes, H256, U256, TransactionReceipt};
+use ethers::types::{Address, Bytes, TransactionReceipt, H256, U256};
 use ethers::utils::keccak256;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

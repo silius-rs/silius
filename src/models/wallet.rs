@@ -13,7 +13,7 @@ impl Wallet {
     pub fn new(output_path: ExpandedPathBuf) -> Self {
         let mut rng = rand::thread_rng();
 
-        fs::create_dir_all(output_path.to_path_buf()).unwrap();
+        fs::create_dir_all(&output_path).unwrap();
 
         Self {
             signer: MnemonicBuilder::<English>::default()

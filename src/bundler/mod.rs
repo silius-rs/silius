@@ -1,9 +1,9 @@
-pub mod bundler;
-
 use std::str::FromStr;
 
 use clap::Parser;
 use ethers::types::{Address, U256};
+
+use crate::models::wallet::Wallet;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerOpts {
@@ -32,6 +32,16 @@ fn parse_address(s: &str) -> Result<Address, String> {
 
 fn parse_u256(s: &str) -> Result<U256, String> {
     U256::from_str_radix(s, 10).map_err(|_| format!("{} is not a valid U256", s))
+}
+
+pub struct Bundler {
+    pub wallet: Wallet,
+}
+
+impl Bundler {
+    pub fn new(wallet: Wallet) -> Self {
+        Self { wallet }
+    }
 }
 
 #[cfg(test)]

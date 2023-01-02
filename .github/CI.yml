@@ -1,0 +1,25 @@
+on: [push]
+
+name: CI
+
+jobs:
+  build_and_test:
+    name: Rust project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Setup
+        run: |
+          make fetch-thirdparty
+      - name: Lint
+        run: |
+          make lint
+      - name: Test
+        run: |
+          make cargo-test
+
+

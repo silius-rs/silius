@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::Parser;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
 use std::future::pending;
-use tracing_subscriber;
 
 use aa_bundler::rpc::{eth::EthApiServerImpl, eth_api::EthApiServer};
 

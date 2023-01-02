@@ -1,6 +1,6 @@
 use crate::{
     types::user_operation::{UserOperation, UserOperationHash},
-    uopool::{server::server::uo_pool_server::UoPoolServer, services::UoPoolService},
+    uopool::{server::uopool_server::uo_pool_server::UoPoolServer, services::UoPoolService},
 };
 use anyhow::Result;
 use clap::Parser;
@@ -23,6 +23,12 @@ impl UserOperationPool {
         Self {
             pool: Default::default(),
         }
+    }
+}
+
+impl Default for UserOperationPool {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
