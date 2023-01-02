@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use anyhow;
 use ethers::abi::AbiDecode;
-use ethers::prelude::ContractError;
 use ethers::providers::Middleware;
 use ethers::types::{Address, Bytes};
 use regex::Regex;
@@ -23,7 +22,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         let api = EntryPointAPI::new(entry_point_address, provider.clone());
         Self {
             provider,
-            entry_point_address: entry_point_address,
+            entry_point_address,
             api,
         }
     }
@@ -39,7 +38,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     fn deserialize_error_msg(
         err_msg: &str,
     ) -> Result<entry_point_api::EntryPointAPIErrors, EntryPointErr> {
-        JsonRpcError::from_str(&err_msg)
+        JsonRpcError::from_str(err_msg)
             .map_err(|_| {
                 EntryPointErr::DecodeErr(format!(
                     "{:?} is not a valid JsonRpcError message",
@@ -115,7 +114,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             })
     }
 
-    async fn get_sender_address<U: Into<UserOperation>>(
+    pub async fn get_sender_address<U: Into<UserOperation>>(
         &self,
         initcode: Bytes,
     ) -> Result<entry_point_api::SenderAddressResult, EntryPointErr> {
@@ -141,10 +140,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         }
     }
 
-    async fn handle_aggregated_ops<U: Into<UserOperation>>(
+    pub async fn handle_aggregated_ops<U: Into<UserOperation>>(
         &self,
-        ops_per_aggregator: Vec<U>,
-        beneficiary: Address,
+        _ops_per_aggregator: Vec<U>,
+        _beneficiary: Address,
     ) -> Result<(), EntryPointErr> {
         todo!()
     }

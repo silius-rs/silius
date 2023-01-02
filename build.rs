@@ -4,7 +4,7 @@ use ethers::solc::{Project, ProjectPathsConfig};
 
 fn config() -> prost_build::Config {
     let mut config = prost_build::Config::new();
-    config.bytes(&["."]);
+    config.bytes(["."]);
     config
 }
 

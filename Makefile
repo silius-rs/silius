@@ -13,6 +13,10 @@ run-create-wallet:
 cargo-fmt:
 	cargo fmt --all
 
+lint:
+	cargo fmt --all -- --check
+	cargo clippy -- -D warnings -A clippy::derive_partial_eq_without_eq
+
 cargo-test:
 	cargo test 
 

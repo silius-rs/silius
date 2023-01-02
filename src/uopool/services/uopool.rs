@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::uopool::{
-    server::server::{
+    server::uopool_server::{
         uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
         RemoveResponse,
     },
