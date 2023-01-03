@@ -1,10 +1,11 @@
 use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
-    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer}, utils::parse_address,
 };
 use anyhow::Result;
 use clap::Parser;
+use ethers::types::Address;
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
 use std::{future::pending, net::SocketAddr, panic};
@@ -17,6 +18,9 @@ use std::{future::pending, net::SocketAddr, panic};
 pub struct Opt {
     #[clap(long)]
     pub mnemonic_file: ExpandedPathBuf,
+
+    #[clap(long, value_delimiter=',', value_parser=parse_address)]
+    pub entry_points: Vec<Address>,
 
     #[clap(long)]
     pub no_uopool: bool,
@@ -60,7 +64,7 @@ fn main() -> Result<()> {
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
-                    aa_bundler::uopool::run(opt.uopool_opts).await?;
+                    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points).await?;
                 }
 
                 if !opt.no_rpc {

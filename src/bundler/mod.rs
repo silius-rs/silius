@@ -1,7 +1,10 @@
 use clap::Parser;
 use ethers::types::{Address, U256};
 
-use crate::{models::wallet::Wallet, utils::{parse_address, parse_u256}};
+use crate::{
+    models::wallet::Wallet,
+    utils::{parse_address, parse_u256},
+};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerOpts {
@@ -13,9 +16,6 @@ pub struct BundlerOpts {
 
     #[clap(long, value_parser=parse_u256)]
     pub min_balance: U256,
-
-    #[clap(long, value_parser=parse_address)]
-    pub entry_point: Address,
 
     #[clap(long, value_parser=parse_address)]
     pub helper: Address,
@@ -50,8 +50,6 @@ mod test {
             "600",
             "--min-balance",
             "1",
-            "--entry-point",
-            "0x0000000000000000000000000000000000000000",
             "--helper",
             "0x0000000000000000000000000000000000000000",
             "--bundler-grpc-listen-address",
@@ -63,7 +61,6 @@ mod test {
                     .unwrap(),
                 gas_factor: U256::from(600),
                 min_balance: U256::from(1),
-                entry_point: Address::from([0; 20]),
                 helper: Address::from([0; 20]),
                 bundler_grpc_listen_address: String::from("127.0.0.1:3000")
             },
