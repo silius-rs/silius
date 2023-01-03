@@ -1,7 +1,8 @@
 use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
-    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer}, utils::parse_address,
+    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+    utils::parse_address,
 };
 use anyhow::Result;
 use clap::Parser;

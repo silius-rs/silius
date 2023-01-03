@@ -10,7 +10,7 @@ run-bundler-rpc:
 run-create-wallet:
 	cargo run --bin create-wallet -- --output-path ${HOME}/.aa-bundler
 
-cargo-fmt:
+format:
 	cargo fmt --all
 
 lint:
@@ -20,7 +20,7 @@ lint:
 build:
 	cargo build
 
-cargo-test:
+test:
 	cargo test 
 
 fetch-thirdparty:
