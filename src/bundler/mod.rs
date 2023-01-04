@@ -1,9 +1,10 @@
-use std::str::FromStr;
-
 use clap::Parser;
 use ethers::types::{Address, U256};
 
-use crate::models::wallet::Wallet;
+use crate::{
+    models::wallet::Wallet,
+    utils::{parse_address, parse_u256},
+};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerOpts {
@@ -17,21 +18,10 @@ pub struct BundlerOpts {
     pub min_balance: U256,
 
     #[clap(long, value_parser=parse_address)]
-    pub entry_point: Address,
-
-    #[clap(long, value_parser=parse_address)]
     pub helper: Address,
 
     #[clap(long, default_value = "127.0.0.1:3000")]
     pub bundler_grpc_listen_address: String,
-}
-
-fn parse_address(s: &str) -> Result<Address, String> {
-    Address::from_str(s).map_err(|_| format!("Adress {} is not a valid address", s))
-}
-
-fn parse_u256(s: &str) -> Result<U256, String> {
-    U256::from_str_radix(s, 10).map_err(|_| format!("{} is not a valid U256", s))
 }
 
 pub struct Bundler {
@@ -45,7 +35,9 @@ impl Bundler {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -58,8 +50,6 @@ mod test {
             "600",
             "--min-balance",
             "1",
-            "--entry-point",
-            "0x0000000000000000000000000000000000000000",
             "--helper",
             "0x0000000000000000000000000000000000000000",
             "--bundler-grpc-listen-address",
@@ -71,7 +61,6 @@ mod test {
                     .unwrap(),
                 gas_factor: U256::from(600),
                 min_balance: U256::from(1),
-                entry_point: Address::from([0; 20]),
                 helper: Address::from([0; 20]),
                 bundler_grpc_listen_address: String::from("127.0.0.1:3000")
             },
