@@ -9,7 +9,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use clap::Parser;
 use educe::Educe;
-use ethers::types::{Address, U256};
+use ethers::{
+    types::{Address, H256, U256},
+    utils::keccak256, abi::AbiEncode,
+};
 use jsonrpsee::tracing::info;
 use std::{fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
@@ -17,8 +20,13 @@ pub mod memory;
 pub mod server;
 pub mod services;
 
+pub type MempoolId = H256;
+
 #[async_trait]
 pub trait Mempool: Debug + Send + Sync + 'static {
+    fn id(entry_point: Address, chain_id: U256) -> MempoolId {
+        H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
+    }
     fn add(
         &mut self,
         user_operation: UserOperation,
@@ -27,16 +35,18 @@ pub trait Mempool: Debug + Send + Sync + 'static {
     ) -> anyhow::Result<()>;
     fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
     fn all(&self) -> anyhow::Result<Vec<UserOperation>>;
-    fn all_by_entry_point(&self, entry_point: Address) -> anyhow::Result<Vec<UserOperation>>;
+    fn all_by_entry_point(&self, entry_point: Address, chain_id: U256) -> anyhow::Result<Vec<UserOperation>>;
     fn all_by_sender(
         &self,
         sender: Address,
         entry_point: Address,
+        chain_id: U256,
     ) -> anyhow::Result<Vec<UserOperation>>;
     fn remove(
         &mut self,
         user_operation_hash: UserOperationHash,
         entry_point: Address,
+        chain_id: U256,
     ) -> anyhow::Result<()>;
     fn clear(&mut self) -> anyhow::Result<()>;
 }
@@ -54,11 +64,11 @@ pub struct UoPoolOpts {
     pub uopool_grpc_listen_address: SocketAddr,
 }
 
-pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>) -> Result<()> {
+pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = UoPoolServer::new(UoPoolService::new(Arc::new(
-            MemoryMempool::new(entry_points).unwrap(),
+            MemoryMempool::new(entry_points, chain_id).unwrap(),
         )));
 
         info!(

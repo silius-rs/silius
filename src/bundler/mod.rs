@@ -38,9 +38,6 @@ impl Bundler {
 mod tests {
     use std::str::FromStr;
 
-mod tests {
-    use std::str::FromStr;
-
     use super::*;
 
     #[test]

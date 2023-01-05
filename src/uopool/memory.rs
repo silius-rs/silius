@@ -4,14 +4,14 @@ use std::collections::{HashMap, HashSet};
 
 use crate::types::user_operation::{UserOperation, UserOperationHash};
 
-use super::Mempool;
+use super::{Mempool, MempoolId};
 
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct MemoryMempool {
     user_operations: HashMap<UserOperationHash, UserOperation>, // user_operation_hash -> user_operation
-    user_operations_by_entry_point: HashMap<Address, HashSet<UserOperationHash>>, // entry_point -> user_operations
-    user_operations_by_sender: HashMap<Address, HashMap<Address, HashSet<UserOperationHash>>>, // entry_point -> sender -> user_operations
+    user_operations_by_entry_point: HashMap<MempoolId, HashSet<UserOperationHash>>, // mempool_id -> user_operations
+    user_operations_by_sender: HashMap<MempoolId, HashMap<Address, HashSet<UserOperationHash>>>, // mempool_id -> sender -> user_operations
 }
 
 impl Mempool for MemoryMempool {
@@ -26,12 +26,14 @@ impl Mempool for MemoryMempool {
             // TODO: implement replace user operation
             return Err(anyhow::anyhow!("User operation already exists"));
         }
+
+        let id = MemoryMempool::id(entry_point, chain_id);
         self.user_operations_by_entry_point
-            .get_mut(&entry_point)
+            .get_mut(&id)
             .unwrap()
             .insert(hash);
         self.user_operations_by_sender
-            .get_mut(&entry_point)
+            .get_mut(&id)
             .unwrap()
             .get_mut(&user_operation.sender)
             .unwrap_or(&mut Default::default())
@@ -55,10 +57,15 @@ impl Mempool for MemoryMempool {
         Ok(self.user_operations.values().cloned().collect())
     }
 
-    fn all_by_entry_point(&self, entry_point: Address) -> anyhow::Result<Vec<UserOperation>> {
+    fn all_by_entry_point(
+        &self,
+        entry_point: Address,
+        chain_id: U256,
+    ) -> anyhow::Result<Vec<UserOperation>> {
+        let id = MemoryMempool::id(entry_point, chain_id);
         Ok(self
             .user_operations_by_entry_point
-            .get(&entry_point)
+            .get(&id)
             .unwrap()
             .iter()
             .map(|hash| self.user_operations.get(hash).unwrap().clone())
@@ -69,10 +76,12 @@ impl Mempool for MemoryMempool {
         &self,
         sender: Address,
         entry_point: Address,
+        chain_id: U256,
     ) -> anyhow::Result<Vec<UserOperation>> {
+        let id = MemoryMempool::id(entry_point, chain_id);
         Ok(self
             .user_operations_by_sender
-            .get(&entry_point)
+            .get(&id)
             .unwrap()
             .get(&sender)
             .unwrap_or(&Default::default())
@@ -85,17 +94,19 @@ impl Mempool for MemoryMempool {
         &mut self,
         user_operation_hash: UserOperationHash,
         entry_point: Address,
+        chain_id: U256,
     ) -> anyhow::Result<()> {
         if !self.user_operations.contains_key(&user_operation_hash) {
             return Err(anyhow::anyhow!("User operation not found"));
         }
         let user_operation = self.user_operations.get(&user_operation_hash).unwrap();
+        let id = MemoryMempool::id(entry_point, chain_id);
         self.user_operations_by_entry_point
-            .get_mut(&entry_point)
+            .get_mut(&id)
             .unwrap()
             .remove(&user_operation_hash);
         self.user_operations_by_sender
-            .get_mut(&entry_point)
+            .get_mut(&id)
             .unwrap()
             .get_mut(&user_operation.sender)
             .unwrap()
@@ -117,17 +128,20 @@ impl Mempool for MemoryMempool {
 }
 
 impl MemoryMempool {
-    pub fn new(entry_points: Vec<Address>) -> anyhow::Result<Self> {
+    pub fn new(entry_points: Vec<Address>, chain_id: U256) -> anyhow::Result<Self> {
         if entry_points.len() < 1 {
             return Err(anyhow::anyhow!("At least 1 entry point is required"));
         }
 
-        let mut user_operations_by_entry_point = HashMap::new();
-        let mut user_operations_by_sender = HashMap::new();
+        let mut user_operations_by_entry_point =
+            HashMap::<MempoolId, HashSet<UserOperationHash>>::new();
+        let mut user_operations_by_sender =
+            HashMap::<MempoolId, HashMap<Address, HashSet<UserOperationHash>>>::new();
 
         for entry_point in entry_points {
-            user_operations_by_entry_point.insert(entry_point, Default::default());
-            user_operations_by_sender.insert(entry_point, Default::default());
+            let id = MemoryMempool::id(entry_point, chain_id);
+            user_operations_by_entry_point.insert(id, Default::default());
+            user_operations_by_sender.insert(id, Default::default());
         }
 
         Ok(Self {
