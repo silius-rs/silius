@@ -1,17 +1,23 @@
 use educe::Educe;
 use ethers::types::{Address, U256};
-use std::collections::{HashMap, HashSet};
+use parking_lot::RwLock;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::types::user_operation::{UserOperation, UserOperationHash};
 
 use super::{Mempool, MempoolId};
 
+pub type UserOperationsBySender = HashMap<Address, HashSet<UserOperationHash>>;
+
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct MemoryMempool {
-    user_operations: HashMap<UserOperationHash, UserOperation>, // user_operation_hash -> user_operation
-    user_operations_by_entry_point: HashMap<MempoolId, HashSet<UserOperationHash>>, // mempool_id -> user_operations
-    user_operations_by_sender: HashMap<MempoolId, HashMap<Address, HashSet<UserOperationHash>>>, // mempool_id -> sender -> user_operations
+    user_operations: Arc<RwLock<HashMap<UserOperationHash, UserOperation>>>, // user_operation_hash -> user_operation
+    user_operations_by_entry_point: Arc<RwLock<HashMap<MempoolId, HashSet<UserOperationHash>>>>, // mempool_id -> user_operations
+    user_operations_by_sender: Arc<RwLock<HashMap<MempoolId, UserOperationsBySender>>>, // mempool_id -> sender -> user_operations
 }
 
 impl Mempool for MemoryMempool {
@@ -22,8 +28,11 @@ impl Mempool for MemoryMempool {
         chain_id: U256,
     ) -> anyhow::Result<()> {
         let hash = user_operation.hash(entry_point, chain_id);
-        if self.user_operations.contains_key(&hash) {
-            let user_operation_old = self.user_operations.get(&hash).unwrap();
+
+        // replace user operation
+        if self.user_operations.read().contains_key(&hash) {
+            let user_operations = self.user_operations.read();
+            let user_operation_old = user_operations.get(&hash).unwrap();
             let max_priority_fee_per_gas_diff = user_operation.max_priority_fee_per_gas
                 - user_operation_old.max_priority_fee_per_gas;
             let max_fee_per_gas_diff =
@@ -38,34 +47,44 @@ impl Mempool for MemoryMempool {
             }
         }
 
+        let mut user_operations = self.user_operations.write();
+        let mut user_operations_by_entry_point = self.user_operations_by_entry_point.write();
+        let mut user_operations_by_sender = self.user_operations_by_sender.write();
+
         let id = MemoryMempool::id(entry_point, chain_id);
-        self.user_operations_by_entry_point
+        user_operations_by_entry_point
             .get_mut(&id)
             .unwrap()
             .insert(hash);
-        self.user_operations_by_sender
+        user_operations_by_sender
             .get_mut(&id)
             .unwrap()
             .get_mut(&user_operation.sender)
             .unwrap_or(&mut Default::default())
             .insert(hash);
-        self.user_operations.insert(hash, user_operation);
+        user_operations.insert(hash, user_operation);
+
         Ok(())
     }
 
     fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation> {
-        if !self.user_operations.contains_key(&user_operation_hash) {
+        if !self
+            .user_operations
+            .read()
+            .contains_key(&user_operation_hash)
+        {
             return Err(anyhow::anyhow!("User operation not found"));
         }
         Ok(self
             .user_operations
+            .read()
             .get(&user_operation_hash)
             .unwrap()
             .clone())
     }
 
     fn all(&self) -> anyhow::Result<Vec<UserOperation>> {
-        Ok(self.user_operations.values().cloned().collect())
+        Ok(self.user_operations.read().values().cloned().collect())
     }
 
     fn all_by_entry_point(
@@ -76,10 +95,11 @@ impl Mempool for MemoryMempool {
         let id = MemoryMempool::id(entry_point, chain_id);
         Ok(self
             .user_operations_by_entry_point
+            .read()
             .get(&id)
             .unwrap()
             .iter()
-            .map(|hash| self.user_operations.get(hash).unwrap().clone())
+            .map(|hash| self.user_operations.read().get(hash).unwrap().clone())
             .collect())
     }
 
@@ -92,12 +112,13 @@ impl Mempool for MemoryMempool {
         let id = MemoryMempool::id(entry_point, chain_id);
         Ok(self
             .user_operations_by_sender
+            .read()
             .get(&id)
             .unwrap()
             .get(&sender)
             .unwrap_or(&Default::default())
             .iter()
-            .map(|hash| self.user_operations.get(hash).unwrap().clone())
+            .map(|hash| self.user_operations.read().get(hash).unwrap().clone())
             .collect())
     }
 
@@ -107,33 +128,51 @@ impl Mempool for MemoryMempool {
         entry_point: Address,
         chain_id: U256,
     ) -> anyhow::Result<()> {
-        if !self.user_operations.contains_key(&user_operation_hash) {
+        if !self
+            .user_operations
+            .read()
+            .contains_key(&user_operation_hash)
+        {
             return Err(anyhow::anyhow!("User operation not found"));
         }
-        let user_operation = self.user_operations.get(&user_operation_hash).unwrap();
+
+        let user_operations = self.user_operations.read();
+
+        let user_operation = user_operations.get(&user_operation_hash).unwrap();
         let id = MemoryMempool::id(entry_point, chain_id);
-        self.user_operations_by_entry_point
+
+        let mut user_operations = self.user_operations.write();
+        let mut user_operations_by_entry_point = self.user_operations_by_entry_point.write();
+        let mut user_operations_by_sender = self.user_operations_by_sender.write();
+
+        user_operations_by_entry_point
             .get_mut(&id)
             .unwrap()
             .remove(&user_operation_hash);
-        self.user_operations_by_sender
+        user_operations_by_sender
             .get_mut(&id)
             .unwrap()
             .get_mut(&user_operation.sender)
             .unwrap()
             .remove(&user_operation_hash);
-        self.user_operations.remove(&user_operation_hash);
+        user_operations.remove(&user_operation_hash);
+
         Ok(())
     }
 
     fn clear(&mut self) -> anyhow::Result<()> {
-        for (_, value) in self.user_operations_by_entry_point.iter_mut() {
+        let mut user_operations = self.user_operations.write();
+        let mut user_operations_by_entry_point = self.user_operations_by_entry_point.write();
+        let mut user_operations_by_sender = self.user_operations_by_sender.write();
+
+        for (_, value) in user_operations_by_entry_point.iter_mut() {
             value.clear();
         }
-        for (_, value) in self.user_operations_by_sender.iter_mut() {
+        for (_, value) in user_operations_by_sender.iter_mut() {
             value.clear();
         }
-        self.user_operations.clear();
+        user_operations.clear();
+
         Ok(())
     }
 }
@@ -146,8 +185,7 @@ impl MemoryMempool {
 
         let mut user_operations_by_entry_point =
             HashMap::<MempoolId, HashSet<UserOperationHash>>::new();
-        let mut user_operations_by_sender =
-            HashMap::<MempoolId, HashMap<Address, HashSet<UserOperationHash>>>::new();
+        let mut user_operations_by_sender = HashMap::<MempoolId, UserOperationsBySender>::new();
 
         for entry_point in entry_points {
             let id = MemoryMempool::id(entry_point, chain_id);
@@ -157,8 +195,8 @@ impl MemoryMempool {
 
         Ok(Self {
             user_operations: Default::default(),
-            user_operations_by_entry_point,
-            user_operations_by_sender,
+            user_operations_by_entry_point: Arc::new(RwLock::new(user_operations_by_entry_point)),
+            user_operations_by_sender: Arc::new(RwLock::new(user_operations_by_sender)),
         })
     }
 }

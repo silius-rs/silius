@@ -20,7 +20,7 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 Create wallet for bundler:
 
 ```bash
-cargo run --bin create-wallet -- --output-path ${HOME}/.aa-bundler
+cargo run --bin create-wallet -- --output-path ${HOME}/.aa-bundler --chain-id 5
 ```
 
 Run bundler (with user operation pool and JSON-RPC API): 

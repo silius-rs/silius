@@ -62,7 +62,7 @@ fn main() -> Result<()> {
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
 
-                let wallet = Wallet::from_file(opt.mnemonic_file);
+                let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id);
                 info!("{:?}", wallet.signer);
 
                 let _bundler = Bundler::new(wallet);
