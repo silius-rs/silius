@@ -129,7 +129,7 @@ impl Mempool for MemoryMempool {
 
 impl MemoryMempool {
     pub fn new(entry_points: Vec<Address>, chain_id: U256) -> anyhow::Result<Self> {
-        if entry_points.len() < 1 {
+        if entry_points.is_empty() {
             return Err(anyhow::anyhow!("At least 1 entry point is required"));
         }
 

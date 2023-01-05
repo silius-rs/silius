@@ -10,8 +10,9 @@ use async_trait::async_trait;
 use clap::Parser;
 use educe::Educe;
 use ethers::{
+    abi::AbiEncode,
     types::{Address, H256, U256},
-    utils::keccak256, abi::AbiEncode,
+    utils::keccak256,
 };
 use jsonrpsee::tracing::info;
 use std::{fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
@@ -35,7 +36,11 @@ pub trait Mempool: Debug + Send + Sync + 'static {
     ) -> anyhow::Result<()>;
     fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
     fn all(&self) -> anyhow::Result<Vec<UserOperation>>;
-    fn all_by_entry_point(&self, entry_point: Address, chain_id: U256) -> anyhow::Result<Vec<UserOperation>>;
+    fn all_by_entry_point(
+        &self,
+        entry_point: Address,
+        chain_id: U256,
+    ) -> anyhow::Result<Vec<UserOperation>>;
     fn all_by_sender(
         &self,
         sender: Address,

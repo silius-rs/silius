@@ -68,7 +68,8 @@ fn main() -> Result<()> {
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
-                    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points, opt.chain_id).await?;
+                    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points, opt.chain_id)
+                        .await?;
                 }
 
                 if !opt.no_rpc {
