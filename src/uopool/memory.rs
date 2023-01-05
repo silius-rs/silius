@@ -23,8 +23,19 @@ impl Mempool for MemoryMempool {
     ) -> anyhow::Result<()> {
         let hash = user_operation.hash(entry_point, chain_id);
         if self.user_operations.contains_key(&hash) {
-            // TODO: implement replace user operation
-            return Err(anyhow::anyhow!("User operation already exists"));
+            let user_operation_old = self.user_operations.get(&hash).unwrap();
+            let max_priority_fee_per_gas_diff = user_operation.max_priority_fee_per_gas
+                - user_operation_old.max_priority_fee_per_gas;
+            let max_fee_per_gas_diff =
+                user_operation.max_fee_per_gas - user_operation_old.max_fee_per_gas;
+            if !(user_operation.sender == user_operation_old.sender
+                && user_operation.nonce == user_operation_old.nonce
+                && user_operation.max_priority_fee_per_gas
+                    > user_operation_old.max_priority_fee_per_gas
+                && max_priority_fee_per_gas_diff == max_fee_per_gas_diff)
+            {
+                return Err(anyhow::anyhow!("User operation already exists"));
+            }
         }
 
         let id = MemoryMempool::id(entry_point, chain_id);
