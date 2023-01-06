@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use educe::Educe;
 use ethers::types::{Address, U256};
 use parking_lot::RwLock;
@@ -22,8 +23,9 @@ pub struct MemoryMempool {
 
 impl MempoolIdGenerator for MemoryMempool {}
 
+#[async_trait]
 impl Mempool for MemoryMempool {
-    fn add(
+    async fn add(
         &mut self,
         user_operation: UserOperation,
         entry_point: Address,
@@ -69,7 +71,7 @@ impl Mempool for MemoryMempool {
         Ok(hash)
     }
 
-    fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation> {
+    async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation> {
         if !self
             .user_operations
             .read()
@@ -85,11 +87,11 @@ impl Mempool for MemoryMempool {
             .clone())
     }
 
-    fn get_all(&self) -> anyhow::Result<Vec<UserOperation>> {
+    async fn get_all(&self) -> anyhow::Result<Vec<UserOperation>> {
         Ok(self.user_operations.read().values().cloned().collect())
     }
 
-    fn get_all_by_entry_point(
+    async fn get_all_by_entry_point(
         &self,
         entry_point: Address,
         chain_id: U256,
@@ -105,7 +107,7 @@ impl Mempool for MemoryMempool {
             .collect())
     }
 
-    fn get_all_by_sender(
+    async fn get_all_by_sender(
         &self,
         sender: Address,
         entry_point: Address,
@@ -124,7 +126,7 @@ impl Mempool for MemoryMempool {
             .collect())
     }
 
-    fn remove(
+    async fn remove(
         &mut self,
         user_operation_hash: UserOperationHash,
         entry_point: Address,
@@ -179,7 +181,7 @@ impl Mempool for MemoryMempool {
         Ok(())
     }
 
-    fn clear(&mut self) -> anyhow::Result<()> {
+    async fn clear(&mut self) -> anyhow::Result<()> {
         let mut user_operations = self.user_operations.write();
         let mut user_operations_by_entry_point = self.user_operations_by_entry_point.write();
         let mut user_operations_by_sender = self.user_operations_by_sender.write();
@@ -224,8 +226,8 @@ impl MemoryMempool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn memory_mempool() {
+    #[tokio::test]
+    async fn memory_mempool() {
         let entry_points = vec![Address::random(), Address::random()];
         let chain_id = U256::from(5);
         let senders = vec![Address::random(), Address::random(), Address::random()];
@@ -242,9 +244,13 @@ mod tests {
             };
             user_operation_hash = mempool
                 .add(user_operation.clone(), entry_points[0], chain_id)
+                .await
                 .unwrap();
 
-            assert_eq!(mempool.get(user_operation_hash).unwrap(), user_operation);
+            assert_eq!(
+                mempool.get(user_operation_hash).await.unwrap(),
+                user_operation
+            );
 
             user_operation = UserOperation {
                 sender: senders[0],
@@ -254,9 +260,13 @@ mod tests {
 
             user_operation_hash = mempool
                 .add(user_operation.clone(), entry_points[1], chain_id)
+                .await
                 .unwrap();
 
-            assert_eq!(mempool.get(user_operation_hash).unwrap(), user_operation);
+            assert_eq!(
+                mempool.get(user_operation_hash).await.unwrap(),
+                user_operation
+            );
         }
 
         for i in 0..3 {
@@ -268,15 +278,20 @@ mod tests {
 
             user_operation_hash = mempool
                 .add(user_operation.clone(), entry_points[1], chain_id)
+                .await
                 .unwrap();
 
-            assert_eq!(mempool.get(user_operation_hash).unwrap(), user_operation);
+            assert_eq!(
+                mempool.get(user_operation_hash).await.unwrap(),
+                user_operation
+            );
         }
 
-        assert_eq!(mempool.get_all().unwrap().len(), 7);
+        assert_eq!(mempool.get_all().await.unwrap().len(), 7);
         assert_eq!(
             mempool
                 .get_all_by_entry_point(entry_points[0], chain_id)
+                .await
                 .unwrap()
                 .len(),
             2
@@ -284,6 +299,7 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_entry_point(entry_points[1], chain_id)
+                .await
                 .unwrap()
                 .len(),
             5
@@ -291,6 +307,7 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_sender(senders[0], entry_points[0], chain_id)
+                .await
                 .unwrap()
                 .len(),
             2
@@ -298,6 +315,7 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_sender(senders[0], entry_points[1], chain_id)
+                .await
                 .unwrap()
                 .len(),
             2
@@ -305,6 +323,7 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_sender(senders[1], entry_points[0], chain_id)
+                .await
                 .unwrap()
                 .len(),
             0
@@ -312,6 +331,7 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_sender(senders[1], entry_points[1], chain_id)
+                .await
                 .unwrap()
                 .len(),
             3
@@ -320,14 +340,16 @@ mod tests {
         assert_eq!(
             mempool
                 .remove(user_operation_hash, entry_points[1], chain_id)
+                .await
                 .unwrap(),
             ()
         );
 
-        assert_eq!(mempool.get_all().unwrap().len(), 6);
+        assert_eq!(mempool.get_all().await.unwrap().len(), 6);
         assert_eq!(
             mempool
                 .get_all_by_entry_point(entry_points[1], chain_id)
+                .await
                 .unwrap()
                 .len(),
             4
@@ -335,6 +357,7 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_sender(senders[0], entry_points[1], chain_id)
+                .await
                 .unwrap()
                 .len(),
             2
@@ -342,13 +365,14 @@ mod tests {
         assert_eq!(
             mempool
                 .get_all_by_sender(senders[1], entry_points[1], chain_id)
+                .await
                 .unwrap()
                 .len(),
             2
         );
 
-        mempool.clear().unwrap();
+        mempool.clear().await.unwrap();
 
-        assert_eq!(mempool.get_all().unwrap().len(), 0);
+        assert_eq!(mempool.get_all().await.unwrap().len(), 0);
     }
 }

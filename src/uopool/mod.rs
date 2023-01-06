@@ -31,32 +31,32 @@ pub trait MempoolIdGenerator {
 
 #[async_trait]
 pub trait Mempool: Debug + Send + Sync + 'static {
-    fn add(
+    async fn add(
         &mut self,
         user_operation: UserOperation,
         entry_point: Address,
         chain_id: U256,
     ) -> anyhow::Result<UserOperationHash>;
-    fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
-    fn get_all(&self) -> anyhow::Result<Vec<UserOperation>>;
-    fn get_all_by_entry_point(
+    async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
+    async fn get_all(&self) -> anyhow::Result<Vec<UserOperation>>;
+    async fn get_all_by_entry_point(
         &self,
         entry_point: Address,
         chain_id: U256,
     ) -> anyhow::Result<Vec<UserOperation>>;
-    fn get_all_by_sender(
+    async fn get_all_by_sender(
         &self,
         sender: Address,
         entry_point: Address,
         chain_id: U256,
     ) -> anyhow::Result<Vec<UserOperation>>;
-    fn remove(
+    async fn remove(
         &mut self,
         user_operation_hash: UserOperationHash,
         entry_point: Address,
         chain_id: U256,
     ) -> anyhow::Result<()>;
-    fn clear(&mut self) -> anyhow::Result<()>;
+    async fn clear(&mut self) -> anyhow::Result<()>;
 }
 
 #[derive(Educe)]
