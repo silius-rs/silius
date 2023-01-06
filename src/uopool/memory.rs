@@ -60,7 +60,7 @@ impl Mempool for MemoryMempool {
             .get_mut(&id)
             .unwrap()
             .entry(user_operation.sender)
-            .or_insert(Default::default())
+            .or_insert_with(Default::default)
             .insert(hash);
         user_operations.insert(hash, user_operation);
 
