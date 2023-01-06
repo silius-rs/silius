@@ -63,7 +63,7 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
         let mut mempools = HashMap::<MempoolId, Box<dyn Mempool>>::new();
         for entry_point in entry_points {
             let id = mempool_id(entry_point, chain_id);
-            mempools.insert(id, Box::new(MemoryMempool::default()));
+            mempools.insert(id, Box::<MemoryMempool>::default());
         }
 
         let svc = UoPoolServer::new(UoPoolService::new(Arc::new(RwLock::new(mempools))));
