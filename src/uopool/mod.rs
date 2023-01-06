@@ -33,15 +33,15 @@ pub trait Mempool: Debug + Send + Sync + 'static {
         user_operation: UserOperation,
         entry_point: Address,
         chain_id: U256,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<UserOperationHash>;
     fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
-    fn all(&self) -> anyhow::Result<Vec<UserOperation>>;
-    fn all_by_entry_point(
+    fn get_all(&self) -> anyhow::Result<Vec<UserOperation>>;
+    fn get_all_by_entry_point(
         &self,
         entry_point: Address,
         chain_id: U256,
     ) -> anyhow::Result<Vec<UserOperation>>;
-    fn all_by_sender(
+    fn get_all_by_sender(
         &self,
         sender: Address,
         entry_point: Address,

@@ -41,7 +41,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bundle_opt() {
+    fn bundler_opts() {
         let args = vec![
             "bundleropts",
             "--beneficiary",

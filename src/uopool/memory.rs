@@ -26,7 +26,7 @@ impl Mempool for MemoryMempool {
         user_operation: UserOperation,
         entry_point: Address,
         chain_id: U256,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<UserOperationHash> {
         let hash = user_operation.hash(entry_point, chain_id);
 
         // replace user operation
@@ -59,12 +59,12 @@ impl Mempool for MemoryMempool {
         user_operations_by_sender
             .get_mut(&id)
             .unwrap()
-            .get_mut(&user_operation.sender)
-            .unwrap_or(&mut Default::default())
+            .entry(user_operation.sender)
+            .or_insert(Default::default())
             .insert(hash);
         user_operations.insert(hash, user_operation);
 
-        Ok(())
+        Ok(hash)
     }
 
     fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation> {
@@ -83,11 +83,11 @@ impl Mempool for MemoryMempool {
             .clone())
     }
 
-    fn all(&self) -> anyhow::Result<Vec<UserOperation>> {
+    fn get_all(&self) -> anyhow::Result<Vec<UserOperation>> {
         Ok(self.user_operations.read().values().cloned().collect())
     }
 
-    fn all_by_entry_point(
+    fn get_all_by_entry_point(
         &self,
         entry_point: Address,
         chain_id: U256,
@@ -103,7 +103,7 @@ impl Mempool for MemoryMempool {
             .collect())
     }
 
-    fn all_by_sender(
+    fn get_all_by_sender(
         &self,
         sender: Address,
         entry_point: Address,
@@ -136,10 +136,14 @@ impl Mempool for MemoryMempool {
             return Err(anyhow::anyhow!("User operation not found"));
         }
 
-        let user_operations = self.user_operations.read();
+        let id: MempoolId;
+        let user_operation: UserOperation;
 
-        let user_operation = user_operations.get(&user_operation_hash).unwrap();
-        let id = MemoryMempool::id(entry_point, chain_id);
+        {
+            let user_operations = self.user_operations.read();
+            user_operation = user_operations.get(&user_operation_hash).unwrap().clone();
+            id = MemoryMempool::id(entry_point, chain_id);
+        }
 
         let mut user_operations = self.user_operations.write();
         let mut user_operations_by_entry_point = self.user_operations_by_entry_point.write();
@@ -201,4 +205,135 @@ impl MemoryMempool {
     }
 }
 
-// tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn memory_mempool() {
+        let entry_points = vec![Address::random(), Address::random()];
+        let chain_id = U256::from(5);
+        let senders = vec![Address::random(), Address::random(), Address::random()];
+
+        let mut mempool = MemoryMempool::new(entry_points.clone(), chain_id).unwrap();
+        let mut user_operation: UserOperation;
+        let mut user_operation_hash: UserOperationHash = Default::default();
+
+        for i in 0..2 {
+            user_operation = UserOperation {
+                sender: senders[0],
+                nonce: U256::from(i),
+                ..UserOperation::random()
+            };
+            user_operation_hash = mempool
+                .add(user_operation.clone(), entry_points[0], chain_id)
+                .unwrap();
+
+            assert_eq!(mempool.get(user_operation_hash).unwrap(), user_operation);
+
+            user_operation = UserOperation {
+                sender: senders[0],
+                nonce: U256::from(i),
+                ..UserOperation::random()
+            };
+
+            user_operation_hash = mempool
+                .add(user_operation.clone(), entry_points[1], chain_id)
+                .unwrap();
+
+            assert_eq!(mempool.get(user_operation_hash).unwrap(), user_operation);
+        }
+
+        for i in 0..3 {
+            user_operation = UserOperation {
+                sender: senders[1],
+                nonce: U256::from(i),
+                ..UserOperation::random()
+            };
+
+            user_operation_hash = mempool
+                .add(user_operation.clone(), entry_points[1], chain_id)
+                .unwrap();
+
+            assert_eq!(mempool.get(user_operation_hash).unwrap(), user_operation);
+        }
+
+        assert_eq!(mempool.get_all().unwrap().len(), 7);
+        assert_eq!(
+            mempool
+                .get_all_by_entry_point(entry_points[0], chain_id)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_entry_point(entry_points[1], chain_id)
+                .unwrap()
+                .len(),
+            5
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_sender(senders[0], entry_points[0], chain_id)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_sender(senders[0], entry_points[1], chain_id)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_sender(senders[1], entry_points[0], chain_id)
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_sender(senders[1], entry_points[1], chain_id)
+                .unwrap()
+                .len(),
+            3
+        );
+
+        assert_eq!(
+            mempool
+                .remove(user_operation_hash, entry_points[1], chain_id)
+                .unwrap(),
+            ()
+        );
+
+        assert_eq!(mempool.get_all().unwrap().len(), 6);
+        assert_eq!(
+            mempool
+                .get_all_by_entry_point(entry_points[1], chain_id)
+                .unwrap()
+                .len(),
+            4
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_sender(senders[0], entry_points[1], chain_id)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            mempool
+                .get_all_by_sender(senders[1], entry_points[1], chain_id)
+                .unwrap()
+                .len(),
+            2
+        );
+
+        mempool.clear().unwrap();
+
+        assert_eq!(mempool.get_all().unwrap().len(), 0);
+    }
+}
