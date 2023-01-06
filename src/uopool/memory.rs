@@ -8,7 +8,7 @@ use std::{
 
 use crate::types::user_operation::{UserOperation, UserOperationHash};
 
-use super::{Mempool, MempoolId};
+use super::{Mempool, MempoolId, MempoolIdGenerator};
 
 pub type UserOperationsBySender = HashMap<Address, HashSet<UserOperationHash>>;
 
@@ -19,6 +19,8 @@ pub struct MemoryMempool {
     user_operations_by_entry_point: Arc<RwLock<HashMap<MempoolId, HashSet<UserOperationHash>>>>, // mempool_id -> user_operations
     user_operations_by_sender: Arc<RwLock<HashMap<MempoolId, UserOperationsBySender>>>, // mempool_id -> sender -> user_operations
 }
+
+impl MempoolIdGenerator for MemoryMempool {}
 
 impl Mempool for MemoryMempool {
     fn add(

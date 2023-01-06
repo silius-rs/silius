@@ -23,11 +23,14 @@ pub mod services;
 
 pub type MempoolId = H256;
 
-#[async_trait]
-pub trait Mempool: Debug + Send + Sync + 'static {
+pub trait MempoolIdGenerator {
     fn id(entry_point: Address, chain_id: U256) -> MempoolId {
         H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
     }
+}
+
+#[async_trait]
+pub trait Mempool: Debug + Send + Sync + 'static {
     fn add(
         &mut self,
         user_operation: UserOperation,
@@ -58,7 +61,7 @@ pub trait Mempool: Debug + Send + Sync + 'static {
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct UserOperationPool<M: Mempool> {
+pub struct UserOperationPool<M: MempoolIdGenerator + Mempool> {
     pub pool: Arc<M>,
 }
 
