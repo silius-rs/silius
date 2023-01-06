@@ -161,6 +161,19 @@ impl Mempool for MemoryMempool {
             .remove(&user_operation_hash);
         user_operations.remove(&user_operation_hash);
 
+        if user_operations_by_sender
+            .get(&id)
+            .unwrap()
+            .get(&user_operation.sender)
+            .unwrap()
+            .is_empty()
+        {
+            user_operations_by_sender
+                .get_mut(&id)
+                .unwrap()
+                .remove(&user_operation.sender);
+        }
+
         Ok(())
     }
 
