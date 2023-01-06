@@ -1,27 +1,30 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::uopool::{
     server::uopool_server::{
         uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
         RemoveResponse,
     },
-    Mempool, MempoolIdGenerator,
+    Mempool, MempoolId,
 };
 use async_trait::async_trait;
+use parking_lot::RwLock;
 use tonic::Response;
 
-pub struct UoPoolService<M: MempoolIdGenerator + Mempool> {
-    _pool: Arc<M>,
+pub struct UoPoolService {
+    _mempools: Arc<RwLock<HashMap<MempoolId, Box<dyn Mempool>>>>,
 }
 
-impl<M: MempoolIdGenerator + Mempool> UoPoolService<M> {
-    pub fn new(pool: Arc<M>) -> Self {
-        Self { _pool: pool }
+impl UoPoolService {
+    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, Box<dyn Mempool>>>>) -> Self {
+        Self {
+            _mempools: mempools,
+        }
     }
 }
 
 #[async_trait]
-impl<M: MempoolIdGenerator + Mempool> UoPool for UoPoolService<M> {
+impl UoPool for UoPoolService {
     async fn add(
         &self,
         _request: tonic::Request<AddRequest>,

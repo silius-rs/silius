@@ -36,9 +36,8 @@ impl Bundler {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn bundler_opts() {
