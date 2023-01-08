@@ -20,6 +20,8 @@ pub struct MemoryMempool {
 
 #[async_trait]
 impl Mempool for MemoryMempool {
+    type UserOperations = Vec<UserOperation>;
+
     async fn add(
         &mut self,
         user_operation: UserOperation,
@@ -48,11 +50,11 @@ impl Mempool for MemoryMempool {
         }
     }
 
-    async fn get_all(&self) -> anyhow::Result<Vec<UserOperation>> {
+    async fn get_all(&self) -> anyhow::Result<Self::UserOperations> {
         Ok(self.user_operations.read().values().cloned().collect())
     }
 
-    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Vec<UserOperation>> {
+    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations> {
         let user_operations = self.user_operations.read();
 
         if let Some(user_operations_by_sender) = self.user_operations_by_sender.read().get(&sender)

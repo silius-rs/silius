@@ -1,22 +1,25 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::uopool::{
-    server::uopool_server::{
-        uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
-        RemoveResponse,
+use crate::{
+    types::user_operation::UserOperation,
+    uopool::{
+        server::uopool_server::{
+            uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse,
+            RemoveRequest, RemoveResponse,
+        },
+        MempoolBox, MempoolId,
     },
-    Mempool, MempoolId,
 };
 use async_trait::async_trait;
 use parking_lot::RwLock;
 use tonic::Response;
 
 pub struct UoPoolService {
-    _mempools: Arc<RwLock<HashMap<MempoolId, Box<dyn Mempool>>>>,
+    _mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
 }
 
 impl UoPoolService {
-    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, Box<dyn Mempool>>>>) -> Self {
+    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>) -> Self {
         Self {
             _mempools: mempools,
         }

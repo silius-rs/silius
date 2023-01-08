@@ -75,6 +75,7 @@ impl UserOperation {
         )
     }
 
+    #[cfg(test)]
     pub fn random() -> Self {
         Self {
             sender: Address::random(),

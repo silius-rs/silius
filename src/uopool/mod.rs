@@ -28,8 +28,12 @@ pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
     H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
 }
 
+pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
+
 #[async_trait]
 pub trait Mempool: Debug + Send + Sync + 'static {
+    type UserOperations: IntoIterator<Item = UserOperation>;
+
     async fn add(
         &mut self,
         user_operation: UserOperation,
@@ -37,8 +41,8 @@ pub trait Mempool: Debug + Send + Sync + 'static {
         chain_id: U256,
     ) -> anyhow::Result<UserOperationHash>;
     async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
-    async fn get_all(&self) -> anyhow::Result<Vec<UserOperation>>;
-    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Vec<UserOperation>>;
+    async fn get_all(&self) -> anyhow::Result<Self::UserOperations>;
+    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations>;
     async fn remove(&mut self, user_operation_hash: UserOperationHash) -> anyhow::Result<()>;
     async fn clear(&mut self) -> anyhow::Result<()>;
 }
@@ -60,7 +64,7 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
-        let mut mempools = HashMap::<MempoolId, Box<dyn Mempool>>::new();
+        let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
         for entry_point in entry_points {
             let id = mempool_id(entry_point, chain_id);
             mempools.insert(id, Box::<MemoryMempool>::default());
