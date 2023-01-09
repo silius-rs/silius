@@ -36,12 +36,11 @@ impl Bundler {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::str::FromStr;
 
-    use super::*;
-
     #[test]
-    fn bundle_opt() {
+    fn bundler_opts() {
         let args = vec![
             "bundleropts",
             "--beneficiary",

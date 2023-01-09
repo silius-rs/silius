@@ -1,22 +1,28 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::uopool::{
-    server::uopool_server::{
-        uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse, RemoveRequest,
-        RemoveResponse,
+use crate::{
+    types::user_operation::UserOperation,
+    uopool::{
+        server::uopool_server::{
+            uo_pool_server::UoPool, AddRequest, AddResponse, AllRequest, AllResponse,
+            RemoveRequest, RemoveResponse,
+        },
+        MempoolBox, MempoolId,
     },
-    UserOperationPool,
 };
 use async_trait::async_trait;
+use parking_lot::RwLock;
 use tonic::Response;
 
 pub struct UoPoolService {
-    _uo_pool: Arc<UserOperationPool>,
+    _mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
 }
 
 impl UoPoolService {
-    pub fn new(uo_pool: Arc<UserOperationPool>) -> Self {
-        Self { _uo_pool: uo_pool }
+    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>) -> Self {
+        Self {
+            _mempools: mempools,
+        }
     }
 }
 
@@ -26,6 +32,9 @@ impl UoPool for UoPoolService {
         &self,
         _request: tonic::Request<AddRequest>,
     ) -> Result<Response<AddResponse>, tonic::Status> {
+        // let req = request.into_inner();
+        // TODO: sanity checks
+        // TODO: simulation
         Err(tonic::Status::unimplemented("todo"))
     }
 

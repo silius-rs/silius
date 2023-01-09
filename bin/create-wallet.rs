@@ -1,7 +1,8 @@
-use aa_bundler::models::wallet::Wallet;
+use aa_bundler::{models::wallet::Wallet, utils::parse_u256};
 use anyhow::Result;
 use clap::Parser;
 use dirs::home_dir;
+use ethers::types::U256;
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::tracing::info;
 use std::str::FromStr;
@@ -14,6 +15,9 @@ use std::str::FromStr;
 pub struct Opt {
     #[clap(long)]
     pub output_path: Option<ExpandedPathBuf>,
+
+    #[clap(long, value_parser=parse_u256, default_value="1")]
+    pub chain_id: U256,
 }
 
 fn main() -> Result<()> {
@@ -28,7 +32,7 @@ fn main() -> Result<()> {
             .unwrap()
     };
 
-    let wallet = Wallet::new(path);
+    let wallet = Wallet::new(path, opt.chain_id);
     info!("{:?}", wallet.signer);
 
     Ok(())

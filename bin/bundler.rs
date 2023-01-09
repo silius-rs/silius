@@ -2,11 +2,11 @@ use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
     rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
-    utils::parse_address,
+    utils::{parse_address, parse_u256},
 };
 use anyhow::Result;
 use clap::Parser;
-use ethers::types::Address;
+use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
 use std::{future::pending, net::SocketAddr, panic};
@@ -22,6 +22,9 @@ pub struct Opt {
 
     #[clap(long, value_delimiter=',', value_parser=parse_address)]
     pub entry_points: Vec<Address>,
+
+    #[clap(long, value_parser=parse_u256)]
+    pub chain_id: U256,
 
     #[clap(long)]
     pub no_uopool: bool,
@@ -59,13 +62,14 @@ fn main() -> Result<()> {
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
 
-                let wallet = Wallet::from_file(opt.mnemonic_file);
+                let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id);
                 info!("{:?}", wallet.signer);
 
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
-                    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points).await?;
+                    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points, opt.chain_id)
+                        .await?;
                 }
 
                 if !opt.no_rpc {
