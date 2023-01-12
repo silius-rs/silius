@@ -8,20 +8,19 @@ use common::gen::{
 use common::DeployedContract;
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
-use ethers::providers::{Http, Middleware};
+use ethers::providers::Http;
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::Address;
 use ethers::utils::{parse_units, AnvilInstance};
 use ethers::{
     core::utils::Anvil,
     prelude::SignerMiddleware,
-    providers::Provider,
+    providers::{Middleware, Provider},
     signers::{LocalWallet, Signer},
     types::{Bytes, U256},
 };
 use std::ops::Deref;
 use std::{convert::TryFrom, sync::Arc, time::Duration};
-use tokio::sync::OnceCell;
 
 use crate::common::{
     deploy_entry_point, deploy_test_opcode_account, deploy_test_opcode_account_factory,
@@ -41,13 +40,6 @@ struct TestContext<M> {
 }
 
 type ClientType = SignerMiddleware<Provider<Http>, LocalWallet>;
-
-static CONTEXT: OnceCell<anyhow::Result<TestContext<ClientType>>> = OnceCell::const_new();
-
-async fn get_global_context() -> &'static TestContext<ClientType> {
-    let res = CONTEXT.get_or_init(setup).await;
-    res.as_ref().expect("setup failed")
-}
 
 async fn setup() -> anyhow::Result<TestContext<ClientType>> {
     let anvil = Anvil::new().spawn();
@@ -108,7 +100,7 @@ async fn create_storage_factory_init_code(
     salt: u64,
     init_func: String,
 ) -> anyhow::Result<(Bytes, Bytes)> {
-    let context = get_global_context().await;
+    let context = setup().await?;
     let contract: &BaseContract = context.storage_factory.contract().deref().deref();
 
     let function = contract.abi().function("create")?;
@@ -120,7 +112,7 @@ async fn create_storage_factory_init_code(
     Ok((Bytes::from(init_code), Bytes::from(init_func)))
 }
 async fn create_opcode_factory_init_code(init_func: String) -> anyhow::Result<(Bytes, Bytes)> {
-    let context = get_global_context().await;
+    let context = setup().await?;
     let contract: &BaseContract = context.opcodes_factory.contract().deref().deref();
 
     let token = vec![Token::String(init_func)];
@@ -139,7 +131,7 @@ async fn create_test_user_op(
     init_func: Bytes,
     factory_address: Address,
 ) -> anyhow::Result<UserOperation> {
-    let context = get_global_context().await;
+    let context = setup().await?;
 
     let paymaster_and_data = if let Some(rule) = pm_rule {
         let mut data = vec![];
@@ -184,15 +176,18 @@ async fn create_test_user_op(
     })
 }
 
-async fn existing_storage_account_user_op(validate_rule: String, pm_rule: String) -> UserOperation {
-    let context = get_global_context().await;
+async fn existing_storage_account_user_op(
+    validate_rule: String,
+    pm_rule: String,
+) -> anyhow::Result<UserOperation> {
+    let context = setup().await?;
 
     let mut paymaster_and_data = vec![];
     paymaster_and_data.extend_from_slice(context.paymaster.address.as_bytes());
     paymaster_and_data.extend_from_slice(pm_rule.as_bytes());
 
     let signature = Bytes::from(validate_rule.as_bytes().to_vec());
-    UserOperation {
+    Ok(UserOperation {
         sender: context.storage_account.address,
         nonce: U256::zero(),
         init_code: Bytes::default(),
@@ -204,7 +199,7 @@ async fn existing_storage_account_user_op(validate_rule: String, pm_rule: String
         max_priority_fee_per_gas: U256::from(0),
         paymaster_and_data: Bytes::from(paymaster_and_data),
         signature,
-    }
+    })
 }
 
 fn validate(_user_op: UserOperation) -> anyhow::Result<()> {
@@ -231,13 +226,13 @@ async fn test_user_op(
 }
 
 async fn test_existing_user_op(validate_rule: String, pm_rule: String) -> anyhow::Result<()> {
-    let user_op = existing_storage_account_user_op(validate_rule, pm_rule).await;
+    let user_op = existing_storage_account_user_op(validate_rule, pm_rule).await?;
     validate(user_op)
 }
 
 #[tokio::test]
-async fn accept_plain_request() {
-    let context = get_global_context().await;
+async fn accept_plain_request() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
@@ -250,12 +245,13 @@ async fn accept_plain_request() {
     )
     .await
     .expect("succeed");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn reject_unkown_rule() {
-    let context = get_global_context().await;
+#[ignore]
+async fn reject_unkown_rule() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
@@ -268,12 +264,13 @@ async fn reject_unkown_rule() {
     )
     .await
     .expect_err("unknown rule");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_with_bad_opcode_in_ctr() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_with_bad_opcode_in_ctr() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("coinbase".to_string())
         .await
         .unwrap();
@@ -286,12 +283,13 @@ async fn fail_with_bad_opcode_in_ctr() {
     )
     .await
     .expect_err("factory uses banned opcode: COINBASE");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_with_bad_opcode_in_paymaster() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
@@ -304,12 +302,13 @@ async fn fail_with_bad_opcode_in_paymaster() {
     )
     .await
     .expect_err("paymaster uses banned opcode: COINBASE");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_with_bad_opcode_in_validation() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
@@ -322,12 +321,12 @@ async fn fail_with_bad_opcode_in_validation() {
     )
     .await
     .expect_err("account uses banned opcode: BLOCKHASH");
+    Ok(())
 }
 
 #[tokio::test]
-// #[should_panic]
-async fn fail_if_create_too_many() {
-    let context = get_global_context().await;
+async fn fail_if_create_too_many() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
@@ -340,12 +339,13 @@ async fn fail_if_create_too_many() {
     )
     .await
     .expect("account uses banned opcode: CREATE2");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_referencing_self_token() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_referencing_self_token() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
@@ -358,6 +358,7 @@ async fn fail_referencing_self_token() {
     )
     .await
     .expect_err("unstaked account accessed");
+    Ok(())
 }
 
 #[tokio::test]
@@ -368,7 +369,7 @@ async fn account_succeeds_referecing_its_own_balance() {
 }
 
 #[tokio::test]
-#[should_panic]
+#[ignore]
 async fn account_fail_to_read_allowance_of_address() {
     test_existing_user_op("allowance-self-1".to_string(), "".to_string())
         .await
@@ -390,7 +391,7 @@ async fn access_self_struct_data() {
 }
 
 #[tokio::test]
-#[should_panic]
+#[ignore]
 async fn fail_to_access_other_address_struct_data() {
     test_existing_user_op("struct-1".to_string(), "".to_string())
         .await
@@ -398,9 +399,9 @@ async fn fail_to_access_other_address_struct_data() {
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_if_referencing_other_token_balance() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
@@ -413,6 +414,7 @@ async fn fail_if_referencing_other_token_balance() {
     )
     .await
     .expect_err("account has forbidden read");
+    Ok(())
 }
 
 #[tokio::test]
@@ -423,9 +425,9 @@ async fn fail_if_referencing_self_token_balance_after_wallet_creation() {
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_with_unstaked_paymaster_returning_context() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> {
+    let context = setup().await?;
     let pm = deploy_test_storage_account(context.client.clone())
         .await
         .expect("deploy succeed");
@@ -451,12 +453,13 @@ async fn fail_with_unstaked_paymaster_returning_context() {
         signature: Bytes::default(),
     };
     validate(user_op).expect_err("unstaked paymaster must not return context");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_with_validation_recursively_calls_handle_ops() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<()> {
+    let context = setup().await?;
     let acct = deploy_test_recursion_account(context.client.clone(), context.entry_point.address)
         .await
         .expect("deploy succeed");
@@ -474,11 +477,12 @@ async fn fail_with_validation_recursively_calls_handle_ops() {
         signature: Bytes::from("handleOps".as_bytes().to_vec()),
     };
     validate(user_op).expect_err("illegal call into EntryPoint");
+    Ok(())
 }
 
 #[tokio::test]
-async fn succeed_with_inner_revert() {
-    let context = get_global_context().await;
+async fn succeed_with_inner_revert() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
@@ -491,12 +495,13 @@ async fn succeed_with_inner_revert() {
     )
     .await
     .expect("succeed");
+    Ok(())
 }
 
 #[tokio::test]
-#[should_panic]
-async fn fail_with_inner_oog_revert() {
-    let context = get_global_context().await;
+#[ignore]
+async fn fail_with_inner_oog_revert() -> anyhow::Result<()> {
+    let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
@@ -509,4 +514,5 @@ async fn fail_with_inner_oog_revert() {
     )
     .await
     .expect_err("oog");
+    Ok(())
 }

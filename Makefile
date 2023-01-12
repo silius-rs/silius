@@ -1,6 +1,6 @@
 build:
 	make fetch-thirdparty
-	cd thirdparty/account-abstraction && yarn install && cd ../..
+	cd thirdparty/account-abstraction && yarn install && yarn compile && cd ../..
 	cargo build
 
 run-bundler:
@@ -19,13 +19,14 @@ fetch-thirdparty:
 	git submodule update --init 
 
 test:	
-	cd thirdparty/bundler && yarn preprocess && cd ../..
+	cd thirdparty/bundler && yarn install && yarn preprocess && cd ../..
 	cargo test 
 
 format:
 	cargo fmt --all
 
 lint:
+	cd thirdparty/bundler && yarn install && yarn preprocess && cd ../..
 	cargo fmt --all -- --check
 	cargo clippy --tests -- -D warnings -A clippy::derive_partial_eq_without_eq
 
