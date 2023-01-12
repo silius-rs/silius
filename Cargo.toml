@@ -5,6 +5,7 @@ authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
 edition = "2021"
 description = "AA - Bundler implementation"
 default-run = "bundler"
+rust-version = "1.66.1"
 
 [dependencies]
 anyhow = "1"
