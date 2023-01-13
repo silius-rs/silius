@@ -1,7 +1,6 @@
 use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
-    parse_address, parse_u256,
     rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
     utils::{parse_address, parse_u256},
 };
@@ -33,11 +32,11 @@ pub struct Opt {
     #[clap(long)]
     pub no_uopool: bool,
 
-    #[clap(long, value_parser=parse_u256)]
-    pub max_verification_gas: U256,
-
     #[clap(flatten)]
     pub uopool_opts: aa_bundler::uopool::UoPoolOpts,
+
+    #[clap(long, value_parser=parse_u256)]
+    pub max_verification_gas: U256,
 
     #[clap(long)]
     pub no_rpc: bool,
@@ -79,9 +78,10 @@ fn main() -> Result<()> {
                 if !opt.no_uopool {
                     aa_bundler::uopool::run(
                         opt.uopool_opts,
+                        opt.entry_points,
                         eth_provider,
-                        opt.entry_point,
                         opt.max_verification_gas,
+                        opt.chain_id,
                     )
                     .await?;
                 }

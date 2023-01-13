@@ -1,6 +1,5 @@
-use std::{collections::HashMap, sync::Arc};
-
 use crate::{
+    contracts::EntryPoint,
     types::user_operation::UserOperation,
     uopool::{
         server::uopool_server::{
@@ -11,27 +10,34 @@ use crate::{
     },
 };
 use async_trait::async_trait;
+use ethers::{providers::Middleware, types::U256};
 use parking_lot::RwLock;
-use ethers::{
-    providers::Middleware,
-    types::{Address, U256},
-};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
 
 pub struct UoPoolService<M: Middleware> {
-    pub _mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+    pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+    pub entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
     pub eth_provider: Arc<M>,
-    pub entry_point: EntryPoint<M>,
     pub max_verification_gas: U256,
+    pub chain_id: U256,
 }
 
 impl<M: Middleware + 'static> UoPoolService<M> {
-    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+    pub fn new(
+        mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+        entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
         eth_provider: Arc<M>,
-        entry_point: Address,
-        max_verification_gas: U256,) -> Self {
-        Self { _uo_pool: uo_pool }
+        max_verification_gas: U256,
+        chain_id: U256,
+    ) -> Self {
+        Self {
+            mempools,
+            entry_points,
+            eth_provider,
+            max_verification_gas,
+            chain_id,
+        }
     }
 }
 

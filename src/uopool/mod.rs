@@ -1,4 +1,5 @@
 use crate::{
+    contracts::EntryPoint,
     types::user_operation::{UserOperation, UserOperationHash},
     uopool::{
         memory::MemoryMempool, server::uopool_server::uo_pool_server::UoPoolServer,
@@ -62,26 +63,32 @@ pub struct UoPoolOpts {
 }
 
 pub async fn run(
-    opts: UoPoolOpts, 
-    entry_points: Vec<Address>, 
-    chain_id: U256,
+    opts: UoPoolOpts,
+    entry_points: Vec<Address>,
     eth_provider: Arc<Provider<Http>>,
     max_verification_gas: U256,
+    chain_id: U256,
 ) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
         let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
+        let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         for entry_point in entry_points {
             let id = mempool_id(entry_point, chain_id);
             mempools.insert(id, Box::<MemoryMempool>::default());
+            entry_points_map.insert(
+                id,
+                EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
+            );
         }
 
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(RwLock::new(mempools)),
+            Arc::new(entry_points_map),
             eth_provider,
-            entry_point,
             max_verification_gas,
+            chain_id,
         ));
 
         info!(

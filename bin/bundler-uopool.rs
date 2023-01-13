@@ -8,7 +8,6 @@ use ethers::{
 use std::{future::pending, sync::Arc};
 
 #[derive(Parser)]
-#[derive(Parser)]
 #[clap(
     name = "aa-bundler-uopool",
     about = "User operation pool for EIP-4337 Account Abstraction Bundler"
@@ -17,15 +16,15 @@ pub struct Opt {
     #[clap(flatten)]
     pub uopool_opts: aa_bundler::uopool::UoPoolOpts,
 
-    #[clap(long, value_parser=parse_u256)]
-    pub max_verification_gas: U256,
+    #[clap(long, value_delimiter=',', value_parser=parse_address)]
+    pub entry_points: Vec<Address>,
 
     // execution client rpc endpoint
     #[clap(long, default_value = "127.0.0.1:8545")]
     pub eth_client_address: String,
 
-    #[clap(long, value_delimiter=',', value_parser=parse_address)]
-    pub entry_points: Vec<Address>,
+    #[clap(long, value_parser=parse_u256)]
+    pub max_verification_gas: U256,
 
     #[clap(long, value_parser=parse_u256)]
     pub chain_id: U256,
@@ -41,10 +40,11 @@ async fn main() -> Result<()> {
 
     aa_bundler::uopool::run(
         opt.uopool_opts,
-        eth_provider,
         opt.entry_points,
+        eth_provider,
         opt.max_verification_gas,
-        opt.chain_id)
+        opt.chain_id,
+    )
     .await?;
 
     pending().await

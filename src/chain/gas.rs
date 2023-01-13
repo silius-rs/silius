@@ -21,8 +21,8 @@ pub struct Overhead {
     pub sig_size: U256,
 }
 
-impl Overhead {
-    pub fn default() -> Self {
+impl Default for Overhead {
+    fn default() -> Self {
         Self {
             fixed: U256::from(21000),
             per_user_op: U256::from(18300),
@@ -33,7 +33,9 @@ impl Overhead {
             sig_size: U256::from(65),
         }
     }
+}
 
+impl Overhead {
     pub fn calculate_pre_verification_gas(&self, user_operation: &UserOperation) -> U256 {
         let user_operation_packed = user_operation.pack();
         let call_data_cost: U256 = U256::from(
