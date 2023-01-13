@@ -109,6 +109,7 @@ mod tests {
     use super::*;
     use ethers::types::{H256, U256};
 
+    #[allow(clippy::unit_cmp)]
     #[tokio::test]
     async fn memory_mempool() {
         let entry_point = Address::random();
