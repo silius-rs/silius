@@ -19,6 +19,10 @@ jobs:
       - name: Setup third party dependencies
         run: |
           make fetch-thirdparty
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
       - name: Install solc
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum

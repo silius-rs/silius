@@ -1,4 +1,6 @@
 build:
+	make fetch-thirdparty
+	cd thirdparty/account-abstraction && yarn install && yarn compile && cd ../..
 	cargo build
 
 run-bundler:
@@ -14,14 +16,21 @@ run-create-wallet:
 	cargo run --bin create-wallet -- --output-path ${HOME}/.aa-bundler
 
 fetch-thirdparty:
-	git submodule update --init
+	git submodule update --init 
 
-test:
+test:	
+	cd thirdparty/bundler && yarn install && yarn preprocess && cd ../..
 	cargo test 
 
 format:
 	cargo fmt --all
 
 lint:
+	cd thirdparty/bundler && yarn install && yarn preprocess && cd ../..
 	cargo fmt --all -- --check
-	cargo clippy -- -D warnings -A clippy::derive_partial_eq_without_eq
+	cargo clippy --tests -- -D warnings -A clippy::derive_partial_eq_without_eq
+
+clean:
+	cd thirdparty/account-abstraction && yarn clean && cd ../..
+	cd thirdparty/bundler && yarn clear && cd ../..
+	cargo clean
