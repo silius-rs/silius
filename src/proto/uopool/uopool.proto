@@ -6,6 +6,8 @@ package uopool;
 
 message AddRequest {
     types.UserOperation uo = 1;
+    types.H160 ep = 2;
+    uint64 cid = 3;
 }
 
 enum AddResult {

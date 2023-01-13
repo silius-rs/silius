@@ -3,6 +3,7 @@ use aa_bundler::{
     models::wallet::Wallet,
     parse_address, parse_u256,
     rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+    utils::{parse_address, parse_u256},
 };
 use anyhow::Result;
 use clap::Parser;
@@ -23,8 +24,11 @@ pub struct Opt {
     #[clap(long)]
     pub mnemonic_file: ExpandedPathBuf,
 
-    #[clap(long, value_parser=parse_address)]
-    pub entry_point: Address,
+    #[clap(long, value_delimiter=',', value_parser=parse_address)]
+    pub entry_points: Vec<Address>,
+
+    #[clap(long, value_parser=parse_u256)]
+    pub chain_id: U256,
 
     #[clap(long)]
     pub no_uopool: bool,
@@ -65,7 +69,7 @@ fn main() -> Result<()> {
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
 
-                let wallet = Wallet::from_file(opt.mnemonic_file);
+                let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id);
                 info!("{:?}", wallet.signer);
 
                 let eth_provider = Arc::new(Provider::<Http>::try_from(opt.eth_client_address)?);

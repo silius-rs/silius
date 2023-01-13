@@ -1,9 +1,10 @@
-use std::str::FromStr;
-
 use clap::Parser;
 use ethers::types::{Address, U256};
 
-use crate::models::wallet::Wallet;
+use crate::{
+    models::wallet::Wallet,
+    utils::{parse_address, parse_u256},
+};
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerOpts {
@@ -21,14 +22,6 @@ pub struct BundlerOpts {
 
     #[clap(long, default_value = "127.0.0.1:3000")]
     pub bundler_grpc_listen_address: String,
-}
-
-fn parse_address(s: &str) -> Result<Address, String> {
-    Address::from_str(s).map_err(|_| format!("Adress {} is not a valid address", s))
-}
-
-fn parse_u256(s: &str) -> Result<U256, String> {
-    U256::from_str_radix(s, 10).map_err(|_| format!("{} is not a valid U256", s))
 }
 
 pub struct Bundler {

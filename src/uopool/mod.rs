@@ -1,39 +1,57 @@
 use crate::{
     types::user_operation::{UserOperation, UserOperationHash},
-    uopool::{server::uopool_server::uo_pool_server::UoPoolServer, services::UoPoolService},
+    uopool::{
+        memory::MemoryMempool, server::uopool_server::uo_pool_server::UoPoolServer,
+        services::UoPoolService,
+    },
 };
 use anyhow::Result;
+use async_trait::async_trait;
 use clap::Parser;
 use educe::Educe;
 use ethers::{
+    abi::AbiEncode,
     providers::{Http, Provider},
-    types::{Address, U256},
+    types::{Address, H256, U256},
+    utils::keccak256,
 };
 use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
+pub mod memory;
 pub mod server;
 pub mod services;
 
+pub type MempoolId = H256;
+
+pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
+    H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
+}
+
+pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
+
+#[async_trait]
+pub trait Mempool: Debug + Send + Sync + 'static {
+    type UserOperations: IntoIterator<Item = UserOperation>;
+
+    async fn add(
+        &mut self,
+        user_operation: UserOperation,
+        entry_point: Address,
+        chain_id: U256,
+    ) -> anyhow::Result<UserOperationHash>;
+    async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
+    async fn get_all(&self) -> anyhow::Result<Self::UserOperations>;
+    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations>;
+    async fn remove(&mut self, user_operation_hash: UserOperationHash) -> anyhow::Result<()>;
+    async fn clear(&mut self) -> anyhow::Result<()>;
+}
+
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct UserOperationPool {
-    pub pool: Arc<RwLock<HashMap<UserOperationHash, UserOperation>>>,
-}
-
-impl UserOperationPool {
-    pub fn new() -> Self {
-        Self {
-            pool: Default::default(),
-        }
-    }
-}
-
-impl Default for UserOperationPool {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct UserOperationPool<M: Mempool> {
+    pub pool: Arc<M>,
 }
 
 #[derive(Educe, Parser)]
@@ -44,15 +62,23 @@ pub struct UoPoolOpts {
 }
 
 pub async fn run(
-    opts: UoPoolOpts,
+    opts: UoPoolOpts, 
+    entry_points: Vec<Address>, 
+    chain_id: U256,
     eth_provider: Arc<Provider<Http>>,
-    entry_point: Address,
     max_verification_gas: U256,
 ) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
+
+        let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
+        for entry_point in entry_points {
+            let id = mempool_id(entry_point, chain_id);
+            mempools.insert(id, Box::<MemoryMempool>::default());
+        }
+
         let svc = UoPoolServer::new(UoPoolService::new(
-            Arc::new(UserOperationPool::new()),
+            Arc::new(RwLock::new(mempools)),
             eth_provider,
             entry_point,
             max_verification_gas,

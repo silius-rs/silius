@@ -74,6 +74,23 @@ impl UserOperation {
             .as_slice(),
         )
     }
+
+    #[cfg(test)]
+    pub fn random() -> Self {
+        Self {
+            sender: Address::random(),
+            nonce: U256::zero(),
+            init_code: Bytes::default(),
+            call_data: Bytes::default(),
+            call_gas_limit: U256::zero(),
+            verification_gas_limit: U256::from(100000),
+            pre_verification_gas: U256::from(21000),
+            max_fee_per_gas: U256::from(0),
+            max_priority_fee_per_gas: U256::from(1e9 as u64),
+            paymaster_and_data: Bytes::default(),
+            signature: Bytes::default(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
