@@ -78,7 +78,7 @@ mod tests {
             call_gas_limit: U256::from(21900),
             verification_gas_limit: U256::from(1218343),
             pre_verification_gas: U256::from(50780),
-            max_fee_per_gas: U256::from(10064120791 as u64),
+            max_fee_per_gas: U256::from(10064120791_u64),
             max_priority_fee_per_gas: U256::from(1620899097),
             paymaster_and_data: Bytes::default(),
             signature: Bytes::from_str("0x4e69eb5e02d47ba28878655d61c59c20c3e9a2e6905381305626f6a5a2892ec12bd8dd59179f0642731e0e853af54a71ce422a1a234548c9dd1c559bd07df4461c").unwrap(),

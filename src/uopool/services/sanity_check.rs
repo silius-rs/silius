@@ -217,34 +217,28 @@ mod tests {
             call_gas_limit: U256::from(21900),
             verification_gas_limit: U256::from(1218343),
             pre_verification_gas: U256::from(50768),
-            max_fee_per_gas: U256::from(3501638950 as u64),
-            max_priority_fee_per_gas: U256::from(2551157264 as u64),
+            max_fee_per_gas: U256::from(3501638950_u64),
+            max_priority_fee_per_gas: U256::from(2551157264_u64),
             paymaster_and_data: Bytes::default(),
             signature: Bytes::from_str("0xb5a4efa90d560f95b508e6b0e7c2dc17a7e86928af551175fe2d9f6a1bd79a604e8a83a391d25c4b3dce56a0a1549c5f40d1a08c3f4b80982556efa768eca7f81c").unwrap(),
         };
 
-        assert_eq!(
-            uo_pool_service
-                .validate_user_operation(&user_operation_valid)
-                .await
-                .unwrap(),
-            ()
-        );
+        assert!(uo_pool_service
+            .validate_user_operation(&user_operation_valid)
+            .await
+            .is_ok());
 
         // sender_or_init_code
-        assert_eq!(
-            uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    sender: "0x6a98c1B9FD763eB693f40C407DC85106eBD74352"
-                        .parse()
-                        .unwrap(),
-                    init_code: Bytes::default(),
-                    ..user_operation_valid.clone()
-                })
-                .await
-                .unwrap(),
-            ()
-        );
+        assert!(uo_pool_service
+            .validate_user_operation(&UserOperation {
+                sender: "0x6a98c1B9FD763eB693f40C407DC85106eBD74352"
+                    .parse()
+                    .unwrap(),
+                init_code: Bytes::default(),
+                ..user_operation_valid.clone()
+            })
+            .await
+            .is_ok());
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -319,7 +313,7 @@ mod tests {
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
-                    max_fee_per_gas: U256::from(1001638950 as u64),
+                    max_fee_per_gas: U256::from(1001638950_u64),
                     ..user_operation_valid.clone()
                 })
                 .await
@@ -331,7 +325,7 @@ mod tests {
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
-                    max_priority_fee_per_gas: U256::from(5501638950 as u64),
+                    max_priority_fee_per_gas: U256::from(5501638950_u64),
                     ..user_operation_valid.clone()
                 })
                 .await
