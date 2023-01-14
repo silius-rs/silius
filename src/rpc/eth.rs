@@ -77,9 +77,9 @@ impl EthApiServer for EthApiServerImpl {
                 )))
             })
             .and_then(|error_object| {
-                return Err(jsonrpsee::core::Error::Call(CallError::Custom(
+                Err(jsonrpsee::core::Error::Call(CallError::Custom(
                     error_object,
-                )));
+                )))
             })
     }
 

@@ -88,7 +88,7 @@ pub mod types {
             }
         }
     }
-    
+
     impl From<UserOperation> for crate::types::user_operation::UserOperation {
         fn from(user_operation: UserOperation) -> Self {
             Self {
