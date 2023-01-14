@@ -1,14 +1,8 @@
 use ethers::types::{Address, U256, U64};
-use jsonrpsee::{core::RpcResult, proc_macros::rpc, types::ErrorObject};
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 
 use crate::types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt};
-
-#[derive(Serialize, Deserialize)]
-pub enum SendUserOperationResponse {
-    Success(UserOperationHash),
-    Failure(ErrorObject<'static>),
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct EstimateUserOperationGasResponse {
@@ -28,7 +22,7 @@ pub trait EthApi {
         &self,
         user_operation: UserOperation,
         entry_point: Address,
-    ) -> RpcResult<SendUserOperationResponse>;
+    ) -> RpcResult<UserOperationHash>;
     #[method(name = "estimateUserOperationGas")]
     async fn estimate_user_operation_gas(
         &self,

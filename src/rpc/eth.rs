@@ -1,7 +1,9 @@
+use std::str::FromStr;
+
 use crate::{
     rpc::eth_api::{EstimateUserOperationGasResponse, EthApiServer},
     types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt},
-    uopool::server::uopool::{uo_pool_client::UoPoolClient, AddRequest},
+    uopool::server::uopool::{uo_pool_client::UoPoolClient, AddRequest, AddResult},
 };
 use async_trait::async_trait;
 use ethers::types::{Address, U256, U64};
@@ -13,8 +15,6 @@ use jsonrpsee::{
         ErrorObject,
     },
 };
-
-use super::eth_api::SendUserOperationResponse;
 
 pub struct EthApiServerImpl {
     pub call_gas_limit: u64,
@@ -35,7 +35,7 @@ impl EthApiServer for EthApiServerImpl {
         &self,
         user_operation: UserOperation,
         entry_point: Address,
-    ) -> RpcResult<SendUserOperationResponse> {
+    ) -> RpcResult<UserOperationHash> {
         info!("{:?}", entry_point);
         info!("{:?}", user_operation);
 
@@ -58,11 +58,29 @@ impl EthApiServer for EthApiServerImpl {
             })?
             .into_inner();
 
-        info!("{:?}", response.data);
+        if response.result == AddResult::Added as i32 {
+            return UserOperationHash::from_str(&response.data).map_err(|err| {
+                jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
+                    ErrorCode::InternalError.code(),
+                    "user operation was not added",
+                    Some(err.to_string()),
+                )))
+            });
+        }
 
-        Ok(SendUserOperationResponse::Success(
-            UserOperationHash::default(),
-        ))
+        serde_json::from_str(&response.data)
+            .map_err(|err| {
+                jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
+                    ErrorCode::InternalError.code(),
+                    "error parsing error object",
+                    Some(err.to_string()),
+                )))
+            })
+            .and_then(|error_object| {
+                return Err(jsonrpsee::core::Error::Call(CallError::Custom(
+                    error_object,
+                )));
+            })
     }
 
     async fn estimate_user_operation_gas(

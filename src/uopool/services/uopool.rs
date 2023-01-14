@@ -9,10 +9,13 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use jsonrpsee::tracing::info;
+use jsonrpsee::{tracing::info, types::ErrorObject};
 use parking_lot::RwLock;
+use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
+
+pub type UoPoolError = ErrorObject<'static>;
 
 pub struct UoPoolService {
     _mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
@@ -46,8 +49,17 @@ impl UoPool for UoPoolService {
             // TODO: sanity checks
             // TODO: simulation
 
+            let uo_pool_error = UoPoolError::owned(
+                -32602,
+                "user operation was not added",
+                Some(json!({
+                    "reason": "this is error",
+                })),
+            );
+
             res.set_result(AddResult::NotAdded);
-            res.data = String::from("\"{\"code\": -32602, \"message\": \"user operation was not added\", \"data\": {\"reason\": \"this is error\"}}\"");
+            res.data = serde_json::to_string(&uo_pool_error)
+                .map_err(|_| tonic::Status::cancelled("user operation was not added"))?;
 
             return Ok(tonic::Response::new(res));
         }

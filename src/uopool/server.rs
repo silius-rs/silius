@@ -1,4 +1,4 @@
-// https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
+// Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
     use arrayref::array_ref;
     use ethers::types::{Address, Bytes, U256};
