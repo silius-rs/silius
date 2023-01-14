@@ -5,7 +5,6 @@ use dirs::home_dir;
 use ethers::types::U256;
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::tracing::info;
-use std::str::FromStr;
 
 #[derive(Parser)]
 #[clap(
@@ -28,11 +27,13 @@ fn main() -> Result<()> {
     let path = if let Some(output_path) = opt.output_path {
         output_path
     } else {
-        ExpandedPathBuf::from_str(home_dir().unwrap().join(".aa-bundler").to_str().unwrap())
-            .unwrap()
+        home_dir()
+            .map(|h| h.join(".aa-bundler"))
+            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
+            .map(ExpandedPathBuf)?
     };
 
-    let wallet = Wallet::new(path, opt.chain_id);
+    let wallet = Wallet::new(path, opt.chain_id)?;
     info!("{:?}", wallet.signer);
 
     Ok(())

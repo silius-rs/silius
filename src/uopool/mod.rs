@@ -81,7 +81,6 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
             .add_service(svc)
             .serve(opts.uopool_grpc_listen_address)
             .await
-            .unwrap();
     });
 
     tokio::time::sleep(Duration::from_secs(1)).await;

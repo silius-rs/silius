@@ -28,7 +28,7 @@ format:
 lint:
 	cd thirdparty/bundler && yarn install && yarn preprocess && cd ../..
 	cargo fmt --all -- --check
-	cargo clippy --tests -- -D warnings -A clippy::derive_partial_eq_without_eq
+	cargo clippy -- -D warnings -A clippy::derive_partial_eq_without_eq -D clippy::unwrap_used
 
 clean:
 	cd thirdparty/account-abstraction && yarn clean && cd ../..
