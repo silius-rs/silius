@@ -7,7 +7,6 @@ package uopool;
 message AddRequest {
     types.UserOperation uo = 1;
     types.H160 ep = 2;
-    uint64 cid = 3;
 }
 
 enum AddResult {
@@ -17,7 +16,7 @@ enum AddResult {
 
 message AddResponse {
     AddResult result = 1;
-    string error = 2;
+    string data = 2;
 }
 
 message RemoveRequest {
@@ -31,7 +30,7 @@ enum RemoveResult {
 
 message RemoveResponse {
     RemoveResult result = 1;
-    string error = 2;
+    string data = 2;
 }
 
 message AllRequest {}
