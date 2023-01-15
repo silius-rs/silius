@@ -1,20 +1,17 @@
-use std::str::FromStr;
-
 use crate::{
     rpc::eth_api::{EstimateUserOperationGasResponse, EthApiServer},
     types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt},
     uopool::server::uopool::{uo_pool_client::UoPoolClient, AddRequest, AddResult},
 };
+use anyhow::format_err;
 use async_trait::async_trait;
 use ethers::types::{Address, U256, U64};
 use jsonrpsee::{
     core::RpcResult,
     tracing::info,
-    types::{
-        error::{CallError, ErrorCode},
-        ErrorObject,
-    },
+    types::{error::CallError, ErrorObject},
 };
+use std::str::FromStr;
 
 pub struct EthApiServerImpl {
     pub call_gas_limit: u64,
@@ -49,38 +46,19 @@ impl EthApiServer for EthApiServerImpl {
         let response = uopool_grpc_client
             .add(request)
             .await
-            .map_err(|status| {
-                jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
-                    ErrorCode::InternalError.code(),
-                    status.message(),
-                    Some(status.details()),
-                )))
-            })?
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
             .into_inner();
 
         if response.result == AddResult::Added as i32 {
-            return UserOperationHash::from_str(&response.data).map_err(|err| {
-                jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
-                    ErrorCode::InternalError.code(),
-                    "user operation was not added",
-                    Some(err.to_string()),
-                )))
-            });
+            let user_operation_hash = UserOperationHash::from_str(&response.data)
+                .map_err(|err| format_err!("error parsing user operation hash: {}", err))?;
+            return Ok(user_operation_hash);
         }
 
-        serde_json::from_str(&response.data)
-            .map_err(|err| {
-                jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
-                    ErrorCode::InternalError.code(),
-                    "error parsing error object",
-                    Some(err.to_string()),
-                )))
-            })
-            .and_then(|error_object| {
-                Err(jsonrpsee::core::Error::Call(CallError::Custom(
-                    error_object,
-                )))
-            })
+        Err(jsonrpsee::core::Error::Call(CallError::Custom(
+            serde_json::from_str::<ErrorObject>(&response.data)
+                .map_err(|err| format_err!("error parsing error object: {}", err))?,
+        )))
     }
 
     async fn estimate_user_operation_gas(

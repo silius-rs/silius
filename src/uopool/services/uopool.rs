@@ -41,7 +41,7 @@ impl UoPool for UoPoolService {
         if let Some(user_operation) = req.uo {
             let user_operation: UserOperation = user_operation
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("user operation is not valid"))?;
+                .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
 
             info!("{:?}", user_operation);
 
@@ -59,12 +59,12 @@ impl UoPool for UoPoolService {
 
             res.set_result(AddResult::NotAdded);
             res.data = serde_json::to_string(&uo_pool_error)
-                .map_err(|_| tonic::Status::cancelled("user operation was not added"))?;
+                .map_err(|_| tonic::Status::internal("error adding user operation"))?;
 
             return Ok(tonic::Response::new(res));
         }
 
-        Err(tonic::Status::invalid_argument("user operation is missing"))
+        Err(tonic::Status::invalid_argument("missing user operation"))
     }
 
     async fn remove(
