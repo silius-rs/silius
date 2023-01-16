@@ -2,6 +2,7 @@ use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
     rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+    uopool::server::uopool::uo_pool_client::UoPoolClient,
     utils::{parse_address, parse_u256},
 };
 use anyhow::Result;
@@ -81,9 +82,16 @@ fn main() -> Result<()> {
                                 .unwrap();
 
                             let mut api = Methods::new();
+                            let uopool_grpc_client = UoPoolClient::connect(format!(
+                                "http://{}",
+                                opt.uopool_opts.uopool_grpc_listen_address
+                            ))
+                            .await
+                            .unwrap();
                             api.merge(
                                 EthApiServerImpl {
                                     call_gas_limit: 100_000_000,
+                                    uopool_grpc_client,
                                 }
                                 .into_rpc(),
                             )
