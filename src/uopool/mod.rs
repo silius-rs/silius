@@ -38,14 +38,14 @@ pub trait Mempool: Debug + Send + Sync + 'static {
 
     async fn add(
         &mut self,
-        user_operation: UserOperation,
-        entry_point: Address,
-        chain_id: U256,
+        user_operation: &UserOperation,
+        entry_point: &Address,
+        chain_id: &U256,
     ) -> anyhow::Result<UserOperationHash>;
-    async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
+    async fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
     async fn get_all(&self) -> anyhow::Result<Self::UserOperations>;
-    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations>;
-    async fn remove(&mut self, user_operation_hash: UserOperationHash) -> anyhow::Result<()>;
+    async fn get_all_by_sender(&self, sender: &Address) -> anyhow::Result<Self::UserOperations>;
+    async fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
     async fn clear(&mut self) -> anyhow::Result<()>;
 }
 

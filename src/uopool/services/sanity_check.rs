@@ -1,13 +1,13 @@
-use ethers::{
-    providers::Middleware,
-    types::{Address, Bytes, U256},
-};
-
 use crate::{
     chain::gas::{self, Overhead},
     types::user_operation::UserOperation,
     uopool::services::uopool::UoPoolService,
 };
+use ethers::{
+    providers::Middleware,
+    types::{Address, Bytes, U256},
+};
+use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BadUserOperationError {
@@ -17,25 +17,86 @@ pub enum BadUserOperationError {
     },
     HighVerificationGasLimit {
         verification_gas_limit: U256,
+        max_verification_gas: U256,
     },
     LowPreVerificationGas {
         pre_verification_gas: U256,
+        calculated_pre_verification_gas: U256,
     },
     InvalidPaymasterAndData {
         paymaster_and_data: Bytes,
     },
     LowCallGasLimit {
         call_gas_limit: U256,
-        non_zero_call_value: U256,
-    },
-    HighMaxPriorityFeePerGas {
-        max_priority_fee_per_gas: U256,
-        max_fee_per_gas: U256,
+        non_zero_value_call: U256,
     },
     LowMaxFeePerGas {
         max_fee_per_gas: U256,
         max_fee_per_gas_estimated: U256,
     },
+    HighMaxPriorityFeePerGas {
+        max_priority_fee_per_gas: U256,
+        max_fee_per_gas: U256,
+    },
+}
+
+impl fmt::Display for BadUserOperationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        return match self {
+            BadUserOperationError::SenderOrInitCode { sender, init_code } => write!(
+                f,
+                "Either the sender {:?} is an existing contract, or the initCode {:?} is not empty (but not both)",
+                sender, init_code
+            ),
+            BadUserOperationError::HighVerificationGasLimit {
+                verification_gas_limit,
+                max_verification_gas,
+            } => write!(
+                f,
+                "Verification gas limit {} is higher than max verification gas {}",
+                verification_gas_limit,
+                max_verification_gas
+            ),
+            BadUserOperationError::LowPreVerificationGas {
+                pre_verification_gas,
+                calculated_pre_verification_gas
+            } => write!(
+                f,
+                "Pre-verification gas {} is lower than calculated pre-verification gas {}",
+                pre_verification_gas,
+                calculated_pre_verification_gas
+            ),
+            BadUserOperationError::InvalidPaymasterAndData { paymaster_and_data } => write!(
+                f,
+                "Paymaster and data {:?} are inconsistent",
+                paymaster_and_data
+            ),
+            BadUserOperationError::LowCallGasLimit {
+                call_gas_limit,
+                non_zero_value_call,
+            } => write!(
+                f,
+                "Call gas limit {} is lower than CALL non-zero value {}",
+                call_gas_limit, non_zero_value_call
+            ),
+            BadUserOperationError::LowMaxFeePerGas {
+                max_fee_per_gas,
+                max_fee_per_gas_estimated,
+            } => write!(
+                f,
+                "Max fee per gas {} is lower than estimated max fee per gas {}",
+                max_fee_per_gas, max_fee_per_gas_estimated
+            ),
+            BadUserOperationError::HighMaxPriorityFeePerGas {
+                max_priority_fee_per_gas,
+                max_fee_per_gas,
+            } => write!(
+                f,
+                "Max priority fee per gas {} is higher than max fee per gas {}",
+                max_priority_fee_per_gas, max_fee_per_gas
+            ),
+        };
+    }
 }
 
 #[derive(Debug)]
@@ -56,7 +117,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), UserOperationSanityCheckError<M>> {
-        // Either the sender is an existing contract, or the initCode is not empty (but not both)
         let code = self
             .eth_provider
             .get_code(user_operation.sender, None)
@@ -79,22 +139,22 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), UserOperationSanityCheckError<M>> {
-        // The verificationGasLimit is sufficiently low (<= MAX_VERIFICATION_GAS) and the preVerificationGas is sufficiently high (enough to pay for the calldata gas cost of serializing the UserOperation plus PRE_VERIFICATION_OVERHEAD_GAS)
         if user_operation.verification_gas_limit > self.max_verification_gas {
             return Err(UserOperationSanityCheckError::SanityCheck(
                 BadUserOperationError::HighVerificationGasLimit {
                     verification_gas_limit: user_operation.verification_gas_limit,
+                    max_verification_gas: self.max_verification_gas,
                 },
             ));
         }
 
-        let gas_overhead = Overhead::default();
-        if user_operation.pre_verification_gas
-            < gas_overhead.calculate_pre_verification_gas(user_operation)
-        {
+        let calculated_pre_verification_gas =
+            Overhead::default().calculate_pre_verification_gas(user_operation);
+        if user_operation.pre_verification_gas < calculated_pre_verification_gas {
             return Err(UserOperationSanityCheckError::SanityCheck(
                 BadUserOperationError::LowPreVerificationGas {
                     pre_verification_gas: user_operation.pre_verification_gas,
+                    calculated_pre_verification_gas,
                 },
             ));
         }
@@ -106,12 +166,12 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), UserOperationSanityCheckError<M>> {
-        // The callgas is at least the cost of a CALL with non-zero value.
-        if user_operation.call_gas_limit < gas::non_zero_value_call() {
+        let non_zero_value_call = gas::non_zero_value_call();
+        if user_operation.call_gas_limit < non_zero_value_call {
             return Err(UserOperationSanityCheckError::SanityCheck(
                 BadUserOperationError::LowCallGasLimit {
                     call_gas_limit: user_operation.call_gas_limit,
-                    non_zero_call_value: gas::non_zero_value_call(),
+                    non_zero_value_call,
                 },
             ));
         }
@@ -123,7 +183,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), UserOperationSanityCheckError<M>> {
-        // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
         let (max_fee_per_gas_estimated, _) = self
             .eth_provider
             .estimate_eip1559_fees(None)
@@ -151,23 +210,38 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
-    async fn validate_user_operation(
+    pub async fn validate_user_operation(
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), UserOperationSanityCheckError<M>> {
+        // condition 1
+        // Either the sender is an existing contract, or the initCode is not empty (but not both)
         self.sender_or_init_code(user_operation).await?;
-        self.verification_gas(user_operation).await?;
+
+        // condition 2
+        // If initCode is not empty, parse its first 20 bytes as a factory address. Record whether the factory is staked, in case the later simulation indicates that it needs to be. If the factory accesses global state, it must be staked - see reputation, throttling and banning section for details.
+        // TODO: implement
 
         // condition 3
-        // The paymaster is either the zero address or is a contract which (i) currently has nonempty code on chain, (ii) has registered with sufficient stake value, (iii) has a sufficient deposit to pay for the UserOperation, and (v) is not currently banned.
+        // The verificationGasLimit is sufficiently low (<= MAX_VERIFICATION_GAS) and the preVerificationGas is sufficiently high (enough to pay for the calldata gas cost of serializing the UserOperation plus PRE_VERIFICATION_OVERHEAD_GAS)
+        self.verification_gas(user_operation).await?;
+
+        // condition 4
+        // The paymasterAndData is either empty, or start with the paymaster address, which is a contract that (i) currently has nonempty code on chain, (ii) has a sufficient deposit to pay for the UserOperation, and (iii) is not currently banned. During simulation, the paymaster's stake is also checked, depending on its storage usage - see reputation, throttling and banning section for details.
         // TODO: implement
 
+        // condition 5
+        // The callgas is at least the cost of a CALL with non-zero value.
         self.call_gas_limit(user_operation).await?;
-        self.max_fee_per_gas(user_operation).await?;
 
         // condition 6
-        // The sender doesn't have another UserOperation already present in the pool (or it replaces an existing entry with the same sender and nonce, with a higher maxPriorityFeePerGas and an equally increased maxFeePerGas). Only one UserOperation per sender may be included in a single batch.
+        // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
+        self.max_fee_per_gas(user_operation).await?;
+
+        // condition 7
+        // The sender doesn't have another UserOperation already present in the pool (or it replaces an existing entry with the same sender and nonce, with a higher maxPriorityFeePerGas and an equally increased maxFeePerGas). Only one UserOperation per sender may be included in a single batch. A sender is exempt from this rule and may have multiple UserOperations in the pool and in a batch if it is staked (see reputation, throttling and banning section below), but this exception is of limited use to normal accounts.
         // TODO: implement
+
         Ok(())
     }
 }
@@ -228,7 +302,7 @@ mod tests {
             .await
             .is_ok());
 
-        // sender_or_init_code
+        // condition 1
         assert!(uo_pool_service
             .validate_user_operation(&UserOperation {
                 sender: "0x6a98c1B9FD763eB693f40C407DC85106eBD74352"
@@ -266,7 +340,10 @@ mod tests {
             )
         ));
 
-        // verification_gas
+        // condition 2
+        // TODO: implement
+
+        // condition 3
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -292,10 +369,10 @@ mod tests {
             )
         ));
 
-        // condition 3
+        // condition 4
         // TODO: implement
 
-        // call_gas_limit
+        // condition 5
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -309,7 +386,7 @@ mod tests {
             )
         ));
 
-        // max_fee_per_gas
+        // condition 6
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -335,7 +412,7 @@ mod tests {
             )
         ));
 
-        // condition 6
+        // condition 7
         // TODO: implement
     }
 }

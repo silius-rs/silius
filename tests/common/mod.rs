@@ -104,8 +104,8 @@ pub async fn deploy_test_rules_account_factory<M: Middleware + 'static>(
 
 pub async fn sign(
     user_op: &mut UserOperation,
-    entry_point_address: Address,
-    chain_id: U256,
+    entry_point_address: &Address,
+    chain_id: &U256,
     key: Wallet<SigningKey>,
 ) -> anyhow::Result<()> {
     let user_op_hash = user_op.hash(entry_point_address, chain_id);

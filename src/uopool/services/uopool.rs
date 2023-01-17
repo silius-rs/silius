@@ -1,3 +1,4 @@
+use super::sanity_check::UserOperationSanityCheckError;
 use crate::{
     contracts::EntryPoint,
     types::user_operation::UserOperation,
@@ -10,14 +11,25 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use ethers::{providers::Middleware, types::U256};
-use jsonrpsee::{tracing::info, types::ErrorObject};
+use ethers::{
+    providers::Middleware,
+    types::{Address, U256},
+};
+use jsonrpsee::{
+    tracing::info,
+    types::{error::ErrorCode, ErrorObject},
+};
 use parking_lot::RwLock;
-use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
 
 pub type UoPoolError = ErrorObject<'static>;
+
+impl<M: Middleware> From<UserOperationSanityCheckError<M>> for UoPoolError {
+    fn from(_: UserOperationSanityCheckError<M>) -> Self {
+        UoPoolError::from(ErrorCode::ServerError(-32602))
+    }
+}
 
 pub struct UoPoolService<M: Middleware> {
     pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
@@ -54,28 +66,48 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
         let req = request.into_inner();
         let mut res = AddResponse::default();
 
-        if let Some(user_operation) = req.uo {
+        if let AddRequest {
+            uo: Some(user_operation),
+            ep: Some(entry_point),
+        } = req
+        {
             let user_operation: UserOperation = user_operation
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
+            let entry_point: Address = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
             info!("{:?}", user_operation);
+            info!("{:?}", entry_point);
 
-            // TODO: validate user operation
-            // TODO: sanity checks
-            // TODO: simulation
+            //  sanity check
+            match self.validate_user_operation(&user_operation).await {
+                Ok(_) => {
+                    // simulation
 
-            let uo_pool_error = UoPoolError::owned(
-                -32602,
-                "user operation was not added",
-                Some(json!({
-                    "reason": "this is error",
-                })),
-            );
+                    // add to mempool
 
-            res.set_result(AddResult::NotAdded);
-            res.data = serde_json::to_string(&uo_pool_error)
-                .map_err(|_| tonic::Status::internal("error adding user operation"))?;
+                    res.set_result(AddResult::Added);
+                    res.data =
+                        serde_json::to_string(&user_operation.hash(&entry_point, &self.chain_id))
+                            .map_err(|_| tonic::Status::internal("error adding user operation"))?;
+                }
+                Err(error) => match error {
+                    UserOperationSanityCheckError::SanityCheck(user_operation_error) => {
+                        res.set_result(AddResult::NotAdded);
+                        res.data = serde_json::to_string(&UoPoolError::owned::<String>(
+                            -32602,
+                            user_operation_error.to_string(),
+                            None,
+                        ))
+                        .map_err(|_| tonic::Status::internal("error adding user operation"))?;
+                    }
+                    _ => {
+                        return Err(tonic::Status::internal("error adding user operation"));
+                    }
+                },
+            }
 
             return Ok(tonic::Response::new(res));
         }
