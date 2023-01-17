@@ -2,7 +2,7 @@ use crate::{
     contracts::EntryPoint,
     types::user_operation::{UserOperation, UserOperationHash},
     uopool::{
-        memory::MemoryMempool, server::uopool_server::uo_pool_server::UoPoolServer,
+        memory::MemoryMempool, server::uopool::uo_pool_server::UoPoolServer,
         services::UoPoolService,
     },
 };
@@ -55,7 +55,7 @@ pub struct UserOperationPool<M: Mempool> {
     pub pool: Arc<M>,
 }
 
-#[derive(Educe, Parser)]
+#[derive(Clone, Copy, Educe, Parser)]
 #[educe(Debug)]
 pub struct UoPoolOpts {
     #[clap(long, default_value = "127.0.0.1:3001")]

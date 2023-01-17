@@ -9,6 +9,7 @@ rust-version = "1.66.1"
 
 [dependencies]
 anyhow = "1"
+arrayref = "0.3"
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"

@@ -1,20 +1,21 @@
 use crate::{
     rpc::eth_api::{EstimateUserOperationGasResponse, EthApiServer},
     types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt},
+    uopool::server::uopool::{uo_pool_client::UoPoolClient, AddRequest, AddResult},
 };
+use anyhow::format_err;
 use async_trait::async_trait;
 use ethers::types::{Address, U256, U64};
 use jsonrpsee::{
     core::RpcResult,
     tracing::info,
-    types::{
-        error::{CallError, ErrorCode},
-        ErrorObject,
-    },
+    types::{error::CallError, ErrorObject},
 };
+use std::str::FromStr;
 
 pub struct EthApiServerImpl {
     pub call_gas_limit: u64,
+    pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 }
 
 #[async_trait]
@@ -32,16 +33,31 @@ impl EthApiServer for EthApiServerImpl {
         user_operation: UserOperation,
         entry_point: Address,
     ) -> RpcResult<UserOperationHash> {
-        info!("{:?}", user_operation);
         info!("{:?}", entry_point);
-        // Ok(SendUserOperationResponse::Success(H256::default()))
-        let data = serde_json::value::to_raw_value(&"{\"a\": 100, \"b\": 200}").unwrap();
+        info!("{:?}", user_operation);
+
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(AddRequest {
+            uo: Some(user_operation.into()),
+            ep: Some(entry_point.into()),
+        });
+
+        let response = uopool_grpc_client
+            .add(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == AddResult::Added as i32 {
+            let user_operation_hash = UserOperationHash::from_str(&response.data)
+                .map_err(|err| format_err!("error parsing user operation hash: {}", err))?;
+            return Ok(user_operation_hash);
+        }
+
         Err(jsonrpsee::core::Error::Call(CallError::Custom(
-            ErrorObject::owned(
-                ErrorCode::ServerError(-32000).code(),
-                "Not implemented",
-                Some(data),
-            ),
+            serde_json::from_str::<ErrorObject>(&response.data)
+                .map_err(|err| format_err!("error parsing error object: {}", err))?,
         )))
     }
 
