@@ -16,7 +16,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Setup third party dependencies
+      - name: Set up third-party dependencies
         run: |
           make setup-thirdparty
       - name: Install Foundry
