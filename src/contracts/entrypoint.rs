@@ -179,8 +179,10 @@ impl FromStr for JsonRpcError {
         let re = Regex::new(
             r###"code: (\d+), message: ([^,]*), data: (None|Some\(String\("([^)]*)"\))"###,
         )?;
-        let captures = re.captures(s).unwrap();
-        let code = captures[1].parse::<u64>().unwrap();
+        let captures = re
+            .captures(s)
+            .ok_or_else(|| anyhow::anyhow!("The return error is not a valid JsonRpcError"))?;
+        let code = captures[1].parse::<u64>()?;
         let message = &captures[2];
         let data = match &captures[3] {
             "None" => None,

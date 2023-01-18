@@ -63,7 +63,7 @@ fn main() -> Result<()> {
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
 
-                let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id);
+                let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id)?;
                 info!("{:?}", wallet.signer);
 
                 let _bundler = Bundler::new(wallet);
@@ -78,29 +78,27 @@ fn main() -> Result<()> {
                         async move {
                             let jsonrpc_server = ServerBuilder::default()
                                 .build(&opt.rpc_listen_address)
-                                .await
-                                .unwrap();
+                                .await?;
 
                             let mut api = Methods::new();
                             let uopool_grpc_client = UoPoolClient::connect(format!(
                                 "http://{}",
                                 opt.uopool_opts.uopool_grpc_listen_address
                             ))
-                            .await
-                            .unwrap();
+                            .await?;
+
                             api.merge(
                                 EthApiServerImpl {
                                     call_gas_limit: 100_000_000,
                                     uopool_grpc_client,
                                 }
                                 .into_rpc(),
-                            )
-                            .unwrap();
+                            )?;
 
-                            let _jsonrpc_server_handle = jsonrpc_server.start(api.clone()).unwrap();
+                            let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
                             info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
 
-                            pending::<()>().await
+                            pending::<Result<()>>().await
                         }
                     });
                 }

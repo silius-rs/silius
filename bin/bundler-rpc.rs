@@ -40,8 +40,7 @@ async fn main() -> Result<()> {
             uopool_grpc_client,
         }
         .into_rpc(),
-    )
-    .unwrap();
+    )?;
 
     let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
     info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
