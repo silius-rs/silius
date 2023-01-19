@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used)]
 use std::{env, path::PathBuf};
 
 use ethers::solc::{Project, ProjectPathsConfig};
@@ -11,6 +12,7 @@ fn config() -> prost_build::Config {
 fn make_protos(protos: &[&str]) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     tonic_build::configure()
+        .server_mod_attribute("uopool", r#"#[allow(clippy::unwrap_used)]"#)
         .file_descriptor_set_path(out_dir.join("descriptor.bin"))
         .compile_with_config(config(), protos, &["./src/proto"])
         .unwrap();

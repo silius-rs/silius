@@ -100,7 +100,6 @@ pub async fn run(
             .add_service(svc)
             .serve(opts.uopool_grpc_listen_address)
             .await
-            .unwrap();
     });
 
     tokio::time::sleep(Duration::from_secs(1)).await;

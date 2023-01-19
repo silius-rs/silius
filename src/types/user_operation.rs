@@ -5,7 +5,6 @@ use ethers::types::{Address, Bytes, TransactionReceipt, H256, U256};
 use ethers::utils::keccak256;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
-use std::str::FromStr;
 
 pub type UserOperationHash = H256;
 
@@ -45,20 +44,17 @@ impl From<UserOperation> for entry_point_api::UserOperation {
 
 impl UserOperation {
     pub fn pack(&self) -> Bytes {
-        self.clone().encode_hex().parse::<Bytes>().unwrap()
+        Bytes::from(self.clone().encode())
     }
 
     pub fn pack_for_signature(&self) -> Bytes {
-        let mut encoded = String::from("0x");
-        let packed = hex::encode(
-            UserOperation {
-                signature: Bytes::from_str("0x").unwrap(),
-                ..self.clone()
-            }
-            .encode(),
-        );
-        encoded.push_str(&packed[..packed.len() - 64]);
-        encoded.parse::<Bytes>().unwrap()
+        let mut packed: Vec<u8> = UserOperation {
+            signature: Bytes::default(),
+            ..self.clone()
+        }
+        .encode();
+        packed.truncate(packed.len() - 32);
+        Bytes::from(packed)
     }
 
     pub fn hash(&self, entry_point: &Address, chain_id: &U256) -> UserOperationHash {
@@ -109,6 +105,8 @@ pub struct UserOperationReceipt {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
