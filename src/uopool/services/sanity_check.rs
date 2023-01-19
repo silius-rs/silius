@@ -9,6 +9,8 @@ use ethers::{
 };
 use std::fmt;
 
+pub const SANITY_CHECK_ERROR_CODE: i32 = -32602;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum BadUserOperationError {
     SenderOrInitCode {

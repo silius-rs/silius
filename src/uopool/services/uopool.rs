@@ -7,6 +7,7 @@ use crate::{
             uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, AllRequest, AllResponse,
             RemoveRequest, RemoveResponse,
         },
+        services::sanity_check::SANITY_CHECK_ERROR_CODE,
         MempoolBox, MempoolId,
     },
 };
@@ -97,7 +98,7 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
                     UserOperationSanityCheckError::SanityCheck(user_operation_error) => {
                         res.set_result(AddResult::NotAdded);
                         res.data = serde_json::to_string(&UoPoolError::owned::<String>(
-                            -32602,
+                            SANITY_CHECK_ERROR_CODE,
                             user_operation_error.to_string(),
                             None,
                         ))
