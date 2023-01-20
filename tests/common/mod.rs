@@ -14,8 +14,7 @@ use self::gen::{
 };
 pub mod gen;
 
-pub const ANVIL_TEST_KEY_PHRASE: &str =
-    "test test test test test test test test test test test junk";
+pub const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
 
 pub struct DeployedContract<C> {
     contract: C,
