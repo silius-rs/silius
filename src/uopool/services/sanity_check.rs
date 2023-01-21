@@ -267,7 +267,7 @@ mod tests {
             .parse::<Address>()
             .unwrap();
         let eth_provider =
-            Arc::new(Provider::try_from("https://rpc-mumbai.maticvigil.com/").unwrap());
+            Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let mut entry_points = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         entry_points.insert(
             mempool_id(entry_point, chain_id),
