@@ -27,6 +27,7 @@ dependencies = [
  "expanded-pathbuf",
  "hex",
  "jsonrpsee",
+ "lazy_static",
  "parking_lot 0.12.1",
  "prost",
  "prost-build",
