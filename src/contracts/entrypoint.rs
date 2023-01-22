@@ -75,11 +75,11 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                     entry_point_api::EntryPointAPIErrors::FailedOp(failed_op) => {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
-                    entry_point_api::EntryPointAPIErrors::SimulationResult(res) => {
-                        Ok(SimulateValidationResult::SimulationResult(res))
+                    entry_point_api::EntryPointAPIErrors::ValidationResult(res) => {
+                        Ok(SimulateValidationResult::ValidationResult(res))
                     }
-                    entry_point_api::EntryPointAPIErrors::SimulationResultWithAggregation(res) => {
-                        Ok(SimulateValidationResult::SimulationResultWithAggregation(
+                    entry_point_api::EntryPointAPIErrors::ValidationResultWithAggregation(res) => {
+                        Ok(SimulateValidationResult::ValidationResultWithAggregation(
                             res,
                         ))
                     }
@@ -179,8 +179,8 @@ impl From<ProviderError> for EntryPointErr {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SimulateValidationResult {
-    SimulationResult(entry_point_api::SimulationResult),
-    SimulationResultWithAggregation(entry_point_api::SimulationResultWithAggregation),
+    ValidationResult(entry_point_api::ValidationResult),
+    ValidationResultWithAggregation(entry_point_api::ValidationResultWithAggregation),
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
