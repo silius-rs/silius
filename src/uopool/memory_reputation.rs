@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+use educe::Educe;
 use ethers::types::{Address, U256};
 use parking_lot::RwLock;
 use std::{
@@ -5,12 +7,18 @@ use std::{
     sync::Arc,
 };
 
+use super::Reputation;
+
+#[derive(Educe)]
+#[educe(Debug)]
 pub enum ReputationStatus {
     OK,
     THROTTLED,
     BANNED,
 }
 
+#[derive(Educe)]
+#[educe(Debug)]
 pub struct ReputationEntry {
     address: Address,
     uo_seen: u64,
@@ -18,7 +26,9 @@ pub struct ReputationEntry {
     status: ReputationStatus,
 }
 
-pub struct Reputation {
+#[derive(Default, Educe)]
+#[educe(Debug)]
+pub struct MemoryReputation {
     min_inclusion_denominator: u64,
     throttling_slack: u64,
     ban_slack: u64,
@@ -30,8 +40,9 @@ pub struct Reputation {
     blacklist: Arc<RwLock<HashSet<Address>>>,
 }
 
-impl Reputation {
-    pub fn new(
+#[async_trait]
+impl Reputation for MemoryReputation {
+    fn new(
         min_inclusion_denominator: u64,
         throttling_slack: u64,
         ban_slack: u64,
@@ -49,4 +60,26 @@ impl Reputation {
             blacklist: Arc::new(RwLock::new(HashSet::new())),
         }
     }
+
+    // hourly cron
+
+    // add whitelist
+
+    // add blacklist
+
+    // init entity
+
+    // increase seen
+
+    // increase included
+
+    // get status
+
+    // check stake
+
+    // crash handle ops
+
+    // debug: set reputation
+
+    // debug: clear reputation
 }

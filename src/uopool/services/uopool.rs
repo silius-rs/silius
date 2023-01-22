@@ -5,7 +5,7 @@ use crate::{
             uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, AllRequest, AllResponse,
             RemoveRequest, RemoveResponse,
         },
-        MempoolBox, MempoolId, reputation::Reputation,
+        MempoolBox, MempoolId, memory_reputation::MemoryReputation,
     },
 };
 use async_trait::async_trait;
@@ -19,11 +19,11 @@ pub type UoPoolError = ErrorObject<'static>;
 
 pub struct UoPoolService {
     _mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
-    _reputation: Arc<RwLock<Reputation>>,
+    _reputation: Arc<RwLock<MemoryReputation>>,
 }
 
 impl UoPoolService {
-    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>, reputation: Arc<RwLock<Reputation>>) -> Self {
+    pub fn new(mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>, reputation: Arc<RwLock<MemoryReputation>>) -> Self {
         Self {
             _mempools: mempools,
             _reputation: reputation,

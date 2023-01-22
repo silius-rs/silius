@@ -1,7 +1,7 @@
 use crate::{
     types::user_operation::{UserOperation, UserOperationHash},
     uopool::{
-        memory::MemoryMempool, reputation::Reputation,
+        memory_mempool::MemoryMempool, memory_reputation::MemoryReputation,
         server::uopool::uo_pool_server::UoPoolServer, services::UoPoolService,
     },
     utils::parse_u256,
@@ -19,8 +19,8 @@ use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
-pub mod memory;
-pub mod reputation;
+pub mod memory_mempool;
+pub mod memory_reputation;
 pub mod server;
 pub mod services;
 
@@ -53,6 +53,17 @@ pub trait Mempool: Debug + Send + Sync + 'static {
     async fn clear(&mut self) -> anyhow::Result<()>;
 }
 
+#[async_trait]
+pub trait Reputation: Debug + Send + Sync + 'static {
+    fn new(
+        min_inclusion_denominator: u64,
+        throttling_slack: u64,
+        ban_slack: u64,
+        min_stake: U256,
+        min_unstake_delay: u64,
+    ) -> Self;
+}
+
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct UserOperationPool<M: Mempool> {
@@ -81,7 +92,7 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
             mempools.insert(id, Box::<MemoryMempool>::default());
         }
 
-        let reputation = Reputation::new(
+        let reputation = MemoryReputation::new(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,
             BAN_SLACK,
