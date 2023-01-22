@@ -1,3 +1,50 @@
+use ethers::types::{Address, Bytes};
+use serde::Deserialize;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct JsTracerFrame {
+    #[serde(rename = "numberLevels")]
+    pub number_levels: Vec<Level>,
+    pub keccak: Vec<Bytes>,
+    pub logs: Vec<Log>,
+    pub calls: Vec<Call>,
+    pub debug: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct Level {
+    pub access: HashMap<Address, ReadsAndWrites>,
+    pub opcodes: HashMap<String, u64>,
+    #[serde(rename = "contractSize")]
+    pub contract_size: HashMap<Address, u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ReadsAndWrites {
+    pub reads: HashMap<String, u64>,
+    pub writes: HashMap<String, u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct Log {
+    pub topics: Vec<Bytes>,
+    pub data: Bytes,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct Call {
+    #[serde(rename = "type")]
+    pub typ: String,
+    #[serde(rename = "gasUsed")]
+    pub gas_used: Option<u64>,
+    pub data: Option<Bytes>,
+    pub from: Option<Address>,
+    pub to: Option<Address>,
+    pub method: Option<Bytes>,
+    pub gas: Option<u64>,
+}
+
 // https://github.com/eth-infinitism/bundler/blob/main/packages/bundler/src/BundlerCollectorTracer.ts
 pub const JS_TRACER: &str = r#"
 {
