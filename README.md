@@ -32,7 +32,7 @@ cargo run -- --mnemonic-file ${HOME}/.aa-bundler/0x129D197b2a989C6798601A49D89a4
 Run only user operation pool:
 
 ```bash
-cargo run --bin bundler-uopool -- --entry-points 0x0000000000000000000000000000000000000000 --chain-id 5
+cargo run --bin bundler-uopool -- --entry-points 0x0000000000000000000000000000000000000000 --chain-id 5 --min-stake 1 --min-unstake-delay 0
 ```
 
 Run only JSON-RPC API: 
