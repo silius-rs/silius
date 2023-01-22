@@ -62,6 +62,7 @@ pub trait Reputation: Debug + Send + Sync + 'static {
         min_stake: U256,
         min_unstake_delay: u64,
     ) -> Self;
+    async fn update_hourly(&mut self) -> anyhow::Result<()>;
 }
 
 #[derive(Educe)]
@@ -70,7 +71,7 @@ pub struct UserOperationPool<M: Mempool> {
     pub pool: Arc<M>,
 }
 
-#[derive(Debug, Parser, PartialEq)]
+#[derive(Clone, Copy, Debug, Parser, PartialEq)]
 pub struct UoPoolOpts {
     #[clap(long, default_value = "127.0.0.1:3001")]
     pub uopool_grpc_listen_address: SocketAddr,
@@ -92,18 +93,18 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
             mempools.insert(id, Box::<MemoryMempool>::default());
         }
 
-        let reputation = MemoryReputation::new(
-            MIN_INCLUSION_RATE_DENOMINATOR,
-            THROTTLING_SLACK,
-            BAN_SLACK,
-            opts.min_stake,
-            opts.min_unstake_delay,
-        );
-
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(RwLock::new(mempools)),
-            Arc::new(RwLock::new(reputation)),
+            Arc::new(RwLock::new(MemoryReputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                opts.min_stake,
+                opts.min_unstake_delay,
+            ))),
         ));
+
+        // TODO: start updating reputation hourly
 
         info!(
             "UoPool gRPC server starting on {}",

@@ -61,7 +61,15 @@ impl Reputation for MemoryReputation {
         }
     }
 
-    // hourly cron
+    async fn update_hourly(&mut self) -> anyhow::Result<()> {
+        let mut entities = self.entites.write();
+        for (_, entity) in entities.iter_mut() {
+            entity.uo_seen = entity.uo_seen * 23 / 24;
+            entity.uo_included = entity.uo_included * 23 / 24;
+        }
+        entities.retain(|_, entity| entity.uo_seen > 0 || entity.uo_included > 0);
+        Ok(())
+    }
 
     // add whitelist
 
