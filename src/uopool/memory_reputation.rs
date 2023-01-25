@@ -9,7 +9,7 @@ use std::{
 
 use super::Reputation;
 
-#[derive(Educe)]
+#[derive(Clone, Copy, Educe)]
 #[educe(Debug)]
 pub enum ReputationStatus {
     OK,
@@ -17,7 +17,7 @@ pub enum ReputationStatus {
     BANNED,
 }
 
-#[derive(Educe)]
+#[derive(Clone, Copy, Educe)]
 #[educe(Debug)]
 pub struct ReputationEntry {
     address: Address,
@@ -35,7 +35,7 @@ pub struct MemoryReputation {
     min_stake: U256,
     min_unstake_delay: u64,
 
-    entites: Arc<RwLock<HashMap<Address, ReputationEntry>>>,
+    entities: Arc<RwLock<HashMap<Address, ReputationEntry>>>,
     whitelist: Arc<RwLock<HashSet<Address>>>,
     blacklist: Arc<RwLock<HashSet<Address>>>,
 }
@@ -55,14 +55,55 @@ impl Reputation for MemoryReputation {
             ban_slack,
             min_stake,
             min_unstake_delay,
-            entites: Arc::new(RwLock::new(HashMap::new())),
+            entities: Arc::new(RwLock::new(HashMap::new())),
             whitelist: Arc::new(RwLock::new(HashSet::new())),
             blacklist: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
+    async fn get(&mut self, address: Address) -> anyhow::Result<ReputationEntry> {
+        let mut entities = self.entities.write();
+
+        if let Some(entity) = entities.get(&address) {
+            return Ok(*entity);
+        }
+
+        let entity = ReputationEntry {
+            address,
+            uo_seen: 0,
+            uo_included: 0,
+            status: ReputationStatus::OK,
+        };
+
+        entities.insert(address, entity);
+
+        Ok(entity)
+    }
+
+    async fn increment_seen(&mut self, address: Address) -> anyhow::Result<()> {
+        let mut entities = self.entities.write();
+
+        if let Some(entity) = entities.get_mut(&address) {
+            entity.uo_seen += 1;
+            return Ok(());
+        }
+
+        Err(anyhow::anyhow!("Entity not found"))
+    }
+
+    async fn increment_included(&mut self, address: Address) -> anyhow::Result<()> {
+        let mut entities = self.entities.write();
+
+        if let Some(entity) = entities.get_mut(&address) {
+            entity.uo_included += 1;
+            return Ok(());
+        }
+
+        Err(anyhow::anyhow!("Entity not found"))
+    }
+
     async fn update_hourly(&mut self) -> anyhow::Result<()> {
-        let mut entities = self.entites.write();
+        let mut entities = self.entities.write();
         for (_, entity) in entities.iter_mut() {
             entity.uo_seen = entity.uo_seen * 23 / 24;
             entity.uo_included = entity.uo_included * 23 / 24;
@@ -71,15 +112,31 @@ impl Reputation for MemoryReputation {
         Ok(())
     }
 
-    // add whitelist
+    async fn add_whitelist(&mut self, address: Address) -> anyhow::Result<()> {
+        self.whitelist.write().insert(address);
+        Ok(())
+    }
 
-    // add blacklist
+    async fn remove_whitelist(&mut self, address: Address) -> anyhow::Result<bool> {
+        Ok(self.whitelist.write().remove(&address))
+    }
 
-    // init entity
+    async fn is_whitelist(&self, address: Address) -> anyhow::Result<bool> {
+        Ok(self.whitelist.read().contains(&address))
+    }
 
-    // increase seen
+    async fn add_blacklist(&mut self, address: Address) -> anyhow::Result<()> {
+        self.blacklist.write().insert(address);
+        Ok(())
+    }
 
-    // increase included
+    async fn remove_blacklist(&mut self, address: Address) -> anyhow::Result<bool> {
+        Ok(self.blacklist.write().remove(&address))
+    }
+
+    async fn is_blacklist(&self, address: Address) -> anyhow::Result<bool> {
+        Ok(self.blacklist.read().contains(&address))
+    }
 
     // get status
 
