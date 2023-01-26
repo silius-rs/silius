@@ -138,7 +138,31 @@ impl Reputation for MemoryReputation {
         Ok(self.blacklist.read().contains(&address))
     }
 
-    // get status
+    async fn get_status(&self, address: Address) -> anyhow::Result<ReputationStatus> {
+        if self.is_whitelist(address).await? {
+            return Ok(ReputationStatus::OK);
+        }
+
+        if self.is_blacklist(address).await? {
+            return Ok(ReputationStatus::BANNED);
+        }
+
+        let entities = self.entities.read();
+
+        match entities.get(&address) {
+            Some(entity) => {
+                let min_expected_included = entity.uo_seen / self.min_inclusion_denominator;
+                if min_expected_included <= entity.uo_included + self.throttling_slack {
+                    Ok(ReputationStatus::OK)
+                } else if min_expected_included <= entity.uo_included + self.ban_slack {
+                    Ok(ReputationStatus::THROTTLED)
+                } else {
+                    Ok(ReputationStatus::BANNED)
+                }
+            }
+            _ => Ok(ReputationStatus::OK),
+        }
+    }
 
     // check stake
 

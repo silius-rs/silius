@@ -19,7 +19,7 @@ use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
-use self::memory_reputation::ReputationEntry;
+use self::memory_reputation::{ReputationEntry, ReputationStatus};
 
 pub mod memory_mempool;
 pub mod memory_reputation;
@@ -74,6 +74,7 @@ pub trait Reputation: Debug + Send + Sync + 'static {
     async fn add_blacklist(&mut self, address: Address) -> anyhow::Result<()>;
     async fn remove_blacklist(&mut self, address: Address) -> anyhow::Result<bool>;
     async fn is_blacklist(&self, address: Address) -> anyhow::Result<bool>;
+    async fn get_status(&self, address: Address) -> anyhow::Result<ReputationStatus>;
 
     // #[cfg(test)]
 }
