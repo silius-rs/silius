@@ -1,15 +1,19 @@
 use async_trait::async_trait;
 use educe::Educe;
-use ethers::types::{Address, U256};
+use ethers::{
+    abi::AbiEncode,
+    types::{Address, U256},
+};
 use parking_lot::RwLock;
+use serde_json::json;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 
-use super::Reputation;
+use super::{Reputation, ReputationError, ENTITY_BANNED_ERROR_CODE, STAKE_TOO_LOW_ERROR_CODE};
 
-#[derive(Clone, Copy, Educe)]
+#[derive(Clone, Copy, Educe, PartialEq, Eq)]
 #[educe(Debug)]
 pub enum ReputationStatus {
     OK,
@@ -26,6 +30,14 @@ pub struct ReputationEntry {
     status: ReputationStatus,
 }
 
+#[derive(Clone, Copy, Educe)]
+#[educe(Debug)]
+pub struct StakeInfo {
+    address: Address,
+    stake: U256,
+    unstake_delay: U256, // seconds
+}
+
 #[derive(Default, Educe)]
 #[educe(Debug)]
 pub struct MemoryReputation {
@@ -33,7 +45,7 @@ pub struct MemoryReputation {
     throttling_slack: u64,
     ban_slack: u64,
     min_stake: U256,
-    min_unstake_delay: u64,
+    min_unstake_delay: U256,
 
     entities: Arc<RwLock<HashMap<Address, ReputationEntry>>>,
     whitelist: Arc<RwLock<HashSet<Address>>>,
@@ -47,7 +59,7 @@ impl Reputation for MemoryReputation {
         throttling_slack: u64,
         ban_slack: u64,
         min_stake: U256,
-        min_unstake_delay: u64,
+        min_unstake_delay: U256,
     ) -> Self {
         Self {
             min_inclusion_denominator,
@@ -61,29 +73,29 @@ impl Reputation for MemoryReputation {
         }
     }
 
-    async fn get(&mut self, address: Address) -> anyhow::Result<ReputationEntry> {
+    async fn get(&mut self, address: &Address) -> anyhow::Result<ReputationEntry> {
         let mut entities = self.entities.write();
 
-        if let Some(entity) = entities.get(&address) {
+        if let Some(entity) = entities.get(address) {
             return Ok(*entity);
         }
 
         let entity = ReputationEntry {
-            address,
+            address: *address,
             uo_seen: 0,
             uo_included: 0,
             status: ReputationStatus::OK,
         };
 
-        entities.insert(address, entity);
+        entities.insert(*address, entity);
 
         Ok(entity)
     }
 
-    async fn increment_seen(&mut self, address: Address) -> anyhow::Result<()> {
+    async fn increment_seen(&mut self, address: &Address) -> anyhow::Result<()> {
         let mut entities = self.entities.write();
 
-        if let Some(entity) = entities.get_mut(&address) {
+        if let Some(entity) = entities.get_mut(address) {
             entity.uo_seen += 1;
             return Ok(());
         }
@@ -91,10 +103,10 @@ impl Reputation for MemoryReputation {
         Err(anyhow::anyhow!("Entity not found"))
     }
 
-    async fn increment_included(&mut self, address: Address) -> anyhow::Result<()> {
+    async fn increment_included(&mut self, address: &Address) -> anyhow::Result<()> {
         let mut entities = self.entities.write();
 
-        if let Some(entity) = entities.get_mut(&address) {
+        if let Some(entity) = entities.get_mut(address) {
             entity.uo_included += 1;
             return Ok(());
         }
@@ -112,33 +124,33 @@ impl Reputation for MemoryReputation {
         Ok(())
     }
 
-    async fn add_whitelist(&mut self, address: Address) -> anyhow::Result<()> {
-        self.whitelist.write().insert(address);
+    async fn add_whitelist(&mut self, address: &Address) -> anyhow::Result<()> {
+        self.whitelist.write().insert(*address);
         Ok(())
     }
 
-    async fn remove_whitelist(&mut self, address: Address) -> anyhow::Result<bool> {
-        Ok(self.whitelist.write().remove(&address))
+    async fn remove_whitelist(&mut self, address: &Address) -> anyhow::Result<bool> {
+        Ok(self.whitelist.write().remove(address))
     }
 
-    async fn is_whitelist(&self, address: Address) -> anyhow::Result<bool> {
-        Ok(self.whitelist.read().contains(&address))
+    async fn is_whitelist(&self, address: &Address) -> anyhow::Result<bool> {
+        Ok(self.whitelist.read().contains(address))
     }
 
-    async fn add_blacklist(&mut self, address: Address) -> anyhow::Result<()> {
-        self.blacklist.write().insert(address);
+    async fn add_blacklist(&mut self, address: &Address) -> anyhow::Result<()> {
+        self.blacklist.write().insert(*address);
         Ok(())
     }
 
-    async fn remove_blacklist(&mut self, address: Address) -> anyhow::Result<bool> {
-        Ok(self.blacklist.write().remove(&address))
+    async fn remove_blacklist(&mut self, address: &Address) -> anyhow::Result<bool> {
+        Ok(self.blacklist.write().remove(address))
     }
 
-    async fn is_blacklist(&self, address: Address) -> anyhow::Result<bool> {
-        Ok(self.blacklist.read().contains(&address))
+    async fn is_blacklist(&self, address: &Address) -> anyhow::Result<bool> {
+        Ok(self.blacklist.read().contains(address))
     }
 
-    async fn get_status(&self, address: Address) -> anyhow::Result<ReputationStatus> {
+    async fn get_status(&self, address: &Address) -> anyhow::Result<ReputationStatus> {
         if self.is_whitelist(address).await? {
             return Ok(ReputationStatus::OK);
         }
@@ -149,7 +161,7 @@ impl Reputation for MemoryReputation {
 
         let entities = self.entities.read();
 
-        match entities.get(&address) {
+        match entities.get(address) {
             Some(entity) => {
                 let min_expected_included = entity.uo_seen / self.min_inclusion_denominator;
                 if min_expected_included <= entity.uo_included + self.throttling_slack {
@@ -164,9 +176,72 @@ impl Reputation for MemoryReputation {
         }
     }
 
-    // check stake
+    async fn update_handle_ops_reverted(&mut self, address: &Address) -> anyhow::Result<()> {
+        if let Ok(mut entity) = self.get(address).await {
+            entity.uo_seen = 100;
+            entity.uo_included = 0;
+        }
 
-    // crash handle ops
+        Ok(())
+    }
+
+    async fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> anyhow::Result<()> {
+        if let Some(stake_info) = stake_info {
+            if self.is_whitelist(&stake_info.address).await? {
+                return Ok(());
+            }
+
+            let entities = self.entities.read();
+
+            if let Some(entity) = entities.get(&stake_info.address) {
+                let error = if entity.status == ReputationStatus::BANNED {
+                    ReputationError::owned(
+                        ENTITY_BANNED_ERROR_CODE,
+                        format!("{title} with address {} is banned", stake_info.address),
+                        Some(json!({
+                            title: stake_info.address.to_string(),
+                        })),
+                    )
+                } else if stake_info.stake < self.min_stake {
+                    ReputationError::owned(
+                        STAKE_TOO_LOW_ERROR_CODE,
+                        format!(
+                            "{title} with address {} stake {} is lower than {}",
+                            stake_info.address, stake_info.stake, self.min_stake
+                        ),
+                        Some(json!({
+                            title: stake_info.address.to_string(),
+                            "minimumStake": AbiEncode::encode_hex(self.min_stake),
+                            "minimumUnstakeDelay": AbiEncode::encode_hex(self.min_unstake_delay),
+                        })),
+                    )
+                } else if stake_info.unstake_delay < self.min_unstake_delay {
+                    ReputationError::owned(
+                        STAKE_TOO_LOW_ERROR_CODE,
+                        format!(
+                            "{title} with address {} unstake delay {} is lower than {}",
+                            stake_info.address, stake_info.unstake_delay, self.min_unstake_delay
+                        ),
+                        Some(json!({
+                            title: stake_info.address.to_string(),
+                            "minimumStake": AbiEncode::encode_hex(self.min_stake),
+                            "minimumUnstakeDelay": AbiEncode::encode_hex(self.min_unstake_delay),
+                        })),
+                    )
+                } else {
+                    return Ok(());
+                };
+
+                return Err(anyhow::anyhow!(serde_json::to_string(&error)?));
+            }
+        }
+
+        Ok(())
+    }
 
     // debug: set reputation
 

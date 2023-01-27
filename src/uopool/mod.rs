@@ -15,11 +15,11 @@ use ethers::{
     types::{Address, H256, U256},
     utils::keccak256,
 };
-use jsonrpsee::tracing::info;
+use jsonrpsee::{tracing::info, types::ErrorObject};
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
-use self::memory_reputation::{ReputationEntry, ReputationStatus};
+use self::memory_reputation::{ReputationEntry, ReputationStatus, StakeInfo};
 
 pub mod memory_mempool;
 pub mod memory_reputation;
@@ -27,10 +27,13 @@ pub mod server;
 pub mod services;
 
 pub type MempoolId = H256;
+pub type ReputationError = ErrorObject<'static>;
 
 const MIN_INCLUSION_RATE_DENOMINATOR: u64 = 10;
 const THROTTLING_SLACK: u64 = 10;
 const BAN_SLACK: u64 = 50;
+const ENTITY_BANNED_ERROR_CODE: i32 = -32504;
+const STAKE_TOO_LOW_ERROR_CODE: i32 = -32505;
 
 pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
     H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
@@ -62,19 +65,25 @@ pub trait Reputation: Debug + Send + Sync + 'static {
         throttling_slack: u64,
         ban_slack: u64,
         min_stake: U256,
-        min_unstake_delay: u64,
+        min_unstake_delay: U256,
     ) -> Self;
-    async fn get(&mut self, address: Address) -> anyhow::Result<ReputationEntry>;
+    async fn get(&mut self, address: &Address) -> anyhow::Result<ReputationEntry>;
     async fn update_hourly(&mut self) -> anyhow::Result<()>;
-    async fn increment_seen(&mut self, address: Address) -> anyhow::Result<()>;
-    async fn increment_included(&mut self, address: Address) -> anyhow::Result<()>;
-    async fn add_whitelist(&mut self, address: Address) -> anyhow::Result<()>;
-    async fn remove_whitelist(&mut self, address: Address) -> anyhow::Result<bool>;
-    async fn is_whitelist(&self, address: Address) -> anyhow::Result<bool>;
-    async fn add_blacklist(&mut self, address: Address) -> anyhow::Result<()>;
-    async fn remove_blacklist(&mut self, address: Address) -> anyhow::Result<bool>;
-    async fn is_blacklist(&self, address: Address) -> anyhow::Result<bool>;
-    async fn get_status(&self, address: Address) -> anyhow::Result<ReputationStatus>;
+    async fn increment_seen(&mut self, address: &Address) -> anyhow::Result<()>;
+    async fn increment_included(&mut self, address: &Address) -> anyhow::Result<()>;
+    async fn add_whitelist(&mut self, address: &Address) -> anyhow::Result<()>;
+    async fn remove_whitelist(&mut self, address: &Address) -> anyhow::Result<bool>;
+    async fn is_whitelist(&self, address: &Address) -> anyhow::Result<bool>;
+    async fn add_blacklist(&mut self, address: &Address) -> anyhow::Result<()>;
+    async fn remove_blacklist(&mut self, address: &Address) -> anyhow::Result<bool>;
+    async fn is_blacklist(&self, address: &Address) -> anyhow::Result<bool>;
+    async fn get_status(&self, address: &Address) -> anyhow::Result<ReputationStatus>;
+    async fn update_handle_ops_reverted(&mut self, address: &Address) -> anyhow::Result<()>;
+    async fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> anyhow::Result<()>;
 
     // #[cfg(test)]
 }
@@ -93,8 +102,8 @@ pub struct UoPoolOpts {
     #[clap(long, value_parser=parse_u256, default_value = "1")]
     pub min_stake: U256,
 
-    #[clap(long, default_value = "0")]
-    pub min_unstake_delay: u64,
+    #[clap(long, value_parser=parse_u256, default_value = "0")]
+    pub min_unstake_delay: U256,
 }
 
 pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -> Result<()> {
