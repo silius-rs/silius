@@ -185,11 +185,7 @@ impl Reputation for MemoryReputation {
         Ok(())
     }
 
-    async fn verify_stake(
-        &self,
-        title: &str,
-        stake_info: Option<StakeInfo>,
-    ) -> anyhow::Result<()> {
+    async fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()> {
         if let Some(stake_info) = stake_info {
             if self.is_whitelist(&stake_info.address).await? {
                 return Ok(());

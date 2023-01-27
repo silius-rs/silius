@@ -79,11 +79,7 @@ pub trait Reputation: Debug + Send + Sync + 'static {
     async fn is_blacklist(&self, address: &Address) -> anyhow::Result<bool>;
     async fn get_status(&self, address: &Address) -> anyhow::Result<ReputationStatus>;
     async fn update_handle_ops_reverted(&mut self, address: &Address) -> anyhow::Result<()>;
-    async fn verify_stake(
-        &self,
-        title: &str,
-        stake_info: Option<StakeInfo>,
-    ) -> anyhow::Result<()>;
+    async fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
 
     // #[cfg(test)]
 }
