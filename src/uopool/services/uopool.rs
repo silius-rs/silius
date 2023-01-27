@@ -55,6 +55,8 @@ impl UoPool for UoPoolService {
             // TODO: sanity checks
             // TODO: simulation
 
+            // TODO: make something with reputation
+
             let uo_pool_error = UoPoolError::owned(
                 -32602,
                 "user operation was not added",
