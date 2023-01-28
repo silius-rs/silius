@@ -1,5 +1,8 @@
 use crate::{
-    types::user_operation::{UserOperation, UserOperationHash},
+    types::{
+        reputation::{ReputationEntry, ReputationStatus, StakeInfo},
+        user_operation::{UserOperation, UserOperationHash},
+    },
     uopool::{
         memory_mempool::MemoryMempool, memory_reputation::MemoryReputation,
         server::uopool::uo_pool_server::UoPoolServer, services::UoPoolService,
@@ -18,8 +21,6 @@ use ethers::{
 use jsonrpsee::{tracing::info, types::ErrorObject};
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
-
-use self::memory_reputation::{ReputationEntry, ReputationStatus, StakeInfo};
 
 pub mod memory_mempool;
 pub mod memory_reputation;
@@ -88,7 +89,7 @@ pub trait Reputation: Debug + Send + Sync + 'static {
     async fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
 
     #[cfg(debug_assertions)]
-    fn set(&mut self, reputation_entries: Self::ReputationEntries) -> Self::ReputationEntries;
+    fn set(&mut self, reputation_entries: Self::ReputationEntries);
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::ReputationEntries;

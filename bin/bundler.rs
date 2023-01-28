@@ -1,7 +1,10 @@
 use aa_bundler::{
     bundler::Bundler,
     models::wallet::Wallet,
-    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+    rpc::{
+        debug::DebugApiServerImpl, debug_api::DebugApiServer, eth::EthApiServerImpl,
+        eth_api::EthApiServer,
+    },
     uopool::server::uopool::uo_pool_client::UoPoolClient,
     utils::{parse_address, parse_u256},
 };
@@ -87,6 +90,13 @@ fn main() -> Result<()> {
                             ))
                             .await?;
 
+                            #[cfg(debug_assertions)]
+                            api.merge(
+                                DebugApiServerImpl {
+                                    uopool_grpc_client: uopool_grpc_client.clone(),
+                                }
+                                .into_rpc(),
+                            )?;
                             api.merge(
                                 EthApiServerImpl {
                                     call_gas_limit: 100_000_000,

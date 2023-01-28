@@ -11,32 +11,9 @@ use std::{
     sync::Arc,
 };
 
+use crate::types::reputation::{ReputationEntry, ReputationStatus, StakeInfo};
+
 use super::{Reputation, ReputationError, ENTITY_BANNED_ERROR_CODE, STAKE_TOO_LOW_ERROR_CODE};
-
-#[derive(Clone, Copy, Educe, PartialEq, Eq)]
-#[educe(Debug)]
-pub enum ReputationStatus {
-    OK,
-    THROTTLED,
-    BANNED,
-}
-
-#[derive(Clone, Copy, Educe)]
-#[educe(Debug)]
-pub struct ReputationEntry {
-    address: Address,
-    uo_seen: u64,
-    uo_included: u64,
-    status: ReputationStatus,
-}
-
-#[derive(Clone, Copy, Educe)]
-#[educe(Debug)]
-pub struct StakeInfo {
-    address: Address,
-    stake: U256,
-    unstake_delay: U256, // seconds
-}
 
 #[derive(Default, Educe)]
 #[educe(Debug)]
@@ -241,14 +218,12 @@ impl Reputation for MemoryReputation {
     }
 
     #[cfg(debug_assertions)]
-    fn set(&mut self, reputation_entries: Self::ReputationEntries) -> Self::ReputationEntries {
+    fn set(&mut self, reputation_entries: Self::ReputationEntries) {
         let mut entities = self.entities.write();
 
         for reputation in reputation_entries {
-            entities.insert(reputation.address, reputation.clone());
+            entities.insert(reputation.address, reputation);
         }
-
-        entities.values().cloned().collect()
     }
 
     #[cfg(debug_assertions)]
