@@ -68,9 +68,9 @@ pub trait Reputation: Debug + Send + Sync + 'static {
         min_unstake_delay: U256,
     ) -> Self;
     async fn get(&mut self, address: &Address) -> anyhow::Result<ReputationEntry>;
-    async fn update_hourly(&mut self) -> anyhow::Result<()>;
     async fn increment_seen(&mut self, address: &Address) -> anyhow::Result<()>;
     async fn increment_included(&mut self, address: &Address) -> anyhow::Result<()>;
+    fn update_hourly(&mut self);
     async fn add_whitelist(&mut self, address: &Address) -> anyhow::Result<()>;
     async fn remove_whitelist(&mut self, address: &Address) -> anyhow::Result<bool>;
     async fn is_whitelist(&self, address: &Address) -> anyhow::Result<bool>;
@@ -112,18 +112,25 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
             mempools.insert(id, Box::<MemoryMempool>::default());
         }
 
+        let reputation = Arc::new(RwLock::new(MemoryReputation::new(
+            MIN_INCLUSION_RATE_DENOMINATOR,
+            THROTTLING_SLACK,
+            BAN_SLACK,
+            opts.min_stake,
+            opts.min_unstake_delay,
+        )));
+
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(RwLock::new(mempools)),
-            Arc::new(RwLock::new(MemoryReputation::new(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
-                opts.min_stake,
-                opts.min_unstake_delay,
-            ))),
+            reputation.clone(),
         ));
 
-        // TODO: start updating reputation hourly
+        tokio::spawn(async move {
+            loop {
+                reputation.write().update_hourly();
+                tokio::time::sleep(Duration::from_secs(60 * 60)).await;
+            }
+        });
 
         info!(
             "UoPool gRPC server starting on {}",
