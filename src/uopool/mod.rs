@@ -60,6 +60,8 @@ pub trait Mempool: Debug + Send + Sync + 'static {
 
 #[async_trait]
 pub trait Reputation: Debug + Send + Sync + 'static {
+    type ReputationEntries: IntoIterator<Item = ReputationEntry>;
+
     fn new(
         min_inclusion_denominator: u64,
         throttling_slack: u64,
@@ -81,7 +83,14 @@ pub trait Reputation: Debug + Send + Sync + 'static {
     async fn update_handle_ops_reverted(&mut self, address: &Address) -> anyhow::Result<()>;
     async fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
 
-    // #[cfg(test)]
+    #[cfg(debug_assertions)]
+    fn set(&mut self, reputation_entries: Self::ReputationEntries) -> Self::ReputationEntries;
+
+    #[cfg(debug_assertions)]
+    fn get_all(&self) -> Self::ReputationEntries;
+
+    #[cfg(debug_assertions)]
+    fn clear(&mut self);
 }
 
 #[derive(Educe)]

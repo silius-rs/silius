@@ -54,6 +54,8 @@ pub struct MemoryReputation {
 
 #[async_trait]
 impl Reputation for MemoryReputation {
+    type ReputationEntries = Vec<ReputationEntry>;
+
     fn new(
         min_inclusion_denominator: u64,
         throttling_slack: u64,
@@ -238,9 +240,26 @@ impl Reputation for MemoryReputation {
         Ok(())
     }
 
-    // debug: set reputation
+    #[cfg(debug_assertions)]
+    fn set(&mut self, reputation_entries: Self::ReputationEntries) -> Self::ReputationEntries {
+        let mut entities = self.entities.write();
 
-    // debug: clear reputation
+        for reputation in reputation_entries {
+            entities.insert(reputation.address, reputation.clone());
+        }
+
+        entities.values().cloned().collect()
+    }
+
+    #[cfg(debug_assertions)]
+    fn get_all(&self) -> Self::ReputationEntries {
+        self.entities.read().values().cloned().collect()
+    }
+
+    #[cfg(debug_assertions)]
+    fn clear(&mut self) {
+        self.entities.write().clear();
+    }
 }
 
 // tests
