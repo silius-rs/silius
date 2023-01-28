@@ -2,8 +2,9 @@ use super::debug_api::DebugApiServer;
 use crate::{
     types::{reputation::ReputationEntry, user_operation::UserOperation},
     uopool::server::uopool::{
-        uo_pool_client::UoPoolClient, ClearRequest, ClearResult, GetAllRequest,
-        GetAllResult,
+        uo_pool_client::UoPoolClient, ClearRequest, ClearResult, GetAllReputationRequest,
+        GetAllReputationResult, GetAllRequest, GetAllResult, SetReputationRequest,
+        SetReputationResult,
     },
 };
 use anyhow::format_err;
@@ -61,11 +62,49 @@ impl DebugApiServer for DebugApiServerImpl {
         ))
     }
 
-    async fn set_reputation(&self, _reputation_entries: Vec<ReputationEntry>) -> RpcResult<()> {
-        todo!()
+    async fn set_reputation(
+        &self,
+        reputation_entries: Vec<ReputationEntry>,
+        _entry_point: Address,
+    ) -> RpcResult<()> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(SetReputationRequest {
+            res: reputation_entries.iter().map(|re| (*re).into()).collect(),
+        });
+
+        let response = uopool_grpc_client
+            .set_reputation(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == SetReputationResult::SetReputation as i32 {
+            return Ok(());
+        }
+
+        Err(jsonrpsee::core::Error::Custom(
+            "error setting reputation".to_string(),
+        ))
     }
 
-    async fn dump_reputation(&self) -> RpcResult<Vec<ReputationEntry>> {
-        todo!()
+    async fn dump_reputation(&self, _entry_point: Address) -> RpcResult<Vec<ReputationEntry>> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(GetAllReputationRequest {});
+
+        let response = uopool_grpc_client
+            .get_all_reputation(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == GetAllReputationResult::GotAllReputation as i32 {
+            return Ok(response.res.iter().map(|re| re.clone().into()).collect());
+        }
+
+        Err(jsonrpsee::core::Error::Custom(
+            "error getting reputation".to_string(),
+        ))
     }
 }

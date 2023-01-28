@@ -3,8 +3,9 @@ use crate::{
     uopool::{
         server::uopool::{
             uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
-            ClearResponse, ClearResult, GetAllRequest, GetAllResponse, GetAllResult, RemoveRequest,
-            RemoveResponse,
+            ClearResponse, ClearResult, GetAllReputationRequest, GetAllReputationResponse,
+            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult, RemoveRequest,
+            RemoveResponse, SetReputationRequest, SetReputationResponse, SetReputationResult,
         },
         MempoolBox, MempoolId, ReputationBox,
     },
@@ -87,6 +88,22 @@ impl UoPool for UoPoolService {
     }
 
     #[cfg(debug_assertions)]
+    async fn clear(
+        &self,
+        _request: tonic::Request<ClearRequest>,
+    ) -> Result<Response<ClearResponse>, tonic::Status> {
+        for mempool in self.mempools.write().values_mut() {
+            mempool.clear();
+        }
+
+        self.reputation.write().clear();
+
+        Ok(tonic::Response::new(ClearResponse {
+            result: ClearResult::Cleared as i32,
+        }))
+    }
+
+    #[cfg(debug_assertions)]
     async fn get_all(
         &self,
         request: tonic::Request<GetAllRequest>,
@@ -123,18 +140,38 @@ impl UoPool for UoPoolService {
     }
 
     #[cfg(debug_assertions)]
-    async fn clear(
+    async fn set_reputation(
         &self,
-        _request: tonic::Request<ClearRequest>,
-    ) -> Result<Response<ClearResponse>, tonic::Status> {
-        for mempool in self.mempools.write().values_mut() {
-            mempool.clear();
-        }
+        request: tonic::Request<SetReputationRequest>,
+    ) -> Result<Response<SetReputationResponse>, tonic::Status> {
+        let req = request.into_inner();
+        let mut res = SetReputationResponse::default();
 
-        self.reputation.write().clear();
+        self.reputation
+            .write()
+            .set(req.res.iter().map(|re| re.clone().into()).collect());
 
-        Ok(tonic::Response::new(ClearResponse {
-            result: ClearResult::Cleared as i32,
-        }))
+        res.result = SetReputationResult::SetReputation as i32;
+
+        Ok(tonic::Response::new(res))
+    }
+
+    #[cfg(debug_assertions)]
+    async fn get_all_reputation(
+        &self,
+        _request: tonic::Request<GetAllReputationRequest>,
+    ) -> Result<Response<GetAllReputationResponse>, tonic::Status> {
+        let res = GetAllReputationResponse {
+            result: GetAllReputationResult::GotAllReputation as i32,
+            res: self
+                .reputation
+                .read()
+                .get_all()
+                .iter()
+                .map(|re| (*re).into())
+                .collect(),
+        };
+
+        Ok(tonic::Response::new(res))
     }
 }

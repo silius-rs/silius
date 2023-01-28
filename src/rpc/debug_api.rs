@@ -12,8 +12,12 @@ pub trait DebugApi {
     async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperation>>;
 
     #[method(name = "setReputation")]
-    async fn set_reputation(&self, reputation_entries: Vec<ReputationEntry>) -> RpcResult<()>;
+    async fn set_reputation(
+        &self,
+        reputation_entries: Vec<ReputationEntry>,
+        entry_point: Address,
+    ) -> RpcResult<()>;
 
     #[method(name = "dumpReputation")]
-    async fn dump_reputation(&self) -> RpcResult<Vec<ReputationEntry>>;
+    async fn dump_reputation(&self, entry_point: Address) -> RpcResult<Vec<ReputationEntry>>;
 }
