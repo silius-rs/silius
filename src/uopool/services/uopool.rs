@@ -1,12 +1,12 @@
 use crate::{
-    types::user_operation::UserOperation,
+    types::{reputation::ReputationEntry, user_operation::UserOperation},
     uopool::{
-        memory_reputation::MemoryReputation,
         server::uopool::{
-            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, AllRequest, AllResponse,
-            RemoveRequest, RemoveResponse,
+            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
+            ClearResponse, ClearResult, GetAllRequest, GetAllResponse, RemoveRequest,
+            RemoveResponse,
         },
-        MempoolBox, MempoolId,
+        MempoolBox, MempoolId, ReputationBox,
     },
 };
 use async_trait::async_trait;
@@ -19,18 +19,18 @@ use tonic::Response;
 pub type UoPoolError = ErrorObject<'static>;
 
 pub struct UoPoolService {
-    _mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
-    _reputation: Arc<RwLock<MemoryReputation>>,
+    mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+    reputation: Arc<RwLock<ReputationBox<Vec<ReputationEntry>>>>,
 }
 
 impl UoPoolService {
     pub fn new(
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
-        reputation: Arc<RwLock<MemoryReputation>>,
+        reputation: Arc<RwLock<ReputationBox<Vec<ReputationEntry>>>>,
     ) -> Self {
         Self {
-            _mempools: mempools,
-            _reputation: reputation,
+            mempools,
+            reputation,
         }
     }
 }
@@ -82,10 +82,26 @@ impl UoPool for UoPoolService {
         Err(tonic::Status::unimplemented("todo"))
     }
 
-    async fn all(
+    async fn get_all(
         &self,
-        _request: tonic::Request<AllRequest>,
-    ) -> Result<Response<AllResponse>, tonic::Status> {
+        _request: tonic::Request<GetAllRequest>,
+    ) -> Result<Response<GetAllResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("todo"))
+    }
+
+    #[cfg(debug_assertions)]
+    async fn clear(
+        &self,
+        _request: tonic::Request<ClearRequest>,
+    ) -> Result<Response<ClearResponse>, tonic::Status> {
+        for mempool in self.mempools.write().values_mut() {
+            mempool.clear();
+        }
+
+        self.reputation.write().clear();
+
+        Ok(tonic::Response::new(ClearResponse {
+            result: ClearResult::Cleared as i32,
+        }))
     }
 }

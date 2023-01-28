@@ -33,23 +33,19 @@ pub struct MemoryReputation {
 impl Reputation for MemoryReputation {
     type ReputationEntries = Vec<ReputationEntry>;
 
-    fn new(
+    fn init(
+        &mut self,
         min_inclusion_denominator: u64,
         throttling_slack: u64,
         ban_slack: u64,
         min_stake: U256,
         min_unstake_delay: U256,
-    ) -> Self {
-        Self {
-            min_inclusion_denominator,
-            throttling_slack,
-            ban_slack,
-            min_stake,
-            min_unstake_delay,
-            entities: Arc::new(RwLock::new(HashMap::new())),
-            whitelist: Arc::new(RwLock::new(HashSet::new())),
-            blacklist: Arc::new(RwLock::new(HashSet::new())),
-        }
+    ) {
+        self.min_inclusion_denominator = min_inclusion_denominator;
+        self.throttling_slack = throttling_slack;
+        self.ban_slack = ban_slack;
+        self.min_stake = min_stake;
+        self.min_unstake_delay = min_unstake_delay;
     }
 
     async fn get(&mut self, address: &Address) -> anyhow::Result<ReputationEntry> {

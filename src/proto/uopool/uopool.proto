@@ -30,17 +30,36 @@ enum RemoveResult {
 
 message RemoveResponse {
     RemoveResult result = 1;
-    string data = 2;
 }
 
-message AllRequest {}
+enum GetAllResult {
+    GOT_ALL = 0;
+    NOT_GOT_ALL = 1;
+}
 
-message AllResponse {
-    repeated types.UserOperation uos = 1;
+message GetAllRequest {}
+
+message GetAllResponse {
+    GetAllResult result = 1;
+    repeated types.UserOperation uos = 2;
+}
+
+enum ClearResult {
+    CLEARED = 0;
+    NOT_CLEARED = 1;
+}
+
+message ClearRequest {}
+
+message ClearResponse {
+    ClearResult result = 1;
 }
 
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
-    rpc All(AllRequest) returns (AllResponse);
+    rpc GetAll(GetAllRequest) returns (GetAllResponse);
+
+    // debug
+    rpc Clear(ClearRequest) returns (ClearResponse);
 }

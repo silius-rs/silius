@@ -41,6 +41,7 @@ pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
 }
 
 pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
+pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T>>;
 
 #[async_trait]
 pub trait Mempool: Debug + Send + Sync + 'static {
@@ -67,13 +68,14 @@ pub trait Mempool: Debug + Send + Sync + 'static {
 pub trait Reputation: Debug + Send + Sync + 'static {
     type ReputationEntries: IntoIterator<Item = ReputationEntry>;
 
-    fn new(
+    fn init(
+        &mut self,
         min_inclusion_denominator: u64,
         throttling_slack: u64,
         ban_slack: u64,
         min_stake: U256,
         min_unstake_delay: U256,
-    ) -> Self;
+    );
     async fn get(&mut self, address: &Address) -> anyhow::Result<ReputationEntry>;
     async fn increment_seen(&mut self, address: &Address) -> anyhow::Result<()>;
     async fn increment_included(&mut self, address: &Address) -> anyhow::Result<()>;
@@ -126,13 +128,15 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
             mempools.insert(id, Box::<MemoryMempool>::default());
         }
 
-        let reputation = Arc::new(RwLock::new(MemoryReputation::new(
+        let reputation: Arc<RwLock<ReputationBox<Vec<ReputationEntry>>>> =
+            Arc::new(RwLock::new(Box::<MemoryReputation>::default()));
+        reputation.write().init(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,
             BAN_SLACK,
             opts.min_stake,
             opts.min_unstake_delay,
-        )));
+        );
 
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(RwLock::new(mempools)),
