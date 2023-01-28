@@ -37,7 +37,9 @@ enum GetAllResult {
     NOT_GOT_ALL = 1;
 }
 
-message GetAllRequest {}
+message GetAllRequest {
+    types.H160 ep = 1;
+}
 
 message GetAllResponse {
     GetAllResult result = 1;
@@ -58,8 +60,8 @@ message ClearResponse {
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
-    rpc GetAll(GetAllRequest) returns (GetAllResponse);
 
     // debug
+    rpc GetAll(GetAllRequest) returns (GetAllResponse);
     rpc Clear(ClearRequest) returns (ClearResponse);
 }

@@ -1,4 +1,5 @@
 use crate::types::{reputation::ReputationEntry, user_operation::UserOperation};
+use ethers::types::Address;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 #[cfg(debug_assertions)]
@@ -8,7 +9,7 @@ pub trait DebugApi {
     async fn clear_state(&self) -> RpcResult<()>;
 
     #[method(name = "dumpMempool")]
-    async fn dump_mempool(&self) -> RpcResult<Vec<UserOperation>>;
+    async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperation>>;
 
     #[method(name = "setReputation")]
     async fn set_reputation(&self, reputation_entries: Vec<ReputationEntry>) -> RpcResult<()>;

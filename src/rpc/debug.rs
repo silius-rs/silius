@@ -1,10 +1,14 @@
 use super::debug_api::DebugApiServer;
 use crate::{
     types::{reputation::ReputationEntry, user_operation::UserOperation},
-    uopool::server::uopool::{uo_pool_client::UoPoolClient, ClearRequest, ClearResult},
+    uopool::server::uopool::{
+        uo_pool_client::UoPoolClient, ClearRequest, ClearResult, GetAllRequest,
+        GetAllResult,
+    },
 };
 use anyhow::format_err;
 use async_trait::async_trait;
+use ethers::types::Address;
 use jsonrpsee::core::RpcResult;
 
 #[cfg(debug_assertions)]
@@ -35,8 +39,26 @@ impl DebugApiServer for DebugApiServerImpl {
         ))
     }
 
-    async fn dump_mempool(&self) -> RpcResult<Vec<UserOperation>> {
-        todo!()
+    async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperation>> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(GetAllRequest {
+            ep: Some(entry_point.into()),
+        });
+
+        let response = uopool_grpc_client
+            .get_all(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == GetAllResult::GotAll as i32 {
+            return Ok(response.uos.iter().map(|uo| uo.clone().into()).collect());
+        }
+
+        Err(jsonrpsee::core::Error::Custom(
+            "error getting mempool".to_string(),
+        ))
     }
 
     async fn set_reputation(&self, _reputation_entries: Vec<ReputationEntry>) -> RpcResult<()> {

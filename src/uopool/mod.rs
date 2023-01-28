@@ -141,6 +141,7 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(RwLock::new(mempools)),
             reputation.clone(),
+            chain_id,
         ));
 
         tokio::spawn(async move {
