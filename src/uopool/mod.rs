@@ -52,10 +52,14 @@ pub trait Mempool: Debug + Send + Sync + 'static {
         chain_id: U256,
     ) -> anyhow::Result<UserOperationHash>;
     async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
-    async fn get_all(&self) -> anyhow::Result<Self::UserOperations>;
     async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations>;
     async fn remove(&mut self, user_operation_hash: UserOperationHash) -> anyhow::Result<()>;
-    async fn clear(&mut self) -> anyhow::Result<()>;
+
+    #[cfg(debug_assertions)]
+    fn get_all(&self) -> Self::UserOperations;
+
+    #[cfg(debug_assertions)]
+    fn clear(&mut self);
 }
 
 #[async_trait]
