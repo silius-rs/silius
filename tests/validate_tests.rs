@@ -7,7 +7,7 @@ use common::gen::{
 };
 use common::{DeployedContract, KEY_PHRASE};
 use ethers::abi::Token;
-use ethers::prelude::BaseContract;
+use ethers::prelude::{BaseContract, MiddlewareBuilder, NonceManagerMiddleware};
 use ethers::providers::Http;
 use ethers::signers::coins_bip39::English;
 use ethers::signers::MnemonicBuilder;
@@ -41,7 +41,7 @@ struct TestContext<M> {
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
 }
 
-type ClientType = SignerMiddleware<Provider<Http>, LocalWallet>;
+type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
 
 async fn setup() -> anyhow::Result<TestContext<ClientType>> {
     let chain_id: u64 = 1337;
@@ -54,17 +54,17 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
     let provider =
         Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
 
-    let client = Arc::new(SignerMiddleware::new(
-        provider,
-        wallet.clone().with_chain_id(chain_id),
-    ));
+    let client = Arc::new(
+        SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
+            .nonce_manager(wallet.address()),
+    );
 
     let coinbase = client.clone().get_accounts().await?[0];
     let tx = TransactionRequest::new()
         .to(wallet.address())
         .value(U256::from(10).pow(U256::from(18)).mul(100))
         .from(coinbase);
-    client.clone().send_transaction(tx, None).await?.await?;
+    provider.send_transaction(tx, None).await?.await?;
 
     let entry_point = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
