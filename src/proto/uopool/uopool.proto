@@ -62,7 +62,9 @@ enum GetAllReputationResult {
     NOT_GOT_ALL_REPUTATION = 1;
 }
 
-message GetAllReputationRequest {}
+message GetAllReputationRequest {
+    types.H160 ep = 1;
+}
 
 message GetAllReputationResponse {
     GetAllReputationResult result = 1;
@@ -76,6 +78,7 @@ enum SetReputationResult {
 
 message SetReputationRequest {
     repeated types.ReputationEntry res = 1;
+    types.H160 ep = 2;
 }
 
 message SetReputationResponse {

@@ -1,6 +1,7 @@
 use crate::{
     types::{reputation::ReputationEntry, user_operation::UserOperation},
     uopool::{
+        mempool_id,
         server::uopool::{
             uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
             ClearResponse, ClearResult, GetAllReputationRequest, GetAllReputationResponse,
@@ -22,19 +23,19 @@ pub type UoPoolError = ErrorObject<'static>;
 
 pub struct UoPoolService {
     pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
-    pub reputation: Arc<RwLock<ReputationBox<Vec<ReputationEntry>>>>,
+    pub reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
     pub chain_id: U256,
 }
 
 impl UoPoolService {
     pub fn new(
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
-        reputation: Arc<RwLock<ReputationBox<Vec<ReputationEntry>>>>,
+        reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
         chain_id: U256,
     ) -> Self {
         Self {
             mempools,
-            reputation,
+            reputations,
             chain_id,
         }
     }
@@ -96,7 +97,7 @@ impl UoPool for UoPoolService {
             mempool.clear();
         }
 
-        self.reputation.write().clear();
+        self.reputations.write().clear();
 
         Ok(tonic::Response::new(ClearResponse {
             result: ClearResult::Cleared as i32,
@@ -108,8 +109,6 @@ impl UoPool for UoPoolService {
         &self,
         request: tonic::Request<GetAllRequest>,
     ) -> Result<Response<GetAllResponse>, tonic::Status> {
-        use crate::uopool::mempool_id;
-
         let req = request.into_inner();
         let mut res = GetAllResponse::default();
 
@@ -147,31 +146,55 @@ impl UoPool for UoPoolService {
         let req = request.into_inner();
         let mut res = SetReputationResponse::default();
 
-        self.reputation
-            .write()
-            .set(req.res.iter().map(|re| re.clone().into()).collect());
+        if let Some(entry_point) = req.ep {
+            let entry_point: Address = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-        res.result = SetReputationResult::SetReputation as i32;
+            if let Some(reputation) = self
+                .reputations
+                .write()
+                .get_mut(&mempool_id(entry_point, self.chain_id))
+            {
+                reputation.set(req.res.iter().map(|re| re.clone().into()).collect());
+                res.result = SetReputationResult::SetReputation as i32;
+            } else {
+                res.result = SetReputationResult::NotSetReputation as i32;
+            }
 
-        Ok(tonic::Response::new(res))
+            return Ok(tonic::Response::new(res));
+        }
+
+        Err(tonic::Status::invalid_argument("missing entry point"))
     }
 
     #[cfg(debug_assertions)]
     async fn get_all_reputation(
         &self,
-        _request: tonic::Request<GetAllReputationRequest>,
+        request: tonic::Request<GetAllReputationRequest>,
     ) -> Result<Response<GetAllReputationResponse>, tonic::Status> {
-        let res = GetAllReputationResponse {
-            result: GetAllReputationResult::GotAllReputation as i32,
-            res: self
-                .reputation
+        let req = request.into_inner();
+        let mut res = GetAllReputationResponse::default();
+
+        if let Some(entry_point) = req.ep {
+            let entry_point: Address = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+
+            if let Some(reputation) = self
+                .reputations
                 .read()
-                .get_all()
-                .iter()
-                .map(|re| (*re).into())
-                .collect(),
+                .get(&mempool_id(entry_point, self.chain_id))
+            {
+                res.result = GetAllReputationResult::GotAllReputation as i32;
+                res.res = reputation.get_all().iter().map(|re| (*re).into()).collect();
+            } else {
+                res.result = GetAllReputationResult::NotGotAllReputation as i32;
+            }
+
+            return Ok(tonic::Response::new(res));
         };
 
-        Ok(tonic::Response::new(res))
+        Err(tonic::Status::invalid_argument("missing entry point"))
     }
 }

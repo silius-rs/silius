@@ -65,12 +65,13 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn set_reputation(
         &self,
         reputation_entries: Vec<ReputationEntry>,
-        _entry_point: Address,
+        entry_point: Address,
     ) -> RpcResult<()> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
         let request = tonic::Request::new(SetReputationRequest {
             res: reputation_entries.iter().map(|re| (*re).into()).collect(),
+            ep: Some(entry_point.into()),
         });
 
         let response = uopool_grpc_client
@@ -88,10 +89,12 @@ impl DebugApiServer for DebugApiServerImpl {
         ))
     }
 
-    async fn dump_reputation(&self, _entry_point: Address) -> RpcResult<Vec<ReputationEntry>> {
+    async fn dump_reputation(&self, entry_point: Address) -> RpcResult<Vec<ReputationEntry>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let request = tonic::Request::new(GetAllReputationRequest {});
+        let request = tonic::Request::new(GetAllReputationRequest {
+            ep: Some(entry_point.into()),
+        });
 
         let response = uopool_grpc_client
             .get_all_reputation(request)

@@ -123,30 +123,37 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
         let mut builder = tonic::transport::Server::builder();
 
         let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
+        let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
+
         for entry_point in entry_points {
             let id = mempool_id(entry_point, chain_id);
             mempools.insert(id, Box::<MemoryMempool>::default());
+
+            reputations.insert(id, Box::<MemoryReputation>::default());
+            if let Some(reputation) = reputations.get_mut(&id) {
+                reputation.init(
+                    MIN_INCLUSION_RATE_DENOMINATOR,
+                    THROTTLING_SLACK,
+                    BAN_SLACK,
+                    opts.min_stake,
+                    opts.min_unstake_delay,
+                );
+            }
         }
 
-        let reputation: Arc<RwLock<ReputationBox<Vec<ReputationEntry>>>> =
-            Arc::new(RwLock::new(Box::<MemoryReputation>::default()));
-        reputation.write().init(
-            MIN_INCLUSION_RATE_DENOMINATOR,
-            THROTTLING_SLACK,
-            BAN_SLACK,
-            opts.min_stake,
-            opts.min_unstake_delay,
-        );
+        let reputations = Arc::new(RwLock::new(reputations));
 
         let svc = UoPoolServer::new(UoPoolService::new(
             Arc::new(RwLock::new(mempools)),
-            reputation.clone(),
+            reputations.clone(),
             chain_id,
         ));
 
         tokio::spawn(async move {
             loop {
-                reputation.write().update_hourly();
+                for reputation in reputations.write().values_mut() {
+                    reputation.update_hourly();
+                }
                 tokio::time::sleep(Duration::from_secs(60 * 60)).await;
             }
         });
