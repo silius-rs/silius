@@ -17,6 +17,12 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 ## How to run?
 
+Set up third-party dependencies (EIP-4337 smart contracts and bundler tests):
+
+```bash
+make setup-thirdparty
+```
+
 Create wallet for bundler:
 
 ```bash
