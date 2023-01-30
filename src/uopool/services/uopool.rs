@@ -97,7 +97,9 @@ impl UoPool for UoPoolService {
             mempool.clear();
         }
 
-        self.reputations.write().clear();
+        for reputation in self.reputations.write().values_mut() {
+            reputation.clear();
+        }
 
         Ok(tonic::Response::new(ClearResponse {
             result: ClearResult::Cleared as i32,
