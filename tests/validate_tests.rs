@@ -5,22 +5,24 @@ use common::gen::{
     EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRulesAccount,
     TestRulesAccountFactory, TestStorageAccountFactory,
 };
-use common::DeployedContract;
+use common::{DeployedContract, KEY_PHRASE};
 use ethers::abi::Token;
-use ethers::prelude::BaseContract;
+use ethers::prelude::{BaseContract, MiddlewareBuilder, NonceManagerMiddleware};
 use ethers::providers::Http;
+use ethers::signers::coins_bip39::English;
+use ethers::signers::MnemonicBuilder;
 use ethers::types::transaction::eip2718::TypedTransaction;
-use ethers::types::Address;
-use ethers::utils::{parse_units, AnvilInstance};
+use ethers::types::{Address, TransactionRequest};
+use ethers::utils::{parse_units, Geth, GethInstance};
 use ethers::{
-    core::utils::Anvil,
     prelude::SignerMiddleware,
     providers::{Middleware, Provider},
     signers::{LocalWallet, Signer},
     types::{Bytes, U256},
 };
-use std::ops::Deref;
+use std::ops::{Deref, Mul};
 use std::{convert::TryFrom, sync::Arc, time::Duration};
+use tempdir::TempDir;
 
 use crate::common::{
     deploy_entry_point, deploy_test_opcode_account, deploy_test_opcode_account_factory,
@@ -30,7 +32,7 @@ use crate::common::{
 
 struct TestContext<M> {
     pub client: Arc<M>,
-    pub _anvil: AnvilInstance,
+    pub _geth: GethInstance,
     pub entry_point: DeployedContract<EntryPointContract<M>>,
     pub paymaster: DeployedContract<TestOpcodesAccount<M>>,
     pub opcodes_factory: DeployedContract<TestOpcodesAccountFactory<M>>,
@@ -39,18 +41,31 @@ struct TestContext<M> {
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
 }
 
-type ClientType = SignerMiddleware<Provider<Http>, LocalWallet>;
+type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
 
 async fn setup() -> anyhow::Result<TestContext<ClientType>> {
-    let anvil = Anvil::new().spawn();
-    let provider =
-        Provider::<Http>::try_from(anvil.endpoint())?.interval(Duration::from_millis(10u64));
-    let wallet: LocalWallet = anvil.keys()[0].clone().into();
+    let chain_id: u64 = 1337;
+    let tmp_dir = TempDir::new("test_geth")?;
+    let wallet = MnemonicBuilder::<English>::default()
+        .phrase(KEY_PHRASE)
+        .build()?;
 
-    let client = Arc::new(SignerMiddleware::new(
-        provider,
-        wallet.clone().with_chain_id(anvil.chain_id()),
-    ));
+    let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();
+    let provider =
+        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
+
+    let client = Arc::new(
+        SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
+            .nonce_manager(wallet.address()),
+    );
+
+    let coinbase = client.clone().get_accounts().await?[0];
+    let tx = TransactionRequest::new()
+        .to(wallet.address())
+        .value(U256::from(10).pow(U256::from(18)).mul(100))
+        .from(coinbase);
+    provider.send_transaction(tx, None).await?.await?;
+
     let entry_point = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
     entry_point
@@ -83,7 +98,7 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
         .await?;
     Ok(TestContext::<ClientType> {
         client: client.clone(),
-        _anvil: anvil,
+        _geth: geth,
         entry_point,
         paymaster,
         opcodes_factory,
