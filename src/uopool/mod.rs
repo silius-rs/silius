@@ -1,6 +1,9 @@
 use crate::{
     types::{
-        reputation::{ReputationEntry, ReputationStatus, StakeInfo},
+        reputation::{
+            ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
+            MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+        },
         user_operation::{UserOperation, UserOperationHash},
     },
     uopool::{
@@ -18,7 +21,7 @@ use ethers::{
     types::{Address, H256, U256},
     utils::keccak256,
 };
-use jsonrpsee::{tracing::info, types::ErrorObject};
+use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
@@ -28,20 +31,13 @@ pub mod server;
 pub mod services;
 
 pub type MempoolId = H256;
-pub type ReputationError = ErrorObject<'static>;
 
-const MIN_INCLUSION_RATE_DENOMINATOR: u64 = 10;
-const THROTTLING_SLACK: u64 = 10;
-const BAN_SLACK: u64 = 50;
-const ENTITY_BANNED_ERROR_CODE: i32 = -32504;
-const STAKE_TOO_LOW_ERROR_CODE: i32 = -32505;
+pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
+pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T>>;
 
 pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
     H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
 }
-
-pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
-pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T>>;
 
 #[async_trait]
 pub trait Mempool: Debug + Send + Sync + 'static {

@@ -1,19 +1,17 @@
 use async_trait::async_trait;
 use educe::Educe;
-use ethers::{
-    abi::AbiEncode,
-    types::{Address, U256},
-};
+use ethers::types::{Address, U256};
 use parking_lot::RwLock;
-use serde_json::json;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 
-use crate::types::reputation::{ReputationEntry, ReputationStatus, StakeInfo};
+use crate::types::reputation::{
+    BadReputationError, ReputationEntry, ReputationError, ReputationStatus, StakeInfo,
+};
 
-use super::{Reputation, ReputationError, ENTITY_BANNED_ERROR_CODE, STAKE_TOO_LOW_ERROR_CODE};
+use super::Reputation;
 
 #[derive(Default, Educe)]
 #[educe(Debug)]
@@ -169,44 +167,33 @@ impl Reputation for MemoryReputation {
 
             if let Some(entity) = entities.get(&stake_info.address) {
                 let error = if entity.status == ReputationStatus::BANNED {
-                    ReputationError::owned(
-                        ENTITY_BANNED_ERROR_CODE,
-                        format!("{title} with address {} is banned", stake_info.address),
-                        Some(json!({
-                            title: stake_info.address.to_string(),
-                        })),
-                    )
+                    BadReputationError::EntityBanned {
+                        address: stake_info.address,
+                        title: title.to_string(),
+                    }
                 } else if stake_info.stake < self.min_stake {
-                    ReputationError::owned(
-                        STAKE_TOO_LOW_ERROR_CODE,
-                        format!(
-                            "{title} with address {} stake {} is lower than {}",
-                            stake_info.address, stake_info.stake, self.min_stake
-                        ),
-                        Some(json!({
-                            title: stake_info.address.to_string(),
-                            "minimumStake": AbiEncode::encode_hex(self.min_stake),
-                            "minimumUnstakeDelay": AbiEncode::encode_hex(self.min_unstake_delay),
-                        })),
-                    )
+                    BadReputationError::StakeTooLow {
+                        address: stake_info.address,
+                        title: title.to_string(),
+                        stake: stake_info.stake,
+                        min_stake: self.min_stake,
+                        min_unstake_delay: self.min_unstake_delay,
+                    }
                 } else if stake_info.unstake_delay < self.min_unstake_delay {
-                    ReputationError::owned(
-                        STAKE_TOO_LOW_ERROR_CODE,
-                        format!(
-                            "{title} with address {} unstake delay {} is lower than {}",
-                            stake_info.address, stake_info.unstake_delay, self.min_unstake_delay
-                        ),
-                        Some(json!({
-                            title: stake_info.address.to_string(),
-                            "minimumStake": AbiEncode::encode_hex(self.min_stake),
-                            "minimumUnstakeDelay": AbiEncode::encode_hex(self.min_unstake_delay),
-                        })),
-                    )
+                    BadReputationError::UnstakeDelayTooLow {
+                        address: stake_info.address,
+                        title: title.to_string(),
+                        unstake_delay: stake_info.unstake_delay,
+                        min_stake: self.min_stake,
+                        min_unstake_delay: self.min_unstake_delay,
+                    }
                 } else {
                     return Ok(());
                 };
 
-                return Err(anyhow::anyhow!(serde_json::to_string(&error)?));
+                return Err(anyhow::anyhow!(serde_json::to_string(
+                    &ReputationError::from(error)
+                )?));
             }
         }
 
@@ -233,4 +220,120 @@ impl Reputation for MemoryReputation {
     }
 }
 
-// tests
+#[cfg(test)]
+mod tests {
+    use crate::uopool::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn memory_reputation() {
+        let mut reputation = MemoryReputation::default();
+        reputation.init(
+            MIN_INCLUSION_RATE_DENOMINATOR,
+            THROTTLING_SLACK,
+            BAN_SLACK,
+            U256::from(1),
+            U256::from(0),
+        );
+
+        let mut addresses: Vec<Address> = vec![];
+
+        for _ in 0..5 {
+            let address = Address::random();
+            assert_eq!(
+                reputation.get(&address).await.unwrap(),
+                ReputationEntry {
+                    address,
+                    uo_seen: 0,
+                    uo_included: 0,
+                    status: ReputationStatus::OK,
+                }
+            );
+            addresses.push(address);
+        }
+
+        assert_eq!(reputation.add_whitelist(&addresses[2]).await.unwrap(), ());
+        assert_eq!(reputation.add_blacklist(&addresses[1]).await.unwrap(), ());
+
+        assert_eq!(reputation.is_whitelist(&addresses[2]).await.unwrap(), true);
+        assert_eq!(reputation.is_whitelist(&addresses[1]).await.unwrap(), false);
+        assert_eq!(reputation.is_blacklist(&addresses[1]).await.unwrap(), true);
+        assert_eq!(reputation.is_blacklist(&addresses[2]).await.unwrap(), false);
+
+        assert_eq!(
+            reputation.remove_whitelist(&addresses[2]).await.unwrap(),
+            true
+        );
+        assert_eq!(
+            reputation.remove_whitelist(&addresses[1]).await.unwrap(),
+            false
+        );
+        assert_eq!(
+            reputation.remove_blacklist(&addresses[1]).await.unwrap(),
+            true
+        );
+        assert_eq!(
+            reputation.remove_blacklist(&addresses[2]).await.unwrap(),
+            false
+        );
+
+        assert_eq!(reputation.add_whitelist(&addresses[2]).await.unwrap(), ());
+        assert_eq!(reputation.add_blacklist(&addresses[1]).await.unwrap(), ());
+
+        assert_eq!(
+            reputation.get_status(&addresses[2]).await.unwrap(),
+            ReputationStatus::OK
+        );
+        assert_eq!(
+            reputation.get_status(&addresses[1]).await.unwrap(),
+            ReputationStatus::BANNED
+        );
+        assert_eq!(
+            reputation.get_status(&addresses[3]).await.unwrap(),
+            ReputationStatus::OK
+        );
+
+        assert_eq!(reputation.increment_seen(&addresses[2]).await.unwrap(), ());
+        assert_eq!(reputation.increment_seen(&addresses[2]).await.unwrap(), ());
+        assert_eq!(reputation.increment_seen(&addresses[3]).await.unwrap(), ());
+        assert_eq!(reputation.increment_seen(&addresses[3]).await.unwrap(), ());
+
+        assert_eq!(
+            reputation.increment_included(&addresses[2]).await.unwrap(),
+            ()
+        );
+        assert_eq!(
+            reputation.increment_included(&addresses[2]).await.unwrap(),
+            ()
+        );
+        assert_eq!(
+            reputation.increment_included(&addresses[3]).await.unwrap(),
+            ()
+        );
+
+        assert_eq!(
+            reputation
+                .update_handle_ops_reverted(&addresses[3])
+                .await
+                .unwrap(),
+            ()
+        );
+
+        for _ in 0..250 {
+            assert_eq!(reputation.increment_seen(&addresses[3]).await.unwrap(), ());
+        }
+        assert_eq!(
+            reputation.get_status(&addresses[3]).await.unwrap(),
+            ReputationStatus::THROTTLED
+        );
+
+        for _ in 0..500 {
+            assert_eq!(reputation.increment_seen(&addresses[3]).await.unwrap(), ());
+        }
+        assert_eq!(
+            reputation.get_status(&addresses[3]).await.unwrap(),
+            ReputationStatus::BANNED
+        );
+    }
+}
