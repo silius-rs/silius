@@ -66,7 +66,7 @@ impl From<BadReputationError> for ReputationError {
         match error {
             BadReputationError::EntityBanned { address, title } => ReputationError::owned(
                 ENTITY_BANNED_ERROR_CODE,
-                format!("{title} with address {} is banned", address),
+                format!("{title} with address {address} is banned",),
                 Some(json!({
                     title: address.to_string(),
                 })),
@@ -80,8 +80,7 @@ impl From<BadReputationError> for ReputationError {
             } => ReputationError::owned(
                 STAKE_TOO_LOW_ERROR_CODE,
                 format!(
-                    "{title} with address {} stake {} is lower than {}",
-                    address, stake, min_stake
+                    "{title} with address {address} stake {stake} is lower than {min_stake}",
                 ),
                 Some(json!({
                     title: address.to_string(),
@@ -98,8 +97,7 @@ impl From<BadReputationError> for ReputationError {
             } => ReputationError::owned(
                 STAKE_TOO_LOW_ERROR_CODE,
                 format!(
-                    "{title} with address {} unstake delay {} is lower than {}",
-                    address, unstake_delay, min_unstake_delay
+                    "{title} with address {address} unstake delay {unstake_delay} is lower than {min_unstake_delay}",
                 ),
                 Some(json!({
                     title: address.to_string(),
