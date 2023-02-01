@@ -112,6 +112,51 @@ pub mod types {
             }
         }
     }
+
+    impl From<crate::types::reputation::ReputationEntry> for ReputationEntry {
+        fn from(reputation_entry: crate::types::reputation::ReputationEntry) -> Self {
+            Self {
+                address: Some(reputation_entry.address.into()),
+                uo_seen: reputation_entry.uo_seen,
+                uo_included: reputation_entry.uo_included,
+                status: match reputation_entry.status {
+                    crate::types::reputation::ReputationStatus::OK => ReputationStatus::Ok,
+                    crate::types::reputation::ReputationStatus::THROTTLED => {
+                        ReputationStatus::Throttled
+                    }
+                    crate::types::reputation::ReputationStatus::BANNED => ReputationStatus::Banned,
+                } as i32,
+            }
+        }
+    }
+
+    impl From<ReputationEntry> for crate::types::reputation::ReputationEntry {
+        fn from(reputation_entry: ReputationEntry) -> Self {
+            Self {
+                address: {
+                    if let Some(address) = reputation_entry.address {
+                        address.into()
+                    } else {
+                        Address::zero()
+                    }
+                },
+                uo_seen: reputation_entry.uo_seen,
+                uo_included: reputation_entry.uo_included,
+                status: match reputation_entry.status {
+                    _ if reputation_entry.status == ReputationStatus::Ok as i32 => {
+                        crate::types::reputation::ReputationStatus::OK
+                    }
+                    _ if reputation_entry.status == ReputationStatus::Throttled as i32 => {
+                        crate::types::reputation::ReputationStatus::THROTTLED
+                    }
+                    _ if reputation_entry.status == ReputationStatus::Banned as i32 => {
+                        crate::types::reputation::ReputationStatus::BANNED
+                    }
+                    _ => crate::types::reputation::ReputationStatus::OK,
+                },
+            }
+        }
+    }
 }
 
 pub mod uopool {

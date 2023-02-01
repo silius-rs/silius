@@ -24,9 +24,9 @@ impl Mempool for MemoryMempool {
 
     async fn add(
         &mut self,
-        user_operation: &UserOperation,
-        entry_point: &Address,
-        chain_id: &U256,
+        user_operation: UserOperation,
+        entry_point: Address,
+        chain_id: U256,
     ) -> anyhow::Result<UserOperationHash> {
         let hash = user_operation.hash(entry_point, chain_id);
 
@@ -37,27 +37,24 @@ impl Mempool for MemoryMempool {
             .entry(user_operation.sender)
             .or_insert_with(Default::default)
             .insert(hash);
-        user_operations.insert(hash, user_operation.clone());
+        user_operations.insert(hash, user_operation);
 
         Ok(hash)
     }
 
-    async fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation> {
-        if let Some(user_operation) = self.user_operations.read().get(user_operation_hash) {
+    async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation> {
+        if let Some(user_operation) = self.user_operations.read().get(&user_operation_hash) {
             return Ok(user_operation.clone());
         } else {
             return Err(anyhow::anyhow!("User operation not found"));
         }
     }
 
-    async fn get_all(&self) -> anyhow::Result<Self::UserOperations> {
-        Ok(self.user_operations.read().values().cloned().collect())
-    }
-
-    async fn get_all_by_sender(&self, sender: &Address) -> anyhow::Result<Self::UserOperations> {
+    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations> {
         let user_operations = self.user_operations.read();
 
-        if let Some(user_operations_by_sender) = self.user_operations_by_sender.read().get(sender) {
+        if let Some(user_operations_by_sender) = self.user_operations_by_sender.read().get(&sender)
+        {
             return Ok(user_operations_by_sender
                 .iter()
                 .filter_map(|hash| user_operations.get(hash).cloned())
@@ -67,11 +64,11 @@ impl Mempool for MemoryMempool {
         }
     }
 
-    async fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()> {
+    async fn remove(&mut self, user_operation_hash: UserOperationHash) -> anyhow::Result<()> {
         let user_operation: UserOperation;
         let mut user_operations = self.user_operations.write();
 
-        if let Some(uo) = user_operations.get(user_operation_hash) {
+        if let Some(uo) = user_operations.get(&user_operation_hash) {
             user_operation = uo.clone();
         } else {
             return Err(anyhow::anyhow!("User operation not found"));
@@ -79,10 +76,10 @@ impl Mempool for MemoryMempool {
 
         let mut user_operations_by_sender = self.user_operations_by_sender.write();
 
-        user_operations.remove(user_operation_hash);
+        user_operations.remove(&user_operation_hash);
 
         if let Some(uos) = user_operations_by_sender.get_mut(&user_operation.sender) {
-            uos.remove(user_operation_hash);
+            uos.remove(&user_operation_hash);
 
             if uos.is_empty() {
                 user_operations_by_sender.remove(&user_operation.sender);
@@ -92,14 +89,18 @@ impl Mempool for MemoryMempool {
         Ok(())
     }
 
-    async fn clear(&mut self) -> anyhow::Result<()> {
+    #[cfg(debug_assertions)]
+    fn get_all(&self) -> Self::UserOperations {
+        self.user_operations.read().values().cloned().collect()
+    }
+
+    #[cfg(debug_assertions)]
+    fn clear(&mut self) {
         let mut user_operations = self.user_operations.write();
         let mut user_operations_by_sender = self.user_operations_by_sender.write();
 
         user_operations.clear();
         user_operations_by_sender.clear();
-
-        Ok(())
     }
 }
 
@@ -126,12 +127,12 @@ mod tests {
                 ..UserOperation::random()
             };
             user_operation_hash = mempool
-                .add(&user_operation, &entry_point, &chain_id)
+                .add(user_operation.clone(), entry_point, chain_id)
                 .await
                 .unwrap();
 
             assert_eq!(
-                mempool.get(&user_operation_hash).await.unwrap(),
+                mempool.get(user_operation_hash).await.unwrap(),
                 user_operation
             );
 
@@ -142,12 +143,12 @@ mod tests {
             };
 
             user_operation_hash = mempool
-                .add(&user_operation, &entry_point, &chain_id)
+                .add(user_operation.clone(), entry_point, chain_id)
                 .await
                 .unwrap();
 
             assert_eq!(
-                mempool.get(&user_operation_hash).await.unwrap(),
+                mempool.get(user_operation_hash).await.unwrap(),
                 user_operation
             );
         }
@@ -160,55 +161,55 @@ mod tests {
             };
 
             user_operation_hash = mempool
-                .add(&user_operation, &entry_point, &chain_id)
+                .add(user_operation.clone(), entry_point, chain_id)
                 .await
                 .unwrap();
 
             assert_eq!(
-                mempool.get(&user_operation_hash).await.unwrap(),
+                mempool.get(user_operation_hash).await.unwrap(),
                 user_operation
             );
         }
 
-        assert_eq!(mempool.get_all().await.unwrap().len(), 7);
+        assert_eq!(mempool.get_all().len(), 7);
         assert_eq!(
-            mempool.get_all_by_sender(&senders[0]).await.unwrap().len(),
+            mempool.get_all_by_sender(senders[0]).await.unwrap().len(),
             2
         );
         assert_eq!(
-            mempool.get_all_by_sender(&senders[1]).await.unwrap().len(),
+            mempool.get_all_by_sender(senders[1]).await.unwrap().len(),
             2
         );
         assert_eq!(
-            mempool.get_all_by_sender(&senders[2]).await.unwrap().len(),
+            mempool.get_all_by_sender(senders[2]).await.unwrap().len(),
             3
         );
 
-        assert_eq!(mempool.remove(&user_operation_hash).await.unwrap(), ());
+        assert_eq!(mempool.remove(user_operation_hash).await.unwrap(), ());
         assert_eq!(
             mempool
-                .remove(&H256::random())
+                .remove(H256::random())
                 .await
                 .unwrap_err()
                 .to_string(),
             anyhow::anyhow!("User operation not found").to_string()
         );
 
-        assert_eq!(mempool.get_all().await.unwrap().len(), 6);
+        assert_eq!(mempool.get_all().len(), 6);
         assert_eq!(
-            mempool.get_all_by_sender(&senders[0]).await.unwrap().len(),
+            mempool.get_all_by_sender(senders[0]).await.unwrap().len(),
             2
         );
         assert_eq!(
-            mempool.get_all_by_sender(&senders[2]).await.unwrap().len(),
+            mempool.get_all_by_sender(senders[2]).await.unwrap().len(),
             2
         );
 
-        assert_eq!(mempool.clear().await.unwrap(), ());
+        assert_eq!(mempool.clear(), ());
 
-        assert_eq!(mempool.get_all().await.unwrap().len(), 0);
+        assert_eq!(mempool.get_all().len(), 0);
         assert_eq!(
-            mempool.get_all_by_sender(&senders[0]).await.unwrap().len(),
+            mempool.get_all_by_sender(senders[0]).await.unwrap().len(),
             0
         );
     }

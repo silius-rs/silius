@@ -4,7 +4,10 @@ use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracin
 use std::future::pending;
 
 use aa_bundler::{
-    rpc::{eth::EthApiServerImpl, eth_api::EthApiServer},
+    rpc::{
+        debug::DebugApiServerImpl, debug_api::DebugApiServer, eth::EthApiServerImpl,
+        eth_api::EthApiServer,
+    },
     uopool::server::uopool::uo_pool_client::UoPoolClient,
 };
 
@@ -34,6 +37,14 @@ async fn main() -> Result<()> {
     let mut api = Methods::new();
     let uopool_grpc_client =
         UoPoolClient::connect(format!("http://{}", opt.uopool_grpc_listen_address)).await?;
+
+    #[cfg(debug_assertions)]
+    api.merge(
+        DebugApiServerImpl {
+            uopool_grpc_client: uopool_grpc_client.clone(),
+        }
+        .into_rpc(),
+    )?;
     api.merge(
         EthApiServerImpl {
             call_gas_limit: 100_000_000,

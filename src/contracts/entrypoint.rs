@@ -40,21 +40,19 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     ) -> Result<entry_point_api::EntryPointAPIErrors, EntryPointErr> {
         JsonRpcError::from_str(err_msg)
             .map_err(|_| {
-                EntryPointErr::DecodeErr(format!(
-                    "{:?} is not a valid JsonRpcError message",
-                    err_msg
-                ))
+                EntryPointErr::DecodeErr(format!("{err_msg:?} is not a valid JsonRpcError message"))
             })
             .and_then(|json_error| {
                 json_error.data.ok_or_else(|| {
-                    EntryPointErr::DecodeErr("{:?} doesn't have valid data field".to_string())
+                    EntryPointErr::DecodeErr(
+                        "{json_error:?} doesn't have valid data field".to_string(),
+                    )
                 })
             })
             .and_then(|data: String| {
                 AbiDecode::decode_hex(data).map_err(|_| {
                     EntryPointErr::DecodeErr(format!(
-                        "{:?} data field could not be deserialize to EntryPointAPIErrors",
-                        err_msg
+                        "{err_msg:?} data field could not be deserialize to EntryPointAPIErrors"
                     ))
                 })
             })
@@ -84,8 +82,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         ))
                     }
                     _ => Err(EntryPointErr::UnknownErr(format!(
-                        "Simulate validation with invalid error: {:?}",
-                        op
+                        "Simulate validation with invalid error: {op:?}"
                     ))),
                 })
             }
@@ -120,8 +117,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
                     _ => Err(EntryPointErr::UnknownErr(format!(
-                        "Handle ops with invalid error: {:?}",
-                        op
+                        "Handle ops with invalid error: {op:?}"
                     ))),
                 })
             })
@@ -145,8 +141,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
                     _ => Err(EntryPointErr::UnknownErr(format!(
-                        "Simulate validation with invalid error: {:?}",
-                        op
+                        "Simulate validation with invalid error: {op:?}"
                     ))),
                 })
             }

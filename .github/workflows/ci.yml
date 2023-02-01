@@ -16,19 +16,16 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - name: Set up third-party dependencies
+      - name: Setup third-party dependencies
         run: |
           make setup-thirdparty
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-      - name: Install solc
+      - name: Install Geth and solc
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum
           sudo add-apt-repository ppa:ethereum/ethereum-dev
           sudo apt-get update
           sudo apt-get install solc
+          sudo apt-get install ethereum
       - name: Build
         run: |
           make build

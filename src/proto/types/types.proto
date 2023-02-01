@@ -34,3 +34,16 @@ message UserOperation {
     bytes paymaster_and_data = 10;
     bytes signature = 11;
 }
+
+enum ReputationStatus {
+    OK = 0;
+    THROTTLED = 1;
+    BANNED = 2;
+}
+
+message ReputationEntry {
+    types.H160 address = 1;
+    uint64 uo_seen = 2;
+    uint64 uo_included = 3;
+    ReputationStatus status = 4;
+}
