@@ -252,7 +252,8 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 mod tests {
     use crate::{
         contracts::EntryPoint,
-        uopool::{mempool_id, MempoolBox, MempoolId},
+        types::reputation::ReputationEntry,
+        uopool::{mempool_id, MempoolBox, MempoolId, ReputationBox},
     };
     use ethers::providers::{Http, Provider};
     use parking_lot::RwLock;
@@ -262,7 +263,7 @@ mod tests {
 
     #[ignore]
     #[tokio::test]
-    async fn user_operation_validation() {
+    async fn user_operation_sanity_checks() {
         let chain_id = U256::from(5);
         let entry_point = "0x1D9a2CB3638C2FC8bF9C01D088B79E75CD188b17"
             .parse::<Address>()
@@ -275,11 +276,15 @@ mod tests {
         );
 
         let uo_pool_service = UoPoolService::new(
+            Arc::new(entry_points),
             Arc::new(RwLock::new(HashMap::<
                 MempoolId,
                 MempoolBox<Vec<UserOperation>>,
             >::new())),
-            Arc::new(entry_points),
+            Arc::new(RwLock::new(HashMap::<
+                MempoolId,
+                ReputationBox<Vec<ReputationEntry>>,
+            >::new())),
             eth_provider,
             U256::from(1500000),
             chain_id,

@@ -48,7 +48,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     pub fn new(
         entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
-        reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,  
+        reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
         eth_provider: Arc<M>,
         max_verification_gas: U256,
         chain_id: U256,
@@ -56,7 +56,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Self {
             entry_points,
             mempools,
-            reputations,            
+            reputations,
             eth_provider,
             max_verification_gas,
             chain_id,

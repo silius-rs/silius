@@ -51,9 +51,9 @@ pub trait Mempool: Debug + Send + Sync + 'static {
         entry_point: &Address,
         chain_id: &U256,
     ) -> anyhow::Result<UserOperationHash>;
-    async fn get(&self, user_operation_hash: UserOperationHash) -> anyhow::Result<UserOperation>;
-    async fn get_all_by_sender(&self, sender: Address) -> anyhow::Result<Self::UserOperations>;
-    async fn remove(&mut self, user_operation_hash: UserOperationHash) -> anyhow::Result<()>;
+    async fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
+    async fn get_all_by_sender(&self, sender: &Address) -> anyhow::Result<Self::UserOperations>;
+    async fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;
@@ -156,7 +156,6 @@ pub async fn run(
             Arc::new(entry_points_map),
             Arc::new(RwLock::new(mempools)),
             reputations.clone(),
-            
             eth_provider,
             max_verification_gas,
             chain_id,
