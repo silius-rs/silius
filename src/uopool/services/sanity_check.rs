@@ -260,14 +260,14 @@ mod tests {
 
     use super::*;
 
+    #[ignore]
     #[tokio::test]
     async fn user_operation_validation() {
         let chain_id = U256::from(5);
         let entry_point = "0x1D9a2CB3638C2FC8bF9C01D088B79E75CD188b17"
             .parse::<Address>()
             .unwrap();
-        let eth_provider =
-            Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
+        let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let mut entry_points = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         entry_points.insert(
             mempool_id(entry_point, chain_id),
