@@ -31,14 +31,14 @@ jobs:
         with:
           node-version: '14'
           cache: 'yarn'
-          directory: thirdparty/account-abstraction
+          cache-dependency-path: thirdparty/account-abstraction
 
       - name: Setup Yarn cache - submodule "thirdparty/bundler"
         uses: actions/setup-node@v3
         with:
           node-version: '14'
           cache: 'yarn'
-          directory: thirdparty/bundler
+          cache-dependency-path: thirdparty/bundler
       
       - name: Setup third-party dependencies
         run: |
