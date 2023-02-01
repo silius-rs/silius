@@ -13,8 +13,10 @@ run-bundler-rpc:
 run-create-wallet:
 	cargo run --bin create-wallet -- --output-path ${HOME}/.aa-bundler
 
-setup-thirdparty:
+fetch-thirdparty:
 	git submodule update --init
+
+setup-thirdparty:
 	cd thirdparty/account-abstraction && yarn install && yarn compile && cd ../..
 	cd thirdparty/bundler && yarn install && yarn preprocess && cd ../..
 
