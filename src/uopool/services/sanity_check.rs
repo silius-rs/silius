@@ -47,55 +47,46 @@ impl fmt::Display for BadUserOperationError {
         return match self {
             BadUserOperationError::SenderOrInitCode { sender, init_code } => write!(
                 f,
-                "Either the sender {:?} is an existing contract, or the initCode {:?} is not empty (but not both)",
-                sender, init_code
+                "Either the sender {sender} is an existing contract, or the initCode {init_code} is not empty (but not both)",
             ),
             BadUserOperationError::HighVerificationGasLimit {
                 verification_gas_limit,
                 max_verification_gas,
             } => write!(
                 f,
-                "Verification gas limit {} is higher than max verification gas {}",
-                verification_gas_limit,
-                max_verification_gas
+                "Verification gas limit {verification_gas_limit} is higher than max verification gas {max_verification_gas}",
             ),
             BadUserOperationError::LowPreVerificationGas {
                 pre_verification_gas,
                 calculated_pre_verification_gas
             } => write!(
                 f,
-                "Pre-verification gas {} is lower than calculated pre-verification gas {}",
-                pre_verification_gas,
-                calculated_pre_verification_gas
+                "Pre-verification gas {pre_verification_gas} is lower than calculated pre-verification gas {calculated_pre_verification_gas}",
             ),
             BadUserOperationError::InvalidPaymasterAndData { paymaster_and_data } => write!(
                 f,
-                "Paymaster and data {:?} are inconsistent",
-                paymaster_and_data
+                "Paymaster and data {paymaster_and_data} are inconsistent",
             ),
             BadUserOperationError::LowCallGasLimit {
                 call_gas_limit,
                 non_zero_value_call,
             } => write!(
                 f,
-                "Call gas limit {} is lower than CALL non-zero value {}",
-                call_gas_limit, non_zero_value_call
+                "Call gas limit {call_gas_limit} is lower than CALL non-zero value {non_zero_value_call}",
             ),
             BadUserOperationError::LowMaxFeePerGas {
                 max_fee_per_gas,
                 max_fee_per_gas_estimated,
             } => write!(
                 f,
-                "Max fee per gas {} is lower than estimated max fee per gas {}",
-                max_fee_per_gas, max_fee_per_gas_estimated
+                "Max fee per gas {max_fee_per_gas} is lower than estimated max fee per gas {max_fee_per_gas_estimated}", 
             ),
             BadUserOperationError::HighMaxPriorityFeePerGas {
                 max_priority_fee_per_gas,
                 max_fee_per_gas,
             } => write!(
                 f,
-                "Max priority fee per gas {} is higher than max fee per gas {}",
-                max_priority_fee_per_gas, max_fee_per_gas
+                "Max priority fee per gas {max_priority_fee_per_gas} is higher than max fee per gas {max_fee_per_gas}",
             ),
         };
     }
