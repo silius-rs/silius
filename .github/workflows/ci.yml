@@ -12,13 +12,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+
+      - name: Setup Rust toolchain
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
+      
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v1
+
+      - name: Setup Yarn cache - submodule "thirdparty/account-abstraction"
+        uses: c-hive/gha-yarn-cache@v2
+        with:
+          directory: thirdparty/account-abstraction
+
+      - name: Setup Yarn cache - submodule "thirdparty/bundler"
+        uses: c-hive/gha-yarn-cache@v2
+        with:
+          directory: thirdparty/bundler
+      
       - name: Setup third-party dependencies
         run: |
           make setup-thirdparty
+      
       - name: Install Geth and solc
         run: |
           sudo add-apt-repository ppa:ethereum/ethereum
@@ -26,12 +43,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install solc
           sudo apt-get install ethereum
+      
       - name: Build
         run: |
           make build
+      
       - name: Lint
         run: |
           make lint
+      
       - name: Test
         run: |
           make test
