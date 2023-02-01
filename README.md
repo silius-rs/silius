@@ -20,6 +20,7 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 Set up third-party dependencies (EIP-4337 smart contracts and bundler tests):
 
 ```bash
+make fetch-thirdparty
 make setup-thirdparty
 ```
 
