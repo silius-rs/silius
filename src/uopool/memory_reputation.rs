@@ -7,9 +7,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::types::reputation::{
-    BadReputationError, ReputationEntry, ReputationError, ReputationStatus, StakeInfo,
-};
+use crate::types::reputation::{BadReputationError, ReputationEntry, ReputationStatus, StakeInfo};
 
 use super::Reputation;
 
@@ -157,9 +155,17 @@ impl Reputation for MemoryReputation {
         Ok(())
     }
 
-    async fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()> {
+    async fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> Result<(), BadReputationError> {
         if let Some(stake_info) = stake_info {
-            if self.is_whitelist(&stake_info.address).await? {
+            if self
+                .is_whitelist(&stake_info.address)
+                .await
+                .map_err(BadReputationError::Internal)?
+            {
                 return Ok(());
             }
 
@@ -191,9 +197,7 @@ impl Reputation for MemoryReputation {
                     return Ok(());
                 };
 
-                return Err(anyhow::anyhow!(serde_json::to_string(
-                    &ReputationError::from(error)
-                )?));
+                return Err(error);
             }
         }
 

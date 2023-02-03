@@ -1,129 +1,27 @@
 use crate::{
     chain::gas::{self, Overhead},
-    types::user_operation::UserOperation,
+    types::{sanity_check::BadUserOperationError, user_operation::UserOperation},
     uopool::services::uopool::UoPoolService,
 };
-use ethers::{
-    providers::Middleware,
-    types::{Address, Bytes, U256},
-};
-use std::fmt;
-
-pub const SANITY_CHECK_ERROR_CODE: i32 = -32602;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum BadUserOperationError {
-    SenderOrInitCode {
-        sender: Address,
-        init_code: Bytes,
-    },
-    HighVerificationGasLimit {
-        verification_gas_limit: U256,
-        max_verification_gas: U256,
-    },
-    LowPreVerificationGas {
-        pre_verification_gas: U256,
-        calculated_pre_verification_gas: U256,
-    },
-    InvalidPaymasterAndData {
-        paymaster_and_data: Bytes,
-    },
-    LowCallGasLimit {
-        call_gas_limit: U256,
-        non_zero_value_call: U256,
-    },
-    LowMaxFeePerGas {
-        max_fee_per_gas: U256,
-        max_fee_per_gas_estimated: U256,
-    },
-    HighMaxPriorityFeePerGas {
-        max_priority_fee_per_gas: U256,
-        max_fee_per_gas: U256,
-    },
-}
-
-impl fmt::Display for BadUserOperationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return match self {
-            BadUserOperationError::SenderOrInitCode { sender, init_code } => write!(
-                f,
-                "Either the sender {sender} is an existing contract, or the initCode {init_code} is not empty (but not both)",
-            ),
-            BadUserOperationError::HighVerificationGasLimit {
-                verification_gas_limit,
-                max_verification_gas,
-            } => write!(
-                f,
-                "Verification gas limit {verification_gas_limit} is higher than max verification gas {max_verification_gas}",
-            ),
-            BadUserOperationError::LowPreVerificationGas {
-                pre_verification_gas,
-                calculated_pre_verification_gas
-            } => write!(
-                f,
-                "Pre-verification gas {pre_verification_gas} is lower than calculated pre-verification gas {calculated_pre_verification_gas}",
-            ),
-            BadUserOperationError::InvalidPaymasterAndData { paymaster_and_data } => write!(
-                f,
-                "Paymaster and data {paymaster_and_data} are inconsistent",
-            ),
-            BadUserOperationError::LowCallGasLimit {
-                call_gas_limit,
-                non_zero_value_call,
-            } => write!(
-                f,
-                "Call gas limit {call_gas_limit} is lower than CALL non-zero value {non_zero_value_call}",
-            ),
-            BadUserOperationError::LowMaxFeePerGas {
-                max_fee_per_gas,
-                max_fee_per_gas_estimated,
-            } => write!(
-                f,
-                "Max fee per gas {max_fee_per_gas} is lower than estimated max fee per gas {max_fee_per_gas_estimated}", 
-            ),
-            BadUserOperationError::HighMaxPriorityFeePerGas {
-                max_priority_fee_per_gas,
-                max_fee_per_gas,
-            } => write!(
-                f,
-                "Max priority fee per gas {max_priority_fee_per_gas} is higher than max fee per gas {max_fee_per_gas}",
-            ),
-        };
-    }
-}
-
-#[derive(Debug)]
-pub enum UserOperationSanityCheckError<M: Middleware> {
-    SanityCheck(BadUserOperationError),
-    Internal(anyhow::Error),
-    Middleware(M::Error),
-}
-
-impl<M: Middleware> From<anyhow::Error> for UserOperationSanityCheckError<M> {
-    fn from(e: anyhow::Error) -> Self {
-        UserOperationSanityCheckError::Internal(e)
-    }
-}
+use ethers::{prelude::gas_oracle::GasOracle, providers::Middleware};
 
 impl<M: Middleware + 'static> UoPoolService<M> {
     async fn sender_or_init_code(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), UserOperationSanityCheckError<M>> {
+    ) -> Result<(), BadUserOperationError<M>> {
         let code = self
             .eth_provider
             .get_code(user_operation.sender, None)
             .await
-            .map_err(UserOperationSanityCheckError::Middleware)?;
+            .map_err(|error| BadUserOperationError::Middleware(error))?;
         if (code.is_empty() && user_operation.init_code.is_empty())
             || (!code.is_empty() && !user_operation.init_code.is_empty())
         {
-            return Err(UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::SenderOrInitCode {
-                    sender: user_operation.sender,
-                    init_code: user_operation.init_code.clone(),
-                },
-            ));
+            return Err(BadUserOperationError::SenderOrInitCode {
+                sender: user_operation.sender,
+                init_code: user_operation.init_code.clone(),
+            });
         }
         Ok(())
     }
@@ -131,25 +29,21 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     async fn verification_gas(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), UserOperationSanityCheckError<M>> {
+    ) -> Result<(), BadUserOperationError<M>> {
         if user_operation.verification_gas_limit > self.max_verification_gas {
-            return Err(UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::HighVerificationGasLimit {
-                    verification_gas_limit: user_operation.verification_gas_limit,
-                    max_verification_gas: self.max_verification_gas,
-                },
-            ));
+            return Err(BadUserOperationError::HighVerificationGasLimit {
+                verification_gas_limit: user_operation.verification_gas_limit,
+                max_verification_gas: self.max_verification_gas,
+            });
         }
 
         let calculated_pre_verification_gas =
             Overhead::default().calculate_pre_verification_gas(user_operation);
         if user_operation.pre_verification_gas < calculated_pre_verification_gas {
-            return Err(UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::LowPreVerificationGas {
-                    pre_verification_gas: user_operation.pre_verification_gas,
-                    calculated_pre_verification_gas,
-                },
-            ));
+            return Err(BadUserOperationError::LowPreVerificationGas {
+                pre_verification_gas: user_operation.pre_verification_gas,
+                calculated_pre_verification_gas,
+            });
         }
 
         Ok(())
@@ -158,15 +52,13 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     async fn call_gas_limit(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), UserOperationSanityCheckError<M>> {
+    ) -> Result<(), BadUserOperationError<M>> {
         let non_zero_value_call = gas::non_zero_value_call();
         if user_operation.call_gas_limit < non_zero_value_call {
-            return Err(UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::LowCallGasLimit {
-                    call_gas_limit: user_operation.call_gas_limit,
-                    non_zero_value_call,
-                },
-            ));
+            return Err(BadUserOperationError::LowCallGasLimit {
+                call_gas_limit: user_operation.call_gas_limit,
+                non_zero_value_call,
+            });
         }
 
         Ok(())
@@ -175,29 +67,28 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     async fn max_fee_per_gas(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), UserOperationSanityCheckError<M>> {
-        let (max_fee_per_gas_estimated, _) = self
-            .eth_provider
-            .estimate_eip1559_fees(None)
+    ) -> Result<(), BadUserOperationError<M>> {
+        let base_fee_estimation = self
+            .gas_oracle
+            .fetch()
             .await
-            .map_err(UserOperationSanityCheckError::Middleware)?;
-
-        if user_operation.max_fee_per_gas < max_fee_per_gas_estimated {
-            return Err(UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::LowMaxFeePerGas {
-                    max_fee_per_gas: user_operation.max_fee_per_gas,
-                    max_fee_per_gas_estimated,
-                },
-            ));
-        }
+            .map_err(|error| BadUserOperationError::GasOracleError(error))?;
 
         if user_operation.max_priority_fee_per_gas > user_operation.max_fee_per_gas {
-            return Err(UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::HighMaxPriorityFeePerGas {
-                    max_priority_fee_per_gas: user_operation.max_priority_fee_per_gas,
-                    max_fee_per_gas: user_operation.max_fee_per_gas,
-                },
-            ));
+            return Err(BadUserOperationError::HighMaxPriorityFeePerGas {
+                max_priority_fee_per_gas: user_operation.max_priority_fee_per_gas,
+                max_fee_per_gas: user_operation.max_fee_per_gas,
+            });
+        }
+
+        if base_fee_estimation + user_operation.max_priority_fee_per_gas
+            > user_operation.max_fee_per_gas
+        {
+            return Err(BadUserOperationError::LowMaxFeePerGas {
+                max_fee_per_gas: user_operation.max_fee_per_gas,
+                max_fee_per_gas_estimated: base_fee_estimation
+                    + user_operation.max_priority_fee_per_gas,
+            });
         }
 
         Ok(())
@@ -206,32 +97,25 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     pub async fn validate_user_operation(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), UserOperationSanityCheckError<M>> {
-        // condition 1
+    ) -> Result<(), BadUserOperationError<M>> {
         // Either the sender is an existing contract, or the initCode is not empty (but not both)
         self.sender_or_init_code(user_operation).await?;
 
-        // condition 2
         // If initCode is not empty, parse its first 20 bytes as a factory address. Record whether the factory is staked, in case the later simulation indicates that it needs to be. If the factory accesses global state, it must be staked - see reputation, throttling and banning section for details.
         // TODO: implement
 
-        // condition 3
         // The verificationGasLimit is sufficiently low (<= MAX_VERIFICATION_GAS) and the preVerificationGas is sufficiently high (enough to pay for the calldata gas cost of serializing the UserOperation plus PRE_VERIFICATION_OVERHEAD_GAS)
         self.verification_gas(user_operation).await?;
 
-        // condition 4
         // The paymasterAndData is either empty, or start with the paymaster address, which is a contract that (i) currently has nonempty code on chain, (ii) has a sufficient deposit to pay for the UserOperation, and (iii) is not currently banned. During simulation, the paymaster's stake is also checked, depending on its storage usage - see reputation, throttling and banning section for details.
         // TODO: implement
 
-        // condition 5
         // The callgas is at least the cost of a CALL with non-zero value.
         self.call_gas_limit(user_operation).await?;
 
-        // condition 6
         // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
         self.max_fee_per_gas(user_operation).await?;
 
-        // condition 7
         // The sender doesn't have another UserOperation already present in the pool (or it replaces an existing entry with the same sender and nonce, with a higher maxPriorityFeePerGas and an equally increased maxFeePerGas). Only one UserOperation per sender may be included in a single batch. A sender is exempt from this rule and may have multiple UserOperations in the pool and in a batch if it is staked (see reputation, throttling and banning section below), but this exception is of limited use to normal accounts.
         // TODO: implement
 
@@ -246,25 +130,34 @@ mod tests {
         types::reputation::ReputationEntry,
         uopool::{mempool_id, MempoolBox, MempoolId, ReputationBox},
     };
-    use ethers::providers::{Http, Provider};
+    use ethers::{
+        prelude::gas_oracle::ProviderOracle,
+        providers::{Http, Provider},
+        types::{Address, Bytes, U256},
+    };
     use parking_lot::RwLock;
     use std::{collections::HashMap, str::FromStr, sync::Arc};
 
     use super::*;
 
-    #[ignore]
     #[tokio::test]
-    async fn user_operation_sanity_checks() {
+    async fn user_operation_sanity_check() {
         let chain_id = U256::from(5);
-        let entry_point = "0x1D9a2CB3638C2FC8bF9C01D088B79E75CD188b17"
+        let entry_point = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69"
             .parse::<Address>()
             .unwrap();
-        let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
+        let eth_provider = Arc::new(Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap());
+        let gas_oracle = Arc::new(ProviderOracle::new(
+            Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap(),
+        ));
         let mut entry_points = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         entry_points.insert(
             mempool_id(entry_point, chain_id),
             EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
         );
+
+        let max_priority_fee_per_gas = U256::from(1500000000_u64);
+        let max_fee_per_gas = max_priority_fee_per_gas + gas_oracle.fetch().await.unwrap();
 
         let uo_pool_service = UoPoolService::new(
             Arc::new(entry_points),
@@ -277,33 +170,35 @@ mod tests {
                 ReputationBox<Vec<ReputationEntry>>,
             >::new())),
             eth_provider,
+            gas_oracle,
             U256::from(1500000),
             chain_id,
         );
 
         let user_operation_valid = UserOperation {
-            sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
+            sender: "0xeF5b78898D61b7020A6DB5a39608C4B02f95b50f".parse().unwrap(),
             nonce: U256::zero(),
-            init_code: Bytes::from_str("0xe19e9755942bb0bd0cccce25b1742596b8a8250b3bf2c3e70000000000000000000000001d9a2cb3638c2fc8bf9c01d088b79e75cd188b17000000000000000000000000789d9058feecf1948af429793e7f1eb4a75db2220000000000000000000000000000000000000000000000000000000000000000").unwrap(),
-            call_data: Bytes::from_str("0x80c5c7d0000000000000000000000000ab7e2cbfcfb6a5f33a75ad745c3e5fb48d689b5400000000000000000000000000000000000000000000000002c68af0bb14000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000").unwrap(),
-            call_gas_limit: U256::from(21900),
-            verification_gas_limit: U256::from(1218343),
-            pre_verification_gas: U256::from(50768),
-            max_fee_per_gas: U256::from(3501638950_u64),
-            max_priority_fee_per_gas: U256::from(2551157264_u64),
+            init_code: Bytes::from_str("0xed886f2d1bbb38b4914e8c545471216a40cce9385fbfb9cf000000000000000000000000ae72a48c1a36bd18af168541c53037965d26e4a8000000000000000000000000000000000000000000000000000001861645d91d").unwrap(),
+            call_data: Bytes::from_str("0xb61d27f6000000000000000000000000ef5b78898d61b7020a6db5a39608c4b02f95b50f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004affed0e000000000000000000000000000000000000000000000000000000000").unwrap(),
+            call_gas_limit: U256::from(22016),
+            verification_gas_limit: U256::from(413910),
+            pre_verification_gas: U256::from(48480),
+            max_fee_per_gas: max_fee_per_gas,
+            max_priority_fee_per_gas: max_priority_fee_per_gas,
             paymaster_and_data: Bytes::default(),
-            signature: Bytes::from_str("0xb5a4efa90d560f95b508e6b0e7c2dc17a7e86928af551175fe2d9f6a1bd79a604e8a83a391d25c4b3dce56a0a1549c5f40d1a08c3f4b80982556efa768eca7f81c").unwrap(),
+            signature: Bytes::default(),
         };
 
+        // valid user operation
         assert!(uo_pool_service
             .validate_user_operation(&user_operation_valid)
             .await
             .is_ok());
 
-        // condition 1
+        // smart contract wallet already deployed
         assert!(uo_pool_service
             .validate_user_operation(&UserOperation {
-                sender: "0x6a98c1B9FD763eB693f40C407DC85106eBD74352"
+                sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
                     .parse()
                     .unwrap(),
                 init_code: Bytes::default(),
@@ -311,6 +206,8 @@ mod tests {
             })
             .await
             .is_ok());
+
+        // sender or init_code
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -319,29 +216,25 @@ mod tests {
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::SenderOrInitCode { .. },
-            )
+            BadUserOperationError::SenderOrInitCode { .. },
         ));
+
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
-                    sender: "0x6a98c1B9FD763eB693f40C407DC85106eBD74352"
+                    sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
                         .parse()
                         .unwrap(),
                     ..user_operation_valid.clone()
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::SenderOrInitCode { .. },
-            )
+            BadUserOperationError::SenderOrInitCode { .. },
         ));
 
-        // condition 2
-        // TODO: implement
+        // // TODO: implement
 
-        // condition 3
+        // verification gas
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -350,10 +243,9 @@ mod tests {
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::HighVerificationGasLimit { .. },
-            )
+            BadUserOperationError::HighVerificationGasLimit { .. },
         ));
+
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -362,15 +254,12 @@ mod tests {
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::LowPreVerificationGas { .. },
-            )
+            BadUserOperationError::LowPreVerificationGas { .. },
         ));
 
-        // condition 4
-        // TODO: implement
+        // // TODO: implement
 
-        // condition 5
+        // call gas
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
@@ -379,38 +268,32 @@ mod tests {
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::LowCallGasLimit { .. },
-            )
+            BadUserOperationError::LowCallGasLimit { .. },
         ));
 
-        // condition 6
+        // max fee per gas and max priority fee per gas
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
-                    max_fee_per_gas: U256::from(1001638950_u64),
+                    max_priority_fee_per_gas: U256::from(1500000000_u64 * 3),
                     ..user_operation_valid.clone()
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::LowMaxFeePerGas { .. },
-            )
+            BadUserOperationError::HighMaxPriorityFeePerGas { .. },
         ));
+
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(&UserOperation {
-                    max_priority_fee_per_gas: U256::from(5501638950_u64),
+                    max_fee_per_gas: U256::from(1500000000_u64 + 10),
                     ..user_operation_valid.clone()
                 })
                 .await
                 .unwrap_err(),
-            UserOperationSanityCheckError::SanityCheck(
-                BadUserOperationError::HighMaxPriorityFeePerGas { .. },
-            )
+            BadUserOperationError::LowMaxFeePerGas { .. },
         ));
 
-        // condition 7
         // TODO: implement
     }
 }

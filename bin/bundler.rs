@@ -11,6 +11,7 @@ use aa_bundler::{
 use anyhow::Result;
 use clap::Parser;
 use ethers::{
+    prelude::gas_oracle::ProviderOracle,
     providers::{Http, Provider},
     types::{Address, U256},
 };
@@ -75,7 +76,11 @@ fn main() -> Result<()> {
                 let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id)?;
                 info!("{:?}", wallet.signer);
 
-                let eth_provider = Arc::new(Provider::<Http>::try_from(opt.eth_client_address)?);
+                let eth_provider =
+                    Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
+                let gas_oracle = Arc::new(ProviderOracle::new(Provider::<Http>::try_from(
+                    opt.eth_client_address,
+                )?));
 
                 let _bundler = Bundler::new(wallet);
 
@@ -84,6 +89,7 @@ fn main() -> Result<()> {
                         opt.uopool_opts,
                         opt.entry_points,
                         eth_provider,
+                        gas_oracle,
                         opt.max_verification_gas,
                         opt.chain_id,
                     )

@@ -1,7 +1,8 @@
-use super::sanity_check::UserOperationSanityCheckError;
 use crate::{
     contracts::EntryPoint,
-    types::{reputation::ReputationEntry, user_operation::UserOperation},
+    types::{
+        reputation::ReputationEntry, sanity_check::SanityCheckError, user_operation::UserOperation,
+    },
     uopool::{
         mempool_id,
         server::uopool::{
@@ -10,19 +11,16 @@ use crate::{
             GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult, RemoveRequest,
             RemoveResponse, SetReputationRequest, SetReputationResponse, SetReputationResult,
         },
-        services::sanity_check::SANITY_CHECK_ERROR_CODE,
         MempoolBox, MempoolId, ReputationBox,
     },
 };
 use async_trait::async_trait;
 use ethers::{
+    prelude::gas_oracle::ProviderOracle,
     providers::Middleware,
     types::{Address, U256},
 };
-use jsonrpsee::{
-    tracing::info,
-    types::{error::ErrorCode, ErrorObject},
-};
+use jsonrpsee::{tracing::info, types::ErrorObject};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
@@ -34,14 +32,9 @@ pub struct UoPoolService<M: Middleware> {
     pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
     pub reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
     pub eth_provider: Arc<M>,
+    pub gas_oracle: Arc<ProviderOracle<M>>,
     pub max_verification_gas: U256,
     pub chain_id: U256,
-}
-
-impl<M: Middleware> From<UserOperationSanityCheckError<M>> for UoPoolError {
-    fn from(_: UserOperationSanityCheckError<M>) -> Self {
-        UoPoolError::from(ErrorCode::ServerError(-32602))
-    }
 }
 
 impl<M: Middleware + 'static> UoPoolService<M> {
@@ -50,6 +43,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
         reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
         eth_provider: Arc<M>,
+        gas_oracle: Arc<ProviderOracle<M>>,
         max_verification_gas: U256,
         chain_id: U256,
     ) -> Self {
@@ -58,6 +52,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             mempools,
             reputations,
             eth_provider,
+            gas_oracle,
             max_verification_gas,
             chain_id,
         }
@@ -102,20 +97,11 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
                         serde_json::to_string(&user_operation.hash(&entry_point, &self.chain_id))
                             .map_err(|_| tonic::Status::internal("error adding user operation"))?;
                 }
-                Err(error) => match error {
-                    UserOperationSanityCheckError::SanityCheck(user_operation_error) => {
-                        res.set_result(AddResult::NotAdded);
-                        res.data = serde_json::to_string(&UoPoolError::owned::<String>(
-                            SANITY_CHECK_ERROR_CODE,
-                            user_operation_error.to_string(),
-                            None,
-                        ))
+                Err(error) => {
+                    res.set_result(AddResult::NotAdded);
+                    res.data = serde_json::to_string(&SanityCheckError::from(error))
                         .map_err(|_| tonic::Status::internal("error adding user operation"))?;
-                    }
-                    _ => {
-                        return Err(tonic::Status::internal("error adding user operation"));
-                    }
-                },
+                }
             }
 
             return Ok(tonic::Response::new(res));

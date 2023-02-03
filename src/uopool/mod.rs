@@ -2,7 +2,7 @@ use crate::{
     contracts::EntryPoint,
     types::{
         reputation::{
-            ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
+            BadReputationError, ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
             MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
         },
         user_operation::{UserOperation, UserOperationHash},
@@ -19,6 +19,7 @@ use clap::Parser;
 use educe::Educe;
 use ethers::{
     abi::AbiEncode,
+    prelude::gas_oracle::ProviderOracle,
     providers::{Http, Provider},
     types::{Address, H256, U256},
     utils::keccak256,
@@ -86,7 +87,11 @@ pub trait Reputation: Debug + Send + Sync + 'static {
     async fn is_blacklist(&self, address: &Address) -> anyhow::Result<bool>;
     async fn get_status(&self, address: &Address) -> anyhow::Result<ReputationStatus>;
     async fn update_handle_ops_reverted(&mut self, address: &Address) -> anyhow::Result<()>;
-    async fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
+    async fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> Result<(), BadReputationError>;
 
     #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
@@ -120,6 +125,7 @@ pub async fn run(
     opts: UoPoolOpts,
     entry_points: Vec<Address>,
     eth_provider: Arc<Provider<Http>>,
+    gas_oracle: Arc<ProviderOracle<Provider<Http>>>,
     max_verification_gas: U256,
     chain_id: U256,
 ) -> Result<()> {
@@ -157,6 +163,7 @@ pub async fn run(
             Arc::new(RwLock::new(mempools)),
             reputations.clone(),
             eth_provider,
+            gas_oracle,
             max_verification_gas,
             chain_id,
         ));

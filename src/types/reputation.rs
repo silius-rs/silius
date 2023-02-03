@@ -3,7 +3,7 @@ use ethers::{
     abi::AbiEncode,
     types::{Address, U256},
 };
-use jsonrpsee::types::ErrorObject;
+use jsonrpsee::types::{error::ErrorCode, ErrorObject};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -59,6 +59,7 @@ pub enum BadReputationError {
         min_stake: U256,
         min_unstake_delay: U256,
     },
+    Internal(anyhow::Error),
 }
 
 impl From<BadReputationError> for ReputationError {
@@ -105,6 +106,7 @@ impl From<BadReputationError> for ReputationError {
                     "minimumUnstakeDelay": AbiEncode::encode_hex(min_unstake_delay),
                 })),
             ),
+            BadReputationError::Internal(_) => ReputationError::from(ErrorCode::InternalError),
         }
     }
 }
