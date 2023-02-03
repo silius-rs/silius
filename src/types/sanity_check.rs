@@ -50,8 +50,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                     SANITY_CHECK_ERROR_CODE,
                     format!(
                         "Either the sender {sender} is an existing contract, or the initCode {init_code} is not empty (but not both)",
-                        sender = sender,
-                        init_code = init_code,
                     ),
                     None::<bool>,
                 )
@@ -63,8 +61,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 SANITY_CHECK_ERROR_CODE,
                 format!(
                     "Verification gas limit {verification_gas_limit} is higher than max verification gas {max_verification_gas}",
-                    verification_gas_limit = verification_gas_limit,
-                    max_verification_gas = max_verification_gas,
                 ),
                 None::<bool>,
             ),
@@ -75,8 +71,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 SANITY_CHECK_ERROR_CODE,
                 format!(
                     "Pre-verification gas {pre_verification_gas} is lower than calculated pre-verification gas {calculated_pre_verification_gas}",
-                    pre_verification_gas = pre_verification_gas,
-                    calculated_pre_verification_gas = calculated_pre_verification_gas,
                 ),
                 None::<bool>,
             ),
@@ -85,7 +79,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                     SANITY_CHECK_ERROR_CODE,
                     format!(
                         "Paymaster and data {paymaster_and_data} is invalid",
-                        paymaster_and_data = paymaster_and_data,
                     ),
                     None::<bool>,
                 )
@@ -97,8 +90,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 SANITY_CHECK_ERROR_CODE,
                 format!(
                     "Call gas limit {call_gas_limit} is lower than CALL non-zero value {non_zero_value_call}",
-                    call_gas_limit = call_gas_limit,
-                    non_zero_value_call = non_zero_value_call,
                 ),
                 None::<bool>,
             ),
@@ -109,8 +100,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 SANITY_CHECK_ERROR_CODE,
                 format!(
                     "Max fee per gas {max_fee_per_gas} is lower than estimated max fee per gas {max_fee_per_gas_estimated}",
-                    max_fee_per_gas = max_fee_per_gas,
-                    max_fee_per_gas_estimated = max_fee_per_gas_estimated,
                 ),
                 None::<bool>,
             ),
@@ -121,8 +110,6 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 SANITY_CHECK_ERROR_CODE,
                 format!(
                     "Max priority fee per gas {max_priority_fee_per_gas} is higher than max fee per gas {max_fee_per_gas}",
-                    max_priority_fee_per_gas = max_priority_fee_per_gas,
-                    max_fee_per_gas = max_fee_per_gas,
                 ),
                 None::<bool>,
             ),
