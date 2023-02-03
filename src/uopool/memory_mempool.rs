@@ -148,7 +148,7 @@ mod tests {
 
         assert_eq!(mempool.remove(&user_operation_hash).unwrap(), ());
         assert_eq!(
-            mempool.remove(&H256::random()).unwrap_err().to_string(),
+            mempool.remove(&H256::random().into()).unwrap_err().to_string(),
             anyhow::anyhow!("User operation not found").to_string()
         );
 
