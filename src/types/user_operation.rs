@@ -57,7 +57,7 @@ impl UserOperation {
         Bytes::from(packed)
     }
 
-    pub fn hash(&self, entry_point_address: Address, chain_id: U256) -> UserOperationHash {
+    pub fn hash(&self, entry_point_address: &Address, chain_id: &U256) -> UserOperationHash {
         H256::from_slice(
             keccak256(
                 [
@@ -209,20 +209,20 @@ mod tests {
         ];
         assert_eq!(
             user_operations[0].hash(
-                "0x2DF1592238420ecFe7f2431360e224707e77fA0E"
+                &"0x2DF1592238420ecFe7f2431360e224707e77fA0E"
                     .parse()
                     .unwrap(),
-                U256::from(1)
+                &U256::from(1)
             ),
             H256::from_str("0x42e145138104ec4124367ea3f7994833071b2011927290f6844d593e05011279")
                 .unwrap()
         );
         assert_eq!(
             user_operations[1].hash(
-                "0x2DF1592238420ecFe7f2431360e224707e77fA0E"
+                &"0x2DF1592238420ecFe7f2431360e224707e77fA0E"
                     .parse()
                     .unwrap(),
-                U256::from(1)
+                &U256::from(1)
             ),
             H256::from_str("0x583c8fcba470fd9da514f9482ccd31c299b0161a36b365aab353a6bfebaa0bb2")
                 .unwrap()
