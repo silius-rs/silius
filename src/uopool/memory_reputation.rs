@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
@@ -36,7 +35,6 @@ impl MemoryReputation {
     }
 }
 
-#[async_trait]
 impl Reputation for MemoryReputation {
     type ReputationEntries = Vec<ReputationEntry>;
 

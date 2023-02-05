@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
@@ -14,7 +13,6 @@ pub struct MemoryMempool {
     user_operations_by_sender: HashMap<Address, HashSet<UserOperationHash>>, // sender -> user_operations
 }
 
-#[async_trait]
 impl Mempool for MemoryMempool {
     type UserOperations = Vec<UserOperation>;
 
