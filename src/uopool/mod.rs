@@ -38,7 +38,7 @@ pub type MempoolId = H256;
 pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T>>;
 
-pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
+pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
     H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
 }
 
@@ -137,7 +137,7 @@ pub async fn run(
         let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
 
         for entry_point in entry_points {
-            let id = mempool_id(entry_point, chain_id);
+            let id = mempool_id(&entry_point, &chain_id);
             mempools.insert(id, Box::<MemoryMempool>::default());
 
             reputations.insert(id, Box::<MemoryReputation>::default());

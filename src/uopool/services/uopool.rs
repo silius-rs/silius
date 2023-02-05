@@ -1,7 +1,9 @@
 use crate::{
     contracts::EntryPoint,
     types::{
-        reputation::ReputationEntry, sanity_check::SanityCheckError, user_operation::UserOperation,
+        reputation::ReputationEntry,
+        sanity_check::{SanityCheckError, SanityCheckResult},
+        user_operation::{UserOperation, UserOperationHash},
     },
     uopool::{
         mempool_id,
@@ -22,7 +24,10 @@ use ethers::{
 };
 use jsonrpsee::{tracing::info, types::ErrorObject};
 use parking_lot::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tonic::Response;
 
 pub type UoPoolError = ErrorObject<'static>;
@@ -31,6 +36,7 @@ pub struct UoPoolService<M: Middleware> {
     pub entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
     pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
     pub reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
+    pub sanity_check_results: Arc<RwLock<HashMap<UserOperationHash, HashSet<SanityCheckResult>>>>,
     pub eth_provider: Arc<M>,
     pub gas_oracle: Arc<ProviderOracle<M>>,
     pub max_verification_gas: U256,
@@ -51,6 +57,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             entry_points,
             mempools,
             reputations,
+            sanity_check_results: Arc::new(RwLock::new(HashMap::new())),
             eth_provider,
             gas_oracle,
             max_verification_gas,
@@ -83,8 +90,13 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
             info!("{:?}", user_operation);
             info!("{:?}", entry_point);
 
+            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+
             //  sanity check
-            match self.validate_user_operation(&user_operation).await {
+            match self
+                .validate_user_operation(&user_operation, &mempool_id)
+                .await
+            {
                 Ok(_) => {
                     // simulation
 
@@ -151,7 +163,7 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
             if let Some(mempool) = self
                 .mempools
                 .read()
-                .get(&mempool_id(entry_point, self.chain_id))
+                .get(&mempool_id(&entry_point, &self.chain_id))
             {
                 res.result = GetAllResult::GotAll as i32;
                 res.uos = mempool
@@ -185,7 +197,7 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
             if let Some(reputation) = self
                 .reputations
                 .write()
-                .get_mut(&mempool_id(entry_point, self.chain_id))
+                .get_mut(&mempool_id(&entry_point, &self.chain_id))
             {
                 reputation.set(req.res.iter().map(|re| re.clone().into()).collect());
                 res.result = SetReputationResult::SetReputation as i32;
@@ -215,7 +227,7 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
             if let Some(reputation) = self
                 .reputations
                 .read()
-                .get(&mempool_id(entry_point, self.chain_id))
+                .get(&mempool_id(&entry_point, &self.chain_id))
             {
                 res.result = GetAllReputationResult::GotAllReputation as i32;
                 res.res = reputation.get_all().iter().map(|re| (*re).into()).collect();

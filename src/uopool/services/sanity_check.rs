@@ -1,9 +1,16 @@
 use crate::{
     chain::gas::{self, Overhead},
-    types::{sanity_check::BadUserOperationError, user_operation::UserOperation},
-    uopool::services::uopool::UoPoolService,
+    types::{
+        sanity_check::{BadUserOperationError, SanityCheckResult},
+        user_operation::UserOperation,
+    },
+    uopool::{services::uopool::UoPoolService, MempoolId},
 };
-use ethers::{prelude::gas_oracle::GasOracle, providers::Middleware};
+use ethers::{
+    prelude::gas_oracle::GasOracle,
+    providers::Middleware,
+    types::Address,
+};
 
 impl<M: Middleware + 'static> UoPoolService<M> {
     async fn sender_or_init_code(
@@ -26,7 +33,50 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
-    async fn verification_gas(
+    async fn factory_staked(
+        &self,
+        user_operation: &UserOperation,
+        mempool_id: &MempoolId,
+    ) -> Result<(), BadUserOperationError<M>> {
+        if !user_operation.init_code.is_empty() {
+            let factory_address = if &user_operation.init_code.len() >= &20 {
+                Address::from_slice(&user_operation.init_code[0..20])
+            } else {
+                Address::zero()
+            };
+
+            // if let Some(entry_point) = self.entry_points.get(&mempool_id) {
+            //     let stake_info = entry_point
+            //     .get_stake_info(factory_address)
+            //     .await
+            //     .map_err(|_| BadUserOperationError::FactoryStaked {
+            //         factory: factory_address,
+            //     })?;
+
+            //     let reputations = self.reputations.read();
+
+            //     if let Some(reputation) = reputations.get(&mempool_id) {
+            //         reputation
+            //         .verify_stake("factory", None)
+            //         .await
+            //         .is_ok();
+            //         self.sanity_check_results
+            //                 .write()
+            //                 .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
+            //                 .or_insert_with(Default::default)
+            //                 .insert(SanityCheckResult::FactoryStaked);
+            //     }
+            // }
+
+            return Err(BadUserOperationError::FactoryStaked {
+                factory: factory_address,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn verification_gas(
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), BadUserOperationError<M>> {
@@ -49,7 +99,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
-    async fn call_gas_limit(
+    fn call_gas_limit(
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), BadUserOperationError<M>> {
@@ -97,21 +147,24 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     pub async fn validate_user_operation(
         &self,
         user_operation: &UserOperation,
+        mempool_id: &MempoolId,
     ) -> Result<(), BadUserOperationError<M>> {
         // Either the sender is an existing contract, or the initCode is not empty (but not both)
         self.sender_or_init_code(user_operation).await?;
 
         // If initCode is not empty, parse its first 20 bytes as a factory address. Record whether the factory is staked, in case the later simulation indicates that it needs to be. If the factory accesses global state, it must be staked - see reputation, throttling and banning section for details.
-        // TODO: implement
+        self.factory_staked(user_operation, mempool_id).await?;
+
+        // simulation checks and enums meces noter kaj je potrebno potem pri simulation preveriti
 
         // The verificationGasLimit is sufficiently low (<= MAX_VERIFICATION_GAS) and the preVerificationGas is sufficiently high (enough to pay for the calldata gas cost of serializing the UserOperation plus PRE_VERIFICATION_OVERHEAD_GAS)
-        self.verification_gas(user_operation).await?;
+        self.verification_gas(user_operation)?;
 
         // The paymasterAndData is either empty, or start with the paymaster address, which is a contract that (i) currently has nonempty code on chain, (ii) has a sufficient deposit to pay for the UserOperation, and (iii) is not currently banned. During simulation, the paymaster's stake is also checked, depending on its storage usage - see reputation, throttling and banning section for details.
         // TODO: implement
 
         // The callgas is at least the cost of a CALL with non-zero value.
-        self.call_gas_limit(user_operation).await?;
+        self.call_gas_limit(user_operation)?;
 
         // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
         self.max_fee_per_gas(user_operation).await?;
@@ -146,13 +199,14 @@ mod tests {
         let entry_point = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69"
             .parse::<Address>()
             .unwrap();
+        let mempool_id = mempool_id(&entry_point, &chain_id);
         let eth_provider = Arc::new(Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap());
         let gas_oracle = Arc::new(ProviderOracle::new(
             Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap(),
         ));
         let mut entry_points = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         entry_points.insert(
-            mempool_id(entry_point, chain_id),
+            mempool_id,
             EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
         );
 
@@ -191,29 +245,35 @@ mod tests {
 
         // valid user operation
         assert!(uo_pool_service
-            .validate_user_operation(&user_operation_valid)
+            .validate_user_operation(&user_operation_valid, &mempool_id)
             .await
             .is_ok());
 
         // smart contract wallet already deployed
         assert!(uo_pool_service
-            .validate_user_operation(&UserOperation {
-                sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
-                    .parse()
-                    .unwrap(),
-                init_code: Bytes::default(),
-                ..user_operation_valid.clone()
-            })
+            .validate_user_operation(
+                &UserOperation {
+                    sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
+                        .parse()
+                        .unwrap(),
+                    init_code: Bytes::default(),
+                    ..user_operation_valid.clone()
+                },
+                &mempool_id
+            )
             .await
             .is_ok());
 
         // sender or init_code
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    init_code: Bytes::default(),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        init_code: Bytes::default(),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::SenderOrInitCode { .. },
@@ -221,12 +281,15 @@ mod tests {
 
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
-                        .parse()
-                        .unwrap(),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
+                            .parse()
+                            .unwrap(),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::SenderOrInitCode { .. },
@@ -237,10 +300,13 @@ mod tests {
         // verification gas
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    verification_gas_limit: U256::from(2000000),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        verification_gas_limit: U256::from(2000000),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::HighVerificationGasLimit { .. },
@@ -248,10 +314,13 @@ mod tests {
 
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    pre_verification_gas: U256::from(25000),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        pre_verification_gas: U256::from(25000),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::LowPreVerificationGas { .. },
@@ -262,10 +331,13 @@ mod tests {
         // call gas
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    call_gas_limit: U256::from(12000),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        call_gas_limit: U256::from(12000),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::LowCallGasLimit { .. },
@@ -274,10 +346,13 @@ mod tests {
         // max fee per gas and max priority fee per gas
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    max_priority_fee_per_gas: U256::from(1500000000_u64 * 3),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        max_priority_fee_per_gas: U256::from(1500000000_u64 * 3),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::HighMaxPriorityFeePerGas { .. },
@@ -285,10 +360,13 @@ mod tests {
 
         assert!(matches!(
             uo_pool_service
-                .validate_user_operation(&UserOperation {
-                    max_fee_per_gas: U256::from(1500000000_u64 + 10),
-                    ..user_operation_valid.clone()
-                })
+                .validate_user_operation(
+                    &UserOperation {
+                        max_fee_per_gas: U256::from(1500000000_u64 + 10),
+                        ..user_operation_valid.clone()
+                    },
+                    &mempool_id
+                )
                 .await
                 .unwrap_err(),
             BadUserOperationError::LowMaxFeePerGas { .. },

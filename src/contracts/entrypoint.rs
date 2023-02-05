@@ -8,22 +8,26 @@ use ethers::types::{Address, Bytes, GethDebugTracingCallOptions, GethTrace};
 use regex::Regex;
 use serde::Deserialize;
 
-use super::gen::entry_point_api::{self, UserOperation};
-use super::gen::EntryPointAPI;
+use super::gen::entry_point_api::{EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult, ValidationResultWithAggregation};
+use super::gen::stake_manager_api::DepositInfo;
+use super::gen::{EntryPointAPI, StakeManagerAPI};
 
 pub struct EntryPoint<M: Middleware> {
     provider: Arc<M>,
-    entry_point_address: Address,
-    api: EntryPointAPI<M>,
+    address: Address,
+    entry_point_api: EntryPointAPI<M>,
+    stake_manager_api: StakeManagerAPI<M>,
 }
 
 impl<M: Middleware + 'static> EntryPoint<M> {
-    pub fn new(provider: Arc<M>, entry_point_address: Address) -> Self {
-        let api = EntryPointAPI::new(entry_point_address, provider.clone());
+    pub fn new(provider: Arc<M>, address: Address) -> Self {
+        let entry_point_api = EntryPointAPI::new(address, provider.clone());
+        let stake_manager_api = StakeManagerAPI::new(address, provider.clone());
         Self {
             provider,
-            entry_point_address,
-            api,
+            address,
+            entry_point_api,
+            stake_manager_api,
         }
     }
 
@@ -31,13 +35,13 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         self.provider.clone()
     }
 
-    pub fn entry_point_address(&self) -> Address {
-        self.entry_point_address
+    pub fn address(&self) -> Address {
+        self.address
     }
 
     fn deserialize_error_msg(
         err_msg: &str,
-    ) -> Result<entry_point_api::EntryPointAPIErrors, EntryPointErr> {
+    ) -> Result<EntryPointAPIErrors, EntryPointErr> {
         JsonRpcError::from_str(err_msg)
             .map_err(|_| {
                 EntryPointErr::DecodeErr(format!("{err_msg:?} is not a valid JsonRpcError message"))
@@ -62,7 +66,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         user_operation: U,
     ) -> Result<SimulateValidationResult, EntryPointErr> {
-        let request_result = self.api.simulate_validation(user_operation.into()).await;
+        let request_result = self.entry_point_api.simulate_validation(user_operation.into()).await;
         match request_result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Simulate validation should expect revert".to_string(),
@@ -70,13 +74,13 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             Err(e) => {
                 let err_msg = e.to_string();
                 Self::deserialize_error_msg(&err_msg).and_then(|op| match op {
-                    entry_point_api::EntryPointAPIErrors::FailedOp(failed_op) => {
+                    EntryPointAPIErrors::FailedOp(failed_op) => {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
-                    entry_point_api::EntryPointAPIErrors::ValidationResult(res) => {
+                    EntryPointAPIErrors::ValidationResult(res) => {
                         Ok(SimulateValidationResult::ValidationResult(res))
                     }
-                    entry_point_api::EntryPointAPIErrors::ValidationResultWithAggregation(res) => {
+                    EntryPointAPIErrors::ValidationResultWithAggregation(res) => {
                         Ok(SimulateValidationResult::ValidationResultWithAggregation(
                             res,
                         ))
@@ -89,11 +93,12 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         }
     }
 
+    // TODO: change to javascript tracer
     pub async fn simulate_validation_trace<U: Into<UserOperation>>(
         &self,
         user_operation: U,
     ) -> Result<GethTrace, EntryPointErr> {
-        let call = self.api.simulate_validation(user_operation.into());
+        let call = self.entry_point_api.simulate_validation(user_operation.into());
         let options: GethDebugTracingCallOptions = GethDebugTracingCallOptions::default();
         let request_result = self
             .provider
@@ -107,13 +112,13 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         ops: Vec<U>,
         beneficiary: Address,
     ) -> Result<(), EntryPointErr> {
-        self.api
+        self.entry_point_api
             .handle_ops(ops.into_iter().map(|u| u.into()).collect(), beneficiary)
             .await
             .or_else(|e| {
                 let err_msg = e.to_string();
                 Self::deserialize_error_msg(&err_msg).and_then(|op| match op {
-                    entry_point_api::EntryPointAPIErrors::FailedOp(failed_op) => {
+                    EntryPointAPIErrors::FailedOp(failed_op) => {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
                     _ => Err(EntryPointErr::UnknownErr(format!(
@@ -123,11 +128,22 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             })
     }
 
-    pub async fn get_sender_address<U: Into<UserOperation>>(
+    pub async fn get_deposit_info(&self, address: &Address) -> Result<DepositInfo, EntryPointErr> {
+        let result = self.stake_manager_api.get_deposit_info(address.clone()).await;
+
+        match result {
+            Ok(deposit_info) => Ok(deposit_info),
+            _ => Err(EntryPointErr::UnknownErr(
+                "Error calling get deposit info".to_string(),
+            )),
+        }
+    }
+
+    pub async fn get_sender_address(
         &self,
         initcode: Bytes,
-    ) -> Result<entry_point_api::SenderAddressResult, EntryPointErr> {
-        let result = self.api.get_sender_address(initcode).await;
+    ) -> Result<SenderAddressResult, EntryPointErr> {
+        let result = self.entry_point_api.get_sender_address(initcode).await;
 
         match result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
@@ -136,8 +152,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             Err(e) => {
                 let err_msg = e.to_string();
                 Self::deserialize_error_msg(&err_msg).and_then(|op| match op {
-                    entry_point_api::EntryPointAPIErrors::SenderAddressResult(res) => Ok(res),
-                    entry_point_api::EntryPointAPIErrors::FailedOp(failed_op) => {
+                    EntryPointAPIErrors::SenderAddressResult(res) => Ok(res),
+                    EntryPointAPIErrors::FailedOp(failed_op) => {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
                     _ => Err(EntryPointErr::UnknownErr(format!(
@@ -159,7 +175,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
 #[derive(Debug)]
 pub enum EntryPointErr {
-    FailedOp(entry_point_api::FailedOp),
+    FailedOp(FailedOp),
     ProviderErr(ProviderError),
     NetworkErr, // TODO
     DecodeErr(String),
@@ -174,8 +190,8 @@ impl From<ProviderError> for EntryPointErr {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SimulateValidationResult {
-    ValidationResult(entry_point_api::ValidationResult),
-    ValidationResultWithAggregation(entry_point_api::ValidationResultWithAggregation),
+    ValidationResult(ValidationResult),
+    ValidationResultWithAggregation(ValidationResultWithAggregation),
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

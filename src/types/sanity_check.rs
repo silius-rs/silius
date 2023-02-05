@@ -15,6 +15,9 @@ pub enum BadUserOperationError<M: Middleware> {
         sender: Address,
         init_code: Bytes,
     },
+    FactoryStaked {
+        factory: Address,
+    },
     HighVerificationGasLimit {
         verification_gas_limit: U256,
         max_verification_gas: U256,
@@ -42,6 +45,13 @@ pub enum BadUserOperationError<M: Middleware> {
     GasOracleError(GasOracleError),
 }
 
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum SanityCheckResult {
+    FactoryStaked,
+    PaymasterStaked,
+    SenderStaked,
+}
+
 impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
     fn from(error: BadUserOperationError<M>) -> Self {
         match error {
@@ -54,6 +64,11 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                     None::<bool>,
                 )
             },
+            BadUserOperationError::FactoryStaked { factory } => SanityCheckError::owned(
+                SANITY_CHECK_ERROR_CODE,
+                format!("Factory {factory} is not valid",),
+                None::<bool>,
+            ),
             BadUserOperationError::HighVerificationGasLimit {
                 verification_gas_limit,
                 max_verification_gas,
