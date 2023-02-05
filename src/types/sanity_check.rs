@@ -15,8 +15,8 @@ pub enum BadUserOperationError<M: Middleware> {
         sender: Address,
         init_code: Bytes,
     },
-    FactoryStaked {
-        factory: Address,
+    FactoryVerification {
+        init_code: Bytes,
     },
     HighVerificationGasLimit {
         verification_gas_limit: U256,
@@ -26,7 +26,7 @@ pub enum BadUserOperationError<M: Middleware> {
         pre_verification_gas: U256,
         calculated_pre_verification_gas: U256,
     },
-    InvalidPaymasterAndData {
+    PaymasterVerification {
         paymaster_and_data: Bytes,
     },
     LowCallGasLimit {
@@ -47,9 +47,9 @@ pub enum BadUserOperationError<M: Middleware> {
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum SanityCheckResult {
-    FactoryStaked,
-    PaymasterStaked,
-    SenderStaked,
+    FactoryVerified,
+    PaymasterVerified,
+    SenderVerified,
 }
 
 impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
@@ -64,9 +64,9 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                     None::<bool>,
                 )
             },
-            BadUserOperationError::FactoryStaked { factory } => SanityCheckError::owned(
+            BadUserOperationError::FactoryVerification { init_code } => SanityCheckError::owned(
                 SANITY_CHECK_ERROR_CODE,
-                format!("Factory {factory} is not valid",),
+                format!("Init code {init_code} is not valid (factory check)",),
                 None::<bool>,
             ),
             BadUserOperationError::HighVerificationGasLimit {
@@ -89,11 +89,11 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 ),
                 None::<bool>,
             ),
-            BadUserOperationError::InvalidPaymasterAndData { paymaster_and_data } => {
+            BadUserOperationError::PaymasterVerification { paymaster_and_data } => {
                 SanityCheckError::owned(
                     SANITY_CHECK_ERROR_CODE,
                     format!(
-                        "Paymaster and data {paymaster_and_data} is invalid",
+                        "Paymaster and data {paymaster_and_data} is invalid (paymaster check)",
                     ),
                     None::<bool>,
                 )

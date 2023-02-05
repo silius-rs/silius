@@ -1,7 +1,7 @@
 use crate::{
     chain::gas::{self, Overhead},
     types::{
-        reputation::StakeInfo,
+        reputation::{ReputationStatus, StakeInfo},
         sanity_check::{BadUserOperationError, SanityCheckResult},
         user_operation::UserOperation,
     },
@@ -34,7 +34,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
-    async fn factory_staked(
+    async fn verify_factory(
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
@@ -43,7 +43,9 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             let factory_address = if user_operation.init_code.len() >= 20 {
                 Address::from_slice(&user_operation.init_code[0..20])
             } else {
-                Address::zero()
+                return Err(BadUserOperationError::FactoryVerification {
+                    init_code: user_operation.init_code.clone(),
+                });
             };
 
             let mempool_id = mempool_id(entry_point, &self.chain_id);
@@ -52,8 +54,8 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                 let deposit_info = entry_point
                     .get_deposit_info(&factory_address)
                     .await
-                    .map_err(|_| BadUserOperationError::FactoryStaked {
-                        factory: factory_address,
+                    .map_err(|_| BadUserOperationError::FactoryVerification {
+                        init_code: user_operation.init_code.clone(),
                     })?;
 
                 if let Some(reputation) = self.reputations.read().get(&mempool_id) {
@@ -72,7 +74,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                             .write()
                             .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
                             .or_insert_with(Default::default)
-                            .insert(SanityCheckResult::FactoryStaked);
+                            .insert(SanityCheckResult::FactoryVerified);
                     }
                 }
             }
@@ -99,6 +101,47 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                 pre_verification_gas: user_operation.pre_verification_gas,
                 calculated_pre_verification_gas,
             });
+        }
+
+        Ok(())
+    }
+
+    async fn verify_paymaster(
+        &self,
+        user_operation: &UserOperation,
+        entry_point: &Address,
+    ) -> Result<(), BadUserOperationError<M>> {
+        if !user_operation.paymaster_and_data.is_empty() {
+            let paymaster_address = if user_operation.paymaster_and_data.len() >= 20 {
+                Address::from_slice(&user_operation.paymaster_and_data[0..20])
+            } else {
+                return Err(BadUserOperationError::PaymasterVerification {
+                    paymaster_and_data: user_operation.paymaster_and_data.clone(),
+                });
+            };
+
+            let mempool_id = mempool_id(entry_point, &self.chain_id);
+
+            if let Some(entry_point) = self.entry_points.get(&mempool_id) {
+                let deposit_info = entry_point
+                    .get_deposit_info(&paymaster_address)
+                    .await
+                    .map_err(|_| BadUserOperationError::PaymasterVerification {
+                        paymaster_and_data: user_operation.paymaster_and_data.clone(),
+                    })?;
+
+                if U256::from(deposit_info.deposit) > user_operation.max_fee_per_gas {
+                    if let Some(reputation) = self.reputations.read().get(&mempool_id) {
+                        if reputation.get_status(&paymaster_address) != ReputationStatus::BANNED {
+                            self.sanity_check_results
+                                .write()
+                                .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
+                                .or_insert_with(Default::default)
+                                .insert(SanityCheckResult::PaymasterVerified);
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -163,15 +206,13 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         self.sender_or_init_code(user_operation).await?;
 
         // If initCode is not empty, parse its first 20 bytes as a factory address. Record whether the factory is staked, in case the later simulation indicates that it needs to be. If the factory accesses global state, it must be staked - see reputation, throttling and banning section for details.
-        self.factory_staked(user_operation, entry_point).await?;
-
-        // simulation checks and enums meces noter kaj je potrebno potem pri simulation preveriti
+        self.verify_factory(user_operation, entry_point).await?;
 
         // The verificationGasLimit is sufficiently low (<= MAX_VERIFICATION_GAS) and the preVerificationGas is sufficiently high (enough to pay for the calldata gas cost of serializing the UserOperation plus PRE_VERIFICATION_OVERHEAD_GAS)
         self.verification_gas(user_operation)?;
 
         // The paymasterAndData is either empty, or start with the paymaster address, which is a contract that (i) currently has nonempty code on chain, (ii) has a sufficient deposit to pay for the UserOperation, and (iii) is not currently banned. During simulation, the paymaster's stake is also checked, depending on its storage usage - see reputation, throttling and banning section for details.
-        // TODO: implement
+        self.verify_paymaster(user_operation, entry_point).await?;
 
         // The callgas is at least the cost of a CALL with non-zero value.
         self.call_gas_limit(user_operation)?;
@@ -322,7 +363,7 @@ mod tests {
             BadUserOperationError::SenderOrInitCode { .. },
         ));
 
-        // factory staked
+        // factory verification
         assert_eq!(
             uo_pool_service
                 .sanity_check_results
@@ -362,7 +403,22 @@ mod tests {
             BadUserOperationError::LowPreVerificationGas { .. },
         ));
 
-        // // TODO: implement
+        // paymaster verification
+        assert!(uo_pool_service
+            .validate_user_operation(
+                &UserOperation {
+                    paymaster_and_data: Bytes::from_str(
+                        "0x1a31f86F876a8b1c90E7DC2aB77A5335D43392Eb"
+                    )
+                    .unwrap(),
+                    ..user_operation_valid.clone()
+                },
+                &entry_point
+            )
+            .await
+            .is_ok());
+        // prvo validate
+        // potem sanity check result
 
         // call gas
         assert!(matches!(
