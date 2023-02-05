@@ -92,9 +92,13 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
+            if !self.entry_points.contains_key(&mempool_id) {
+                return Err(tonic::Status::invalid_argument("entry point not supported"));
+            }
+
             //  sanity check
             match self
-                .validate_user_operation(&user_operation, &mempool_id)
+                .validate_user_operation(&user_operation, &entry_point)
                 .await
             {
                 Ok(_) => {
@@ -110,6 +114,9 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
                             .map_err(|_| tonic::Status::internal("error adding user operation"))?;
                 }
                 Err(error) => {
+                    self.sanity_check_results
+                        .write()
+                        .remove(&user_operation.hash(&entry_point, &self.chain_id));
                     res.set_result(AddResult::NotAdded);
                     res.data = serde_json::to_string(&SanityCheckError::from(error))
                         .map_err(|_| tonic::Status::internal("error adding user operation"))?;

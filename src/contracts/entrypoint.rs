@@ -8,7 +8,10 @@ use ethers::types::{Address, Bytes, GethDebugTracingCallOptions, GethTrace};
 use regex::Regex;
 use serde::Deserialize;
 
-use super::gen::entry_point_api::{EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult, ValidationResultWithAggregation};
+use super::gen::entry_point_api::{
+    EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult,
+    ValidationResultWithAggregation,
+};
 use super::gen::stake_manager_api::DepositInfo;
 use super::gen::{EntryPointAPI, StakeManagerAPI};
 
@@ -39,9 +42,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         self.address
     }
 
-    fn deserialize_error_msg(
-        err_msg: &str,
-    ) -> Result<EntryPointAPIErrors, EntryPointErr> {
+    fn deserialize_error_msg(err_msg: &str) -> Result<EntryPointAPIErrors, EntryPointErr> {
         JsonRpcError::from_str(err_msg)
             .map_err(|_| {
                 EntryPointErr::DecodeErr(format!("{err_msg:?} is not a valid JsonRpcError message"))
@@ -66,7 +67,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         user_operation: U,
     ) -> Result<SimulateValidationResult, EntryPointErr> {
-        let request_result = self.entry_point_api.simulate_validation(user_operation.into()).await;
+        let request_result = self
+            .entry_point_api
+            .simulate_validation(user_operation.into())
+            .await;
         match request_result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Simulate validation should expect revert".to_string(),
@@ -80,11 +84,9 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                     EntryPointAPIErrors::ValidationResult(res) => {
                         Ok(SimulateValidationResult::ValidationResult(res))
                     }
-                    EntryPointAPIErrors::ValidationResultWithAggregation(res) => {
-                        Ok(SimulateValidationResult::ValidationResultWithAggregation(
-                            res,
-                        ))
-                    }
+                    EntryPointAPIErrors::ValidationResultWithAggregation(res) => Ok(
+                        SimulateValidationResult::ValidationResultWithAggregation(res),
+                    ),
                     _ => Err(EntryPointErr::UnknownErr(format!(
                         "Simulate validation with invalid error: {op:?}"
                     ))),
@@ -98,7 +100,9 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         user_operation: U,
     ) -> Result<GethTrace, EntryPointErr> {
-        let call = self.entry_point_api.simulate_validation(user_operation.into());
+        let call = self
+            .entry_point_api
+            .simulate_validation(user_operation.into());
         let options: GethDebugTracingCallOptions = GethDebugTracingCallOptions::default();
         let request_result = self
             .provider
@@ -129,7 +133,11 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     }
 
     pub async fn get_deposit_info(&self, address: &Address) -> Result<DepositInfo, EntryPointErr> {
-        let result = self.stake_manager_api.get_deposit_info(address.clone()).await;
+        let result = self
+            .stake_manager_api
+            .get_deposit_info(*address)
+            .call()
+            .await;
 
         match result {
             Ok(deposit_info) => Ok(deposit_info),

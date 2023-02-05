@@ -57,7 +57,7 @@ impl UserOperation {
         Bytes::from(packed)
     }
 
-    pub fn hash(&self, entry_point_address: &Address, chain_id: &U256) -> UserOperationHash {
+    pub fn hash(&self, entry_point: &Address, chain_id: &U256) -> UserOperationHash {
         H256::from_slice(
             keccak256(
                 [

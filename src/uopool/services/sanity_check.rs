@@ -1,15 +1,16 @@
 use crate::{
     chain::gas::{self, Overhead},
     types::{
+        reputation::StakeInfo,
         sanity_check::{BadUserOperationError, SanityCheckResult},
         user_operation::UserOperation,
     },
-    uopool::{services::uopool::UoPoolService, MempoolId},
+    uopool::{mempool_id, services::uopool::UoPoolService},
 };
 use ethers::{
     prelude::gas_oracle::GasOracle,
     providers::Middleware,
-    types::Address,
+    types::{Address, U256},
 };
 
 impl<M: Middleware + 'static> UoPoolService<M> {
@@ -36,41 +37,45 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     async fn factory_staked(
         &self,
         user_operation: &UserOperation,
-        mempool_id: &MempoolId,
+        entry_point: &Address,
     ) -> Result<(), BadUserOperationError<M>> {
         if !user_operation.init_code.is_empty() {
-            let factory_address = if &user_operation.init_code.len() >= &20 {
+            let factory_address = if user_operation.init_code.len() >= 20 {
                 Address::from_slice(&user_operation.init_code[0..20])
             } else {
                 Address::zero()
             };
 
-            // if let Some(entry_point) = self.entry_points.get(&mempool_id) {
-            //     let stake_info = entry_point
-            //     .get_stake_info(factory_address)
-            //     .await
-            //     .map_err(|_| BadUserOperationError::FactoryStaked {
-            //         factory: factory_address,
-            //     })?;
+            let mempool_id = mempool_id(entry_point, &self.chain_id);
 
-            //     let reputations = self.reputations.read();
+            if let Some(entry_point) = self.entry_points.get(&mempool_id) {
+                let deposit_info = entry_point
+                    .get_deposit_info(&factory_address)
+                    .await
+                    .map_err(|_| BadUserOperationError::FactoryStaked {
+                        factory: factory_address,
+                    })?;
 
-            //     if let Some(reputation) = reputations.get(&mempool_id) {
-            //         reputation
-            //         .verify_stake("factory", None)
-            //         .await
-            //         .is_ok();
-            //         self.sanity_check_results
-            //                 .write()
-            //                 .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
-            //                 .or_insert_with(Default::default)
-            //                 .insert(SanityCheckResult::FactoryStaked);
-            //     }
-            // }
-
-            return Err(BadUserOperationError::FactoryStaked {
-                factory: factory_address,
-            });
+                if let Some(reputation) = self.reputations.read().get(&mempool_id) {
+                    if reputation
+                        .verify_stake(
+                            "factory",
+                            Some(StakeInfo {
+                                address: factory_address,
+                                stake: U256::from(deposit_info.stake),
+                                unstake_delay: U256::from(deposit_info.unstake_delay_sec),
+                            }),
+                        )
+                        .is_ok()
+                    {
+                        self.sanity_check_results
+                            .write()
+                            .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
+                            .or_insert_with(Default::default)
+                            .insert(SanityCheckResult::FactoryStaked);
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -147,13 +152,18 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     pub async fn validate_user_operation(
         &self,
         user_operation: &UserOperation,
-        mempool_id: &MempoolId,
+        entry_point: &Address,
     ) -> Result<(), BadUserOperationError<M>> {
+        self.sanity_check_results.write().insert(
+            user_operation.hash(entry_point, &self.chain_id),
+            Default::default(),
+        );
+
         // Either the sender is an existing contract, or the initCode is not empty (but not both)
         self.sender_or_init_code(user_operation).await?;
 
         // If initCode is not empty, parse its first 20 bytes as a factory address. Record whether the factory is staked, in case the later simulation indicates that it needs to be. If the factory accesses global state, it must be staked - see reputation, throttling and banning section for details.
-        self.factory_staked(user_operation, mempool_id).await?;
+        self.factory_staked(user_operation, entry_point).await?;
 
         // simulation checks and enums meces noter kaj je potrebno potem pri simulation preveriti
 
@@ -180,8 +190,13 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 mod tests {
     use crate::{
         contracts::EntryPoint,
-        types::reputation::ReputationEntry,
-        uopool::{mempool_id, MempoolBox, MempoolId, ReputationBox},
+        types::reputation::{
+            ReputationEntry, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+        },
+        uopool::{
+            memory_mempool::MemoryMempool, memory_reputation::MemoryReputation, mempool_id,
+            MempoolBox, MempoolId, ReputationBox,
+        },
     };
     use ethers::{
         prelude::gas_oracle::ProviderOracle,
@@ -199,30 +214,42 @@ mod tests {
         let entry_point = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69"
             .parse::<Address>()
             .unwrap();
-        let mempool_id = mempool_id(&entry_point, &chain_id);
         let eth_provider = Arc::new(Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap());
         let gas_oracle = Arc::new(ProviderOracle::new(
             Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap(),
         ));
-        let mut entry_points = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
-        entry_points.insert(
-            mempool_id,
-            EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
-        );
+
+        let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
+        let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
+        let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
+
+        for entry_point in vec![entry_point] {
+            let id = mempool_id(&entry_point, &chain_id);
+            mempools.insert(id, Box::<MemoryMempool>::default());
+
+            reputations.insert(id, Box::<MemoryReputation>::default());
+            if let Some(reputation) = reputations.get_mut(&id) {
+                reputation.init(
+                    MIN_INCLUSION_RATE_DENOMINATOR,
+                    THROTTLING_SLACK,
+                    BAN_SLACK,
+                    U256::from(0),
+                    U256::from(0),
+                );
+            }
+            entry_points_map.insert(
+                id,
+                EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
+            );
+        }
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);
         let max_fee_per_gas = max_priority_fee_per_gas + gas_oracle.fetch().await.unwrap();
 
         let uo_pool_service = UoPoolService::new(
-            Arc::new(entry_points),
-            Arc::new(RwLock::new(HashMap::<
-                MempoolId,
-                MempoolBox<Vec<UserOperation>>,
-            >::new())),
-            Arc::new(RwLock::new(HashMap::<
-                MempoolId,
-                ReputationBox<Vec<ReputationEntry>>,
-            >::new())),
+            Arc::new(entry_points_map),
+            Arc::new(RwLock::new(mempools)),
+            Arc::new(RwLock::new(reputations)),
             eth_provider,
             gas_oracle,
             U256::from(1500000),
@@ -237,15 +264,15 @@ mod tests {
             call_gas_limit: U256::from(22016),
             verification_gas_limit: U256::from(413910),
             pre_verification_gas: U256::from(48480),
-            max_fee_per_gas: max_fee_per_gas,
-            max_priority_fee_per_gas: max_priority_fee_per_gas,
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
             paymaster_and_data: Bytes::default(),
             signature: Bytes::default(),
         };
 
         // valid user operation
         assert!(uo_pool_service
-            .validate_user_operation(&user_operation_valid, &mempool_id)
+            .validate_user_operation(&user_operation_valid, &entry_point)
             .await
             .is_ok());
 
@@ -259,7 +286,7 @@ mod tests {
                     init_code: Bytes::default(),
                     ..user_operation_valid.clone()
                 },
-                &mempool_id
+                &entry_point
             )
             .await
             .is_ok());
@@ -272,7 +299,7 @@ mod tests {
                         init_code: Bytes::default(),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),
@@ -288,14 +315,23 @@ mod tests {
                             .unwrap(),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),
             BadUserOperationError::SenderOrInitCode { .. },
         ));
 
-        // // TODO: implement
+        // factory staked
+        assert_eq!(
+            uo_pool_service
+                .sanity_check_results
+                .read()
+                .get(&user_operation_valid.hash(&entry_point, &chain_id))
+                .unwrap()
+                .len(),
+            1
+        );
 
         // verification gas
         assert!(matches!(
@@ -305,7 +341,7 @@ mod tests {
                         verification_gas_limit: U256::from(2000000),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),
@@ -319,7 +355,7 @@ mod tests {
                         pre_verification_gas: U256::from(25000),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),
@@ -336,7 +372,7 @@ mod tests {
                         call_gas_limit: U256::from(12000),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),
@@ -351,7 +387,7 @@ mod tests {
                         max_priority_fee_per_gas: U256::from(1500000000_u64 * 3),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),
@@ -365,7 +401,7 @@ mod tests {
                         max_fee_per_gas: U256::from(1500000000_u64 + 10),
                         ..user_operation_valid.clone()
                     },
-                    &mempool_id
+                    &entry_point
                 )
                 .await
                 .unwrap_err(),

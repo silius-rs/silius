@@ -84,7 +84,11 @@ pub trait Reputation: Debug {
     fn is_blacklist(&self, address: &Address) -> bool;
     fn get_status(&self, address: &Address) -> ReputationStatus;
     fn update_handle_ops_reverted(&mut self, address: &Address);
-    fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
+    fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> Result<(), BadReputationError>;
 
     #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
