@@ -14,7 +14,6 @@ use crate::{
     utils::parse_u256,
 };
 use anyhow::Result;
-use async_trait::async_trait;
 use clap::Parser;
 use educe::Educe;
 use ethers::{
@@ -35,26 +34,25 @@ pub mod services;
 
 pub type MempoolId = H256;
 
-pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T>>;
-pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T>>;
+pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T> + Send + Sync>;
+pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
 
 pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
     H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
 }
 
-#[async_trait]
-pub trait Mempool: Debug + Send + Sync + 'static {
+pub trait Mempool: Debug {
     type UserOperations: IntoIterator<Item = UserOperation>;
 
-    async fn add(
+    fn add(
         &mut self,
-        user_operation: &UserOperation,
+        user_operation: UserOperation,
         entry_point: &Address,
         chain_id: &U256,
-    ) -> anyhow::Result<UserOperationHash>;
-    async fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
-    async fn get_all_by_sender(&self, sender: &Address) -> anyhow::Result<Self::UserOperations>;
-    async fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
+    ) -> UserOperationHash;
+    fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
+    fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
+    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;
@@ -63,8 +61,7 @@ pub trait Mempool: Debug + Send + Sync + 'static {
     fn clear(&mut self);
 }
 
-#[async_trait]
-pub trait Reputation: Debug + Send + Sync + 'static {
+pub trait Reputation: Debug {
     type ReputationEntries: IntoIterator<Item = ReputationEntry>;
 
     fn init(
@@ -75,23 +72,19 @@ pub trait Reputation: Debug + Send + Sync + 'static {
         min_stake: U256,
         min_unstake_delay: U256,
     );
-    async fn get(&mut self, address: &Address) -> anyhow::Result<ReputationEntry>;
-    async fn increment_seen(&mut self, address: &Address) -> anyhow::Result<()>;
-    async fn increment_included(&mut self, address: &Address) -> anyhow::Result<()>;
+    fn get(&mut self, address: &Address) -> ReputationEntry;
+    fn increment_seen(&mut self, address: &Address);
+    fn increment_included(&mut self, address: &Address);
     fn update_hourly(&mut self);
-    async fn add_whitelist(&mut self, address: &Address) -> anyhow::Result<()>;
-    async fn remove_whitelist(&mut self, address: &Address) -> anyhow::Result<bool>;
-    async fn is_whitelist(&self, address: &Address) -> anyhow::Result<bool>;
-    async fn add_blacklist(&mut self, address: &Address) -> anyhow::Result<()>;
-    async fn remove_blacklist(&mut self, address: &Address) -> anyhow::Result<bool>;
-    async fn is_blacklist(&self, address: &Address) -> anyhow::Result<bool>;
-    async fn get_status(&self, address: &Address) -> anyhow::Result<ReputationStatus>;
-    async fn update_handle_ops_reverted(&mut self, address: &Address) -> anyhow::Result<()>;
-    async fn verify_stake(
-        &self,
-        title: &str,
-        stake_info: Option<StakeInfo>,
-    ) -> Result<(), BadReputationError>;
+    fn add_whitelist(&mut self, address: &Address) -> bool;
+    fn remove_whitelist(&mut self, address: &Address) -> bool;
+    fn is_whitelist(&self, address: &Address) -> bool;
+    fn add_blacklist(&mut self, address: &Address) -> bool;
+    fn remove_blacklist(&mut self, address: &Address) -> bool;
+    fn is_blacklist(&self, address: &Address) -> bool;
+    fn get_status(&self, address: &Address) -> ReputationStatus;
+    fn update_handle_ops_reverted(&mut self, address: &Address);
+    fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
 
     #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
