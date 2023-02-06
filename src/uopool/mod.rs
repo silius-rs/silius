@@ -24,6 +24,7 @@ use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
+pub mod database;
 pub mod memory_mempool;
 pub mod memory_reputation;
 pub mod server;
@@ -46,8 +47,9 @@ pub trait Mempool: Debug {
         user_operation: UserOperation,
         entry_point: &Address,
         chain_id: &U256,
-    ) -> UserOperationHash;
-    fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
+    ) -> anyhow::Result<UserOperationHash>;
+    fn get(&self, user_operation_hash: &UserOperationHash)
+        -> anyhow::Result<Option<UserOperation>>;
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
 

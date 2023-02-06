@@ -1,8 +1,9 @@
 use crate::contracts::gen::entry_point_api;
-use ethers::abi::AbiEncode;
+use ethers::abi::{AbiDecode, AbiEncode};
 use ethers::prelude::{EthAbiCodec, EthAbiType};
 use ethers::types::{Address, Bytes, TransactionReceipt, H256, U256};
 use ethers::utils::keccak256;
+use reth_db::table::{Compress, Decode, Decompress, Encode};
 use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -27,6 +28,19 @@ impl FromStr for UserOperationHash {
     type Err = FromHexError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         H256::from_str(s).map(|h| h.into())
+    }
+}
+
+impl Decode for UserOperationHash {
+    fn decode<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        Ok(H256::from_slice(value.into().as_ref()).into())
+    }
+}
+
+impl Encode for UserOperationHash {
+    type Encoded = [u8; 32];
+    fn encode(self) -> Self::Encoded {
+        *self.0.as_fixed_bytes()
     }
 }
 
@@ -109,6 +123,19 @@ impl UserOperation {
             paymaster_and_data: Bytes::default(),
             signature: Bytes::default(),
         }
+    }
+}
+
+impl Compress for UserOperation {
+    type Compressed = Bytes;
+    fn compress(self) -> Self::Compressed {
+        self.pack()
+    }
+}
+
+impl Decompress for UserOperation {
+    fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        Self::decode(value.into()).map_err(|_e| reth_db::Error::DecodeError)
     }
 }
 
