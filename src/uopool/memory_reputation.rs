@@ -169,7 +169,6 @@ impl Reputation for MemoryReputation {
                     BadReputationError::StakeTooLow {
                         address: stake_info.address,
                         title: title.to_string(),
-                        stake: stake_info.stake,
                         min_stake: self.min_stake,
                         min_unstake_delay: self.min_unstake_delay,
                     }
@@ -177,7 +176,6 @@ impl Reputation for MemoryReputation {
                     BadReputationError::UnstakeDelayTooLow {
                         address: stake_info.address,
                         title: title.to_string(),
-                        unstake_delay: stake_info.unstake_delay,
                         min_stake: self.min_stake,
                         min_unstake_delay: self.min_unstake_delay,
                     }

@@ -52,6 +52,7 @@ pub trait Mempool: Debug {
     ) -> UserOperationHash;
     fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
+    fn get_number_by_sender(&self, sender: &Address) -> usize;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
 
     #[cfg(debug_assertions)]

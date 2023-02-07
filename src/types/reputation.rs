@@ -48,14 +48,12 @@ pub enum BadReputationError {
     StakeTooLow {
         address: Address,
         title: String,
-        stake: U256,
         min_stake: U256,
         min_unstake_delay: U256,
     },
     UnstakeDelayTooLow {
         address: Address,
         title: String,
-        unstake_delay: U256,
         min_stake: U256,
         min_unstake_delay: U256,
     },
@@ -75,13 +73,12 @@ impl From<BadReputationError> for ReputationError {
             BadReputationError::StakeTooLow {
                 address,
                 title,
-                stake,
                 min_stake,
                 min_unstake_delay,
             } => ReputationError::owned(
                 STAKE_TOO_LOW_ERROR_CODE,
                 format!(
-                    "{title} with address {address} stake {stake} is lower than {min_stake}",
+                    "{title} with address {address} stake is lower than {min_stake}",
                 ),
                 Some(json!({
                     title: address.to_string(),
@@ -92,13 +89,12 @@ impl From<BadReputationError> for ReputationError {
             BadReputationError::UnstakeDelayTooLow {
                 address,
                 title,
-                unstake_delay,
                 min_stake,
                 min_unstake_delay,
             } => ReputationError::owned(
                 STAKE_TOO_LOW_ERROR_CODE,
                 format!(
-                    "{title} with address {address} unstake delay {unstake_delay} is lower than {min_unstake_delay}",
+                    "{title} with address {address} unstake delay is lower than {min_unstake_delay}",
                 ),
                 Some(json!({
                     title: address.to_string(),

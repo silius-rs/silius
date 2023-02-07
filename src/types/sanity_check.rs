@@ -41,6 +41,9 @@ pub enum BadUserOperationError<M: Middleware> {
         max_priority_fee_per_gas: U256,
         max_fee_per_gas: U256,
     },
+    SenderVerification {
+        sender: Address,
+    },
     Middleware(M::Error),
     GasOracleError(GasOracleError),
 }
@@ -126,6 +129,11 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 format!(
                     "Max priority fee per gas {max_priority_fee_per_gas} is higher than max fee per gas {max_fee_per_gas}",
                 ),
+                None::<bool>,
+            ),
+            BadUserOperationError::SenderVerification { sender } => SanityCheckError::owned(
+                SANITY_CHECK_ERROR_CODE,
+                format!("Sender {sender} is invalid (sender check)",),
                 None::<bool>,
             ),
             BadUserOperationError::Middleware(_) => SanityCheckError::from(ErrorCode::InternalError),
