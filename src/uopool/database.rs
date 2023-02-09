@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
+use super::Mempool;
 use crate::types::{
     user_operation::{UserOperation, UserOperationHash},
     WrapAddress,
 };
 use ethers::types::{Address, U256};
 use reth_db::{
-    cursor::DbDupCursorRO,
+    cursor::{DbCursorRO, DbDupCursorRO},
     database::{Database, DatabaseGAT},
     mdbx::{
         tx::{self, Tx},
@@ -18,8 +19,6 @@ use reth_db::{
     transaction::{DbTx, DbTxMut},
     Error, TableType,
 };
-
-use super::Mempool;
 
 table!(
     /// UserOperation DB
@@ -39,7 +38,7 @@ pub const TABLES: [(TableType, &str); 2] = [
 ];
 
 impl DupSort for SenderUserOperationDB {
-    type SubKey = UserOperationHash;
+    type SubKey = WrapAddress;
 }
 
 #[derive(Debug)]
@@ -87,11 +86,10 @@ impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
         chain_id: &U256,
     ) -> anyhow::Result<UserOperationHash> {
         let hash = user_operation.hash(entry_point, chain_id);
-
-        self.env
-            .tx_mut()
-            .and_then(|t| t.put::<UserOperationDB>(hash, user_operation))
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let tx = self.env.tx_mut()?;
+        tx.put::<UserOperationDB>(hash, user_operation.clone())?;
+        tx.put::<SenderUserOperationDB>(user_operation.sender.into(), user_operation)?;
+        tx.commit()?;
         Ok(hash)
     }
 
@@ -99,42 +97,66 @@ impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
         &self,
         user_operation_hash: &UserOperationHash,
     ) -> anyhow::Result<Option<UserOperation>> {
-        self.env
-            .tx()
-            .and_then(|t| t.get::<UserOperationDB>(*user_operation_hash))
-            .map_err(|e| anyhow::anyhow!(e.to_string()))
+        let tx = self.env.tx()?;
+        let res = tx.get::<UserOperationDB>(*user_operation_hash)?;
+        tx.commit()?;
+        Ok(res)
     }
 
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations {
+        let wrap_sender: WrapAddress = (*sender).into();
         self.env
             .tx()
-            .and_then(|t| t.cursor_dup_read::<SenderUserOperationDB>())
-            .and_then(|mut c| {
-                c.walk_dup((*sender).into(), UserOperationHash::default())?
+            .and_then(|tx| {
+                let mut cursor = tx.cursor_dup_read::<SenderUserOperationDB>()?;
+                let res = cursor
+                    .walk_dup(wrap_sender.clone(), Address::default().into())?
                     .map(|a| a.map(|(_, v)| v))
-                    .collect::<Result<Vec<_>, _>>()
+                    .collect::<Result<Vec<_>, _>>()?;
+                tx.commit()?;
+                Ok(res)
             })
             .unwrap_or_else(|_| vec![])
     }
 
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()> {
-        self.env
-            .tx_mut()
-            .and_then(|t| {
-                t.delete::<UserOperationDB>(*user_operation_hash, None)?;
-                Ok(())
-            })
-            .map_err(|e| anyhow::anyhow!(e.to_string()))
+        let tx = self.env.tx_mut()?;
+        if let Some(user_op) = tx.get::<UserOperationDB>(*user_operation_hash)? {
+            tx.delete::<UserOperationDB>(*user_operation_hash, None)?;
+            tx.delete::<SenderUserOperationDB>(user_op.sender.into(), Some(user_op))?;
+            tx.commit()?;
+            Ok(())
+        } else {
+            anyhow::bail!("User operation not found")
+        }
     }
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations {
-        todo!()
+        self.env
+            .tx()
+            .and_then(|tx| {
+                let mut c = tx.cursor_read::<UserOperationDB>()?;
+                let res = c
+                    .walk(UserOperationHash::default())?
+                    .map(|a| a.map(|(_, v)| v))
+                    .collect::<Result<Vec<_>, _>>()?;
+                tx.commit()?;
+                Ok(res)
+            })
+            .unwrap_or_else(|_| vec![])
     }
 
     #[cfg(debug_assertions)]
     fn clear(&mut self) {
-        todo!()
+        self.env
+            .tx_mut()
+            .and_then(|tx| {
+                tx.clear::<UserOperationDB>()?;
+                tx.clear::<SenderUserOperationDB>()?;
+                tx.commit()
+            })
+            .expect("Clear database failed");
     }
 }
 fn default_page_size() -> usize {
@@ -217,6 +239,9 @@ mod tests {
 
         let dir = TempDir::new("test-userop-db").unwrap();
         let mut mempool: UserOpDatabase<NoWriteMap> = UserOpDatabase::new(dir.into_path()).unwrap();
+        mempool
+            .create_tables()
+            .expect("Create mdbx database tables failed");
         let mut user_operation: UserOperation;
         let mut user_operation_hash: UserOperationHash = Default::default();
 

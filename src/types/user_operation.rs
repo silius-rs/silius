@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::str::FromStr;
 
-#[derive(Eq, Hash, PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Default)]
+#[derive(
+    Eq, Hash, PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Default, PartialOrd, Ord,
+)]
 pub struct UserOperationHash(pub H256);
 
 impl From<H256> for UserOperationHash {

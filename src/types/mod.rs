@@ -4,7 +4,7 @@ use reth_db::table::{Decode, Encode};
 pub mod reputation;
 pub mod user_operation;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct WrapAddress(Address);
 
 impl Decode for WrapAddress {
