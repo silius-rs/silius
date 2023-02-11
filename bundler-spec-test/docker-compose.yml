@@ -1,0 +1,11 @@
+version: '2'
+
+services:
+  bundler:
+    build:
+      context: ../ # https://github.com/Vid201/aa-bundler.git
+    ports: [ '3000:3000' ]
+    depends_on: [ geth-dev ]
+  geth-dev:
+    build: geth-dev
+    ports: [ '8545:8545' ]

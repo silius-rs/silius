@@ -20,7 +20,7 @@ pub struct BundlerOpts {
     #[clap(long, value_parser=parse_address)]
     pub helper: Address,
 
-    #[clap(long, default_value = "127.0.0.1:3000")]
+    #[clap(long, default_value = "127.0.0.1:3002")]
     pub bundler_grpc_listen_address: String,
 }
 
@@ -52,7 +52,7 @@ mod tests {
             "--helper",
             "0x0000000000000000000000000000000000000000",
             "--bundler-grpc-listen-address",
-            "127.0.0.1:3000",
+            "127.0.0.1:3002",
         ];
         assert_eq!(
             BundlerOpts {
@@ -61,7 +61,7 @@ mod tests {
                 gas_factor: U256::from(600),
                 min_balance: U256::from(1),
                 helper: Address::from([0; 20]),
-                bundler_grpc_listen_address: String::from("127.0.0.1:3000")
+                bundler_grpc_listen_address: String::from("127.0.0.1:3002")
             },
             BundlerOpts::try_parse_from(args).unwrap()
         );
