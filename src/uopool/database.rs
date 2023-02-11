@@ -76,15 +76,27 @@ impl<E: EnvironmentKind> Database for Env<E> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum DBError {
+    DBInternalError(Error),
+    NotFound,
+}
+
+impl From<Error> for DBError {
+    fn from(value: Error) -> Self {
+        DBError::DBInternalError(value)
+    }
+}
+
 impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
     type UserOperations = Vec<UserOperation>;
-
+    type Error = DBError;
     fn add(
         &mut self,
         user_operation: UserOperation,
         entry_point: &Address,
         chain_id: &U256,
-    ) -> anyhow::Result<UserOperationHash> {
+    ) -> Result<UserOperationHash, DBError> {
         let hash = user_operation.hash(entry_point, chain_id);
         let tx = self.env.tx_mut()?;
         tx.put::<UserOperationDB>(hash, user_operation.clone())?;
@@ -96,7 +108,7 @@ impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
     fn get(
         &self,
         user_operation_hash: &UserOperationHash,
-    ) -> anyhow::Result<Option<UserOperation>> {
+    ) -> Result<Option<UserOperation>, DBError> {
         let tx = self.env.tx()?;
         let res = tx.get::<UserOperationDB>(*user_operation_hash)?;
         tx.commit()?;
@@ -119,7 +131,7 @@ impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
             .unwrap_or_else(|_| vec![])
     }
 
-    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()> {
+    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), DBError> {
         let tx = self.env.tx_mut()?;
         if let Some(user_op) = tx.get::<UserOperationDB>(*user_operation_hash)? {
             tx.delete::<UserOperationDB>(*user_operation_hash, None)?;
@@ -127,7 +139,7 @@ impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
             tx.commit()?;
             Ok(())
         } else {
-            anyhow::bail!("User operation not found")
+            Err(DBError::NotFound)
         }
     }
 
@@ -300,11 +312,8 @@ mod tests {
 
         assert_eq!(mempool.remove(&user_operation_hash).unwrap(), ());
         assert_eq!(
-            mempool
-                .remove(&H256::random().into())
-                .unwrap_err()
-                .to_string(),
-            anyhow::anyhow!("User operation not found").to_string()
+            mempool.remove(&H256::random().into()).unwrap_err(),
+            DBError::NotFound
         );
 
         assert_eq!(mempool.get_all().len(), 6);

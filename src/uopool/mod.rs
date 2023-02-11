@@ -32,7 +32,7 @@ pub mod services;
 
 pub type MempoolId = H256;
 
-pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T> + Send + Sync>;
+pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T, Error = anyhow::Error> + Send + Sync>;
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
 
 pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
@@ -41,17 +41,19 @@ pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
 
 pub trait Mempool: Debug {
     type UserOperations: IntoIterator<Item = UserOperation>;
-
+    type Error;
     fn add(
         &mut self,
         user_operation: UserOperation,
         entry_point: &Address,
         chain_id: &U256,
-    ) -> anyhow::Result<UserOperationHash>;
-    fn get(&self, user_operation_hash: &UserOperationHash)
-        -> anyhow::Result<Option<UserOperation>>;
+    ) -> Result<UserOperationHash, Self::Error>;
+    fn get(
+        &self,
+        user_operation_hash: &UserOperationHash,
+    ) -> Result<Option<UserOperation>, Self::Error>;
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
-    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
+    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;

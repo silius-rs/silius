@@ -15,6 +15,7 @@ pub struct MemoryMempool {
 
 impl Mempool for MemoryMempool {
     type UserOperations = Vec<UserOperation>;
+    type Error = anyhow::Error;
 
     fn add(
         &mut self,
