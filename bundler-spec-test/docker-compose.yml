@@ -4,7 +4,10 @@ services:
   bundler:
     build:
       context: ../ # https://github.com/Vid201/aa-bundler.git
+    command: --rpc-listen-address 0.0.0.0:3000 --eth-client-address http://geth-dev:8545 --mnemonic-file /root/${BUNDLER_ACCOUNT} --beneficiary 0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990 --gas-factor 600 --min-balance 1 --entry-points 0x0000000000000000000000000000000000000000 --chain-id 5 --helper 0x0000000000000000000000000000000000000000 --min-stake 1 --min-unstake-delay 0
     ports: [ '3000:3000' ]
+    volumes:
+      - ./keys:/root
     depends_on: [ geth-dev ]
   geth-dev:
     build: geth-dev
