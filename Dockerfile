@@ -1,7 +1,7 @@
 # build
 FROM ubuntu:18.04 AS builder
 
-RUN apt-get update && apt-get -y upgrade && apt-get install -y build-essential software-properties-common curl git
+RUN apt-get update && apt-get -y upgrade && apt-get install -y build-essential software-properties-common curl git libclang-dev
 RUN add-apt-repository ppa:ethereum/ethereum && apt-get update && apt-get install -y solc
 
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sh -

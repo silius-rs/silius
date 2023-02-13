@@ -24,7 +24,7 @@ use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
-pub mod database;
+pub mod database_mempool;
 pub mod memory_mempool;
 pub mod memory_reputation;
 pub mod server;

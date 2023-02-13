@@ -12,8 +12,9 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 ## Prerequisites
 
-1. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode; so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
-2. [solc](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12
+1. libclang, `libclang-dev` on Debian/Ubuntu.
+2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode; so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
+3. [solc](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
 
 ## How to run?
 
