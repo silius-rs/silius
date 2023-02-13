@@ -27,6 +27,7 @@ use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
+pub mod database;
 pub mod memory_mempool;
 pub mod memory_reputation;
 pub mod server;
@@ -34,7 +35,7 @@ pub mod services;
 
 pub type MempoolId = H256;
 
-pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T> + Send + Sync>;
+pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T, Error = anyhow::Error> + Send + Sync>;
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
 
 pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
@@ -43,17 +44,20 @@ pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
 
 pub trait Mempool: Debug {
     type UserOperations: IntoIterator<Item = UserOperation>;
-
+    type Error;
     fn add(
         &mut self,
         user_operation: UserOperation,
         entry_point: &Address,
         chain_id: &U256,
-    ) -> UserOperationHash;
-    fn get(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<UserOperation>;
+    ) -> Result<UserOperationHash, Self::Error>;
+    fn get(
+        &self,
+        user_operation_hash: &UserOperationHash,
+    ) -> Result<Option<UserOperation>, Self::Error>;
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, sender: &Address) -> usize;
-    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()>;
+    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;

@@ -1,12 +1,50 @@
 use crate::contracts::gen::entry_point_api;
-use ethers::abi::AbiEncode;
+use ethers::abi::{AbiDecode, AbiEncode};
 use ethers::prelude::{EthAbiCodec, EthAbiType};
 use ethers::types::{Address, Bytes, TransactionReceipt, H256, U256};
 use ethers::utils::keccak256;
+use reth_db::table::{Compress, Decode, Decompress, Encode};
+use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use std::str::FromStr;
 
-pub type UserOperationHash = H256;
+#[derive(
+    Eq, Hash, PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Default, PartialOrd, Ord,
+)]
+pub struct UserOperationHash(pub H256);
+
+impl From<H256> for UserOperationHash {
+    fn from(value: H256) -> Self {
+        Self(value)
+    }
+}
+
+impl From<UserOperationHash> for H256 {
+    fn from(value: UserOperationHash) -> Self {
+        value.0
+    }
+}
+
+impl FromStr for UserOperationHash {
+    type Err = FromHexError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        H256::from_str(s).map(|h| h.into())
+    }
+}
+
+impl Decode for UserOperationHash {
+    fn decode<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        Ok(H256::from_slice(value.into().as_ref()).into())
+    }
+}
+
+impl Encode for UserOperationHash {
+    type Encoded = [u8; 32];
+    fn encode(self) -> Self::Encoded {
+        *self.0.as_fixed_bytes()
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, EthAbiCodec, EthAbiType)]
 #[serde(rename_all = "camelCase")]
@@ -69,6 +107,7 @@ impl UserOperation {
             )
             .as_slice(),
         )
+        .into()
     }
 
     #[cfg(test)]
@@ -86,6 +125,19 @@ impl UserOperation {
             paymaster_and_data: Bytes::default(),
             signature: Bytes::default(),
         }
+    }
+}
+
+impl Compress for UserOperation {
+    type Compressed = Bytes;
+    fn compress(self) -> Self::Compressed {
+        self.pack()
+    }
+}
+
+impl Decompress for UserOperation {
+    fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        Self::decode(value.into()).map_err(|_e| reth_db::Error::DecodeError)
     }
 }
 
@@ -216,6 +268,7 @@ mod tests {
             ),
             H256::from_str("0x42e145138104ec4124367ea3f7994833071b2011927290f6844d593e05011279")
                 .unwrap()
+                .into()
         );
         assert_eq!(
             user_operations[1].hash(
@@ -226,6 +279,7 @@ mod tests {
             ),
             H256::from_str("0x583c8fcba470fd9da514f9482ccd31c299b0161a36b365aab353a6bfebaa0bb2")
                 .unwrap()
+                .into()
         );
     }
 }

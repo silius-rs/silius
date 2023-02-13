@@ -1,0 +1,5 @@
+docs
+target
+tests
+thirdparty/account-abstraction/*
+thirdparty/bundler/*

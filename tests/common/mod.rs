@@ -108,7 +108,7 @@ pub async fn sign(
     key: Wallet<SigningKey>,
 ) -> anyhow::Result<()> {
     let user_op_hash = user_op.hash(entry_point_address, chain_id);
-    let signature = key.sign_message(user_op_hash.as_bytes()).await?;
+    let signature = key.sign_message(user_op_hash.0.as_bytes()).await?;
     user_op.signature = Bytes::from(signature.to_vec());
     Ok(())
 }

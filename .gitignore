@@ -1,3 +1,6 @@
 /target
 .local
 .vscode
+
+# bundler spec test
+/bundler-spec-test/keys/0x*
