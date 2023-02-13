@@ -17,7 +17,7 @@ use aa_bundler::{
     about = "JSON-RPC server for EIP-4337 Account Abstraction Bundler"
 )]
 pub struct Opt {
-    #[clap(long, default_value = "127.0.0.1:4337")]
+    #[clap(long, default_value = "127.0.0.1:3000")]
     pub rpc_listen_address: String,
 
     #[clap(long, default_value = "127.0.0.1:3001")]

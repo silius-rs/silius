@@ -10,10 +10,13 @@ use aa_bundler::{
 };
 use anyhow::Result;
 use clap::Parser;
-use ethers::types::{Address, U256};
+use ethers::{
+    providers::{Http, Middleware, Provider},
+    types::{Address, U256},
+};
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
-use std::{future::pending, net::SocketAddr, panic};
+use std::{future::pending, panic, sync::Arc};
 
 #[derive(Parser)]
 #[clap(
@@ -39,12 +42,12 @@ pub struct Opt {
     #[clap(long)]
     pub no_rpc: bool,
 
-    #[clap(long, default_value = "127.0.0.1:4337")]
+    #[clap(long, default_value = "127.0.0.1:3000")]
     pub rpc_listen_address: String,
 
     // execution client rpc endpoint
-    #[clap(long, default_value = "127.0.0.1:8545")]
-    pub eth_client_address: SocketAddr,
+    #[clap(long, default_value = "http://127.0.0.1:8545")]
+    pub eth_client_address: String,
 
     #[clap(flatten)]
     pub bundler_opts: aa_bundler::bundler::BundlerOpts,
@@ -65,6 +68,14 @@ fn main() -> Result<()> {
 
             rt.block_on(async move {
                 info!("Starting AA - Bundler");
+
+                let eth_provider =
+                    Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
+                info!(
+                    "Connected to Ethereum execution client at {}: {}",
+                    opt.eth_client_address,
+                    eth_provider.client_version().await?
+                );
 
                 let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id)?;
                 info!("{:?}", wallet.signer);
