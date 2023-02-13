@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::Mempool;
 use crate::types::{
     user_operation::{UserOperation, UserOperationHash},
-    WrapAddress,
+    utils::WrapAddress,
 };
 use ethers::types::{Address, U256};
 use reth_db::{
