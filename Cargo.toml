@@ -15,14 +15,18 @@ clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethereum-interfaces = { git = "https://github.com/ledgerwatch/interfaces" }
-ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "c60990d7b6e6b3034f1e50b27b495aeda30e35e8", features = ["ethers-solc"]  }
+ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "c60990d7b6e6b3034f1e50b27b495aeda30e35e8", features = ["ethers-solc"] }
 expanded-pathbuf = "0.1"
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
 jsonrpsee = { version = "0.16", features = ["server", "macros"] }
+page_size = "0.5.0"
 parking_lot = "0.12"
 prost = "0.11"
 regex = "1"
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "314ea0883b1062375ad86577be1fccc39233739d" }
+reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "314ea0883b1062375ad86577be1fccc39233739d" }
 ron = "0.8"
+rustc-hex = "^2.0.1"
 serde = "1"
 serde_json = "1"
 tokio = { version = "1.18", features = ["full"] }
@@ -33,19 +37,15 @@ tonic = { version = "0.8", default-features = false, features = [
 ] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-rustc-hex="^2.0.1"
-reth-db = { git ="https://github.com/paradigmxyz/reth.git" , rev = "314ea0883b1062375ad86577be1fccc39233739d"}
-reth-libmdbx = { git ="https://github.com/paradigmxyz/reth.git" , rev = "314ea0883b1062375ad86577be1fccc39233739d"}
-page_size = "0.5.0"
 
 [dev-dependencies]
 tempdir = "0.3.7"
 
 [build-dependencies]
 anyhow = "1"
-ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "c60990d7b6e6b3034f1e50b27b495aeda30e35e8", features = ["ethers-solc"]  }
-protobuf-src = "1.1.0"
+ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "c60990d7b6e6b3034f1e50b27b495aeda30e35e8", features = ["ethers-solc"] }
 prost-build = "0.11"
+protobuf-src = "1.1.0"
 tonic-build = "0.8"
 
 [[bin]]

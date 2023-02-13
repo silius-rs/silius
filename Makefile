@@ -29,6 +29,7 @@ format:
 lint:
 	cargo fmt --all -- --check
 	cargo clippy -- -D warnings -A clippy::derive_partial_eq_without_eq -D clippy::unwrap_used -D clippy::uninlined_format_args
+	cargo sort --check
 
 clean:
 	cd thirdparty/account-abstraction && yarn clean && cd ../..
