@@ -18,7 +18,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use ethers::{
-    prelude::gas_oracle::ProviderOracle,
     providers::Middleware,
     types::{Address, U256},
 };
@@ -38,8 +37,8 @@ pub struct UoPoolService<M: Middleware> {
     pub reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
     pub sanity_check_results: Arc<RwLock<HashMap<UserOperationHash, HashSet<SanityCheckResult>>>>,
     pub eth_provider: Arc<M>,
-    pub gas_oracle: Arc<ProviderOracle<M>>,
     pub max_verification_gas: U256,
+    pub min_priority_fee_per_gas: U256,
     pub chain_id: U256,
 }
 
@@ -49,8 +48,8 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
         reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
         eth_provider: Arc<M>,
-        gas_oracle: Arc<ProviderOracle<M>>,
         max_verification_gas: U256,
+        min_priority_fee_per_gas: U256,
         chain_id: U256,
     ) -> Self {
         Self {
@@ -59,8 +58,8 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             reputations,
             sanity_check_results: Arc::new(RwLock::new(HashMap::new())),
             eth_provider,
-            gas_oracle,
             max_verification_gas,
+            min_priority_fee_per_gas,
             chain_id,
         }
     }

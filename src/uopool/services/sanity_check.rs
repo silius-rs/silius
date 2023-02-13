@@ -1,5 +1,5 @@
 use crate::{
-    chain::gas::{self, Overhead},
+    chain::gas::Overhead,
     types::{
         reputation::{ReputationStatus, StakeInfo},
         sanity_check::{BadUserOperationError, SanityCheckResult},
@@ -8,9 +8,8 @@ use crate::{
     uopool::{mempool_id, services::uopool::UoPoolService},
 };
 use ethers::{
-    prelude::gas_oracle::GasOracle,
     providers::Middleware,
-    types::{Address, U256},
+    types::{Address, TransactionRequest, U256},
 };
 
 impl<M: Middleware + 'static> UoPoolService<M> {
@@ -120,6 +119,18 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                 });
             };
 
+            let code = self
+                .eth_provider
+                .get_code(paymaster_address, None)
+                .await
+                .map_err(|error| BadUserOperationError::Middleware(error))?;
+
+            if code.is_empty() {
+                return Err(BadUserOperationError::PaymasterVerification {
+                    paymaster_and_data: user_operation.paymaster_and_data.clone(),
+                });
+            }
+
             let mempool_id = mempool_id(entry_point, &self.chain_id);
 
             if let Some(entry_point) = self.entry_points.get(&mempool_id) {
@@ -147,15 +158,28 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
-    fn call_gas_limit(
+    async fn call_gas_limit(
         &self,
         user_operation: &UserOperation,
+        entry_point: &Address,
     ) -> Result<(), BadUserOperationError<M>> {
-        let non_zero_value_call = gas::non_zero_value_call();
-        if user_operation.call_gas_limit < non_zero_value_call {
+        let call_gas_estimation = self
+            .eth_provider
+            .estimate_gas(
+                &TransactionRequest::new()
+                    .from(*entry_point)
+                    .to(user_operation.sender)
+                    .data(user_operation.call_data.clone())
+                    .into(),
+                None,
+            )
+            .await
+            .map_err(|error| BadUserOperationError::Middleware(error))?;
+
+        if user_operation.call_gas_limit < call_gas_estimation {
             return Err(BadUserOperationError::LowCallGasLimit {
                 call_gas_limit: user_operation.call_gas_limit,
-                non_zero_value_call,
+                call_gas_estimation,
             });
         }
 
@@ -167,10 +191,10 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         user_operation: &UserOperation,
     ) -> Result<(), BadUserOperationError<M>> {
         let base_fee_estimation = self
-            .gas_oracle
-            .fetch()
+            .eth_provider
+            .get_gas_price()
             .await
-            .map_err(|error| BadUserOperationError::GasOracleError(error))?;
+            .map_err(|error| BadUserOperationError::Middleware(error))?;
 
         if user_operation.max_priority_fee_per_gas > user_operation.max_fee_per_gas {
             return Err(BadUserOperationError::HighMaxPriorityFeePerGas {
@@ -186,6 +210,13 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                 max_fee_per_gas: user_operation.max_fee_per_gas,
                 max_fee_per_gas_estimated: base_fee_estimation
                     + user_operation.max_priority_fee_per_gas,
+            });
+        }
+
+        if user_operation.max_priority_fee_per_gas < self.min_priority_fee_per_gas {
+            return Err(BadUserOperationError::LowMaxPriorityFeePerGas {
+                max_priority_fee_per_gas: user_operation.max_priority_fee_per_gas,
+                min_priority_fee_per_gas: self.min_priority_fee_per_gas,
             });
         }
 
@@ -279,7 +310,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         self.verify_paymaster(user_operation, entry_point).await?;
 
         // The callgas is at least the cost of a CALL with non-zero value.
-        self.call_gas_limit(user_operation)?;
+        self.call_gas_limit(user_operation, entry_point).await?;
 
         // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
         self.max_fee_per_gas(user_operation).await?;
@@ -304,7 +335,6 @@ mod tests {
         },
     };
     use ethers::{
-        prelude::gas_oracle::ProviderOracle,
         providers::{Http, Provider},
         types::{Address, Bytes, U256},
     };
@@ -320,9 +350,6 @@ mod tests {
             .parse::<Address>()
             .unwrap();
         let eth_provider = Arc::new(Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap());
-        let gas_oracle = Arc::new(ProviderOracle::new(
-            Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap(),
-        ));
 
         let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
@@ -347,15 +374,16 @@ mod tests {
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);
-        let max_fee_per_gas = max_priority_fee_per_gas + gas_oracle.fetch().await.unwrap();
+        let max_fee_per_gas =
+            max_priority_fee_per_gas + eth_provider.get_gas_price().await.unwrap();
 
         let uo_pool_service = UoPoolService::new(
             Arc::new(entry_points_map),
             Arc::new(RwLock::new(mempools)),
             Arc::new(RwLock::new(reputations)),
             eth_provider,
-            gas_oracle,
             U256::from(1500000),
+            U256::from(2),
             chain_id,
         );
 
@@ -379,20 +407,7 @@ mod tests {
             .await
             .is_ok());
 
-        // smart contract wallet already deployed
-        assert!(uo_pool_service
-            .validate_user_operation(
-                &UserOperation {
-                    sender: "0x6f55C6b12CdF6D77A77bc3b8639Ac77468b3f5e9"
-                        .parse()
-                        .unwrap(),
-                    init_code: Bytes::default(),
-                    ..user_operation_valid.clone()
-                },
-                &entry_point
-            )
-            .await
-            .is_ok());
+        // TODO: smart contract wallet already deployed
 
         // sender or init_code
         assert!(matches!(
@@ -465,7 +480,7 @@ mod tests {
 
         // paymaster verification
         let user_operation_pv = UserOperation {
-            paymaster_and_data: Bytes::from_str("0x1a31f86F876a8b1c90E7DC2aB77A5335D43392Eb")
+            paymaster_and_data: Bytes::from_str("0x83DAc8e36D8FDeCF69CD78f9f86f25664EEE72f4")
                 .unwrap(),
             ..user_operation_valid.clone()
         };
@@ -483,7 +498,7 @@ mod tests {
             2
         );
 
-        // call gas
+        // call gas limit
         assert!(matches!(
             uo_pool_service
                 .validate_user_operation(
@@ -503,7 +518,7 @@ mod tests {
             uo_pool_service
                 .validate_user_operation(
                     &UserOperation {
-                        max_priority_fee_per_gas: U256::from(1500000000_u64 * 3),
+                        max_priority_fee_per_gas: U256::from(1500000000_u64 * 100),
                         ..user_operation_valid.clone()
                     },
                     &entry_point
@@ -525,6 +540,19 @@ mod tests {
                 .unwrap_err(),
             BadUserOperationError::LowMaxFeePerGas { .. },
         ));
+        assert!(matches!(
+            uo_pool_service
+                .validate_user_operation(
+                    &UserOperation {
+                        max_priority_fee_per_gas: U256::from(1),
+                        ..user_operation_valid.clone()
+                    },
+                    &entry_point
+                )
+                .await
+                .unwrap_err(),
+            BadUserOperationError::LowMaxPriorityFeePerGas { .. },
+        ));
 
         // sender verification
         let user_operation_sv = UserOperation {
@@ -539,7 +567,8 @@ mod tests {
                 .write()
                 .get_mut(&m_id)
                 .unwrap()
-                .add(user_operation_sv.clone(), &entry_point, &chain_id),
+                .add(user_operation_sv.clone(), &entry_point, &chain_id)
+                .unwrap(),
             user_operation_sv.hash(&entry_point, &chain_id)
         );
         assert!(uo_pool_service

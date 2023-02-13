@@ -12,10 +12,7 @@ use anyhow::Result;
 use clap::Parser;
 use ethers::{
     providers::{Http, Middleware, Provider},
-    {
-    prelude::gas_oracle::ProviderOracle,
     types::{Address, U256},
-},
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
@@ -88,9 +85,6 @@ fn main() -> Result<()> {
 
                 let eth_provider =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
-                let gas_oracle = Arc::new(ProviderOracle::new(Provider::<Http>::try_from(
-                    opt.eth_client_address,
-                )?));
 
                 let _bundler = Bundler::new(wallet);
 
@@ -99,7 +93,6 @@ fn main() -> Result<()> {
                         opt.uopool_opts,
                         opt.entry_points,
                         eth_provider,
-                        gas_oracle,
                         opt.max_verification_gas,
                         opt.chain_id,
                     )

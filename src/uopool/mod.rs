@@ -18,7 +18,6 @@ use clap::Parser;
 use educe::Educe;
 use ethers::{
     abi::AbiEncode,
-    prelude::gas_oracle::ProviderOracle,
     providers::{Http, Provider},
     types::{Address, H256, U256},
     utils::keccak256,
@@ -121,13 +120,15 @@ pub struct UoPoolOpts {
 
     #[clap(long, value_parser=parse_u256, default_value = "0")]
     pub min_unstake_delay: U256,
+
+    #[clap(long, value_parser=parse_u256, default_value = "0")]
+    pub min_priority_fee_per_gas: U256,
 }
 
 pub async fn run(
     opts: UoPoolOpts,
     entry_points: Vec<Address>,
     eth_provider: Arc<Provider<Http>>,
-    gas_oracle: Arc<ProviderOracle<Provider<Http>>>,
     max_verification_gas: U256,
     chain_id: U256,
 ) -> Result<()> {
@@ -165,8 +166,8 @@ pub async fn run(
             Arc::new(RwLock::new(mempools)),
             reputations.clone(),
             eth_provider,
-            gas_oracle,
             max_verification_gas,
+            opts.min_priority_fee_per_gas,
             chain_id,
         ));
 

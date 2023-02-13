@@ -1,5 +1,4 @@
 use ethers::{
-    prelude::gas_oracle::GasOracleError,
     providers::Middleware,
     types::{Address, Bytes, U256},
 };
@@ -31,7 +30,7 @@ pub enum BadUserOperationError<M: Middleware> {
     },
     LowCallGasLimit {
         call_gas_limit: U256,
-        non_zero_value_call: U256,
+        call_gas_estimation: U256,
     },
     LowMaxFeePerGas {
         max_fee_per_gas: U256,
@@ -41,11 +40,14 @@ pub enum BadUserOperationError<M: Middleware> {
         max_priority_fee_per_gas: U256,
         max_fee_per_gas: U256,
     },
+    LowMaxPriorityFeePerGas {
+        max_priority_fee_per_gas: U256,
+        min_priority_fee_per_gas: U256,
+    },
     SenderVerification {
         sender: Address,
     },
     Middleware(M::Error),
-    GasOracleError(GasOracleError),
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -103,11 +105,11 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
             },
             BadUserOperationError::LowCallGasLimit {
                 call_gas_limit,
-                non_zero_value_call,
+                call_gas_estimation,
             } => SanityCheckError::owned(
                 SANITY_CHECK_ERROR_CODE,
                 format!(
-                    "Call gas limit {call_gas_limit} is lower than CALL non-zero value {non_zero_value_call}",
+                    "Call gas limit {call_gas_limit} is lower than call gas estimation {call_gas_estimation}",
                 ),
                 None::<bool>,
             ),
@@ -131,15 +133,22 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 ),
                 None::<bool>,
             ),
+            BadUserOperationError::LowMaxPriorityFeePerGas {
+                max_priority_fee_per_gas,
+                min_priority_fee_per_gas,
+            } => SanityCheckError::owned(
+                SANITY_CHECK_ERROR_CODE,
+                format!(
+                    "Max priority fee per gas {max_priority_fee_per_gas} is lower than min priority fee per gas {min_priority_fee_per_gas}",
+                ),
+                None::<bool>,
+            ),
             BadUserOperationError::SenderVerification { sender } => SanityCheckError::owned(
                 SANITY_CHECK_ERROR_CODE,
                 format!("Sender {sender} is invalid (sender check)",),
                 None::<bool>,
             ),
             BadUserOperationError::Middleware(_) => SanityCheckError::from(ErrorCode::InternalError),
-            BadUserOperationError::GasOracleError(_) => {
-                SanityCheckError::from(ErrorCode::InternalError)
-            },
         }
     }
 }

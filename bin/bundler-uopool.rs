@@ -2,7 +2,6 @@ use aa_bundler::utils::{parse_address, parse_u256};
 use anyhow::Result;
 use clap::Parser;
 use ethers::{
-    prelude::gas_oracle::ProviderOracle,
     providers::{Http, Provider},
     types::{Address, U256},
 };
@@ -38,15 +37,11 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let eth_provider = Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
-    let gas_oracle = Arc::new(ProviderOracle::new(Provider::<Http>::try_from(
-        opt.eth_client_address,
-    )?));
 
     aa_bundler::uopool::run(
         opt.uopool_opts,
         opt.entry_points,
         eth_provider,
-        gas_oracle,
         opt.max_verification_gas,
         opt.chain_id,
     )
