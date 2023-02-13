@@ -15,7 +15,7 @@ clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethereum-interfaces = { git = "https://github.com/ledgerwatch/interfaces" }
-ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "c60990d7b6e6b3034f1e50b27b495aeda30e35e8", features = ["ethers-solc"] }
+ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "fd83e203b405682cc56cccbac5b43dce33913a8e", features = ["ethers-solc"] }
 expanded-pathbuf = "0.1"
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
 jsonrpsee = { version = "0.16", features = ["server", "macros"] }
@@ -43,7 +43,7 @@ tempdir = "0.3.7"
 
 [build-dependencies]
 anyhow = "1"
-ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "c60990d7b6e6b3034f1e50b27b495aeda30e35e8", features = ["ethers-solc"] }
+ethers = { git = "https://github.com/gakonst/ethers-rs.git", rev = "fd83e203b405682cc56cccbac5b43dce33913a8e", features = ["ethers-solc"] }
 prost-build = "0.11"
 protobuf-src = "1.1.0"
 tonic-build = "0.8"
