@@ -38,3 +38,7 @@ abigen!(
     TestRulesAccountFactory,
     "$CARGO_MANIFEST_DIR/thirdparty/bundler/packages/bundler/artifacts/contracts/tests/TestRulesAccount.sol/TestRulesAccountFactory.json"
 );
+abigen!(
+    TracerTest,
+    "$CARGO_MANIFEST_DIR/thirdparty/bundler/packages/bundler/artifacts/contracts/tests/TracerTest.sol/TracerTest.json"
+);
