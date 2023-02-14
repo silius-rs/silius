@@ -52,6 +52,14 @@ impl Mempool for MemoryMempool {
         };
     }
 
+    fn get_number_by_sender(&self, sender: &Address) -> usize {
+        return if let Some(user_operations_by_sender) = self.user_operations_by_sender.get(sender) {
+            user_operations_by_sender.len()
+        } else {
+            0
+        };
+    }
+
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()> {
         let user_operation: UserOperation;
 

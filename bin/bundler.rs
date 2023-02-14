@@ -39,6 +39,9 @@ pub struct Opt {
     #[clap(flatten)]
     pub uopool_opts: aa_bundler::uopool::UoPoolOpts,
 
+    #[clap(long, value_parser=parse_u256)]
+    pub max_verification_gas: U256,
+
     #[clap(long)]
     pub no_rpc: bool,
 
@@ -80,11 +83,20 @@ fn main() -> Result<()> {
                 let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id)?;
                 info!("{:?}", wallet.signer);
 
+                let eth_provider =
+                    Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
+
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
-                    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points, opt.chain_id)
-                        .await?;
+                    aa_bundler::uopool::run(
+                        opt.uopool_opts,
+                        opt.entry_points,
+                        eth_provider,
+                        opt.max_verification_gas,
+                        opt.chain_id,
+                    )
+                    .await?;
                 }
 
                 if !opt.no_rpc {

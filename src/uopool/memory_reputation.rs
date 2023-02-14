@@ -1,11 +1,8 @@
-use async_trait::async_trait;
 use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
 
-use crate::types::reputation::{
-    BadReputationError, ReputationEntry, ReputationError, ReputationStatus, StakeInfo,
-};
+use crate::types::reputation::{BadReputationError, ReputationEntry, ReputationStatus, StakeInfo};
 
 use super::Reputation;
 
@@ -38,7 +35,6 @@ impl MemoryReputation {
     }
 }
 
-#[async_trait]
 impl Reputation for MemoryReputation {
     type ReputationEntries = Vec<ReputationEntry>;
 
@@ -153,7 +149,11 @@ impl Reputation for MemoryReputation {
         }
     }
 
-    fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()> {
+    fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> Result<(), BadReputationError> {
         if let Some(stake_info) = stake_info {
             if self.is_whitelist(&stake_info.address) {
                 return Ok(());
@@ -169,7 +169,6 @@ impl Reputation for MemoryReputation {
                     BadReputationError::StakeTooLow {
                         address: stake_info.address,
                         title: title.to_string(),
-                        stake: stake_info.stake,
                         min_stake: self.min_stake,
                         min_unstake_delay: self.min_unstake_delay,
                     }
@@ -177,7 +176,6 @@ impl Reputation for MemoryReputation {
                     BadReputationError::UnstakeDelayTooLow {
                         address: stake_info.address,
                         title: title.to_string(),
-                        unstake_delay: stake_info.unstake_delay,
                         min_stake: self.min_stake,
                         min_unstake_delay: self.min_unstake_delay,
                     }
@@ -185,9 +183,7 @@ impl Reputation for MemoryReputation {
                     return Ok(());
                 };
 
-                return Err(anyhow::anyhow!(serde_json::to_string(
-                    &ReputationError::from(error)
-                )?));
+                return Err(error);
             }
         }
 
