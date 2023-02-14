@@ -1,8 +1,11 @@
 use aa_bundler::utils::{parse_address, parse_u256};
 use anyhow::Result;
 use clap::Parser;
-use ethers::types::{Address, U256};
-use std::future::pending;
+use ethers::{
+    providers::{Http, Provider},
+    types::{Address, U256},
+};
+use std::{future::pending, sync::Arc};
 
 #[derive(Parser)]
 #[clap(
@@ -16,6 +19,13 @@ pub struct Opt {
     #[clap(long, value_delimiter=',', value_parser=parse_address)]
     pub entry_points: Vec<Address>,
 
+    // execution client rpc endpoint
+    #[clap(long, default_value = "127.0.0.1:8545")]
+    pub eth_client_address: String,
+
+    #[clap(long, value_parser=parse_u256)]
+    pub max_verification_gas: U256,
+
     #[clap(long, value_parser=parse_u256)]
     pub chain_id: U256,
 }
@@ -26,7 +36,16 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt::init();
 
-    aa_bundler::uopool::run(opt.uopool_opts, opt.entry_points, opt.chain_id).await?;
+    let eth_provider = Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
+
+    aa_bundler::uopool::run(
+        opt.uopool_opts,
+        opt.entry_points,
+        eth_provider,
+        opt.max_verification_gas,
+        opt.chain_id,
+    )
+    .await?;
 
     pending().await
 }

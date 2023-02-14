@@ -95,12 +95,12 @@ impl UserOperation {
         Bytes::from(packed)
     }
 
-    pub fn hash(&self, entry_point_address: &Address, chain_id: &U256) -> UserOperationHash {
+    pub fn hash(&self, entry_point: &Address, chain_id: &U256) -> UserOperationHash {
         H256::from_slice(
             keccak256(
                 [
                     keccak256(self.pack_for_signature().deref()).to_vec(),
-                    entry_point_address.encode(),
+                    entry_point.encode(),
                     chain_id.encode(),
                 ]
                 .concat(),

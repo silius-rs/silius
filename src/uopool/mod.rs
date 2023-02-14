@@ -1,7 +1,8 @@
 use crate::{
+    contracts::EntryPoint,
     types::{
         reputation::{
-            ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
+            BadReputationError, ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
             MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
         },
         user_operation::{UserOperation, UserOperationHash},
@@ -17,6 +18,7 @@ use clap::Parser;
 use educe::Educe;
 use ethers::{
     abi::AbiEncode,
+    providers::{Http, Provider},
     types::{Address, H256, U256},
     utils::keccak256,
 };
@@ -35,7 +37,7 @@ pub type MempoolId = H256;
 pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T, Error = anyhow::Error> + Send + Sync>;
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
 
-pub fn mempool_id(entry_point: Address, chain_id: U256) -> MempoolId {
+pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
     H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
 }
 
@@ -53,6 +55,7 @@ pub trait Mempool: Debug {
         user_operation_hash: &UserOperationHash,
     ) -> Result<Option<UserOperation>, Self::Error>;
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
+    fn get_number_by_sender(&self, sender: &Address) -> usize;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
 
     #[cfg(debug_assertions)]
@@ -85,7 +88,11 @@ pub trait Reputation: Debug {
     fn is_blacklist(&self, address: &Address) -> bool;
     fn get_status(&self, address: &Address) -> ReputationStatus;
     fn update_handle_ops_reverted(&mut self, address: &Address);
-    fn verify_stake(&self, title: &str, stake_info: Option<StakeInfo>) -> anyhow::Result<()>;
+    fn verify_stake(
+        &self,
+        title: &str,
+        stake_info: Option<StakeInfo>,
+    ) -> Result<(), BadReputationError>;
 
     #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
@@ -113,17 +120,27 @@ pub struct UoPoolOpts {
 
     #[clap(long, value_parser=parse_u256, default_value = "0")]
     pub min_unstake_delay: U256,
+
+    #[clap(long, value_parser=parse_u256, default_value = "0")]
+    pub min_priority_fee_per_gas: U256,
 }
 
-pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -> Result<()> {
+pub async fn run(
+    opts: UoPoolOpts,
+    entry_points: Vec<Address>,
+    eth_provider: Arc<Provider<Http>>,
+    max_verification_gas: U256,
+    chain_id: U256,
+) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
+        let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
         let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
         let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
 
         for entry_point in entry_points {
-            let id = mempool_id(entry_point, chain_id);
+            let id = mempool_id(&entry_point, &chain_id);
             mempools.insert(id, Box::<MemoryMempool>::default());
 
             reputations.insert(id, Box::<MemoryReputation>::default());
@@ -136,13 +153,21 @@ pub async fn run(opts: UoPoolOpts, entry_points: Vec<Address>, chain_id: U256) -
                     opts.min_unstake_delay,
                 );
             }
+            entry_points_map.insert(
+                id,
+                EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
+            );
         }
 
         let reputations = Arc::new(RwLock::new(reputations));
 
         let svc = UoPoolServer::new(UoPoolService::new(
+            Arc::new(entry_points_map),
             Arc::new(RwLock::new(mempools)),
             reputations.clone(),
+            eth_provider,
+            max_verification_gas,
+            opts.min_priority_fee_per_gas,
             chain_id,
         ));
 

@@ -131,6 +131,21 @@ impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
             .unwrap_or_else(|_| vec![])
     }
 
+    fn get_number_by_sender(&self, sender: &Address) -> usize {
+        let wrap_sender: WrapAddress = (*sender).into();
+        self.env
+            .tx()
+            .and_then(|tx| {
+                let mut cursor = tx.cursor_dup_read::<SenderUserOperationDB>()?;
+                let res = cursor
+                    .walk_dup(wrap_sender.clone(), Address::default().into())?
+                    .count();
+                tx.commit()?;
+                Ok(res)
+            })
+            .unwrap_or(0)
+    }
+
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), DBError> {
         let tx = self.env.tx_mut()?;
         if let Some(user_op) = tx.get::<UserOperationDB>(*user_operation_hash)? {
