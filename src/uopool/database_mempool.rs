@@ -265,7 +265,8 @@ mod tests {
         let senders = vec![Address::random(), Address::random(), Address::random()];
 
         let dir = TempDir::new("test-userop-db").unwrap();
-        let mut mempool: DatabaseMempool<NoWriteMap> = DatabaseMempool::new(dir.into_path()).unwrap();
+        let mut mempool: DatabaseMempool<NoWriteMap> =
+            DatabaseMempool::new(dir.into_path()).unwrap();
         mempool
             .create_tables()
             .expect("Create mdbx database tables failed");

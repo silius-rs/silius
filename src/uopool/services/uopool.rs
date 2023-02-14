@@ -10,8 +10,9 @@ use crate::{
         server::uopool::{
             uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
             ClearResponse, ClearResult, GetAllReputationRequest, GetAllReputationResponse,
-            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult, RemoveRequest,
-            RemoveResponse, SetReputationRequest, SetReputationResponse, SetReputationResult,
+            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult, GetChainIdRequest,
+            GetChainIdResponse, GetChainIdResult, RemoveRequest, RemoveResponse,
+            SetReputationRequest, SetReputationResponse, SetReputationResult,
         },
         MempoolBox, MempoolId, ReputationBox,
     },
@@ -133,6 +134,16 @@ impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
         _request: tonic::Request<RemoveRequest>,
     ) -> Result<Response<RemoveResponse>, tonic::Status> {
         Err(tonic::Status::unimplemented("todo"))
+    }
+
+    async fn get_chain_id(
+        &self,
+        _request: tonic::Request<GetChainIdRequest>,
+    ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
+        Ok(tonic::Response::new(GetChainIdResponse {
+            result: GetChainIdResult::GotChainId as i32,
+            chain_id: self.chain_id.as_u64(),
+        }))
     }
 
     #[cfg(debug_assertions)]

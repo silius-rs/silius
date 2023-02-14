@@ -30,9 +30,6 @@ pub struct Opt {
     #[clap(long, value_delimiter=',', value_parser=parse_address)]
     pub entry_points: Vec<Address>,
 
-    #[clap(long, value_parser=parse_u256)]
-    pub chain_id: U256,
-
     #[clap(long)]
     pub no_uopool: bool,
 
@@ -80,7 +77,9 @@ fn main() -> Result<()> {
                     eth_provider.client_version().await?
                 );
 
-                let wallet = Wallet::from_file(opt.mnemonic_file, opt.chain_id)?;
+                let chain_id = eth_provider.get_chainid().await?;
+
+                let wallet = Wallet::from_file(opt.mnemonic_file, chain_id)?;
                 info!("{:?}", wallet.signer);
 
                 let eth_provider =
@@ -94,7 +93,6 @@ fn main() -> Result<()> {
                         opt.entry_points,
                         eth_provider,
                         opt.max_verification_gas,
-                        opt.chain_id,
                     )
                     .await?;
                 }

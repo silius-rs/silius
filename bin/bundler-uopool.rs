@@ -25,9 +25,6 @@ pub struct Opt {
 
     #[clap(long, value_parser=parse_u256)]
     pub max_verification_gas: U256,
-
-    #[clap(long, value_parser=parse_u256)]
-    pub chain_id: U256,
 }
 
 #[tokio::main]
@@ -43,7 +40,6 @@ async fn main() -> Result<()> {
         opt.entry_points,
         eth_provider,
         opt.max_verification_gas,
-        opt.chain_id,
     )
     .await?;
 
