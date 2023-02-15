@@ -2,7 +2,8 @@ use crate::{
     rpc::eth_api::{EstimateUserOperationGasResponse, EthApiServer},
     types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt},
     uopool::server::uopool::{
-        uo_pool_client::UoPoolClient, AddRequest, AddResult, GetChainIdRequest, GetChainIdResult,
+        
+        uo_pool_client::UoPoolClient, AddRequest, AddResult, GetChainIdRequest, GetChainIdResult, GetSupportedEntryPointsRequest, GetSupportedEntryPointsResult,
     },
 };
 use anyhow::format_err;
@@ -43,7 +44,27 @@ impl EthApiServer for EthApiServerImpl {
     }
 
     async fn supported_entry_points(&self) -> RpcResult<Vec<Address>> {
-        Ok(vec![Address::default()])
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(GetSupportedEntryPointsRequest {});
+
+        let response = uopool_grpc_client
+            .get_supported_entry_points(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == GetSupportedEntryPointsResult::GotSupportedEntryPoints as i32 {
+            return Ok(response
+                .eps
+                .into_iter()
+                .map(|entry_point| entry_point.into())
+                .collect());
+        }
+
+        Err(jsonrpsee::core::Error::Call(CallError::Failed(
+            anyhow::format_err!("failed to get supported entry points"),
+        )))
     }
 
     async fn send_user_operation(

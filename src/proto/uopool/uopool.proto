@@ -44,6 +44,33 @@ message GetChainIdResponse {
     uint64 chain_id = 2;
 }
 
+message GetSupportedEntryPointsRequest {}
+
+enum GetSupportedEntryPointsResult {
+    GOT_SUPPORTED_ENTRY_POINTS = 0;
+    NOT_GOT_SUPPORTED_ENTRY_POINTS = 1;
+}
+
+message GetSupportedEntryPointsResponse {
+    GetSupportedEntryPointsResult result = 1;
+    repeated types.H160 eps = 2;
+}
+
+message EstimateUserOperationGasRequest {
+    types.UserOperation uo = 1;
+    types.H160 ep = 2;
+}
+
+enum EstimateUserOperationGasResult {
+    ESTIMATED = 0;
+    NOT_ESTIMATED = 1;
+}
+
+message EstimateUserOperationGasResponse {
+    EstimateUserOperationGasResult result = 1;
+    string data = 2;
+}
+
 enum GetAllResult {
     GOT_ALL = 0;
     NOT_GOT_ALL = 1;
@@ -101,6 +128,8 @@ service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
     rpc GetChainId(GetChainIdRequest) returns (GetChainIdResponse);
+    rpc GetSupportedEntryPoints(GetSupportedEntryPointsRequest) returns (GetSupportedEntryPointsResponse);
+    rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);

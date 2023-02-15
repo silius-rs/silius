@@ -9,10 +9,12 @@ use crate::{
         mempool_id,
         server::uopool::{
             uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
-            ClearResponse, ClearResult, GetAllReputationRequest, GetAllReputationResponse,
+            ClearResponse, ClearResult, EstimateUserOperationGasRequest,
+            EstimateUserOperationGasResponse, GetAllReputationRequest, GetAllReputationResponse,
             GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult, GetChainIdRequest,
-            GetChainIdResponse, GetChainIdResult, RemoveRequest, RemoveResponse,
-            SetReputationRequest, SetReputationResponse, SetReputationResult,
+            GetChainIdResponse, GetChainIdResult, GetSupportedEntryPointsRequest, GetSupportedEntryPointsResponse,
+            GetSupportedEntryPointsResult, RemoveRequest,
+            RemoveResponse, SetReputationRequest, SetReputationResponse, SetReputationResult,
         },
         MempoolBox, MempoolId, ReputationBox,
     },
@@ -147,6 +149,27 @@ where
             result: GetChainIdResult::GotChainId as i32,
             chain_id: self.chain_id.as_u64(),
         }))
+    }
+
+    async fn get_supported_entry_points(
+        &self,
+        _request: tonic::Request<GetSupportedEntryPointsRequest>,
+    ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
+        Ok(tonic::Response::new(GetSupportedEntryPointsResponse {
+            result: GetSupportedEntryPointsResult::GotSupportedEntryPoints as i32,
+            eps: self
+                .entry_points
+                .values()
+                .map(|entry_point| entry_point.address().into())
+                .collect(),
+        }))
+    }
+
+    async fn estimate_user_operation_gas(
+        &self,
+        _request: tonic::Request<EstimateUserOperationGasRequest>,
+    ) -> Result<Response<EstimateUserOperationGasResponse>, tonic::Status> {
+        todo!()
     }
 
     #[cfg(debug_assertions)]
