@@ -1,5 +1,6 @@
 use ethers::types::{Address, Bytes};
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -12,6 +13,12 @@ pub struct JsTracerFrame {
     pub debug: Vec<String>,
 }
 
+impl TryFrom<Value> for JsTracerFrame {
+    type Error = serde_json::Error;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        serde_json::from_value(value)
+    }
+}
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Level {
     pub access: HashMap<Address, ReadsAndWrites>,
