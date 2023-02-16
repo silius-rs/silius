@@ -48,7 +48,7 @@ pub struct Env<E: EnvironmentKind> {
 }
 
 #[derive(Debug)]
-pub struct UserOpDatabase<E: EnvironmentKind> {
+pub struct DatabaseMempool<E: EnvironmentKind> {
     _path: PathBuf,
     env: Env<E>,
 }
@@ -88,7 +88,7 @@ impl From<Error> for DBError {
     }
 }
 
-impl<E: EnvironmentKind> Mempool for UserOpDatabase<E> {
+impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     type UserOperations = Vec<UserOperation>;
     type Error = DBError;
     fn add(
@@ -199,7 +199,7 @@ fn default_page_size() -> usize {
     os_page_size.clamp(min_page_size, libmdbx_max_page_size)
 }
 
-impl<E: EnvironmentKind> UserOpDatabase<E> {
+impl<E: EnvironmentKind> DatabaseMempool<E> {
     pub fn new(path: PathBuf) -> anyhow::Result<Self> {
         let env = Environment::new()
             .set_max_dbs(TABLES.len())
@@ -265,7 +265,8 @@ mod tests {
         let senders = vec![Address::random(), Address::random(), Address::random()];
 
         let dir = TempDir::new("test-userop-db").unwrap();
-        let mut mempool: UserOpDatabase<NoWriteMap> = UserOpDatabase::new(dir.into_path()).unwrap();
+        let mut mempool: DatabaseMempool<NoWriteMap> =
+            DatabaseMempool::new(dir.into_path()).unwrap();
         mempool
             .create_tables()
             .expect("Create mdbx database tables failed");

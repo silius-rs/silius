@@ -1,7 +1,9 @@
 use crate::{
     rpc::eth_api::{EstimateUserOperationGasResponse, EthApiServer},
     types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt},
-    uopool::server::uopool::{uo_pool_client::UoPoolClient, AddRequest, AddResult},
+    uopool::server::uopool::{
+        uo_pool_client::UoPoolClient, AddRequest, AddResult, GetChainIdRequest, GetChainIdResult,
+    },
 };
 use anyhow::format_err;
 use async_trait::async_trait;
@@ -21,7 +23,23 @@ pub struct EthApiServerImpl {
 #[async_trait]
 impl EthApiServer for EthApiServerImpl {
     async fn chain_id(&self) -> RpcResult<U64> {
-        Ok(U64::default())
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(GetChainIdRequest {});
+
+        let response = uopool_grpc_client
+            .get_chain_id(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == GetChainIdResult::GotChainId as i32 {
+            return Ok(response.chain_id.into());
+        }
+
+        Err(jsonrpsee::core::Error::Call(CallError::Failed(
+            anyhow::format_err!("failed to get chain id"),
+        )))
     }
 
     async fn supported_entry_points(&self) -> RpcResult<Vec<Address>> {

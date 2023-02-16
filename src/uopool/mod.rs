@@ -18,7 +18,7 @@ use clap::Parser;
 use educe::Educe;
 use ethers::{
     abi::AbiEncode,
-    providers::{Http, Provider},
+    providers::{Http, Middleware, Provider},
     types::{Address, H256, U256},
     utils::keccak256,
 };
@@ -26,7 +26,7 @@ use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
-pub mod database;
+pub mod database_mempool;
 pub mod memory_mempool;
 pub mod memory_reputation;
 pub mod server;
@@ -130,8 +130,9 @@ pub async fn run(
     entry_points: Vec<Address>,
     eth_provider: Arc<Provider<Http>>,
     max_verification_gas: U256,
-    chain_id: U256,
 ) -> Result<()> {
+    let chain_id = eth_provider.get_chainid().await?;
+
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 

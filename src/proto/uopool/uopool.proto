@@ -32,6 +32,18 @@ message RemoveResponse {
     RemoveResult result = 1;
 }
 
+message GetChainIdRequest {}
+
+enum GetChainIdResult {
+    GOT_CHAIN_ID = 0;
+    NOT_GOT_CHAIN_ID = 1;
+}
+
+message GetChainIdResponse {
+    GetChainIdResult result = 1;
+    uint64 chain_id = 2;
+}
+
 enum GetAllResult {
     GOT_ALL = 0;
     NOT_GOT_ALL = 1;
@@ -88,6 +100,7 @@ message SetReputationResponse {
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
+    rpc GetChainId(GetChainIdRequest) returns (GetChainIdResponse);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);
