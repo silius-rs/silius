@@ -2,9 +2,10 @@ use aa_bundler::utils::{parse_address, parse_u256};
 use anyhow::Result;
 use clap::Parser;
 use ethers::{
-    providers::{Http, Provider},
+    providers::{Http, Middleware, Provider},
     types::{Address, U256},
 };
+use jsonrpsee::tracing::info;
 use std::{future::pending, sync::Arc};
 
 #[derive(Parser)]
@@ -34,6 +35,11 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let eth_provider = Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
+    info!(
+        "Connected to Ethereum execution client at {}: {}",
+        opt.eth_client_address,
+        eth_provider.client_version().await?
+    );
 
     aa_bundler::uopool::run(
         opt.uopool_opts,

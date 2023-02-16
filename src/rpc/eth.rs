@@ -1,14 +1,21 @@
 use crate::{
-    rpc::eth_api::{EstimateUserOperationGasResponse, EthApiServer},
-    types::user_operation::{UserOperation, UserOperationHash, UserOperationReceipt},
+    rpc::eth_api::EthApiServer,
+    types::user_operation::{
+        UserOperation, UserOperationGasEstimation, UserOperationHash, UserOperationPartial,
+        UserOperationReceipt,
+    },
     uopool::server::uopool::{
-        
-        uo_pool_client::UoPoolClient, AddRequest, AddResult, GetChainIdRequest, GetChainIdResult, GetSupportedEntryPointsRequest, GetSupportedEntryPointsResult,
+        uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
+        EstimateUserOperationGasResult, GetChainIdRequest, GetChainIdResult,
+        GetSupportedEntryPointsRequest, GetSupportedEntryPointsResult,
     },
 };
 use anyhow::format_err;
 use async_trait::async_trait;
-use ethers::types::{Address, U256, U64};
+use ethers::{
+    types::{Address, U64},
+    utils::to_checksum,
+};
 use jsonrpsee::{
     core::RpcResult,
     tracing::info,
@@ -43,7 +50,7 @@ impl EthApiServer for EthApiServerImpl {
         )))
     }
 
-    async fn supported_entry_points(&self) -> RpcResult<Vec<Address>> {
+    async fn supported_entry_points(&self) -> RpcResult<Vec<String>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
         let request = tonic::Request::new(GetSupportedEntryPointsRequest {});
@@ -58,7 +65,7 @@ impl EthApiServer for EthApiServerImpl {
             return Ok(response
                 .eps
                 .into_iter()
-                .map(|entry_point| entry_point.into())
+                .map(|entry_point| to_checksum(&entry_point.into(), None))
                 .collect());
         }
 
@@ -102,16 +109,33 @@ impl EthApiServer for EthApiServerImpl {
 
     async fn estimate_user_operation_gas(
         &self,
-        user_operation: UserOperation,
+        user_operation: UserOperationPartial,
         entry_point: Address,
-    ) -> RpcResult<EstimateUserOperationGasResponse> {
-        info!("{:?}", user_operation);
-        info!("{:?}", entry_point);
-        Ok(EstimateUserOperationGasResponse {
-            pre_verification_gas: U256::from(0),
-            verification_gas_limit: U256::from(0),
-            call_gas_limit: U256::from(self.call_gas_limit),
-        })
+    ) -> RpcResult<UserOperationGasEstimation> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let request = tonic::Request::new(EstimateUserOperationGasRequest {
+            uo: Some(UserOperation::from(user_operation).into()),
+            ep: Some(entry_point.into()),
+        });
+
+        let response = uopool_grpc_client
+            .estimate_user_operation_gas(request)
+            .await
+            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .into_inner();
+
+        if response.result == EstimateUserOperationGasResult::Estimated as i32 {
+            let user_operation_gas_estimation = serde_json::from_str::<UserOperationGasEstimation>(
+                &response.data,
+            )
+            .map_err(|err| format_err!("error parsing user operation gas estimation: {}", err))?;
+            return Ok(user_operation_gas_estimation);
+        }
+
+        Err(jsonrpsee::core::Error::Call(CallError::Failed(
+            anyhow::format_err!("failed to gas estimation for user operation"),
+        )))
     }
 
     async fn get_user_operation_receipt(

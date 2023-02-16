@@ -8,6 +8,7 @@ use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::str::FromStr;
+use std::vec;
 
 #[derive(
     Eq, Hash, PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Default, PartialOrd, Ord,
@@ -153,6 +154,100 @@ pub struct UserOperationReceipt {
     pub reason: String,
     pub logs: Vec<String>,
     pub receipt: TransactionReceipt,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserOperationPartial {
+    pub sender: Address,
+    pub nonce: U256,
+    pub init_code: Option<Bytes>,
+    pub call_data: Option<Bytes>,
+    pub call_gas_limit: Option<U256>,
+    pub verification_gas_limit: Option<U256>,
+    pub pre_verification_gas: Option<U256>,
+    pub max_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<U256>,
+    pub paymaster_and_data: Option<Bytes>,
+    pub signature: Option<Bytes>,
+}
+
+impl From<UserOperationPartial> for UserOperation {
+    fn from(user_operation: UserOperationPartial) -> Self {
+        Self {
+            sender: user_operation.sender,
+            nonce: user_operation.nonce,
+            init_code: {
+                if let Some(init_code) = user_operation.init_code {
+                    init_code
+                } else {
+                    Bytes::default()
+                }
+            },
+            call_data: {
+                if let Some(call_data) = user_operation.call_data {
+                    call_data
+                } else {
+                    Bytes::default()
+                }
+            },
+            call_gas_limit: {
+                if let Some(call_gas_limit) = user_operation.call_gas_limit {
+                    call_gas_limit
+                } else {
+                    U256::zero()
+                }
+            },
+            verification_gas_limit: {
+                if let Some(verification_gas_limit) = user_operation.verification_gas_limit {
+                    verification_gas_limit
+                } else {
+                    U256::from(10000000)
+                }
+            },
+            pre_verification_gas: {
+                if let Some(pre_verification_gas) = user_operation.pre_verification_gas {
+                    pre_verification_gas
+                } else {
+                    U256::zero()
+                }
+            },
+            max_fee_per_gas: {
+                if let Some(max_fee_per_gas) = user_operation.max_fee_per_gas {
+                    max_fee_per_gas
+                } else {
+                    U256::zero()
+                }
+            },
+            max_priority_fee_per_gas: {
+                if let Some(max_priority_fee_per_gas) = user_operation.max_priority_fee_per_gas {
+                    max_priority_fee_per_gas
+                } else {
+                    U256::zero()
+                }
+            },
+            paymaster_and_data: {
+                if let Some(paymaster_and_data) = user_operation.paymaster_and_data {
+                    paymaster_and_data
+                } else {
+                    Bytes::default()
+                }
+            },
+            signature: {
+                if let Some(signature) = user_operation.signature {
+                    signature
+                } else {
+                    Bytes::from(vec![1; 65])
+                }
+            },
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserOperationGasEstimation {
+    pub pre_verification_gas: U256,
+    pub verification_gas_limit: U256,
+    pub call_gas_limit: U256,
 }
 
 #[cfg(test)]
