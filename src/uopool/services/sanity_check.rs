@@ -1,5 +1,6 @@
 use crate::{
     chain::gas::Overhead,
+    contracts::EntryPointErr,
     types::{
         reputation::{ReputationStatus, StakeInfo},
         sanity_check::{BadUserOperationError, SanityCheckResult},
@@ -12,7 +13,10 @@ use ethers::{
     types::{Address, TransactionRequest, U256},
 };
 
-impl<M: Middleware + 'static> UoPoolService<M> {
+impl<M: Middleware + 'static> UoPoolService<M>
+where
+    EntryPointErr<M>: From<<M as Middleware>::Error>,
+{
     async fn sender_or_init_code(
         &self,
         user_operation: &UserOperation,

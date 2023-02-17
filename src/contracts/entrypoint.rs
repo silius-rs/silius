@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow;
 use ethers::abi::AbiDecode;
-use ethers::providers::{Middleware, ProviderError};
+use ethers::providers::{FromErr, Middleware, ProviderError};
 use ethers::types::{Address, Bytes, GethDebugTracingCallOptions, GethTrace};
 use regex::Regex;
 use serde::Deserialize;
@@ -22,7 +22,10 @@ pub struct EntryPoint<M: Middleware> {
     stake_manager_api: StakeManagerAPI<M>,
 }
 
-impl<M: Middleware + 'static> EntryPoint<M> {
+impl<M: Middleware + 'static> EntryPoint<M>
+where
+    EntryPointErr<M>: From<<M as Middleware>::Error>,
+{
     pub fn new(provider: Arc<M>, address: Address) -> Self {
         let entry_point_api = EntryPointAPI::new(address, provider.clone());
         let stake_manager_api = StakeManagerAPI::new(address, provider.clone());
@@ -42,7 +45,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         self.address
     }
 
-    fn deserialize_error_msg(err_msg: &str) -> Result<EntryPointAPIErrors, EntryPointErr> {
+    fn deserialize_error_msg(err_msg: &str) -> Result<EntryPointAPIErrors, EntryPointErr<M>> {
         JsonRpcError::from_str(err_msg)
             .map_err(|_| {
                 EntryPointErr::DecodeErr(format!("{err_msg:?} is not a valid JsonRpcError message"))
@@ -66,7 +69,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn simulate_validation<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<SimulateValidationResult, EntryPointErr> {
+    ) -> Result<SimulateValidationResult, EntryPointErr<M>> {
         let request_result = self
             .entry_point_api
             .simulate_validation(user_operation.into())
@@ -99,7 +102,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn simulate_validation_trace<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<GethTrace, EntryPointErr> {
+    ) -> Result<GethTrace, EntryPointErr<M>> {
         let call = self
             .entry_point_api
             .simulate_validation(user_operation.into());
@@ -115,7 +118,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         ops: Vec<U>,
         beneficiary: Address,
-    ) -> Result<(), EntryPointErr> {
+    ) -> Result<(), EntryPointErr<M>> {
         self.entry_point_api
             .handle_ops(ops.into_iter().map(|u| u.into()).collect(), beneficiary)
             .await
@@ -132,7 +135,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             })
     }
 
-    pub async fn get_deposit_info(&self, address: &Address) -> Result<DepositInfo, EntryPointErr> {
+    pub async fn get_deposit_info(
+        &self,
+        address: &Address,
+    ) -> Result<DepositInfo, EntryPointErr<M>> {
         let result = self
             .stake_manager_api
             .get_deposit_info(*address)
@@ -150,7 +156,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn get_sender_address(
         &self,
         initcode: Bytes,
-    ) -> Result<SenderAddressResult, EntryPointErr> {
+    ) -> Result<SenderAddressResult, EntryPointErr<M>> {
         let result = self.entry_point_api.get_sender_address(initcode).await;
 
         match result {
@@ -176,23 +182,30 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         _ops_per_aggregator: Vec<U>,
         _beneficiary: Address,
-    ) -> Result<(), EntryPointErr> {
+    ) -> Result<(), EntryPointErr<M>> {
         todo!()
     }
 }
 
 #[derive(Debug)]
-pub enum EntryPointErr {
+pub enum EntryPointErr<M: Middleware> {
     FailedOp(FailedOp),
     ProviderErr(ProviderError),
+    MiddlewareErr(M::Error),
     NetworkErr, // TODO
     DecodeErr(String),
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
 }
 
-impl From<ProviderError> for EntryPointErr {
+impl<M: Middleware> From<ProviderError> for EntryPointErr<M> {
     fn from(e: ProviderError) -> Self {
         EntryPointErr::ProviderErr(e)
+    }
+}
+
+impl<M: Middleware> FromErr<M::Error> for EntryPointErr<M> {
+    fn from(src: M::Error) -> Self {
+        EntryPointErr::MiddlewareErr(src)
     }
 }
 

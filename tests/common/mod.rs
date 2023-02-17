@@ -1,20 +1,25 @@
-use std::sync::Arc;
+use std::{ops::Mul, sync::Arc, time::Duration};
 
 use aa_bundler::types::user_operation::UserOperation;
 use ethers::{
-    prelude::k256::ecdsa::SigningKey,
-    providers::Middleware,
-    signers::{Signer, Wallet},
-    types::{Address, Bytes, U256},
+    prelude::{
+        k256::ecdsa::SigningKey, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
+    },
+    providers::{Http, Middleware, Provider},
+    signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, Wallet},
+    types::{Address, Bytes, TransactionRequest, U256},
+    utils::{Geth, GethInstance},
 };
+use tempdir::TempDir;
 
 use self::gen::{
     EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRecursionAccount,
-    TestRulesAccountFactory, TestStorageAccount, TestStorageAccountFactory,
+    TestRulesAccountFactory, TestStorageAccount, TestStorageAccountFactory, TracerTest,
 };
 pub mod gen;
 
 pub const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
+pub type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
 
 pub struct DeployedContract<C> {
     contract: C,
@@ -101,6 +106,14 @@ pub async fn deploy_test_rules_account_factory<M: Middleware + 'static>(
     Ok(DeployedContract::new(factory, address))
 }
 
+pub async fn deploy_tracer_test<M: Middleware + 'static>(
+    client: Arc<M>,
+) -> anyhow::Result<DeployedContract<TracerTest<M>>> {
+    let (factory, receipt) = TracerTest::deploy(client, ())?.send_with_receipt().await?;
+    let address = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, address))
+}
+
 pub async fn sign(
     user_op: &mut UserOperation,
     entry_point_address: &Address,
@@ -111,4 +124,28 @@ pub async fn sign(
     let signature = key.sign_message(user_op_hash.0.as_bytes()).await?;
     user_op.signature = Bytes::from(signature.to_vec());
     Ok(())
+}
+
+pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
+    let chain_id: u64 = 1337;
+    let tmp_dir = TempDir::new("test_geth")?;
+    let wallet = MnemonicBuilder::<English>::default()
+        .phrase(KEY_PHRASE)
+        .build()?;
+
+    let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();
+    let provider =
+        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
+
+    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
+        .nonce_manager(wallet.address());
+
+    let coinbase = client.get_accounts().await?[0];
+    let tx = TransactionRequest::new()
+        .to(wallet.address())
+        .value(U256::from(10).pow(U256::from(18)).mul(100))
+        .from(coinbase);
+    provider.send_transaction(tx, None).await?.await?;
+
+    Ok((geth, client))
 }

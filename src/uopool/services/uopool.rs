@@ -1,5 +1,5 @@
 use crate::{
-    contracts::EntryPoint,
+    contracts::{EntryPoint, EntryPointErr},
     types::{
         reputation::ReputationEntry,
         sanity_check::{SanityCheckError, SanityCheckResult},
@@ -67,7 +67,10 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 }
 
 #[async_trait]
-impl<M: Middleware + 'static> UoPool for UoPoolService<M> {
+impl<M: Middleware + 'static> UoPool for UoPoolService<M>
+where
+    EntryPointErr<M>: From<<M as Middleware>::Error>,
+{
     async fn add(
         &self,
         request: tonic::Request<AddRequest>,

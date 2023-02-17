@@ -5,24 +5,18 @@ use common::gen::{
     EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRulesAccount,
     TestRulesAccountFactory, TestStorageAccountFactory,
 };
-use common::{DeployedContract, KEY_PHRASE};
+use common::{setup_geth, ClientType, DeployedContract};
 use ethers::abi::Token;
-use ethers::prelude::{BaseContract, MiddlewareBuilder, NonceManagerMiddleware};
-use ethers::providers::Http;
-use ethers::signers::coins_bip39::English;
-use ethers::signers::MnemonicBuilder;
+use ethers::prelude::BaseContract;
 use ethers::types::transaction::eip2718::TypedTransaction;
-use ethers::types::{Address, TransactionRequest};
-use ethers::utils::{parse_units, Geth, GethInstance};
+use ethers::types::Address;
+use ethers::utils::{parse_units, GethInstance};
 use ethers::{
-    prelude::SignerMiddleware,
-    providers::{Middleware, Provider},
-    signers::{LocalWallet, Signer},
+    providers::Middleware,
     types::{Bytes, U256},
 };
-use std::ops::{Deref, Mul};
-use std::{convert::TryFrom, sync::Arc, time::Duration};
-use tempdir::TempDir;
+use std::ops::Deref;
+use std::sync::Arc;
 
 use crate::common::{
     deploy_entry_point, deploy_test_opcode_account, deploy_test_opcode_account_factory,
@@ -41,31 +35,9 @@ struct TestContext<M> {
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
 }
 
-type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
-
 async fn setup() -> anyhow::Result<TestContext<ClientType>> {
-    let chain_id: u64 = 1337;
-    let tmp_dir = TempDir::new("test_geth")?;
-    let wallet = MnemonicBuilder::<English>::default()
-        .phrase(KEY_PHRASE)
-        .build()?;
-
-    let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();
-    let provider =
-        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
-
-    let client = Arc::new(
-        SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
-            .nonce_manager(wallet.address()),
-    );
-
-    let coinbase = client.clone().get_accounts().await?[0];
-    let tx = TransactionRequest::new()
-        .to(wallet.address())
-        .value(U256::from(10).pow(U256::from(18)).mul(100))
-        .from(coinbase);
-    provider.send_transaction(tx, None).await?.await?;
-
+    let (_geth, _client) = setup_geth().await?;
+    let client = Arc::new(_client);
     let entry_point = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
     entry_point
@@ -98,7 +70,7 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
         .await?;
     Ok(TestContext::<ClientType> {
         client: client.clone(),
-        _geth: geth,
+        _geth,
         entry_point,
         paymaster,
         opcodes_factory,
