@@ -1,17 +1,19 @@
 use crate::{
-    contracts::{EntryPoint, EntryPointErr},
+    chain::gas::Overhead,
+    contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::ReputationEntry,
         sanity_check::{SanityCheckError, SanityCheckResult},
-        user_operation::{UserOperation, UserOperationHash},
+        user_operation::{UserOperation, UserOperationGasEstimation, UserOperationHash},
     },
     uopool::{
         mempool_id,
         server::uopool::{
-            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
-            ClearResponse, ClearResult, GetAllReputationRequest, GetAllReputationResponse,
-            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult, GetChainIdRequest,
-            GetChainIdResponse, GetChainIdResult, RemoveRequest, RemoveResponse,
+            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearResponse, ClearResult,
+            EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
+            EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
+            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
+            GetChainIdResponse, GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse,
             SetReputationRequest, SetReputationResponse, SetReputationResult,
         },
         MempoolBox, MempoolId, ReputationBox,
@@ -20,7 +22,7 @@ use crate::{
 use async_trait::async_trait;
 use ethers::{
     providers::Middleware,
-    types::{Address, U256},
+    types::{Address, TransactionRequest, U256},
 };
 use jsonrpsee::{tracing::info, types::ErrorObject};
 use parking_lot::RwLock;
@@ -99,17 +101,17 @@ where
                 return Err(tonic::Status::invalid_argument("entry point not supported"));
             }
 
-            //  sanity check
+            // sanity check
             match self
                 .validate_user_operation(&user_operation, &entry_point)
                 .await
             {
                 Ok(_) => {
-                    // simulation
+                    // TODO: simulation
 
-                    // TODO: make something with reputation
+                    // TODO: update reputation
 
-                    // add to mempool
+                    // TODO: add to mempool
 
                     res.set_result(AddResult::Added);
                     res.data =
@@ -141,18 +143,101 @@ where
 
     async fn get_chain_id(
         &self,
-        _request: tonic::Request<GetChainIdRequest>,
+        _request: tonic::Request<()>,
     ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
         Ok(tonic::Response::new(GetChainIdResponse {
-            result: GetChainIdResult::GotChainId as i32,
             chain_id: self.chain_id.as_u64(),
         }))
+    }
+
+    async fn get_supported_entry_points(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
+        Ok(tonic::Response::new(GetSupportedEntryPointsResponse {
+            eps: self
+                .entry_points
+                .values()
+                .map(|entry_point| entry_point.address().into())
+                .collect(),
+        }))
+    }
+
+    async fn estimate_user_operation_gas(
+        &self,
+        request: tonic::Request<EstimateUserOperationGasRequest>,
+    ) -> Result<Response<EstimateUserOperationGasResponse>, tonic::Status> {
+        let req = request.into_inner();
+        let mut res = EstimateUserOperationGasResponse::default();
+
+        if let EstimateUserOperationGasRequest {
+            uo: Some(user_operation),
+            ep: Some(entry_point),
+        } = req
+        {
+            let user_operation: UserOperation = user_operation
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
+            let entry_point: Address = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+
+            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+
+            if let Some(entry_point) = self.entry_points.get(&mempool_id) {
+                // TODO: simulation
+
+                let pre_verification_gas =
+                    Overhead::default().calculate_pre_verification_gas(&user_operation);
+
+                let simulate_validation_response = entry_point
+                    .simulate_validation(user_operation.clone())
+                    .await
+                    .map_err(|_| tonic::Status::internal("error estimating user operation gas"))?;
+
+                let verification_gas_limit = match simulate_validation_response {
+                    SimulateValidationResult::ValidationResult(validation_result) => {
+                        validation_result.return_info.0
+                    }
+                    SimulateValidationResult::ValidationResultWithAggregation(
+                        validation_result_with_aggregation,
+                    ) => validation_result_with_aggregation.return_info.0,
+                };
+
+                let call_gas_limit = self
+                    .eth_provider
+                    .estimate_gas(
+                        &TransactionRequest::new()
+                            .from(entry_point.address())
+                            .to(user_operation.sender)
+                            .data(user_operation.call_data.clone())
+                            .into(),
+                        None,
+                    )
+                    .await
+                    .map_err(|_| tonic::Status::internal("error estimating user operation gas"))?;
+
+                res.set_result(EstimateUserOperationGasResult::Estimated);
+                res.data = serde_json::to_string(&UserOperationGasEstimation {
+                    pre_verification_gas,
+                    verification_gas_limit,
+                    call_gas_limit,
+                })
+                .map_err(|_| tonic::Status::internal("error estimating user operation gas"))?;
+
+                return Ok(tonic::Response::new(res));
+            } else {
+                return Err(tonic::Status::invalid_argument("entry point not supported"));
+            }
+        }
+
+        Err(tonic::Status::invalid_argument("missing user operation"))
     }
 
     #[cfg(debug_assertions)]
     async fn clear(
         &self,
-        _request: tonic::Request<ClearRequest>,
+        _request: tonic::Request<()>,
     ) -> Result<Response<ClearResponse>, tonic::Status> {
         for mempool in self.mempools.write().values_mut() {
             mempool.clear();

@@ -73,6 +73,7 @@ where
         let request_result = self
             .entry_point_api
             .simulate_validation(user_operation.into())
+            .call()
             .await;
         match request_result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
@@ -121,6 +122,7 @@ where
     ) -> Result<(), EntryPointErr<M>> {
         self.entry_point_api
             .handle_ops(ops.into_iter().map(|u| u.into()).collect(), beneficiary)
+            .call()
             .await
             .or_else(|e| {
                 let err_msg = e.to_string();
@@ -157,7 +159,11 @@ where
         &self,
         initcode: Bytes,
     ) -> Result<SenderAddressResult, EntryPointErr<M>> {
-        let result = self.entry_point_api.get_sender_address(initcode).await;
+        let result = self
+            .entry_point_api
+            .get_sender_address(initcode)
+            .call()
+            .await;
 
         match result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
