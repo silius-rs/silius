@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
 import "types/types.proto";
 
 package uopool;
@@ -32,28 +33,12 @@ message RemoveResponse {
     RemoveResult result = 1;
 }
 
-message GetChainIdRequest {}
-
-enum GetChainIdResult {
-    GOT_CHAIN_ID = 0;
-    NOT_GOT_CHAIN_ID = 1;
-}
-
 message GetChainIdResponse {
-    GetChainIdResult result = 1;
-    uint64 chain_id = 2;
-}
-
-message GetSupportedEntryPointsRequest {}
-
-enum GetSupportedEntryPointsResult {
-    GOT_SUPPORTED_ENTRY_POINTS = 0;
-    NOT_GOT_SUPPORTED_ENTRY_POINTS = 1;
+    uint64 chain_id = 1;
 }
 
 message GetSupportedEntryPointsResponse {
-    GetSupportedEntryPointsResult result = 1;
-    repeated types.H160 eps = 2;
+    repeated types.H160 eps = 1;
 }
 
 message EstimateUserOperationGasRequest {
@@ -90,8 +75,6 @@ enum ClearResult {
     NOT_CLEARED = 1;
 }
 
-message ClearRequest {}
-
 message ClearResponse {
     ClearResult result = 1;
 }
@@ -127,13 +110,13 @@ message SetReputationResponse {
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
-    rpc GetChainId(GetChainIdRequest) returns (GetChainIdResponse);
-    rpc GetSupportedEntryPoints(GetSupportedEntryPointsRequest) returns (GetSupportedEntryPointsResponse);
+    rpc GetChainId(google.protobuf.Empty) returns (GetChainIdResponse);
+    rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (GetSupportedEntryPointsResponse);
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);
-    rpc Clear(ClearRequest) returns (ClearResponse);
+    rpc Clear(google.protobuf.Empty) returns (ClearResponse);
     rpc GetAllReputation(GetAllReputationRequest) returns (GetAllReputationResponse);
     rpc SetReputation(SetReputationRequest) returns (SetReputationResponse);
 }

@@ -9,14 +9,12 @@ use crate::{
     uopool::{
         mempool_id,
         server::uopool::{
-            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearRequest,
-            ClearResponse, ClearResult, EstimateUserOperationGasRequest,
-            EstimateUserOperationGasResponse, EstimateUserOperationGasResult,
-            GetAllReputationRequest, GetAllReputationResponse, GetAllReputationResult,
-            GetAllRequest, GetAllResponse, GetAllResult, GetChainIdRequest, GetChainIdResponse,
-            GetChainIdResult, GetSupportedEntryPointsRequest, GetSupportedEntryPointsResponse,
-            GetSupportedEntryPointsResult, RemoveRequest, RemoveResponse, SetReputationRequest,
-            SetReputationResponse, SetReputationResult,
+            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearResponse, ClearResult,
+            EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
+            EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
+            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
+            GetChainIdResponse, GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse,
+            SetReputationRequest, SetReputationResponse, SetReputationResult,
         },
         MempoolBox, MempoolId, ReputationBox,
     },
@@ -145,20 +143,18 @@ where
 
     async fn get_chain_id(
         &self,
-        _request: tonic::Request<GetChainIdRequest>,
+        _request: tonic::Request<()>,
     ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
         Ok(tonic::Response::new(GetChainIdResponse {
-            result: GetChainIdResult::GotChainId as i32,
             chain_id: self.chain_id.as_u64(),
         }))
     }
 
     async fn get_supported_entry_points(
         &self,
-        _request: tonic::Request<GetSupportedEntryPointsRequest>,
+        _request: tonic::Request<()>,
     ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
         Ok(tonic::Response::new(GetSupportedEntryPointsResponse {
-            result: GetSupportedEntryPointsResult::GotSupportedEntryPoints as i32,
             eps: self
                 .entry_points
                 .values()
@@ -241,7 +237,7 @@ where
     #[cfg(debug_assertions)]
     async fn clear(
         &self,
-        _request: tonic::Request<ClearRequest>,
+        _request: tonic::Request<()>,
     ) -> Result<Response<ClearResponse>, tonic::Status> {
         for mempool in self.mempools.write().values_mut() {
             mempool.clear();

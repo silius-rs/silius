@@ -6,8 +6,7 @@ use crate::{
     },
     uopool::server::uopool::{
         uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
-        EstimateUserOperationGasResult, GetChainIdRequest, GetChainIdResult,
-        GetSupportedEntryPointsRequest, GetSupportedEntryPointsResult,
+        EstimateUserOperationGasResult,
     },
 };
 use anyhow::format_err;
@@ -33,45 +32,29 @@ impl EthApiServer for EthApiServerImpl {
     async fn chain_id(&self) -> RpcResult<U64> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let request = tonic::Request::new(GetChainIdRequest {});
-
         let response = uopool_grpc_client
-            .get_chain_id(request)
+            .get_chain_id(tonic::Request::new(()))
             .await
             .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
             .into_inner();
 
-        if response.result == GetChainIdResult::GotChainId as i32 {
-            return Ok(response.chain_id.into());
-        }
-
-        Err(jsonrpsee::core::Error::Call(CallError::Failed(
-            anyhow::format_err!("failed to get chain id"),
-        )))
+        return Ok(response.chain_id.into());
     }
 
     async fn supported_entry_points(&self) -> RpcResult<Vec<String>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let request = tonic::Request::new(GetSupportedEntryPointsRequest {});
-
         let response = uopool_grpc_client
-            .get_supported_entry_points(request)
+            .get_supported_entry_points(tonic::Request::new(()))
             .await
             .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
             .into_inner();
 
-        if response.result == GetSupportedEntryPointsResult::GotSupportedEntryPoints as i32 {
-            return Ok(response
-                .eps
-                .into_iter()
-                .map(|entry_point| to_checksum(&entry_point.into(), None))
-                .collect());
-        }
-
-        Err(jsonrpsee::core::Error::Call(CallError::Failed(
-            anyhow::format_err!("failed to get supported entry points"),
-        )))
+        return Ok(response
+            .eps
+            .into_iter()
+            .map(|entry_point| to_checksum(&entry_point.into(), None))
+            .collect());
     }
 
     async fn send_user_operation(

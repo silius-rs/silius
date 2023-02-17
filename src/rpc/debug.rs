@@ -2,9 +2,8 @@ use super::debug_api::DebugApiServer;
 use crate::{
     types::{reputation::ReputationEntry, user_operation::UserOperation},
     uopool::server::uopool::{
-        uo_pool_client::UoPoolClient, ClearRequest, ClearResult, GetAllReputationRequest,
-        GetAllReputationResult, GetAllRequest, GetAllResult, SetReputationRequest,
-        SetReputationResult,
+        uo_pool_client::UoPoolClient, ClearResult, GetAllReputationRequest, GetAllReputationResult,
+        GetAllRequest, GetAllResult, SetReputationRequest, SetReputationResult,
     },
 };
 use anyhow::format_err;
@@ -23,10 +22,8 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn clear_state(&self) -> RpcResult<()> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let request = tonic::Request::new(ClearRequest {});
-
         let response = uopool_grpc_client
-            .clear(request)
+            .clear(tonic::Request::new(()))
             .await
             .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
             .into_inner();
