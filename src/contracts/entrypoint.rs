@@ -4,7 +4,10 @@ use std::sync::Arc;
 use anyhow;
 use ethers::abi::AbiDecode;
 use ethers::providers::{FromErr, Middleware, ProviderError};
-use ethers::types::{Address, Bytes, GethDebugTracingCallOptions, GethTrace};
+use ethers::types::{
+    Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
+    GethTrace,
+};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -14,6 +17,7 @@ use super::gen::entry_point_api::{
 };
 use super::gen::stake_manager_api::DepositInfo;
 use super::gen::{EntryPointAPI, StakeManagerAPI};
+use super::tracer::JS_TRACER;
 
 pub struct EntryPoint<M: Middleware> {
     provider: Arc<M>,
@@ -73,7 +77,6 @@ where
         let request_result = self
             .entry_point_api
             .simulate_validation(user_operation.into())
-            .call()
             .await;
         match request_result {
             Ok(_) => Err(EntryPointErr::UnknownErr(
@@ -99,7 +102,6 @@ where
         }
     }
 
-    // TODO: change to javascript tracer
     pub async fn simulate_validation_trace<U: Into<UserOperation>>(
         &self,
         user_operation: U,
@@ -107,10 +109,23 @@ where
         let call = self
             .entry_point_api
             .simulate_validation(user_operation.into());
-        let options: GethDebugTracingCallOptions = GethDebugTracingCallOptions::default();
         let request_result = self
             .provider
-            .debug_trace_call(call.tx, None, options)
+            .debug_trace_call(
+                call.tx,
+                None,
+                GethDebugTracingCallOptions {
+                    tracing_options: GethDebugTracingOptions {
+                        disable_storage: None,
+                        disable_stack: None,
+                        enable_memory: None,
+                        enable_return_data: None,
+                        tracer: Some(GethDebugTracerType::JsTracer(JS_TRACER.to_string())),
+                        tracer_config: None,
+                        timeout: None,
+                    },
+                },
+            )
             .await?;
         Ok(request_result)
     }
@@ -256,8 +271,15 @@ impl FromStr for JsonRpcError {
 
 #[cfg(test)]
 mod tests {
-    use super::JsonRpcError;
-    use std::str::FromStr;
+    use ethers::{
+        providers::{Http, Middleware, Provider},
+        types::{Address, Bytes, GethTrace, U256},
+    };
+
+    use crate::types::user_operation::UserOperation;
+
+    use super::{EntryPoint, JsonRpcError};
+    use std::{str::FromStr, sync::Arc};
 
     #[test]
     fn json_rpc_err_parse() {
@@ -284,5 +306,43 @@ mod tests {
                 data: None
             }
         );
+    }
+
+    #[ignore]
+    #[tokio::test]
+    async fn simulate_validation_trace() {
+        let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
+        let entry_point = EntryPoint::<Provider<Http>>::new(
+            eth_provider.clone(),
+            Address::from_str("0x1306b01bc3e4ad202612d3843387e94737673f53").unwrap(),
+        );
+
+        let max_priority_fee_per_gas = U256::from(1500000000_u64);
+        let max_fee_per_gas =
+            max_priority_fee_per_gas + eth_provider.get_gas_price().await.unwrap();
+
+        let user_operation = UserOperation {
+            sender: "0xBBe6a3230Ef8abC44EF61B3fBf93Cd0394D1d21f".parse().unwrap(),
+            nonce: U256::zero(),
+            init_code: Bytes::from_str("0xed886f2d1bbb38b4914e8c545471216a40cce9385fbfb9cf000000000000000000000000ae72a48c1a36bd18af168541c53037965d26e4a80000000000000000000000000000000000000000000000000000018661be6ed7").unwrap(),
+            call_data: Bytes::from_str("0xb61d27f6000000000000000000000000bbe6a3230ef8abc44ef61b3fbf93cd0394d1d21f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004affed0e000000000000000000000000000000000000000000000000000000000").unwrap(),
+            call_gas_limit: U256::from(22016),
+            verification_gas_limit: U256::from(413910),
+            pre_verification_gas: U256::from(48480),
+            max_fee_per_gas,
+            max_priority_fee_per_gas,
+            paymaster_and_data: Bytes::default(),
+            signature: Bytes::from_str("0xeb99f2f72c16b3eb5bdeadb243dd38a6e54771f1dd9b3d1d08e99e3e0840717331e6c8c83457c6c33daa3aa30a238197dbf7ea1f17d02aa57c3fa9e9ce3dc1731c").unwrap(),
+        };
+
+        let simulate_validation_trace = entry_point
+            .simulate_validation_trace(user_operation)
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            simulate_validation_trace,
+            GethTrace::Unknown { .. },
+        ));
     }
 }
