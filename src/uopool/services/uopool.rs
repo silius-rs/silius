@@ -3,7 +3,7 @@ use crate::{
     contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::ReputationEntry,
-        sanity_check::{SanityCheckError, SanityCheckResult},
+        sanity_check::SanityCheckResult,
         user_operation::{UserOperation, UserOperationGasEstimation, UserOperationHash},
     },
     uopool::{
@@ -24,7 +24,7 @@ use ethers::{
     providers::Middleware,
     types::{Address, TransactionRequest, U256},
 };
-use jsonrpsee::{tracing::info, types::ErrorObject};
+use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
@@ -45,7 +45,10 @@ pub struct UoPoolService<M: Middleware> {
     pub chain_id: U256,
 }
 
-impl<M: Middleware + 'static> UoPoolService<M> {
+impl<M: Middleware + 'static> UoPoolService<M>
+where
+    EntryPointErr<M>: From<<M as Middleware>::Error>,
+{
     pub fn new(
         entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
@@ -65,6 +68,22 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             min_priority_fee_per_gas,
             chain_id,
         }
+    }
+
+    async fn verify_user_operation(
+        &self,
+        user_operation: &UserOperation,
+        entry_point: &Address,
+    ) -> Result<(), ErrorObject<'static>> {
+        // sanity check
+        self.validate_user_operation(user_operation, entry_point)
+            .await?;
+
+        // simulation
+        self.simulate_user_operation(user_operation, entry_point)
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -92,8 +111,8 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            info!("{:?}", user_operation);
-            info!("{:?}", entry_point);
+            // info!("{:?}", user_operation);
+            // info!("{:?}", entry_point);
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
@@ -101,16 +120,12 @@ where
                 return Err(tonic::Status::invalid_argument("entry point not supported"));
             }
 
-            // sanity check
             match self
-                .validate_user_operation(&user_operation, &entry_point)
+                .verify_user_operation(&user_operation, &entry_point)
                 .await
             {
                 Ok(_) => {
-                    // TODO: simulation
-
                     // TODO: update reputation
-
                     // TODO: add to mempool
 
                     res.set_result(AddResult::Added);
@@ -123,7 +138,7 @@ where
                         .write()
                         .remove(&user_operation.hash(&entry_point, &self.chain_id));
                     res.set_result(AddResult::NotAdded);
-                    res.data = serde_json::to_string(&SanityCheckError::from(error))
+                    res.data = serde_json::to_string(&error)
                         .map_err(|_| tonic::Status::internal("error adding user operation"))?;
                 }
             }

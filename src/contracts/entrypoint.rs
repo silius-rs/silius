@@ -278,7 +278,7 @@ mod tests {
 
     use crate::types::user_operation::UserOperation;
 
-    use super::{EntryPoint, JsonRpcError};
+    use super::*;
     use std::{str::FromStr, sync::Arc};
 
     #[test]
@@ -310,7 +310,7 @@ mod tests {
 
     #[ignore]
     #[tokio::test]
-    async fn simulate_validation_trace() {
+    async fn simulate_validation() {
         let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let entry_point = EntryPoint::<Provider<Http>>::new(
             eth_provider.clone(),
@@ -334,6 +334,13 @@ mod tests {
             paymaster_and_data: Bytes::default(),
             signature: Bytes::from_str("0xeb99f2f72c16b3eb5bdeadb243dd38a6e54771f1dd9b3d1d08e99e3e0840717331e6c8c83457c6c33daa3aa30a238197dbf7ea1f17d02aa57c3fa9e9ce3dc1731c").unwrap(),
         };
+
+        let simulate_validation = entry_point.simulate_validation(user_operation.clone()).await.unwrap();
+
+        assert!(matches!(
+            simulate_validation,
+            SimulateValidationResult::ValidationResult { .. },
+        ));
 
         let simulate_validation_trace = entry_point
             .simulate_validation_trace(user_operation)

@@ -1,6 +1,6 @@
-use ethers::types::{Address, Bytes};
+use anyhow::format_err;
+use ethers::types::{Address, Bytes, GethTrace};
 use serde::Deserialize;
-use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -13,12 +13,17 @@ pub struct JsTracerFrame {
     pub debug: Vec<String>,
 }
 
-impl TryFrom<Value> for JsTracerFrame {
-    type Error = serde_json::Error;
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        serde_json::from_value(value)
+impl TryFrom<GethTrace> for JsTracerFrame {
+    type Error = anyhow::Error;
+    fn try_from(value: GethTrace) -> Result<Self, Self::Error> {
+        match value {
+            GethTrace::Known(value) => Err(format_err!("invalid geth trace: {value:?}")),
+            GethTrace::Unknown(value) => serde_json::from_value(value)
+                .map_err(|error| format_err!("failed to parse geth trace: {error}")),
+        }
     }
 }
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Level {
     pub access: HashMap<Address, ReadsAndWrites>,

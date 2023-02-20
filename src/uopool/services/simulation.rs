@@ -4,7 +4,7 @@ use ethers::{
 };
 
 use crate::{
-    contracts::EntryPointErr,
+    contracts::{tracer::JsTracerFrame, EntryPointErr, SimulateValidationResult},
     types::{simulation::SimulateValidationError, user_operation::UserOperation},
     uopool::mempool_id,
 };
@@ -15,7 +15,41 @@ impl<M: Middleware + 'static> UoPoolService<M>
 where
     EntryPointErr<M>: From<<M as Middleware>::Error>,
 {
-    pub async fn simulate_validation_trace(
+    async fn simulate_validation(
+        &self,
+        user_operation: &UserOperation,
+        entry_point: &Address,
+    ) -> Result<SimulateValidationResult, SimulateValidationError<M>> {
+        let mempool_id = mempool_id(entry_point, &self.chain_id);
+
+        if let Some(entry_point) = self.entry_points.get(&mempool_id) {
+            return match entry_point
+                .simulate_validation(user_operation.clone())
+                .await
+            {
+                Ok(simulate_validation_result) => Ok(simulate_validation_result),
+                Err(entry_point_error) => match entry_point_error {
+                    EntryPointErr::MiddlewareErr(middleware_error) => {
+                        Err(SimulateValidationError::Middleware(middleware_error))
+                    }
+                    EntryPointErr::FailedOp(failed_op) => {
+                        Err(SimulateValidationError::UserOperationRejected {
+                            message: format!("{failed_op}"),
+                        })
+                    }
+                    _ => Err(SimulateValidationError::UserOperationRejected {
+                        message: "unknown error".to_string(),
+                    }),
+                },
+            };
+        }
+
+        Err(SimulateValidationError::UserOperationRejected {
+            message: "invalid entry point".to_string(),
+        })
+    }
+
+    async fn simulate_validation_trace(
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
@@ -49,16 +83,38 @@ where
         })
     }
 
+    async fn forbidden_opcodes(
+        &self,
+        simulate_validation_result: &SimulateValidationResult,
+        trace: &JsTracerFrame,
+    ) -> Result<(), SimulateValidationError<M>> {
+        println!("simulate_validation_result: {simulate_validation_result:?}");
+        println!("trace: {trace:?}");
+        Ok(())
+    }
+
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
     ) -> Result<(), SimulateValidationError<M>> {
-        let simulate_validation_trace = self
+        let simulate_validation_result = self
+            .simulate_validation(user_operation, entry_point)
+            .await?;
+
+        let geth_trace = self
             .simulate_validation_trace(user_operation, entry_point)
             .await?;
 
-        println!("{simulate_validation_trace:?}");
+        let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
+            SimulateValidationError::UserOperationRejected {
+                message: error.to_string(),
+            }
+        })?;
+
+        // may not invokes any forbidden opcodes
+        self.forbidden_opcodes(&simulate_validation_result, &js_trace)
+            .await?;
 
         Ok(())
     }
@@ -142,8 +198,9 @@ mod tests {
             signature: Bytes::from_str("0xeb99f2f72c16b3eb5bdeadb243dd38a6e54771f1dd9b3d1d08e99e3e0840717331e6c8c83457c6c33daa3aa30a238197dbf7ea1f17d02aa57c3fa9e9ce3dc1731c").unwrap(),
         };
 
-        let _ = uo_pool_service
+        assert!(uo_pool_service
             .simulate_user_operation(&user_operation, &entry_point)
-            .await;
+            .await
+            .is_ok());
     }
 }

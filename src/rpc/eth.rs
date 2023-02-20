@@ -62,8 +62,8 @@ impl EthApiServer for EthApiServerImpl {
         user_operation: UserOperation,
         entry_point: Address,
     ) -> RpcResult<UserOperationHash> {
-        info!("{:?}", entry_point);
-        info!("{:?}", user_operation);
+        // info!("{:?}", entry_point);
+        // info!("{:?}", user_operation);
 
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
