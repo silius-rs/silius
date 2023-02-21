@@ -3,8 +3,7 @@ use crate::{
     contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::ReputationEntry,
-        sanity_check::SanityCheckResult,
-        user_operation::{UserOperation, UserOperationGasEstimation, UserOperationHash},
+        user_operation::{UserOperation, UserOperationGasEstimation},
     },
     uopool::{
         mempool_id,
@@ -26,10 +25,7 @@ use ethers::{
 };
 use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
 
 pub type UoPoolError = ErrorObject<'static>;
@@ -38,7 +34,6 @@ pub struct UoPoolService<M: Middleware> {
     pub entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
     pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
     pub reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
-    pub sanity_check_results: Arc<RwLock<HashMap<UserOperationHash, HashSet<SanityCheckResult>>>>,
     pub eth_provider: Arc<M>,
     pub max_verification_gas: U256,
     pub min_priority_fee_per_gas: U256,
@@ -62,7 +57,6 @@ where
             entry_points,
             mempools,
             reputations,
-            sanity_check_results: Arc::new(RwLock::new(HashMap::new())),
             eth_provider,
             max_verification_gas,
             min_priority_fee_per_gas,
@@ -134,9 +128,6 @@ where
                             .map_err(|_| tonic::Status::internal("error adding user operation"))?;
                 }
                 Err(error) => {
-                    self.sanity_check_results
-                        .write()
-                        .remove(&user_operation.hash(&entry_point, &self.chain_id));
                     res.set_result(AddResult::NotAdded);
                     res.data = serde_json::to_string(&error)
                         .map_err(|_| tonic::Status::internal("error adding user operation"))?;

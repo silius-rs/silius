@@ -335,7 +335,10 @@ mod tests {
             signature: Bytes::from_str("0xeb99f2f72c16b3eb5bdeadb243dd38a6e54771f1dd9b3d1d08e99e3e0840717331e6c8c83457c6c33daa3aa30a238197dbf7ea1f17d02aa57c3fa9e9ce3dc1731c").unwrap(),
         };
 
-        let simulate_validation = entry_point.simulate_validation(user_operation.clone()).await.unwrap();
+        let simulate_validation = entry_point
+            .simulate_validation(user_operation.clone())
+            .await
+            .unwrap();
 
         assert!(matches!(
             simulate_validation,

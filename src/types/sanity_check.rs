@@ -50,13 +50,6 @@ pub enum BadUserOperationError<M: Middleware> {
     Middleware(M::Error),
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub enum SanityCheckResult {
-    FactoryVerified,
-    PaymasterVerified,
-    SenderVerified,
-}
-
 impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
     fn from(error: BadUserOperationError<M>) -> Self {
         match error {
