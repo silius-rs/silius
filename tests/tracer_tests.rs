@@ -9,7 +9,7 @@ use ethers::{
     providers::Middleware,
     types::{
         Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-        GethTrace, TransactionRequest, H256,
+        TransactionRequest, H256,
     },
     utils::GethInstance,
 };
@@ -62,10 +62,7 @@ async fn trace_call<M: Middleware + 'static>(
             },
         )
         .await?;
-    let frames = match res {
-        GethTrace::Known(_) => anyhow::bail!("Trace call return incorrect format"),
-        GethTrace::Unknown(value) => value.try_into()?,
-    };
+    let frames: JsTracerFrame = res.try_into().unwrap();
     Ok(frames)
 }
 
