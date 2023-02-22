@@ -438,7 +438,7 @@ mod tests {
             uo_pool_service
                 .validate_user_operation(
                     &UserOperation {
-                        max_priority_fee_per_gas: U256::from(1500000000_u64 * 100),
+                        max_priority_fee_per_gas: U256::from(max_fee_per_gas + 10),
                         ..user_operation_valid.clone()
                     },
                     &entry_point
