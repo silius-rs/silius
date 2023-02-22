@@ -105,9 +105,6 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            // info!("{:?}", user_operation);
-            // info!("{:?}", entry_point);
-
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             if !self.entry_points.contains_key(&mempool_id) {
