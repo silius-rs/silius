@@ -1,7 +1,7 @@
 # build
 FROM ubuntu:18.04 AS builder
 
-RUN apt-get update && apt-get -y upgrade && apt-get install -y build-essential software-properties-common curl git libclang-dev
+RUN apt-get update && apt-get -y upgrade && apt-get install -y build-essential software-properties-common curl git clang libclang-dev
 RUN add-apt-repository ppa:ethereum/ethereum && apt-get update && apt-get install -y solc
 
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sh -
@@ -30,3 +30,5 @@ COPY --from=builder /aa-bundler/target/debug/bundler /usr/local/bin/bundler
 EXPOSE 3000
 
 ENTRYPOINT ["usr/local/bin/bundler"]
+
+LABEL org.opencontainers.image.source=https://github.com/Vid201/aa-bundler
