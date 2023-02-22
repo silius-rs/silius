@@ -156,7 +156,8 @@ pub struct UserOperationReceipt {
     pub receipt: TransactionReceipt,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserOperationPartial {
     pub sender: Address,
     pub nonce: U256,
@@ -244,6 +245,7 @@ impl From<UserOperationPartial> for UserOperation {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserOperationGasEstimation {
     pub pre_verification_gas: U256,
     pub verification_gas_limit: U256,

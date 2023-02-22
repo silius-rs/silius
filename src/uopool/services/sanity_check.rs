@@ -3,7 +3,7 @@ use crate::{
     contracts::EntryPointErr,
     types::{
         reputation::{ReputationStatus, StakeInfo},
-        sanity_check::{BadUserOperationError, SanityCheckResult},
+        sanity_check::BadUserOperationError,
         user_operation::UserOperation,
     },
     uopool::{mempool_id, services::uopool::UoPoolService},
@@ -34,55 +34,6 @@ where
                 init_code: user_operation.init_code.clone(),
             });
         }
-        Ok(())
-    }
-
-    async fn verify_factory(
-        &self,
-        user_operation: &UserOperation,
-        entry_point: &Address,
-    ) -> Result<(), BadUserOperationError<M>> {
-        if !user_operation.init_code.is_empty() {
-            let factory_address = if user_operation.init_code.len() >= 20 {
-                Address::from_slice(&user_operation.init_code[0..20])
-            } else {
-                return Err(BadUserOperationError::FactoryVerification {
-                    init_code: user_operation.init_code.clone(),
-                });
-            };
-
-            let mempool_id = mempool_id(entry_point, &self.chain_id);
-
-            if let Some(entry_point) = self.entry_points.get(&mempool_id) {
-                let deposit_info = entry_point
-                    .get_deposit_info(&factory_address)
-                    .await
-                    .map_err(|_| BadUserOperationError::FactoryVerification {
-                        init_code: user_operation.init_code.clone(),
-                    })?;
-
-                if let Some(reputation) = self.reputations.read().get(&mempool_id) {
-                    if reputation
-                        .verify_stake(
-                            "factory",
-                            Some(StakeInfo {
-                                address: factory_address,
-                                stake: U256::from(deposit_info.stake),
-                                unstake_delay: U256::from(deposit_info.unstake_delay_sec),
-                            }),
-                        )
-                        .is_ok()
-                    {
-                        self.sanity_check_results
-                            .write()
-                            .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
-                            .or_insert_with(Default::default)
-                            .insert(SanityCheckResult::FactoryVerified);
-                    }
-                }
-            }
-        }
-
         Ok(())
     }
 
@@ -145,15 +96,13 @@ where
                         paymaster_and_data: user_operation.paymaster_and_data.clone(),
                     })?;
 
-                if U256::from(deposit_info.deposit) > user_operation.max_fee_per_gas {
-                    if let Some(reputation) = self.reputations.read().get(&mempool_id) {
-                        if reputation.get_status(&paymaster_address) != ReputationStatus::BANNED {
-                            self.sanity_check_results
-                                .write()
-                                .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
-                                .or_insert_with(Default::default)
-                                .insert(SanityCheckResult::PaymasterVerified);
-                        }
+                if let Some(reputation) = self.reputations.read().get(&mempool_id) {
+                    if U256::from(deposit_info.deposit) < user_operation.max_fee_per_gas
+                        || reputation.get_status(&paymaster_address) == ReputationStatus::BANNED
+                    {
+                        return Err(BadUserOperationError::PaymasterVerification {
+                            paymaster_and_data: user_operation.paymaster_and_data.clone(),
+                        });
                     }
                 }
             }
@@ -251,7 +200,7 @@ where
             if let Some(reputation) = self.reputations.read().get(&mempool_id) {
                 if reputation
                     .verify_stake(
-                        "sender",
+                        "account",
                         Some(StakeInfo {
                             address: user_operation.sender,
                             stake: U256::from(deposit_info.stake),
@@ -260,11 +209,6 @@ where
                     )
                     .is_ok()
                 {
-                    self.sanity_check_results
-                        .write()
-                        .entry(user_operation.hash(&entry_point.address(), &self.chain_id))
-                        .or_insert_with(Default::default)
-                        .insert(SanityCheckResult::SenderVerified);
                     return Ok(());
                 }
             }
@@ -296,16 +240,8 @@ where
         user_operation: &UserOperation,
         entry_point: &Address,
     ) -> Result<(), BadUserOperationError<M>> {
-        self.sanity_check_results.write().insert(
-            user_operation.hash(entry_point, &self.chain_id),
-            Default::default(),
-        );
-
         // Either the sender is an existing contract, or the initCode is not empty (but not both)
         self.sender_or_init_code(user_operation).await?;
-
-        // If initCode is not empty, parse its first 20 bytes as a factory address. Record whether the factory is staked, in case the later simulation indicates that it needs to be. If the factory accesses global state, it must be staked - see reputation, throttling and banning section for details.
-        self.verify_factory(user_operation, entry_point).await?;
 
         // The verificationGasLimit is sufficiently low (<= MAX_VERIFICATION_GAS) and the preVerificationGas is sufficiently high (enough to pay for the calldata gas cost of serializing the UserOperation plus PRE_VERIFICATION_OVERHEAD_GAS)
         self.verification_gas(user_operation)?;
@@ -443,17 +379,6 @@ mod tests {
             BadUserOperationError::SenderOrInitCode { .. },
         ));
 
-        // factory verification
-        assert_eq!(
-            uo_pool_service
-                .sanity_check_results
-                .read()
-                .get(&user_operation_valid.hash(&entry_point, &chain_id))
-                .unwrap()
-                .len(),
-            1
-        );
-
         // verification gas
         assert!(matches!(
             uo_pool_service
@@ -492,15 +417,6 @@ mod tests {
             .validate_user_operation(&user_operation_pv, &entry_point)
             .await
             .is_ok());
-        assert_eq!(
-            uo_pool_service
-                .sanity_check_results
-                .read()
-                .get(&user_operation_pv.hash(&entry_point, &chain_id))
-                .unwrap()
-                .len(),
-            2
-        );
 
         // call gas limit
         assert!(matches!(
@@ -522,7 +438,7 @@ mod tests {
             uo_pool_service
                 .validate_user_operation(
                     &UserOperation {
-                        max_priority_fee_per_gas: U256::from(1500000000_u64 * 100),
+                        max_priority_fee_per_gas: U256::from(max_fee_per_gas + 10),
                         ..user_operation_valid.clone()
                     },
                     &entry_point
@@ -579,14 +495,5 @@ mod tests {
             .validate_user_operation(&user_operation_sv, &entry_point)
             .await
             .is_ok());
-        assert_eq!(
-            uo_pool_service
-                .sanity_check_results
-                .read()
-                .get(&user_operation_sv.hash(&entry_point, &chain_id))
-                .unwrap()
-                .len(),
-            2
-        );
     }
 }
