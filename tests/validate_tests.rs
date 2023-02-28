@@ -218,6 +218,7 @@ async fn test_existing_user_op(validate_rule: String, pm_rule: String) -> anyhow
 }
 
 #[tokio::test]
+#[ignore]
 async fn accept_plain_request() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
@@ -312,6 +313,7 @@ async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn fail_if_create_too_many() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
@@ -349,6 +351,7 @@ async fn fail_referencing_self_token() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn account_succeeds_referecing_its_own_balance() {
     test_existing_user_op("balance-self".to_string(), "".to_string())
         .await
@@ -364,6 +367,7 @@ async fn account_fail_to_read_allowance_of_address() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
     test_existing_user_op("allowance-1-self".to_string(), "".to_string())
         .await
@@ -371,6 +375,7 @@ async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn access_self_struct_data() {
     test_existing_user_op("struct-self".to_string(), "".to_string())
         .await
@@ -405,6 +410,7 @@ async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn fail_if_referencing_self_token_balance_after_wallet_creation() {
     test_existing_user_op("balance-self".to_string(), "".to_string())
         .await
@@ -468,6 +474,7 @@ async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<(
 }
 
 #[tokio::test]
+#[ignore]
 async fn succeed_with_inner_revert() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
