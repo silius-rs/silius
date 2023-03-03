@@ -88,6 +88,7 @@ fn main() -> Result<()> {
                 let _bundler = Bundler::new(wallet);
 
                 if !opt.no_uopool {
+                    info!("Starting op pool with bundler");
                     aa_bundler::uopool::run(
                         opt.uopool_opts,
                         opt.entry_points,
@@ -98,6 +99,7 @@ fn main() -> Result<()> {
                 }
 
                 if !opt.no_rpc {
+                    info!("Starting rpc server with bundler");
                     tokio::spawn({
                         async move {
                             let jsonrpc_server = ServerBuilder::default()
