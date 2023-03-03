@@ -21,7 +21,7 @@ message AddResponse {
 }
 
 message RemoveRequest {
-    types.H256 hash = 1;
+    repeated types.H256 hash = 1;
 }
 
 enum RemoveResult {
@@ -107,12 +107,22 @@ message SetReputationResponse {
     SetReputationResult result = 1;
 }
 
+message GetSortedRequest{
+    types.H160 entrypoint = 1;
+    uint64 max_limit = 2;
+}
+
+message GetSortedResponse{
+    repeated types.UserOperation user_operations = 1;
+}
+
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
     rpc GetChainId(google.protobuf.Empty) returns (GetChainIdResponse);
     rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (GetSupportedEntryPointsResponse);
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
+    rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);

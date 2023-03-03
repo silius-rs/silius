@@ -13,8 +13,9 @@ use crate::{
             EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
             EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
             GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
-            GetChainIdResponse, GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse,
-            SetReputationRequest, SetReputationResponse, SetReputationResult,
+            GetChainIdResponse, GetSortedRequest, GetSortedResponse,
+            GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse, SetReputationRequest,
+            SetReputationResponse, SetReputationResult,
         },
         MempoolBox, MempoolId, ReputationBox,
     },
@@ -254,6 +255,13 @@ where
         }
 
         Err(tonic::Status::invalid_argument("missing user operation"))
+    }
+
+    async fn get_sorted_user_operations(
+        &self,
+        request: tonic::Request<GetSortedRequest>,
+    ) -> Result<Response<GetSortedResponse>, tonic::Status> {
+        todo!()
     }
 
     #[cfg(debug_assertions)]
