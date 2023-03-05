@@ -90,5 +90,29 @@ pub mod tests {
 
         assert_eq!(mempool.get_all().len(), 0);
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 0);
+
+        for i in 0..3 {
+            user_operation = UserOperation {
+                sender: senders[2],
+                nonce: U256::from(i),
+                max_priority_fee_per_gas: U256::from(i + 1),
+                ..UserOperation::random()
+            };
+
+            user_operation_hash = mempool
+                .add(user_operation.clone(), &entry_point, &chain_id)
+                .unwrap();
+        }
+
+        let sorted = mempool.get_sorted(2).unwrap();
+        assert_eq!(sorted[0].max_priority_fee_per_gas, U256::from(3));
+        assert_eq!(sorted[1].max_priority_fee_per_gas, U256::from(2));
+        assert_eq!(sorted.len(), 2);
+
+        let sorted = mempool.get_sorted(5).unwrap();
+        assert_eq!(sorted[0].max_priority_fee_per_gas, U256::from(3));
+        assert_eq!(sorted[1].max_priority_fee_per_gas, U256::from(2));
+        assert_eq!(sorted[2].max_priority_fee_per_gas, U256::from(1));
+        assert_eq!(sorted.len(), 3);
     }
 }
