@@ -261,7 +261,39 @@ where
         &self,
         request: tonic::Request<GetSortedRequest>,
     ) -> Result<Response<GetSortedResponse>, tonic::Status> {
-        todo!()
+        let req = request.into_inner();
+        if let GetSortedRequest {
+            entrypoint: Some(entry_point),
+            max_limit,
+        } = req
+        {
+            let entry_point: Address = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            if !self.entry_points.contains_key(&mempool_id) {
+                return Err(tonic::Status::invalid_argument("entry point not supported"));
+            }
+            let mempool = self.mempools.clone();
+            let uos = {
+                let lock = mempool.read();
+                if let Some(pool) = lock.get(&mempool_id) {
+                    pool.get_sorted(max_limit).map_err(|e| {
+                        tonic::Status::internal(format!("Get Sored internal error: {e:?}"))
+                    })
+                } else {
+                    return Err(tonic::Status::unavailable("mempool could not be found"));
+                }
+            }?;
+            let response = GetSortedResponse {
+                user_operations: uos.into_iter().map(|u| u.into()).collect(),
+            };
+            return Ok(tonic::Response::new(response));
+        } else {
+            return Err(tonic::Status::invalid_argument(format!(
+                "invalid GetSortedRequest {req:?}"
+            )));
+        }
     }
 
     #[cfg(debug_assertions)]

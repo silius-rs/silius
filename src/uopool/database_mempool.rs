@@ -158,6 +158,23 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
         }
     }
 
+    fn get_sorted(&self, max_limit: u64) -> Result<Self::UserOperations, DBError> {
+        self.env
+            .tx()
+            .and_then(|tx| {
+                let mut cursor = tx.cursor_read::<UserOperationDB>()?;
+                let mut user_ops = cursor
+                    .walk(UserOperationHash::default())?
+                    .map(|a| a.map(|(_, uo)| uo))
+                    .collect::<Result<Vec<_>, _>>()?;
+                user_ops
+                    .sort_by(|a, b| b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas));
+                user_ops.truncate(max_limit as usize);
+                Ok(user_ops)
+            })
+            .map_err(DBError::DBInternalError)
+    }
+
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations {
         self.env

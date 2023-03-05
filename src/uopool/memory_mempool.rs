@@ -86,6 +86,14 @@ impl Mempool for MemoryMempool {
         Ok(())
     }
 
+    fn get_sorted(&self, max_limit: u64) -> anyhow::Result<Self::UserOperations> {
+        let mut user_operations: Vec<UserOperation> =
+            self.user_operations.values().into_iter().cloned().collect();
+        user_operations.sort_by(|a, b| b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas));
+        user_operations.truncate(max_limit as usize);
+        Ok(user_operations)
+    }
+
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations {
         self.user_operations.values().cloned().collect()
