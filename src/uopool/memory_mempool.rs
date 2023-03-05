@@ -109,88 +109,11 @@ impl Mempool for MemoryMempool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethers::types::{H256, U256};
-
+    use crate::uopool::utils::tests::mempool_test_case;
     #[allow(clippy::unit_cmp)]
     #[tokio::test]
     async fn memory_mempool() {
-        let entry_point = Address::random();
-        let chain_id = U256::from(5);
-        let senders = vec![Address::random(), Address::random(), Address::random()];
-
-        let mut mempool = MemoryMempool::default();
-        let mut user_operation: UserOperation;
-        let mut user_operation_hash: UserOperationHash = Default::default();
-
-        for i in 0..2 {
-            user_operation = UserOperation {
-                sender: senders[0],
-                nonce: U256::from(i),
-                ..UserOperation::random()
-            };
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
-
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
-
-            user_operation = UserOperation {
-                sender: senders[1],
-                nonce: U256::from(i),
-                ..UserOperation::random()
-            };
-
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
-
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
-        }
-
-        for i in 0..3 {
-            user_operation = UserOperation {
-                sender: senders[2],
-                nonce: U256::from(i),
-                ..UserOperation::random()
-            };
-
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
-
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
-        }
-
-        assert_eq!(mempool.get_all().len(), 7);
-        assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
-        assert_eq!(mempool.get_all_by_sender(&senders[1]).len(), 2);
-        assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 3);
-
-        assert_eq!(mempool.remove(&user_operation_hash).unwrap(), ());
-        assert_eq!(
-            mempool
-                .remove(&H256::random().into())
-                .unwrap_err()
-                .to_string(),
-            anyhow::anyhow!("User operation not found").to_string()
-        );
-
-        assert_eq!(mempool.get_all().len(), 6);
-        assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
-        assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 2);
-
-        assert_eq!(mempool.clear(), ());
-
-        assert_eq!(mempool.get_all().len(), 0);
-        assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 0);
+        let mempool = MemoryMempool::default();
+        mempool_test_case(mempool, "User operation not found");
     }
 }

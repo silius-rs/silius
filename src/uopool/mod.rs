@@ -31,6 +31,7 @@ pub mod memory_mempool;
 pub mod memory_reputation;
 pub mod server;
 pub mod services;
+pub mod utils;
 
 pub type MempoolId = H256;
 
