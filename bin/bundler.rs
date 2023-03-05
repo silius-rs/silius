@@ -130,8 +130,7 @@ fn main() -> Result<()> {
 
                             let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
                             info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
-
-                            pending::<Result<()>>().await
+                            <Result<(), anyhow::Error>>::Ok(())
                         }
                     });
                 }
