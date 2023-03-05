@@ -36,6 +36,8 @@ lazy_static! {
         set.insert("CREATE".to_string());
         set.insert("COINBASE".to_string());
         set.insert("SELFDESTRUCT".to_string());
+        set.insert("RANDOM".to_string());
+        set.insert("PREVRANDAO".to_string());
         set
     };
 }
@@ -55,7 +57,7 @@ impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
             }
             SimulateValidationError::OpcodeValidation { entity, opcode } => SimulationError::owned(
                 OPCODE_VALIDATION_ERROR_CODE,
-                format!("{entity} uses opcode {opcode}"),
+                format!("{entity} uses banned opcode: {opcode}"),
                 None::<bool>,
             ),
             SimulateValidationError::Middleware(_) => {

@@ -116,18 +116,21 @@ where
         user_operation: &UserOperation,
         entry_point: &Address,
     ) -> Result<(), BadUserOperationError<M>> {
-        let call_gas_estimation = self
-            .eth_provider
-            .estimate_gas(
-                &TransactionRequest::new()
-                    .from(*entry_point)
-                    .to(user_operation.sender)
-                    .data(user_operation.call_data.clone())
-                    .into(),
-                None,
-            )
-            .await
-            .map_err(|error| BadUserOperationError::Middleware(error))?;
+        let call_gas_estimation = if user_operation.call_data.is_empty() {
+            U256::zero()
+        } else {
+            self.eth_provider
+                .estimate_gas(
+                    &TransactionRequest::new()
+                        .from(*entry_point)
+                        .to(user_operation.sender)
+                        .data(user_operation.call_data.clone())
+                        .into(),
+                    None,
+                )
+                .await
+                .map_err(|error| BadUserOperationError::Middleware(error))?
+        };
 
         if user_operation.call_gas_limit < call_gas_estimation {
             return Err(BadUserOperationError::LowCallGasLimit {
