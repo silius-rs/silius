@@ -6,7 +6,7 @@ use ethers::{
 use crate::{
     contracts::{tracer::JsTracerFrame, EntryPointErr, SimulateValidationResult},
     types::{
-        simulation::{SimulateValidationError, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
+        simulation::{SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
         user_operation::UserOperation,
     },
     uopool::mempool_id,
@@ -116,6 +116,16 @@ where
                         opcode: opcode.clone(),
                     });
                 }
+            }
+
+            if let Some(count) = trace.number_levels[index].opcodes.get(&*CREATE2_OPCODE) {
+                if LEVEL_TO_ENTITY[&index] == "factory" && *count == 1 {
+                    continue;
+                }
+                return Err(SimulateValidationError::OpcodeValidation {
+                    entity: LEVEL_TO_ENTITY[&index].to_string(),
+                    opcode: CREATE2_OPCODE.to_string(),
+                });
             }
         }
 

@@ -40,6 +40,8 @@ lazy_static! {
         set.insert("PREVRANDAO".to_string());
         set
     };
+
+    pub static ref CREATE2_OPCODE: String = "CREATE2".to_string();
 }
 
 #[derive(Debug)]
