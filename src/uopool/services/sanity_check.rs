@@ -129,7 +129,7 @@ where
                         }
                     }
                     _ => BadUserOperationError::UnknownError {
-                        error: format!("{:?}", error),
+                        error: format!("{error:?}"),
                     },
                 })?;
 
@@ -144,7 +144,7 @@ where
         }
 
         Err(BadUserOperationError::UnknownError {
-            error: format!("Unknown entry point: {}", entry_point),
+            error: format!("Unknown entry point: {entry_point}"),
         })
     }
 

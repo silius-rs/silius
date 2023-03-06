@@ -228,7 +228,7 @@ where
                                             }
                                         }
                                         _ => SimulateValidationError::UnknownError {
-                                            error: format!("{:?}", error),
+                                            error: format!("{error:?}"),
                                         },
                                     }))
                                     .map_err(|_| {
