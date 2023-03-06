@@ -5,6 +5,7 @@ use ethers::{
 use jsonrpsee::types::{error::ErrorCode, ErrorObject};
 
 const SANITY_CHECK_ERROR_CODE: i32 = -32602;
+const SANITY_CHECK_EXECUTION_ERROR_CODE: i32 = -32521;
 
 pub type SanityCheckError = ErrorObject<'static>;
 
@@ -47,7 +48,13 @@ pub enum BadUserOperationError<M: Middleware> {
     SenderVerification {
         sender: Address,
     },
+    UserOperationExecution {
+        message: String,
+    },
     Middleware(M::Error),
+    UnknownError {
+        error: String,
+    },
 }
 
 impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
@@ -141,7 +148,23 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 format!("Sender {sender} is invalid (sender check)",),
                 None::<bool>,
             ),
-            BadUserOperationError::Middleware(_) => SanityCheckError::from(ErrorCode::InternalError),
+            BadUserOperationError::UserOperationExecution { message } => {
+                SanityCheckError::owned(
+                    SANITY_CHECK_EXECUTION_ERROR_CODE,
+                    message,
+                    None::<bool>,
+                )
+            },
+            BadUserOperationError::Middleware(_) => {
+                SanityCheckError::from(ErrorCode::InternalError)
+            },
+            BadUserOperationError::UnknownError { error } => {
+                SanityCheckError::owned(
+                    SANITY_CHECK_ERROR_CODE,
+                    error,
+                    None::<bool>,
+                )
+            },
         }
     }
 }

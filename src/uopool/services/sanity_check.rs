@@ -10,7 +10,7 @@ use crate::{
 };
 use ethers::{
     providers::Middleware,
-    types::{Address, TransactionRequest, U256},
+    types::{Address, U256},
 };
 
 impl<M: Middleware + 'static> UoPoolService<M>
@@ -116,30 +116,36 @@ where
         user_operation: &UserOperation,
         entry_point: &Address,
     ) -> Result<(), BadUserOperationError<M>> {
-        let call_gas_estimation = if user_operation.call_data.is_empty() {
-            U256::zero()
-        } else {
-            self.eth_provider
-                .estimate_gas(
-                    &TransactionRequest::new()
-                        .from(*entry_point)
-                        .to(user_operation.sender)
-                        .data(user_operation.call_data.clone())
-                        .into(),
-                    None,
-                )
-                .await
-                .map_err(|error| BadUserOperationError::Middleware(error))?
-        };
+        let mempool_id = mempool_id(entry_point, &self.chain_id);
 
-        if user_operation.call_gas_limit < call_gas_estimation {
+        if let Some(entry_point) = self.entry_points.get(&mempool_id) {
+            let call_gas_estimation = entry_point
+                .estimate_call_gas(user_operation.clone())
+                .await
+                .map_err(|error| match error {
+                    EntryPointErr::JsonRpcError(err) => {
+                        BadUserOperationError::UserOperationExecution {
+                            message: err.message,
+                        }
+                    }
+                    _ => BadUserOperationError::UnknownError {
+                        error: format!("{:?}", error),
+                    },
+                })?;
+
+            if user_operation.call_gas_limit >= call_gas_estimation {
+                return Ok(());
+            }
+
             return Err(BadUserOperationError::LowCallGasLimit {
                 call_gas_limit: user_operation.call_gas_limit,
                 call_gas_estimation,
             });
         }
 
-        Ok(())
+        Err(BadUserOperationError::UnknownError {
+            error: format!("Unknown entry point: {}", entry_point),
+        })
     }
 
     async fn max_fee_per_gas(

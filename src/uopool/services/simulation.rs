@@ -136,7 +136,7 @@ where
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
-    ) -> Result<(), SimulateValidationError<M>> {
+    ) -> Result<SimulateValidationResult, SimulateValidationError<M>> {
         let simulate_validation_result = self
             .simulate_validation(user_operation, entry_point)
             .await?;
@@ -155,6 +155,6 @@ where
         self.forbidden_opcodes(&simulate_validation_result, &js_trace)
             .await?;
 
-        Ok(())
+        Ok(simulate_validation_result)
     }
 }

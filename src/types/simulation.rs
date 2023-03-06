@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 const SIMULATE_VALIDATION_ERROR_CODE: i32 = -32500;
 const OPCODE_VALIDATION_ERROR_CODE: i32 = -32502;
+const SIMULATION_EXECUTION_ERROR_CODE: i32 = -32521;
 
 pub type SimulationError = ErrorObject<'static>;
 
@@ -48,7 +49,9 @@ lazy_static! {
 pub enum SimulateValidationError<M: Middleware> {
     UserOperationRejected { message: String },
     OpcodeValidation { entity: String, opcode: String },
+    UserOperationExecution { message: String },
     Middleware(M::Error),
+    UnknownError { error: String },
 }
 
 impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
@@ -62,8 +65,14 @@ impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
                 format!("{entity} uses banned opcode: {opcode}"),
                 None::<bool>,
             ),
+            SimulateValidationError::UserOperationExecution { message } => {
+                SimulationError::owned(SIMULATION_EXECUTION_ERROR_CODE, message, None::<bool>)
+            }
             SimulateValidationError::Middleware(_) => {
                 SimulationError::from(ErrorCode::InternalError)
+            }
+            SimulateValidationError::UnknownError { error } => {
+                SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, error, None::<bool>)
             }
         }
     }
