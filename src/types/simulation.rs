@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 const SIMULATE_VALIDATION_ERROR_CODE: i32 = -32500;
 const OPCODE_VALIDATION_ERROR_CODE: i32 = -32502;
+const SIMULATION_EXECUTION_ERROR_CODE: i32 = -32521;
 
 pub type SimulationError = ErrorObject<'static>;
 
@@ -36,15 +37,21 @@ lazy_static! {
         set.insert("CREATE".to_string());
         set.insert("COINBASE".to_string());
         set.insert("SELFDESTRUCT".to_string());
+        set.insert("RANDOM".to_string());
+        set.insert("PREVRANDAO".to_string());
         set
     };
+
+    pub static ref CREATE2_OPCODE: String = "CREATE2".to_string();
 }
 
 #[derive(Debug)]
 pub enum SimulateValidationError<M: Middleware> {
     UserOperationRejected { message: String },
     OpcodeValidation { entity: String, opcode: String },
+    UserOperationExecution { message: String },
     Middleware(M::Error),
+    UnknownError { error: String },
 }
 
 impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
@@ -55,11 +62,17 @@ impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
             }
             SimulateValidationError::OpcodeValidation { entity, opcode } => SimulationError::owned(
                 OPCODE_VALIDATION_ERROR_CODE,
-                format!("{entity} uses opcode {opcode}"),
+                format!("{entity} uses banned opcode: {opcode}"),
                 None::<bool>,
             ),
+            SimulateValidationError::UserOperationExecution { message } => {
+                SimulationError::owned(SIMULATION_EXECUTION_ERROR_CODE, message, None::<bool>)
+            }
             SimulateValidationError::Middleware(_) => {
                 SimulationError::from(ErrorCode::InternalError)
+            }
+            SimulateValidationError::UnknownError { error } => {
+                SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, error, None::<bool>)
             }
         }
     }

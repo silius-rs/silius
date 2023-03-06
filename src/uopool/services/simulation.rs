@@ -6,7 +6,7 @@ use ethers::{
 use crate::{
     contracts::{tracer::JsTracerFrame, EntryPointErr, SimulateValidationResult},
     types::{
-        simulation::{SimulateValidationError, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
+        simulation::{SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
         user_operation::UserOperation,
     },
     uopool::mempool_id,
@@ -117,6 +117,16 @@ where
                     });
                 }
             }
+
+            if let Some(count) = trace.number_levels[index].opcodes.get(&*CREATE2_OPCODE) {
+                if LEVEL_TO_ENTITY[&index] == "factory" && *count == 1 {
+                    continue;
+                }
+                return Err(SimulateValidationError::OpcodeValidation {
+                    entity: LEVEL_TO_ENTITY[&index].to_string(),
+                    opcode: CREATE2_OPCODE.to_string(),
+                });
+            }
         }
 
         Ok(())
@@ -126,7 +136,7 @@ where
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
-    ) -> Result<(), SimulateValidationError<M>> {
+    ) -> Result<SimulateValidationResult, SimulateValidationError<M>> {
         let simulate_validation_result = self
             .simulate_validation(user_operation, entry_point)
             .await?;
@@ -145,6 +155,6 @@ where
         self.forbidden_opcodes(&simulate_validation_result, &js_trace)
             .await?;
 
-        Ok(())
+        Ok(simulate_validation_result)
     }
 }

@@ -113,8 +113,9 @@ impl EthApiServer for EthApiServerImpl {
             return Ok(user_operation_gas_estimation);
         }
 
-        Err(jsonrpsee::core::Error::Call(CallError::Failed(
-            anyhow::format_err!("failed to gas estimation for user operation"),
+        Err(jsonrpsee::core::Error::Call(CallError::Custom(
+            serde_json::from_str::<ErrorObject>(&response.data)
+                .map_err(|err| format_err!("error parsing error object: {}", err))?,
         )))
     }
 

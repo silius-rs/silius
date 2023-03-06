@@ -6,7 +6,7 @@ use ethers::abi::AbiDecode;
 use ethers::providers::{FromErr, Middleware, ProviderError};
 use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-    GethTrace,
+    GethTrace, TransactionRequest, U256,
 };
 use regex::Regex;
 use serde::Deserialize;
@@ -199,6 +199,44 @@ where
         }
     }
 
+    pub async fn estimate_call_gas<U: Into<UserOperation>>(
+        &self,
+        user_operation: U,
+    ) -> Result<U256, EntryPointErr<M>> {
+        let user_operation = user_operation.into();
+
+        if user_operation.call_data.is_empty() {
+            Ok(U256::zero())
+        } else {
+            let result = self
+                .provider
+                .estimate_gas(
+                    &TransactionRequest::new()
+                        .from(self.address)
+                        .to(user_operation.sender)
+                        .data(user_operation.call_data.clone())
+                        .into(),
+                    None,
+                )
+                .await;
+
+            match result {
+                Ok(gas) => Ok(gas),
+                Err(e) => {
+                    let err_msg = e.to_string();
+
+                    JsonRpcError::from_str(&err_msg)
+                        .map_err(|_| {
+                            EntryPointErr::DecodeErr(format!(
+                                "{err_msg:?} is not a valid JsonRpcError message"
+                            ))
+                        })
+                        .and_then(|json_error| Err(EntryPointErr::JsonRpcError(json_error)))
+                }
+            }
+        }
+    }
+
     pub async fn handle_aggregated_ops<U: Into<UserOperation>>(
         &self,
         _ops_per_aggregator: Vec<U>,
@@ -213,6 +251,7 @@ pub enum EntryPointErr<M: Middleware> {
     FailedOp(FailedOp),
     ProviderErr(ProviderError),
     MiddlewareErr(M::Error),
+    JsonRpcError(JsonRpcError),
     NetworkErr, // TODO
     DecodeErr(String),
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.

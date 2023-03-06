@@ -3,6 +3,7 @@ use crate::{
     contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::ReputationEntry,
+        simulation::{SimulateValidationError, SimulationError},
         user_operation::{UserOperation, UserOperationGasEstimation},
     },
     uopool::{
@@ -21,7 +22,7 @@ use crate::{
 use async_trait::async_trait;
 use ethers::{
     providers::Middleware,
-    types::{Address, TransactionRequest, U256},
+    types::{Address, U256},
 };
 use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
@@ -188,46 +189,64 @@ where
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             if let Some(entry_point) = self.entry_points.get(&mempool_id) {
-                // TODO: simulation
-
-                let pre_verification_gas =
-                    Overhead::default().calculate_pre_verification_gas(&user_operation);
-
-                let simulate_validation_response = entry_point
-                    .simulate_validation(user_operation.clone())
+                match self
+                    .simulate_user_operation(&user_operation, &entry_point.address())
                     .await
-                    .map_err(|_| tonic::Status::internal("error estimating user operation gas"))?;
+                {
+                    Ok(simulate_validation_result) => {
+                        let pre_verification_gas =
+                            Overhead::default().calculate_pre_verification_gas(&user_operation);
 
-                let verification_gas_limit = match simulate_validation_response {
-                    SimulateValidationResult::ValidationResult(validation_result) => {
-                        validation_result.return_info.0
+                        let verification_gas_limit = match simulate_validation_result {
+                            SimulateValidationResult::ValidationResult(validation_result) => {
+                                validation_result.return_info.0
+                            }
+                            SimulateValidationResult::ValidationResultWithAggregation(
+                                validation_result_with_aggregation,
+                            ) => validation_result_with_aggregation.return_info.0,
+                        };
+
+                        match entry_point.estimate_call_gas(user_operation.clone()).await {
+                            Ok(call_gas_limit) => {
+                                res.set_result(EstimateUserOperationGasResult::Estimated);
+                                res.data = serde_json::to_string(&UserOperationGasEstimation {
+                                    pre_verification_gas,
+                                    verification_gas_limit,
+                                    call_gas_limit,
+                                })
+                                .map_err(|_| {
+                                    tonic::Status::internal("error estimating user operation gas")
+                                })?;
+                            }
+                            Err(error) => {
+                                res.set_result(EstimateUserOperationGasResult::NotEstimated);
+                                res.data =
+                                    serde_json::to_string(&SimulationError::from(match error {
+                                        EntryPointErr::JsonRpcError(err) => {
+                                            SimulateValidationError::<M>::UserOperationExecution {
+                                                message: err.message,
+                                            }
+                                        }
+                                        _ => SimulateValidationError::UnknownError {
+                                            error: format!("{error:?}"),
+                                        },
+                                    }))
+                                    .map_err(|_| {
+                                        tonic::Status::internal(
+                                            "error estimating user operation gas",
+                                        )
+                                    })?;
+                            }
+                        }
                     }
-                    SimulateValidationResult::ValidationResultWithAggregation(
-                        validation_result_with_aggregation,
-                    ) => validation_result_with_aggregation.return_info.0,
-                };
-
-                let call_gas_limit = self
-                    .eth_provider
-                    .estimate_gas(
-                        &TransactionRequest::new()
-                            .from(entry_point.address())
-                            .to(user_operation.sender)
-                            .data(user_operation.call_data.clone())
-                            .into(),
-                        None,
-                    )
-                    .await
-                    .map_err(|_| tonic::Status::internal("error estimating user operation gas"))?;
-
-                res.set_result(EstimateUserOperationGasResult::Estimated);
-                res.data = serde_json::to_string(&UserOperationGasEstimation {
-                    pre_verification_gas,
-                    verification_gas_limit,
-                    call_gas_limit,
-                })
-                .map_err(|_| tonic::Status::internal("error estimating user operation gas"))?;
-
+                    Err(error) => {
+                        res.set_result(EstimateUserOperationGasResult::NotEstimated);
+                        res.data =
+                            serde_json::to_string(&SimulationError::from(error)).map_err(|_| {
+                                tonic::Status::internal("error estimating user operation gas")
+                            })?;
+                    }
+                }
                 return Ok(tonic::Response::new(res));
             } else {
                 return Err(tonic::Status::invalid_argument("entry point not supported"));

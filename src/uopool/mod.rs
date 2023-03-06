@@ -20,7 +20,7 @@ use ethers::{
     abi::AbiEncode,
     providers::{Http, Middleware, Provider},
     types::{Address, H256, U256},
-    utils::keccak256,
+    utils::{keccak256, to_checksum},
 };
 use jsonrpsee::tracing::info;
 use parking_lot::RwLock;
@@ -38,7 +38,9 @@ pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T, Error = anyhow::Err
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
 
 pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
-    H256::from_slice(keccak256([entry_point.encode(), chain_id.encode()].concat()).as_slice())
+    H256::from_slice(
+        keccak256([to_checksum(entry_point, None).encode(), chain_id.encode()].concat()).as_slice(),
+    )
 }
 
 pub trait Mempool: Debug {
