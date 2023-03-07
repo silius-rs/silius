@@ -86,7 +86,7 @@ where
         })
     }
 
-    async fn forbidden_opcodes(
+    fn forbidden_opcodes(
         &self,
         simulate_validation_result: &SimulateValidationResult,
         trace: &JsTracerFrame,
@@ -132,6 +132,16 @@ where
         Ok(())
     }
 
+    fn storage_access(&self, _simulate_validation_result: &SimulateValidationResult, trace: &JsTracerFrame) -> Result<(), SimulateValidationError<M>> {
+        if trace.keccak.is_empty() {
+            return Ok(());
+        }
+
+        
+
+        Ok(())
+    }
+
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
@@ -152,8 +162,10 @@ where
         })?;
 
         // may not invokes any forbidden opcodes
-        self.forbidden_opcodes(&simulate_validation_result, &js_trace)
-            .await?;
+        self.forbidden_opcodes(&simulate_validation_result, &js_trace)?;
+
+        // verify storage access
+        self.storage_access(&simulate_validation_result, &js_trace)?;
 
         Ok(simulate_validation_result)
     }
