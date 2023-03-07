@@ -99,7 +99,7 @@ pub mod tests {
                 ..UserOperation::random()
             };
 
-            user_operation_hash = mempool
+            mempool
                 .add(user_operation.clone(), &entry_point, &chain_id)
                 .unwrap();
         }

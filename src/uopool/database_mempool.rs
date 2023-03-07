@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Display, Pointer},
-    path::PathBuf,
-};
+use std::{fmt::Display, path::PathBuf};
 
 use super::Mempool;
 use crate::types::{
@@ -93,7 +90,7 @@ impl From<Error> for DBError {
 
 impl Display for DBError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
