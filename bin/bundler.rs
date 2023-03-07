@@ -92,10 +92,13 @@ fn main() -> Result<()> {
                     info!("{:?}", wallet.signer);
                     let _bundler = Bundler::new(
                         wallet,
+                        opt.bundler_opts.beneficiary,
                         uopool_grpc_client.clone(),
                         opt.bundler_opts.bundle_interval,
                         opt.bundler_opts.max_bundle_limit,
                         *entry_point,
+                        opt.eth_client_address.clone(),
+                        opt.bundler_opts.chain_id,
                     );
                 }
 
