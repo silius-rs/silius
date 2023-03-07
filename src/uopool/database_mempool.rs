@@ -164,7 +164,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
         }
     }
 
-    fn get_sorted(&self, max_limit: u64) -> Result<Self::UserOperations, DBError> {
+    fn get_sorted(&self) -> Result<Self::UserOperations, DBError> {
         self.env
             .tx()
             .and_then(|tx| {
@@ -175,7 +175,6 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
                     .collect::<Result<Vec<_>, _>>()?;
                 user_ops
                     .sort_by(|a, b| b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas));
-                user_ops.truncate(max_limit as usize);
                 Ok(user_ops)
             })
             .map_err(DBError::DBInternalError)

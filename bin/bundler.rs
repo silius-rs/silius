@@ -79,13 +79,25 @@ fn main() -> Result<()> {
 
                 let chain_id = eth_provider.get_chainid().await?;
 
-                let wallet = Wallet::from_file(opt.mnemonic_file, chain_id)?;
-                info!("{:?}", wallet.signer);
-
                 let eth_provider =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
 
-                let _bundler = Bundler::new(wallet);
+                let uopool_grpc_client = UoPoolClient::connect(format!(
+                    "http://{}",
+                    opt.uopool_opts.uopool_grpc_listen_address
+                ))
+                .await?;
+                for entry_point in opt.entry_points.iter() {
+                    let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)?;
+                    info!("{:?}", wallet.signer);
+                    let _bundler = Bundler::new(
+                        wallet,
+                        uopool_grpc_client.clone(),
+                        opt.bundler_opts.bundle_interval,
+                        opt.bundler_opts.max_bundle_limit,
+                        *entry_point,
+                    );
+                }
 
                 if !opt.no_uopool {
                     info!("Starting op pool with bundler");
@@ -107,11 +119,6 @@ fn main() -> Result<()> {
                                 .await?;
 
                             let mut api = Methods::new();
-                            let uopool_grpc_client = UoPoolClient::connect(format!(
-                                "http://{}",
-                                opt.uopool_opts.uopool_grpc_listen_address
-                            ))
-                            .await?;
 
                             #[cfg(debug_assertions)]
                             api.merge(

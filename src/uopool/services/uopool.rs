@@ -2,7 +2,7 @@ use crate::{
     chain::gas::Overhead,
     contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
-        reputation::ReputationEntry,
+        reputation::{ReputationEntry, ReputationStatus},
         simulation::{SimulateValidationError, SimulationError},
         user_operation::{UserOperation, UserOperationGasEstimation},
     },
@@ -23,12 +23,13 @@ use crate::{
 use async_trait::async_trait;
 use ethers::{
     providers::Middleware,
-    types::{Address, U256},
+    types::{Address, Bytes, U256},
 };
 use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
+use tracing::debug;
 
 pub type UoPoolError = ErrorObject<'static>;
 
@@ -82,7 +83,13 @@ where
         Ok(())
     }
 }
-
+fn get_addr(bytes: &Bytes) -> Option<Address> {
+    if bytes.len() >= 20 {
+        Some(Address::from_slice(&bytes[0..20]))
+    } else {
+        None
+    }
+}
 #[async_trait]
 impl<M: Middleware + 'static> UoPool for UoPoolService<M>
 where
@@ -264,7 +271,7 @@ where
         let req = request.into_inner();
         if let GetSortedRequest {
             entrypoint: Some(entry_point),
-            max_limit,
+            ..
         } = req
         {
             let entry_point: Address = entry_point
@@ -278,15 +285,87 @@ where
             let uos = {
                 let lock = mempool.read();
                 if let Some(pool) = lock.get(&mempool_id) {
-                    pool.get_sorted(max_limit).map_err(|e| {
+                    pool.get_sorted().map_err(|e| {
                         tonic::Status::internal(format!("Get Sored internal error: {e:?}"))
                     })
                 } else {
                     return Err(tonic::Status::unavailable("mempool could not be found"));
                 }
             }?;
+
+            let remove_user_op = |uo: &UserOperation| -> Result<(), tonic::Status> {
+                let mut memory_pool = self.mempools.write();
+                if let Some(pool) = memory_pool.get_mut(&mempool_id) {
+                    let user_op_hash = uo.hash(&entry_point, &self.chain_id);
+                    pool.remove(&user_op_hash).map_err(|e| {
+                        tonic::Status::unknown(format!(
+                            "remove a banned user operation {user_op_hash:x?} failed with {e:?}."
+                        ))
+                    })?;
+                }
+                Ok(())
+            };
+
+            let mut valid_user_operations = vec![];
+            for uo in uos.iter() {
+                let (paymaster_status, deployer_status) = {
+                    let reputation_lock = self.reputations.read();
+                    match reputation_lock.get(&mempool_id) {
+                        Some(reputation_entries) => {
+                            let paymaster_status =
+                                if let Some(paymaster) = get_addr(&uo.paymaster_and_data) {
+                                    reputation_entries.get_status(&paymaster)
+                                } else {
+                                    ReputationStatus::OK
+                                };
+                            let deployer_status = if let Some(factory) = get_addr(&uo.init_code) {
+                                reputation_entries.get_status(&factory)
+                            } else {
+                                ReputationStatus::OK
+                            };
+                            (paymaster_status, deployer_status)
+                        }
+                        None => {
+                            return Err(tonic::Status::unavailable("mempool could not be found"))
+                        }
+                    }
+                };
+
+                match (paymaster_status, deployer_status) {
+                    (ReputationStatus::BANNED, _) | (_, ReputationStatus::BANNED) => {
+                        remove_user_op(uo)?;
+                        continue;
+                    }
+                    (ReputationStatus::THROTTLED, _) => {
+                        debug!("skipping throttled paymaster {} {}", uo.sender, uo.nonce);
+                        continue;
+                    }
+                    (_, ReputationStatus::THROTTLED) => {
+                        debug!("skipping throttled factory {} {}", uo.sender, uo.nonce);
+                        continue;
+                    }
+                    _ => (),
+                };
+
+                // TODO
+                // For each paymaster used in the batch, keep track of the balance while adding UserOps.
+                // Ensure that it has sufficient deposit to pay for all the UserOps that use it.
+                let _res = match self.validate_user_operation(uo, &entry_point).await {
+                    Ok(res) => res,
+                    Err(_) => {
+                        remove_user_op(uo)?;
+                        continue;
+                    }
+                };
+
+                valid_user_operations.push(uo.to_owned())
+            }
+
             let response = GetSortedResponse {
-                user_operations: uos.into_iter().map(|u| u.into()).collect(),
+                user_operations: valid_user_operations
+                    .into_iter()
+                    .map(|u| u.into())
+                    .collect(),
             };
             return Ok(tonic::Response::new(response));
         } else {
@@ -294,24 +373,6 @@ where
                 "invalid GetSortedRequest {req:?}"
             )));
         }
-    }
-
-    #[cfg(debug_assertions)]
-    async fn clear(
-        &self,
-        _request: tonic::Request<()>,
-    ) -> Result<Response<ClearResponse>, tonic::Status> {
-        for mempool in self.mempools.write().values_mut() {
-            mempool.clear();
-        }
-
-        for reputation in self.reputations.write().values_mut() {
-            reputation.clear();
-        }
-
-        Ok(tonic::Response::new(ClearResponse {
-            result: ClearResult::Cleared as i32,
-        }))
     }
 
     #[cfg(debug_assertions)]
@@ -349,33 +410,21 @@ where
     }
 
     #[cfg(debug_assertions)]
-    async fn set_reputation(
+    async fn clear(
         &self,
-        request: tonic::Request<SetReputationRequest>,
-    ) -> Result<Response<SetReputationResponse>, tonic::Status> {
-        let req = request.into_inner();
-        let mut res = SetReputationResponse::default();
-
-        if let Some(entry_point) = req.ep {
-            let entry_point: Address = entry_point
-                .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
-
-            if let Some(reputation) = self
-                .reputations
-                .write()
-                .get_mut(&mempool_id(&entry_point, &self.chain_id))
-            {
-                reputation.set(req.res.iter().map(|re| re.clone().into()).collect());
-                res.result = SetReputationResult::SetReputation as i32;
-            } else {
-                res.result = SetReputationResult::NotSetReputation as i32;
-            }
-
-            return Ok(tonic::Response::new(res));
+        _request: tonic::Request<()>,
+    ) -> Result<Response<ClearResponse>, tonic::Status> {
+        for mempool in self.mempools.write().values_mut() {
+            mempool.clear();
         }
 
-        Err(tonic::Status::invalid_argument("missing entry point"))
+        for reputation in self.reputations.write().values_mut() {
+            reputation.clear();
+        }
+
+        Ok(tonic::Response::new(ClearResponse {
+            result: ClearResult::Cleared as i32,
+        }))
     }
 
     #[cfg(debug_assertions)]
@@ -404,6 +453,36 @@ where
 
             return Ok(tonic::Response::new(res));
         };
+
+        Err(tonic::Status::invalid_argument("missing entry point"))
+    }
+
+    #[cfg(debug_assertions)]
+    async fn set_reputation(
+        &self,
+        request: tonic::Request<SetReputationRequest>,
+    ) -> Result<Response<SetReputationResponse>, tonic::Status> {
+        let req = request.into_inner();
+        let mut res = SetReputationResponse::default();
+
+        if let Some(entry_point) = req.ep {
+            let entry_point: Address = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+
+            if let Some(reputation) = self
+                .reputations
+                .write()
+                .get_mut(&mempool_id(&entry_point, &self.chain_id))
+            {
+                reputation.set(req.res.iter().map(|re| re.clone().into()).collect());
+                res.result = SetReputationResult::SetReputation as i32;
+            } else {
+                res.result = SetReputationResult::NotSetReputation as i32;
+            }
+
+            return Ok(tonic::Response::new(res));
+        }
 
         Err(tonic::Status::invalid_argument("missing entry point"))
     }

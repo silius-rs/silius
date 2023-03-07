@@ -60,7 +60,8 @@ pub trait Mempool: Debug {
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, sender: &Address) -> usize;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
-    fn get_sorted(&self, max_limit: u64) -> Result<Self::UserOperations, Self::Error>;
+    // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
+    fn get_sorted(&self) -> Result<Self::UserOperations, Self::Error>;
 
     #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;
