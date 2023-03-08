@@ -1,4 +1,7 @@
-use ethers::providers::Middleware;
+use ethers::{
+    providers::Middleware,
+    types::{Address, U256},
+};
 use jsonrpsee::types::{error::ErrorCode, ErrorObject};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
@@ -43,6 +46,11 @@ lazy_static! {
     };
 
     pub static ref CREATE2_OPCODE: String = "CREATE2".to_string();
+}
+
+pub struct StakeInfo {
+    pub address: Address,
+    pub stake: (U256, U256),
 }
 
 #[derive(Debug)]
