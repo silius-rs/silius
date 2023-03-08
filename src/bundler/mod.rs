@@ -102,7 +102,8 @@ impl Bundler {
             .clone()
             .get_transaction_count(self.wallet.signer.address(), None)
             .await?;
-        let fee = client.clone().estimate_eip1559_fees(None).await?;
+        let (max_fee_per_gas, max_priority_fee_per_gas) =
+            client.clone().estimate_eip1559_fees(None).await?;
         let mut tx: TypedTransaction = entry_point
             .handle_ops(
                 bundles.into_iter().map(Into::into).collect(),
@@ -110,14 +111,21 @@ impl Bundler {
             )
             .tx
             .clone();
-        tx.set_gas(U256::from(1000000))
-            .set_nonce(nonce)
-            .set_gas_price(fee.0);
+        tx.set_gas(U256::from(1000000)).set_nonce(nonce);
+        match tx {
+            TypedTransaction::Eip1559(ref mut inner) => {
+                inner.max_fee_per_gas = Some(max_fee_per_gas);
+                inner.max_priority_fee_per_gas = Some(max_priority_fee_per_gas)
+            }
+            _ => {
+                tx.set_gas_price(max_fee_per_gas);
+            }
+        };
         let res = client.send_transaction(tx, None).await?.await?;
 
         debug!("Send bundles with ret: {res:?}");
 
-        // TODO check reputation on the task heres
+        // TODO update reputation based on the execution result
         Ok(())
     }
 }
