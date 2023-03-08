@@ -33,6 +33,8 @@ use tracing::debug;
 
 pub type UoPoolError = ErrorObject<'static>;
 
+const THROTTLED_MAX_INCLUDE: u64 = 1;
+
 pub struct UoPoolService<M: Middleware> {
     pub entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
     pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
@@ -271,7 +273,6 @@ where
         let req = request.into_inner();
         if let GetSortedRequest {
             entrypoint: Some(entry_point),
-            ..
         } = req
         {
             let entry_point: Address = entry_point
@@ -307,18 +308,22 @@ where
             };
 
             let mut valid_user_operations = vec![];
+            let mut total_gas = U256::zero();
+            let mut pasmaster_deposit: HashMap<Address, U256> = HashMap::new();
+            let mut staked_entity_count: HashMap<Address, u64> = HashMap::new();
             for uo in uos.iter() {
+                let paymaster_opt = get_addr(&uo.paymaster_and_data);
+                let factory_opt = get_addr(&uo.init_code);
                 let (paymaster_status, deployer_status) = {
                     let reputation_lock = self.reputations.read();
                     match reputation_lock.get(&mempool_id) {
                         Some(reputation_entries) => {
-                            let paymaster_status =
-                                if let Some(paymaster) = get_addr(&uo.paymaster_and_data) {
-                                    reputation_entries.get_status(&paymaster)
-                                } else {
-                                    ReputationStatus::OK
-                                };
-                            let deployer_status = if let Some(factory) = get_addr(&uo.init_code) {
+                            let paymaster_status = if let Some(paymaster) = paymaster_opt {
+                                reputation_entries.get_status(&paymaster)
+                            } else {
+                                ReputationStatus::OK
+                            };
+                            let deployer_status = if let Some(factory) = factory_opt {
                                 reputation_entries.get_status(&factory)
                             } else {
                                 ReputationStatus::OK
@@ -330,29 +335,80 @@ where
                         }
                     }
                 };
+                let paymaster_count = paymaster_opt
+                    .map(|p| staked_entity_count.get(&p).cloned().unwrap_or(0))
+                    .unwrap_or(0);
+                let factory_count = factory_opt
+                    .map(|p| staked_entity_count.get(&p).cloned().unwrap_or(0))
+                    .unwrap_or(0);
 
                 match (paymaster_status, deployer_status) {
                     (ReputationStatus::BANNED, _) | (_, ReputationStatus::BANNED) => {
                         remove_user_op(uo)?;
                         continue;
                     }
-                    (ReputationStatus::THROTTLED, _) => {
+                    (ReputationStatus::THROTTLED, _) if paymaster_count > THROTTLED_MAX_INCLUDE => {
                         debug!("skipping throttled paymaster {} {}", uo.sender, uo.nonce);
                         continue;
                     }
-                    (_, ReputationStatus::THROTTLED) => {
+                    (_, ReputationStatus::THROTTLED) if factory_count > THROTTLED_MAX_INCLUDE => {
                         debug!("skipping throttled factory {} {}", uo.sender, uo.nonce);
                         continue;
                     }
                     _ => (),
                 };
 
-                // TODO
-                // For each paymaster used in the batch, keep track of the balance while adding UserOps.
-                // Ensure that it has sufficient deposit to pay for all the UserOps that use it.
-                let _res = match self.validate_user_operation(uo, &entry_point).await {
-                    Ok(res) => res,
-                    Err(_) => {
+                match self.simulate_user_operation(uo, &entry_point).await {
+                    Ok(res) => match res {
+                        SimulateValidationResult::ValidationResult(res) => {
+                            // TODO
+                            // it would be better to use estimate_gas instead of call_gas_limit
+                            // The result of call_gas_limit is usesally higher and less user op would be included
+                            let user_op_gas_cost =
+                                res.return_info.0.saturating_add(uo.call_gas_limit);
+                            let new_total_gas = total_gas.saturating_add(user_op_gas_cost);
+                            if new_total_gas.gt(&self.max_verification_gas) {
+                                break;
+                            }
+                            if let Some(paymaster) = paymaster_opt {
+                                let balance = match pasmaster_deposit.get(&paymaster) {
+                                    Some(n) => Ok(n.to_owned()),
+                                    None => self
+                                        .eth_provider
+                                        .get_balance(paymaster, None)
+                                        .await
+                                        .map_err(|e| {
+                                            tonic::Status::internal(
+                                                format!("Could not get pasmaster {paymaster:?} balance because of {e:?}")
+                                            )
+                                        }),
+                                }?;
+
+                                if balance.lt(&res.return_info.1) {
+                                    continue;
+                                }
+
+                                let update_balance = balance.saturating_sub(res.return_info.1);
+                                staked_entity_count
+                                    .entry(paymaster)
+                                    .and_modify(|c| *c += 1)
+                                    .or_insert(1);
+                                pasmaster_deposit.insert(paymaster, update_balance);
+                            };
+                            if let Some(factory) = factory_opt {
+                                staked_entity_count
+                                    .entry(factory)
+                                    .and_modify(|c| *c += 1)
+                                    .or_insert(1);
+                            };
+                            total_gas = new_total_gas
+                        }
+                        SimulateValidationResult::ValidationResultWithAggregation(_) => {
+                            todo!("Aggregation is not supported now.")
+                        }
+                    },
+                    Err(e) => {
+                        debug!("Failed in 2nd validation: {e:?} ");
                         remove_user_op(uo)?;
                         continue;
                     }
