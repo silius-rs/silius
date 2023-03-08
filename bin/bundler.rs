@@ -97,7 +97,6 @@ fn main() -> Result<()> {
                         opt.bundler_opts.bundle_interval,
                         *entry_point,
                         opt.eth_client_address.clone(),
-                        opt.bundler_opts.chain_id,
                     );
                 }
 

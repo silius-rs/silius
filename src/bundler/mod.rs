@@ -37,9 +37,6 @@ pub struct BundlerOpts {
 
     #[clap(long, default_value = "10")]
     pub bundle_interval: u64,
-
-    #[clap(long, default_value = "1")]
-    pub chain_id: u64,
 }
 
 pub struct Bundler {
@@ -49,7 +46,6 @@ pub struct Bundler {
     pub bundle_interval: u64,
     pub entrypoint: Address,
     pub eth_client_address: String,
-    pub chain_id: u64,
 }
 
 impl Bundler {
@@ -60,7 +56,6 @@ impl Bundler {
         bundle_interval: u64,
         entrypoint: Address,
         eth_client_address: String,
-        chain_id: u64,
     ) -> Self {
         Self {
             wallet,
@@ -69,7 +64,6 @@ impl Bundler {
             bundle_interval,
             entrypoint,
             eth_client_address,
-            chain_id,
         }
     }
 
@@ -102,10 +96,7 @@ impl Bundler {
     async fn send_next_bundle(&mut self) -> anyhow::Result<()> {
         let bundles = self.create_bundle().await?;
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
-        let client = Arc::new(SignerMiddleware::new(
-            provider,
-            self.wallet.signer.clone().with_chain_id(self.chain_id),
-        ));
+        let client = Arc::new(SignerMiddleware::new(provider, self.wallet.signer.clone()));
         let entry_point = EntryPointAPI::new(self.entrypoint, client.clone());
         let nonce = client
             .clone()
@@ -152,8 +143,6 @@ mod tests {
             "127.0.0.1:3002",
             "--bundle-interval",
             "10",
-            "--chain-id",
-            "1",
         ];
         assert_eq!(
             BundlerOpts {
@@ -164,7 +153,6 @@ mod tests {
                 helper: Address::from([0; 20]),
                 bundler_grpc_listen_address: String::from("127.0.0.1:3002"),
                 bundle_interval: 10,
-                chain_id: 1
             },
             BundlerOpts::try_parse_from(args).unwrap()
         );
