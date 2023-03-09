@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use ethers::{
+    abi::AbiEncode,
     providers::Middleware,
-    types::{Address, Bytes, GethTrace},
+    types::{Address, Bytes, GethTrace, U256},
     utils::keccak256,
 };
 
@@ -187,7 +188,7 @@ where
         &self,
         keccak: Vec<Bytes>,
         stake_info_by_entity: &HashMap<usize, StakeInfo>,
-        slots: &mut HashMap<Address, HashSet<Bytes>>,
+        slots_by_entity: &mut HashMap<Address, HashSet<String>>,
     ) {
         for kecc in keccak {
             for entity in stake_info_by_entity.values() {
@@ -195,29 +196,117 @@ where
                     continue;
                 }
 
-                let k = keccak256(Bytes::from(kecc.clone()));
+                let entity_address_bytes =
+                    Bytes::from([vec![0; 12], entity.address.to_fixed_bytes().to_vec()].concat());
 
-                if kecc.starts_with(entity.address.as_bytes()) {
-                    slots
+                if kecc.starts_with(&entity_address_bytes) {
+                    let k = AbiEncode::encode_hex(keccak256(kecc.clone()));
+                    slots_by_entity
                         .entry(entity.address)
                         .or_insert(HashSet::new())
-                        .insert(k.into());
+                        .insert(k);
                 }
             }
         }
     }
 
+    fn associated_with_slot(
+        &self,
+        address: &Address,
+        slot: &String,
+        slots_by_entity: &HashMap<Address, HashSet<String>>,
+    ) -> Result<bool, SimulateValidationError<M>> {
+        if *slot == address.to_string() {
+            return Ok(true);
+        }
+
+        if !slots_by_entity.contains_key(address) {
+            return Ok(false);
+        }
+
+        let slot_as_number = U256::from_str_radix(slot, 16)
+            .map_err(|_| SimulateValidationError::StorageAccessValidation { slot: slot.clone() })?;
+
+        if let Some(slots) = slots_by_entity.get(address) {
+            for slot_entity in slots {
+                let slot_entity_as_number =
+                    U256::from_str_radix(slot_entity, 16).map_err(|_| {
+                        SimulateValidationError::StorageAccessValidation { slot: slot.clone() }
+                    })?;
+
+                if slot_as_number >= slot_entity_as_number
+                    && slot_as_number < (slot_entity_as_number + 128)
+                {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
     fn storage_access(
         &self,
+        user_operation: &UserOperation,
+        entry_point: &Address,
         stake_info_by_entity: &HashMap<usize, StakeInfo>,
         trace: &JsTracerFrame,
     ) -> Result<(), SimulateValidationError<M>> {
-        if trace.keccak.is_empty() {
-            return Ok(());
-        }
+        let mut slots_by_entity = HashMap::new();
+        self.parse_slots(
+            trace.keccak.clone(),
+            stake_info_by_entity,
+            &mut slots_by_entity,
+        );
 
-        let mut slots = HashMap::new();
-        self.parse_slots(trace.keccak.clone(), stake_info_by_entity, &mut slots);
+        let mut slot_staked = String::new();
+
+        for (index, stake_info) in stake_info_by_entity.iter() {
+            if let Some(level) = trace.number_levels.get(*index) {
+                for (address, access) in &level.access {
+                    if *address == user_operation.sender || *address == *entry_point {
+                        continue;
+                    }
+
+                    for slot in [
+                        access.reads.keys().cloned().collect::<Vec<String>>(),
+                        access.writes.keys().cloned().collect(),
+                    ]
+                    .concat()
+                    {
+                        slot_staked.clear();
+
+                        if self.associated_with_slot(
+                            &user_operation.sender,
+                            &slot,
+                            &slots_by_entity,
+                        )? {
+                            if user_operation.init_code.len() > 0 {
+                                slot_staked = slot.clone();
+                            } else {
+                                continue;
+                            }
+                        } else if *address == stake_info.address
+                            || self.associated_with_slot(
+                                &stake_info.address,
+                                &slot,
+                                &slots_by_entity,
+                            )?
+                        {
+                            slot_staked = slot.clone();
+                        } else {
+                            return Err(SimulateValidationError::StorageAccessValidation { slot });
+                        }
+
+                        if !slot_staked.is_empty() && stake_info.stake.is_zero() {
+                            return Err(SimulateValidationError::StorageAccessValidation {
+                                slot: slot_staked.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -252,7 +341,12 @@ where
         self.forbidden_opcodes(&stake_info_by_entity, &js_trace)?;
 
         // verify storage access
-        self.storage_access(&stake_info_by_entity, &js_trace)?;
+        self.storage_access(
+            user_operation,
+            entry_point,
+            &stake_info_by_entity,
+            &js_trace,
+        )?;
 
         Ok(simulate_validation_result)
     }

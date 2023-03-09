@@ -58,6 +58,7 @@ pub enum SimulateValidationError<M: Middleware> {
     UserOperationRejected { message: String },
     OpcodeValidation { entity: String, opcode: String },
     UserOperationExecution { message: String },
+    StorageAccessValidation { slot: String },
     Middleware(M::Error),
     UnknownError { error: String },
 }
@@ -76,6 +77,11 @@ impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
             SimulateValidationError::UserOperationExecution { message } => {
                 SimulationError::owned(SIMULATION_EXECUTION_ERROR_CODE, message, None::<bool>)
             }
+            SimulateValidationError::StorageAccessValidation { slot } => SimulationError::owned(
+                OPCODE_VALIDATION_ERROR_CODE,
+                format!("Storage access validation failed for slot: {slot}"),
+                None::<bool>,
+            ),
             SimulateValidationError::Middleware(_) => {
                 SimulationError::from(ErrorCode::InternalError)
             }
