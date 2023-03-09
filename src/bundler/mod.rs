@@ -124,8 +124,6 @@ impl<'a> Bundler<'a> {
         let res = client.send_transaction(tx, None).await?.await?;
 
         debug!("Send bundles with ret: {res:?}");
-
-        // TODO update reputation based on the execution result
         Ok(())
     }
 }

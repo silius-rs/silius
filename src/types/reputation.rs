@@ -13,6 +13,9 @@ pub const BAN_SLACK: u64 = 50;
 const ENTITY_BANNED_ERROR_CODE: i32 = -32504;
 const STAKE_TOO_LOW_ERROR_CODE: i32 = -32505;
 
+// If the paymaster is throttle, maximum amount in one bundle is 1.
+pub const THROTTLED_MAX_INCLUDE: u64 = 1;
+
 pub type ReputationError = ErrorObject<'static>;
 
 #[derive(Clone, Copy, Educe, PartialEq, Eq, Serialize, Deserialize)]

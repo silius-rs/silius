@@ -1,3 +1,13 @@
+use ethers::types::{Address, Bytes};
+
+// Try to get the address from first 20 bytes. Return None if length of bytes < 20.
+pub fn get_addr(bytes: &Bytes) -> Option<Address> {
+    if bytes.len() >= 20 {
+        Some(Address::from_slice(&bytes[0..20]))
+    } else {
+        None
+    }
+}
 #[cfg(test)]
 pub mod tests {
     use std::fmt::Debug;

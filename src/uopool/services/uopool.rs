@@ -2,7 +2,7 @@ use crate::{
     chain::gas::Overhead,
     contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
-        reputation::{ReputationEntry, ReputationStatus},
+        reputation::{ReputationEntry, ReputationStatus, THROTTLED_MAX_INCLUDE},
         simulation::{SimulateValidationError, SimulationError},
         user_operation::{UserOperation, UserOperationGasEstimation},
     },
@@ -17,13 +17,14 @@ use crate::{
             GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse, SetReputationRequest,
             SetReputationResponse, SetReputationResult,
         },
+        utils::get_addr,
         MempoolBox, MempoolId, ReputationBox,
     },
 };
 use async_trait::async_trait;
 use ethers::{
     providers::Middleware,
-    types::{Address, Bytes, U256},
+    types::{Address, U256},
 };
 use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
@@ -32,8 +33,6 @@ use tonic::Response;
 use tracing::debug;
 
 pub type UoPoolError = ErrorObject<'static>;
-
-const THROTTLED_MAX_INCLUDE: u64 = 1;
 
 pub struct UoPoolService<M: Middleware> {
     pub entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
@@ -85,13 +84,7 @@ where
         Ok(())
     }
 }
-fn get_addr(bytes: &Bytes) -> Option<Address> {
-    if bytes.len() >= 20 {
-        Some(Address::from_slice(&bytes[0..20]))
-    } else {
-        None
-    }
-}
+
 #[async_trait]
 impl<M: Middleware + 'static> UoPool for UoPoolService<M>
 where
@@ -309,12 +302,12 @@ where
 
             let mut valid_user_operations = vec![];
             let mut total_gas = U256::zero();
-            let mut pasmaster_deposit: HashMap<Address, U256> = HashMap::new();
+            let mut paymaster_deposit: HashMap<Address, U256> = HashMap::new();
             let mut staked_entity_count: HashMap<Address, u64> = HashMap::new();
             for uo in uos.iter() {
                 let paymaster_opt = get_addr(&uo.paymaster_and_data);
                 let factory_opt = get_addr(&uo.init_code);
-                let (paymaster_status, deployer_status) = {
+                let (paymaster_status, factory_status) = {
                     let reputation_lock = self.reputations.read();
                     match reputation_lock.get(&mempool_id) {
                         Some(reputation_entries) => {
@@ -342,7 +335,7 @@ where
                     .map(|p| staked_entity_count.get(&p).cloned().unwrap_or(0))
                     .unwrap_or(0);
 
-                match (paymaster_status, deployer_status) {
+                match (paymaster_status, factory_status) {
                     (ReputationStatus::BANNED, _) | (_, ReputationStatus::BANNED) => {
                         remove_user_op(uo)?;
                         continue;
@@ -371,7 +364,7 @@ where
                                 break;
                             }
                             if let Some(paymaster) = paymaster_opt {
-                                let balance = match pasmaster_deposit.get(&paymaster) {
+                                let balance = match paymaster_deposit.get(&paymaster) {
                                     Some(n) => Ok(n.to_owned()),
                                     None => self
                                         .eth_provider
@@ -379,7 +372,7 @@ where
                                         .await
                                         .map_err(|e| {
                                             tonic::Status::internal(
-                                                format!("Could not get pasmaster {paymaster:?} balance because of {e:?}")
+                                                format!("Could not get paymaster {paymaster:?} balance because of {e:?}")
                                             )
                                         }),
                                 }?;
@@ -393,7 +386,7 @@ where
                                     .entry(paymaster)
                                     .and_modify(|c| *c += 1)
                                     .or_insert(1);
-                                pasmaster_deposit.insert(paymaster, update_balance);
+                                paymaster_deposit.insert(paymaster, update_balance);
                             };
                             if let Some(factory) = factory_opt {
                                 staked_entity_count
