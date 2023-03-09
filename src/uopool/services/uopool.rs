@@ -272,7 +272,7 @@ where
     ) -> Result<Response<GetSortedResponse>, tonic::Status> {
         let req = request.into_inner();
         if let GetSortedRequest {
-            entrypoint: Some(entry_point),
+            entry_point: Some(entry_point),
         } = req
         {
             let entry_point: Address = entry_point

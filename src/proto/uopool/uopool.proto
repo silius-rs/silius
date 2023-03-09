@@ -108,7 +108,7 @@ message SetReputationResponse {
 }
 
 message GetSortedRequest{
-    types.H160 entrypoint = 1;
+    types.H160 entry_point = 1;
 }
 
 message GetSortedResponse{

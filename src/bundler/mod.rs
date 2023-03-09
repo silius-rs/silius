@@ -44,7 +44,7 @@ pub struct Bundler<'a> {
     pub beneficiary: Address,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     pub bundle_interval: u64,
-    pub entrypoint: Address,
+    pub entry_point: Address,
     pub eth_client_address: String,
 }
 
@@ -54,7 +54,7 @@ impl<'a> Bundler<'a> {
         beneficiary: Address,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
         bundle_interval: u64,
-        entrypoint: Address,
+        entry_point: Address,
         eth_client_address: String,
     ) -> Self {
         Self {
@@ -62,7 +62,7 @@ impl<'a> Bundler<'a> {
             beneficiary,
             uopool_grpc_client,
             bundle_interval,
-            entrypoint,
+            entry_point,
             eth_client_address,
         }
     }
@@ -78,7 +78,7 @@ impl<'a> Bundler<'a> {
 
     async fn create_bundle(&mut self) -> anyhow::Result<Vec<UserOperation>> {
         let request = tonic::Request::new(GetSortedRequest {
-            entrypoint: Some(self.entrypoint.into()),
+            entry_point: Some(self.entry_point.into()),
         });
         let response = self
             .uopool_grpc_client
@@ -97,7 +97,7 @@ impl<'a> Bundler<'a> {
         let bundles = self.create_bundle().await?;
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(provider, self.wallet.signer.clone()));
-        let entry_point = EntryPointAPI::new(self.entrypoint, client.clone());
+        let entry_point = EntryPointAPI::new(self.entry_point, client.clone());
         let nonce = client
             .clone()
             .get_transaction_count(self.wallet.signer.address(), None)
