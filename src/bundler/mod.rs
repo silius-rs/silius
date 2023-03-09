@@ -39,8 +39,8 @@ pub struct BundlerOpts {
     pub bundle_interval: u64,
 }
 
-pub struct Bundler {
-    pub wallet: Wallet,
+pub struct Bundler<'a> {
+    pub wallet: &'a Wallet,
     pub beneficiary: Address,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     pub bundle_interval: u64,
@@ -48,9 +48,9 @@ pub struct Bundler {
     pub eth_client_address: String,
 }
 
-impl Bundler {
+impl<'a> Bundler<'a> {
     pub fn new(
-        wallet: Wallet,
+        wallet: &'a Wallet,
         beneficiary: Address,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
         bundle_interval: u64,

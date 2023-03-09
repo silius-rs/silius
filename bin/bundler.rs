@@ -79,6 +79,9 @@ fn main() -> Result<()> {
 
                 let chain_id = eth_provider.get_chainid().await?;
 
+                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)?;
+                info!("{:?}", wallet.signer);
+
                 let eth_provider =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
 
@@ -88,10 +91,8 @@ fn main() -> Result<()> {
                 ))
                 .await?;
                 for entry_point in opt.entry_points.iter() {
-                    let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)?;
-                    info!("{:?}", wallet.signer);
                     let _bundler = Bundler::new(
-                        wallet,
+                        &wallet,
                         opt.bundler_opts.beneficiary,
                         uopool_grpc_client.clone(),
                         opt.bundler_opts.bundle_interval,
