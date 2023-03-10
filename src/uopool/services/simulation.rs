@@ -1,23 +1,22 @@
-use std::collections::{HashMap, HashSet};
-
-use ethers::{
-    abi::AbiEncode,
-    providers::Middleware,
-    types::{Address, Bytes, GethTrace, U256},
-    utils::keccak256,
-};
-
+use super::UoPoolService;
 use crate::{
     contracts::{tracer::JsTracerFrame, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::StakeInfo,
-        simulation::{SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
+        simulation::{
+            SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY,
+            NUMBER_LEVELS,
+        },
         user_operation::UserOperation,
     },
     uopool::mempool_id,
 };
-
-use super::UoPoolService;
+use ethers::{
+    providers::Middleware,
+    types::{Address, Bytes, GethTrace, U256},
+    utils::keccak256,
+};
+use std::collections::{HashMap, HashSet};
 
 impl<M: Middleware + 'static> UoPoolService<M>
 where
@@ -95,7 +94,7 @@ where
         &self,
         user_operation: &UserOperation,
         simulate_validation_result: &SimulateValidationResult,
-        stake_info_by_entity: &mut HashMap<usize, StakeInfo>,
+        stake_info_by_entity: &mut [StakeInfo; NUMBER_LEVELS],
     ) {
         let (factory_info, sender_info, paymaster_info) = match simulate_validation_result {
             SimulateValidationResult::ValidationResult(validation_result) => (
@@ -113,51 +112,38 @@ where
         };
 
         // factory
-        stake_info_by_entity.insert(
-            0,
-            StakeInfo {
-                address: if user_operation.init_code.len() >= 20 {
-                    Address::from_slice(&user_operation.init_code[0..20])
-                } else {
-                    Address::zero()
-                },
-                stake: factory_info.0,
-                unstake_delay: factory_info.1,
+        stake_info_by_entity[0] = StakeInfo {
+            address: if user_operation.init_code.len() >= 20 {
+                Address::from_slice(&user_operation.init_code[0..20])
+            } else {
+                Address::zero()
             },
-        );
+            stake: factory_info.0,
+            unstake_delay: factory_info.1,
+        };
 
         // account
-        stake_info_by_entity.insert(
-            1,
-            StakeInfo {
-                address: user_operation.sender,
-                stake: sender_info.0,
-                unstake_delay: sender_info.1,
-            },
-        );
+        stake_info_by_entity[1] = StakeInfo {
+            address: user_operation.sender,
+            stake: sender_info.0,
+            unstake_delay: sender_info.1,
+        };
 
         // paymaster
-        stake_info_by_entity.insert(
-            2,
-            StakeInfo {
-                address: if user_operation.paymaster_and_data.len() >= 20 {
-                    Address::from_slice(&user_operation.paymaster_and_data[0..20])
-                } else {
-                    Address::zero()
-                },
-                stake: paymaster_info.0,
-                unstake_delay: paymaster_info.1,
+        stake_info_by_entity[2] = StakeInfo {
+            address: if user_operation.paymaster_and_data.len() >= 20 {
+                Address::from_slice(&user_operation.paymaster_and_data[0..20])
+            } else {
+                Address::zero()
             },
-        );
+            stake: paymaster_info.0,
+            unstake_delay: paymaster_info.1,
+        };
     }
 
-    fn forbidden_opcodes(
-        &self,
-        stake_info_by_entity: &HashMap<usize, StakeInfo>,
-        trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError<M>> {
-        for index in stake_info_by_entity.keys() {
-            if let Some(level) = trace.number_levels.get(*index) {
+    fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError<M>> {
+        for (index, _) in LEVEL_TO_ENTITY.iter().enumerate() {
+            if let Some(level) = trace.number_levels.get(index) {
                 for opcode in level.opcodes.keys() {
                     if FORBIDDEN_OPCODES.contains(opcode) {
                         return Err(SimulateValidationError::OpcodeValidation {
@@ -168,7 +154,7 @@ where
                 }
             }
 
-            if let Some(level) = trace.number_levels.get(*index) {
+            if let Some(level) = trace.number_levels.get(index) {
                 if let Some(count) = level.opcodes.get(&*CREATE2_OPCODE) {
                     if LEVEL_TO_ENTITY[index] == "factory" && *count == 1 {
                         continue;
@@ -187,11 +173,11 @@ where
     fn parse_slots(
         &self,
         keccak: Vec<Bytes>,
-        stake_info_by_entity: &HashMap<usize, StakeInfo>,
-        slots_by_entity: &mut HashMap<Address, HashSet<String>>,
+        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
+        slots_by_entity: &mut HashMap<Address, HashSet<Bytes>>,
     ) {
         for kecc in keccak {
-            for entity in stake_info_by_entity.values() {
+            for entity in stake_info_by_entity {
                 if entity.address.is_zero() {
                     continue;
                 }
@@ -200,11 +186,11 @@ where
                     Bytes::from([vec![0; 12], entity.address.to_fixed_bytes().to_vec()].concat());
 
                 if kecc.starts_with(&entity_address_bytes) {
-                    let k = AbiEncode::encode_hex(keccak256(kecc.clone()));
+                    let k = keccak256(kecc.clone());
                     slots_by_entity
                         .entry(entity.address)
                         .or_insert(HashSet::new())
-                        .insert(k);
+                        .insert(k.into());
                 }
             }
         }
@@ -214,7 +200,7 @@ where
         &self,
         address: &Address,
         slot: &String,
-        slots_by_entity: &HashMap<Address, HashSet<String>>,
+        slots_by_entity: &HashMap<Address, HashSet<Bytes>>,
     ) -> Result<bool, SimulateValidationError<M>> {
         if *slot == address.to_string() {
             return Ok(true);
@@ -229,10 +215,7 @@ where
 
         if let Some(slots) = slots_by_entity.get(address) {
             for slot_entity in slots {
-                let slot_entity_as_number =
-                    U256::from_str_radix(slot_entity, 16).map_err(|_| {
-                        SimulateValidationError::StorageAccessValidation { slot: slot.clone() }
-                    })?;
+                let slot_entity_as_number = U256::from(slot_entity.as_ref());
 
                 if slot_as_number >= slot_entity_as_number
                     && slot_as_number < (slot_entity_as_number + 128)
@@ -249,7 +232,7 @@ where
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
-        stake_info_by_entity: &HashMap<usize, StakeInfo>,
+        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
     ) -> Result<(), SimulateValidationError<M>> {
         let mut slots_by_entity = HashMap::new();
@@ -261,8 +244,8 @@ where
 
         let mut slot_staked = String::new();
 
-        for (index, stake_info) in stake_info_by_entity.iter() {
-            if let Some(level) = trace.number_levels.get(*index) {
+        for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
+            if let Some(level) = trace.number_levels.get(index) {
                 for (address, access) in &level.access {
                     if *address == user_operation.sender || *address == *entry_point {
                         continue;
@@ -330,7 +313,7 @@ where
             }
         })?;
 
-        let mut stake_info_by_entity: HashMap<usize, StakeInfo> = HashMap::new();
+        let mut stake_info_by_entity: [StakeInfo; NUMBER_LEVELS] = Default::default();
         self.extract_stake_info(
             user_operation,
             &simulate_validation_result,
@@ -338,7 +321,7 @@ where
         );
 
         // may not invokes any forbidden opcodes
-        self.forbidden_opcodes(&stake_info_by_entity, &js_trace)?;
+        self.forbidden_opcodes(&js_trace)?;
 
         // verify storage access
         self.storage_access(
