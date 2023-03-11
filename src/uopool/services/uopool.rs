@@ -311,16 +311,10 @@ where
                     let reputation_lock = self.reputations.read();
                     match reputation_lock.get(&mempool_id) {
                         Some(reputation_entries) => {
-                            let paymaster_status = if let Some(paymaster) = paymaster_opt {
-                                reputation_entries.get_status(&paymaster)
-                            } else {
-                                ReputationStatus::OK
-                            };
-                            let deployer_status = if let Some(factory) = factory_opt {
-                                reputation_entries.get_status(&factory)
-                            } else {
-                                ReputationStatus::OK
-                            };
+                            let paymaster_status =
+                                reputation_entries.get_status_from_bytes(&uo.paymaster_and_data);
+                            let deployer_status =
+                                reputation_entries.get_status_from_bytes(&uo.init_code);
                             (paymaster_status, deployer_status)
                         }
                         None => {
