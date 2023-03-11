@@ -59,11 +59,7 @@ pub trait Mempool: Debug {
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, sender: &Address) -> usize;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
-
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;
-
-    #[cfg(debug_assertions)]
     fn clear(&mut self);
 }
 
@@ -95,14 +91,8 @@ pub trait Reputation: Debug {
         title: &str,
         stake_info: Option<StakeInfo>,
     ) -> Result<(), BadReputationError>;
-
-    #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
-
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::ReputationEntries;
-
-    #[cfg(debug_assertions)]
     fn clear(&mut self);
 }
 
