@@ -1,18 +1,22 @@
-use ethers::{
-    providers::Middleware,
-    types::{Address, GethTrace, U256},
-};
-
+use super::UoPoolService;
 use crate::{
     contracts::{tracer::JsTracerFrame, EntryPointErr, SimulateValidationResult},
     types::{
-        simulation::{SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
+        reputation::StakeInfo,
+        simulation::{
+            SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY,
+            NUMBER_LEVELS,
+        },
         user_operation::UserOperation,
     },
     uopool::mempool_id,
 };
-
-use super::UoPoolService;
+use ethers::{
+    providers::Middleware,
+    types::{Address, Bytes, GethTrace, U256},
+    utils::keccak256,
+};
+use std::collections::{HashMap, HashSet};
 
 impl<M: Middleware + 'static> UoPoolService<M>
 where
@@ -86,46 +90,204 @@ where
         })
     }
 
-    async fn forbidden_opcodes(
+    fn extract_stake_info(
         &self,
+        user_operation: &UserOperation,
         simulate_validation_result: &SimulateValidationResult,
-        trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError<M>> {
-        let mut stake_info: Vec<(U256, U256)> = vec![];
-
-        match simulate_validation_result {
-            SimulateValidationResult::ValidationResult(validation_result) => {
-                stake_info.push(validation_result.factory_info);
-                stake_info.push(validation_result.sender_info);
-                stake_info.push(validation_result.paymaster_info);
-            }
+        stake_info_by_entity: &mut [StakeInfo; NUMBER_LEVELS],
+    ) {
+        let (factory_info, sender_info, paymaster_info) = match simulate_validation_result {
+            SimulateValidationResult::ValidationResult(validation_result) => (
+                validation_result.factory_info,
+                validation_result.sender_info,
+                validation_result.paymaster_info,
+            ),
             SimulateValidationResult::ValidationResultWithAggregation(
                 validation_result_with_aggregation,
-            ) => {
-                stake_info.push(validation_result_with_aggregation.factory_info);
-                stake_info.push(validation_result_with_aggregation.sender_info);
-                stake_info.push(validation_result_with_aggregation.paymaster_info);
-            }
-        }
+            ) => (
+                validation_result_with_aggregation.factory_info,
+                validation_result_with_aggregation.sender_info,
+                validation_result_with_aggregation.paymaster_info,
+            ),
+        };
 
-        for (index, _) in stake_info.iter().enumerate() {
-            for opcode in trace.number_levels[index].opcodes.keys() {
-                if FORBIDDEN_OPCODES.contains(opcode) {
+        // factory
+        stake_info_by_entity[0] = StakeInfo {
+            address: if user_operation.init_code.len() >= 20 {
+                Address::from_slice(&user_operation.init_code[0..20])
+            } else {
+                Address::zero()
+            },
+            stake: factory_info.0,
+            unstake_delay: factory_info.1,
+        };
+
+        // account
+        stake_info_by_entity[1] = StakeInfo {
+            address: user_operation.sender,
+            stake: sender_info.0,
+            unstake_delay: sender_info.1,
+        };
+
+        // paymaster
+        stake_info_by_entity[2] = StakeInfo {
+            address: if user_operation.paymaster_and_data.len() >= 20 {
+                Address::from_slice(&user_operation.paymaster_and_data[0..20])
+            } else {
+                Address::zero()
+            },
+            stake: paymaster_info.0,
+            unstake_delay: paymaster_info.1,
+        };
+    }
+
+    fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError<M>> {
+        for (index, _) in LEVEL_TO_ENTITY.iter().enumerate() {
+            if let Some(level) = trace.number_levels.get(index) {
+                for opcode in level.opcodes.keys() {
+                    if FORBIDDEN_OPCODES.contains(opcode) {
+                        return Err(SimulateValidationError::OpcodeValidation {
+                            entity: LEVEL_TO_ENTITY[index].to_string(),
+                            opcode: opcode.clone(),
+                        });
+                    }
+                }
+            }
+
+            if let Some(level) = trace.number_levels.get(index) {
+                if let Some(count) = level.opcodes.get(&*CREATE2_OPCODE) {
+                    if LEVEL_TO_ENTITY[index] == "factory" && *count == 1 {
+                        continue;
+                    }
                     return Err(SimulateValidationError::OpcodeValidation {
-                        entity: LEVEL_TO_ENTITY[&index].to_string(),
-                        opcode: opcode.clone(),
+                        entity: LEVEL_TO_ENTITY[index].to_string(),
+                        opcode: CREATE2_OPCODE.to_string(),
                     });
                 }
             }
+        }
 
-            if let Some(count) = trace.number_levels[index].opcodes.get(&*CREATE2_OPCODE) {
-                if LEVEL_TO_ENTITY[&index] == "factory" && *count == 1 {
+        Ok(())
+    }
+
+    fn parse_slots(
+        &self,
+        keccak: Vec<Bytes>,
+        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
+        slots_by_entity: &mut HashMap<Address, HashSet<Bytes>>,
+    ) {
+        for kecc in keccak {
+            for entity in stake_info_by_entity {
+                if entity.address.is_zero() {
                     continue;
                 }
-                return Err(SimulateValidationError::OpcodeValidation {
-                    entity: LEVEL_TO_ENTITY[&index].to_string(),
-                    opcode: CREATE2_OPCODE.to_string(),
-                });
+
+                let entity_address_bytes =
+                    Bytes::from([vec![0; 12], entity.address.to_fixed_bytes().to_vec()].concat());
+
+                if kecc.starts_with(&entity_address_bytes) {
+                    let k = keccak256(kecc.clone());
+                    slots_by_entity
+                        .entry(entity.address)
+                        .or_insert(HashSet::new())
+                        .insert(k.into());
+                }
+            }
+        }
+    }
+
+    fn associated_with_slot(
+        &self,
+        address: &Address,
+        slot: &String,
+        slots_by_entity: &HashMap<Address, HashSet<Bytes>>,
+    ) -> Result<bool, SimulateValidationError<M>> {
+        if *slot == address.to_string() {
+            return Ok(true);
+        }
+
+        if !slots_by_entity.contains_key(address) {
+            return Ok(false);
+        }
+
+        let slot_as_number = U256::from_str_radix(slot, 16)
+            .map_err(|_| SimulateValidationError::StorageAccessValidation { slot: slot.clone() })?;
+
+        if let Some(slots) = slots_by_entity.get(address) {
+            for slot_entity in slots {
+                let slot_entity_as_number = U256::from(slot_entity.as_ref());
+
+                if slot_as_number >= slot_entity_as_number
+                    && slot_as_number < (slot_entity_as_number + 128)
+                {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn storage_access(
+        &self,
+        user_operation: &UserOperation,
+        entry_point: &Address,
+        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
+        trace: &JsTracerFrame,
+    ) -> Result<(), SimulateValidationError<M>> {
+        let mut slots_by_entity = HashMap::new();
+        self.parse_slots(
+            trace.keccak.clone(),
+            stake_info_by_entity,
+            &mut slots_by_entity,
+        );
+
+        let mut slot_staked = String::new();
+
+        for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
+            if let Some(level) = trace.number_levels.get(index) {
+                for (address, access) in &level.access {
+                    if *address == user_operation.sender || *address == *entry_point {
+                        continue;
+                    }
+
+                    for slot in [
+                        access.reads.keys().cloned().collect::<Vec<String>>(),
+                        access.writes.keys().cloned().collect(),
+                    ]
+                    .concat()
+                    {
+                        slot_staked.clear();
+
+                        if self.associated_with_slot(
+                            &user_operation.sender,
+                            &slot,
+                            &slots_by_entity,
+                        )? {
+                            if user_operation.init_code.len() > 0 {
+                                slot_staked = slot.clone();
+                            } else {
+                                continue;
+                            }
+                        } else if *address == stake_info.address
+                            || self.associated_with_slot(
+                                &stake_info.address,
+                                &slot,
+                                &slots_by_entity,
+                            )?
+                        {
+                            slot_staked = slot.clone();
+                        } else {
+                            return Err(SimulateValidationError::StorageAccessValidation { slot });
+                        }
+
+                        if !slot_staked.is_empty() && stake_info.stake.is_zero() {
+                            return Err(SimulateValidationError::StorageAccessValidation {
+                                slot: slot_staked.clone(),
+                            });
+                        }
+                    }
+                }
             }
         }
 
@@ -151,9 +313,23 @@ where
             }
         })?;
 
+        let mut stake_info_by_entity: [StakeInfo; NUMBER_LEVELS] = Default::default();
+        self.extract_stake_info(
+            user_operation,
+            &simulate_validation_result,
+            &mut stake_info_by_entity,
+        );
+
         // may not invokes any forbidden opcodes
-        self.forbidden_opcodes(&simulate_validation_result, &js_trace)
-            .await?;
+        self.forbidden_opcodes(&js_trace)?;
+
+        // verify storage access
+        self.storage_access(
+            user_operation,
+            entry_point,
+            &stake_info_by_entity,
+            &js_trace,
+        )?;
 
         Ok(simulate_validation_result)
     }

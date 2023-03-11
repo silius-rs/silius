@@ -32,7 +32,7 @@ pub struct ReputationEntry {
     pub status: ReputationStatus,
 }
 
-#[derive(Clone, Copy, Educe, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Educe, Eq, PartialEq, Serialize, Deserialize)]
 #[educe(Debug)]
 pub struct StakeInfo {
     pub address: Address,

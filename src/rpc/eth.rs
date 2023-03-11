@@ -20,7 +20,6 @@ use jsonrpsee::{
     tracing::info,
     types::{error::CallError, ErrorObject},
 };
-use std::str::FromStr;
 
 pub struct EthApiServerImpl {
     pub call_gas_limit: u64,
@@ -76,7 +75,7 @@ impl EthApiServer for EthApiServerImpl {
             .into_inner();
 
         if response.result == AddResult::Added as i32 {
-            let user_operation_hash = UserOperationHash::from_str(&response.data)
+            let user_operation_hash = serde_json::from_str::<UserOperationHash>(&response.data)
                 .map_err(|err| format_err!("error parsing user operation hash: {}", err))?;
             return Ok(user_operation_hash);
         }
