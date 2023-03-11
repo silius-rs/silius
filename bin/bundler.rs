@@ -85,11 +85,25 @@ fn main() -> Result<()> {
                 let eth_provider =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
 
+                if !opt.no_uopool {
+                    info!("Starting op pool with bundler");
+                    aa_bundler::uopool::run(
+                        opt.uopool_opts,
+                        opt.entry_points.clone(),
+                        eth_provider,
+                        opt.max_verification_gas,
+                    )
+                    .await?;
+                }
+
+                info!("Connecting to uopool grpc");
                 let uopool_grpc_client = UoPoolClient::connect(format!(
                     "http://{}",
                     opt.uopool_opts.uopool_grpc_listen_address
                 ))
                 .await?;
+                info!("Connected to uopool grpc");
+
                 for entry_point in opt.entry_points.iter() {
                     let _bundler = Bundler::new(
                         &wallet,
@@ -99,17 +113,6 @@ fn main() -> Result<()> {
                         *entry_point,
                         opt.eth_client_address.clone(),
                     );
-                }
-
-                if !opt.no_uopool {
-                    info!("Starting op pool with bundler");
-                    aa_bundler::uopool::run(
-                        opt.uopool_opts,
-                        opt.entry_points,
-                        eth_provider,
-                        opt.max_verification_gas,
-                    )
-                    .await?;
                 }
 
                 if !opt.no_rpc {
