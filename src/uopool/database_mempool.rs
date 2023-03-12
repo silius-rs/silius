@@ -180,8 +180,6 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .map_err(DBError::DBInternalError)
     }
 
-
-    
     fn get_all(&self) -> Self::UserOperations {
         self.env
             .tx()
