@@ -79,25 +79,44 @@ fn main() -> Result<()> {
 
                 let chain_id = eth_provider.get_chainid().await?;
 
-                let wallet = Wallet::from_file(opt.mnemonic_file, chain_id)?;
+                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)?;
                 info!("{:?}", wallet.signer);
 
                 let eth_provider =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
 
-                let _bundler = Bundler::new(wallet);
-
                 if !opt.no_uopool {
+                    info!("Starting op pool with bundler");
                     aa_bundler::uopool::run(
                         opt.uopool_opts,
-                        opt.entry_points,
+                        opt.entry_points.clone(),
                         eth_provider,
                         opt.max_verification_gas,
                     )
                     .await?;
                 }
 
+                info!("Connecting to uopool grpc");
+                let uopool_grpc_client = UoPoolClient::connect(format!(
+                    "http://{}",
+                    opt.uopool_opts.uopool_grpc_listen_address
+                ))
+                .await?;
+                info!("Connected to uopool grpc");
+
+                for entry_point in opt.entry_points.iter() {
+                    let _bundler = Bundler::new(
+                        &wallet,
+                        opt.bundler_opts.beneficiary,
+                        uopool_grpc_client.clone(),
+                        opt.bundler_opts.bundle_interval,
+                        *entry_point,
+                        opt.eth_client_address.clone(),
+                    );
+                }
+
                 if !opt.no_rpc {
+                    info!("Starting rpc server with bundler");
                     tokio::spawn({
                         async move {
                             let jsonrpc_server = ServerBuilder::default()
@@ -105,11 +124,6 @@ fn main() -> Result<()> {
                                 .await?;
 
                             let mut api = Methods::new();
-                            let uopool_grpc_client = UoPoolClient::connect(format!(
-                                "http://{}",
-                                opt.uopool_opts.uopool_grpc_listen_address
-                            ))
-                            .await?;
 
                             #[cfg(debug_assertions)]
                             api.merge(
@@ -128,8 +142,7 @@ fn main() -> Result<()> {
 
                             let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
                             info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
-
-                            pending::<Result<()>>().await
+                            <Result<(), anyhow::Error>>::Ok(())
                         }
                     });
                 }
