@@ -19,7 +19,7 @@ use educe::Educe;
 use ethers::{
     abi::AbiEncode,
     providers::{Http, Middleware, Provider},
-    types::{Address, H256, U256},
+    types::{Address, Bytes, H256, U256},
     utils::{keccak256, to_checksum},
 };
 use jsonrpsee::tracing::info;
@@ -31,6 +31,7 @@ pub mod memory_mempool;
 pub mod memory_reputation;
 pub mod server;
 pub mod services;
+pub mod utils;
 
 pub type MempoolId = H256;
 
@@ -59,6 +60,8 @@ pub trait Mempool: Debug {
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, sender: &Address) -> usize;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
+    // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
+    fn get_sorted(&self) -> Result<Self::UserOperations, Self::Error>;
     fn get_all(&self) -> Self::UserOperations;
     fn clear(&mut self);
 }
@@ -91,6 +94,19 @@ pub trait Reputation: Debug {
         title: &str,
         stake_info: Option<StakeInfo>,
     ) -> Result<(), BadReputationError>;
+
+    // Try to get the reputation status from a sequence of bytes which the first 20 bytes should be the address
+    // This is useful in getting the reputation directly from paymaster_and_data field and init_code field in user operation.
+    // If the address is not found in the first 20 bytes, it would return ReputationStatus::OK directly.
+    fn get_status_from_bytes(&self, bytes: &Bytes) -> ReputationStatus {
+        let address_opt = utils::get_addr(bytes);
+        if let Some(address) = address_opt {
+            self.get_status(&address)
+        } else {
+            ReputationStatus::OK
+        }
+    }
+
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
     fn get_all(&self) -> Self::ReputationEntries;
     fn clear(&mut self);

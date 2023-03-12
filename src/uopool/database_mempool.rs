@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use super::Mempool;
 use crate::types::{
@@ -88,6 +88,12 @@ impl From<Error> for DBError {
     }
 }
 
+impl Display for DBError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     type UserOperations = Vec<UserOperation>;
     type Error = DBError;
@@ -158,6 +164,24 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
         }
     }
 
+    fn get_sorted(&self) -> Result<Self::UserOperations, DBError> {
+        self.env
+            .tx()
+            .and_then(|tx| {
+                let mut cursor = tx.cursor_read::<UserOperationDB>()?;
+                let mut user_ops = cursor
+                    .walk(UserOperationHash::default())?
+                    .map(|a| a.map(|(_, uo)| uo))
+                    .collect::<Result<Vec<_>, _>>()?;
+                user_ops
+                    .sort_by(|a, b| b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas));
+                Ok(user_ops)
+            })
+            .map_err(DBError::DBInternalError)
+    }
+
+
+    
     fn get_all(&self) -> Self::UserOperations {
         self.env
             .tx()
@@ -250,93 +274,20 @@ impl<E: EnvironmentKind> DatabaseMempool<E> {
 
 #[cfg(test)]
 mod tests {
+    use crate::uopool::utils::tests::mempool_test_case;
+
     use super::*;
-    use ethers::types::{H256, U256};
     use reth_db::mdbx::NoWriteMap;
     use tempdir::TempDir;
 
     #[allow(clippy::unit_cmp)]
     #[tokio::test]
     async fn memory_mempool() {
-        let entry_point = Address::random();
-        let chain_id = U256::from(5);
-        let senders = vec![Address::random(), Address::random(), Address::random()];
-
         let dir = TempDir::new("test-userop-db").unwrap();
-        let mut mempool: DatabaseMempool<NoWriteMap> =
-            DatabaseMempool::new(dir.into_path()).unwrap();
+        let mempool: DatabaseMempool<NoWriteMap> = DatabaseMempool::new(dir.into_path()).unwrap();
         mempool
             .create_tables()
             .expect("Create mdbx database tables failed");
-        let mut user_operation: UserOperation;
-        let mut user_operation_hash: UserOperationHash = Default::default();
-
-        for i in 0..2 {
-            user_operation = UserOperation {
-                sender: senders[0],
-                nonce: U256::from(i),
-                ..UserOperation::random()
-            };
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
-
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
-
-            user_operation = UserOperation {
-                sender: senders[1],
-                nonce: U256::from(i),
-                ..UserOperation::random()
-            };
-
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
-
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
-        }
-
-        for i in 0..3 {
-            user_operation = UserOperation {
-                sender: senders[2],
-                nonce: U256::from(i),
-                ..UserOperation::random()
-            };
-
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
-
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
-        }
-
-        assert_eq!(mempool.get_all().len(), 7);
-        assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
-        assert_eq!(mempool.get_all_by_sender(&senders[1]).len(), 2);
-        assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 3);
-
-        assert_eq!(mempool.remove(&user_operation_hash).unwrap(), ());
-        assert_eq!(
-            mempool.remove(&H256::random().into()).unwrap_err(),
-            DBError::NotFound
-        );
-
-        assert_eq!(mempool.get_all().len(), 6);
-        assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
-        assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 2);
-
-        assert_eq!(mempool.clear(), ());
-
-        assert_eq!(mempool.get_all().len(), 0);
-        assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 0);
+        mempool_test_case(mempool, "NotFound");
     }
 }
