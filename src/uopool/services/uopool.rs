@@ -418,7 +418,6 @@ where
         }
     }
 
-    #[cfg(debug_assertions)]
     async fn get_all(
         &self,
         request: tonic::Request<GetAllRequest>,
@@ -452,7 +451,6 @@ where
         Err(tonic::Status::invalid_argument("missing entry point"))
     }
 
-    #[cfg(debug_assertions)]
     async fn clear(
         &self,
         _request: tonic::Request<()>,
@@ -470,7 +468,6 @@ where
         }))
     }
 
-    #[cfg(debug_assertions)]
     async fn get_all_reputation(
         &self,
         request: tonic::Request<GetAllReputationRequest>,
@@ -500,7 +497,6 @@ where
         Err(tonic::Status::invalid_argument("missing entry point"))
     }
 
-    #[cfg(debug_assertions)]
     async fn set_reputation(
         &self,
         request: tonic::Request<SetReputationRequest>,

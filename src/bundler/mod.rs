@@ -29,9 +29,6 @@ pub struct BundlerOpts {
     #[clap(long, value_parser=parse_u256)]
     pub min_balance: U256,
 
-    #[clap(long, value_parser=parse_address)]
-    pub helper: Address,
-
     #[clap(long, default_value = "127.0.0.1:3002")]
     pub bundler_grpc_listen_address: String,
 
@@ -143,8 +140,6 @@ mod tests {
             "600",
             "--min-balance",
             "1",
-            "--helper",
-            "0x0000000000000000000000000000000000000000",
             "--bundler-grpc-listen-address",
             "127.0.0.1:3002",
             "--bundle-interval",
@@ -156,7 +151,6 @@ mod tests {
                     .unwrap(),
                 gas_factor: U256::from(600),
                 min_balance: U256::from(1),
-                helper: Address::from([0; 20]),
                 bundler_grpc_listen_address: String::from("127.0.0.1:3002"),
                 bundle_interval: 10,
             },

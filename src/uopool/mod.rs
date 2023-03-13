@@ -62,11 +62,7 @@ pub trait Mempool: Debug {
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
     // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
     fn get_sorted(&self) -> Result<Self::UserOperations, Self::Error>;
-
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations;
-
-    #[cfg(debug_assertions)]
     fn clear(&mut self);
 }
 
@@ -111,13 +107,8 @@ pub trait Reputation: Debug {
         }
     }
 
-    #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries);
-
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::ReputationEntries;
-
-    #[cfg(debug_assertions)]
     fn clear(&mut self);
 }
 

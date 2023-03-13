@@ -93,12 +93,10 @@ impl Mempool for MemoryMempool {
         Ok(user_operations)
     }
 
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations {
         self.user_operations.values().cloned().collect()
     }
 
-    #[cfg(debug_assertions)]
     fn clear(&mut self) {
         self.user_operations.clear();
         self.user_operations_by_sender.clear();

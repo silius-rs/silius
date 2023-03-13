@@ -11,12 +11,10 @@ use async_trait::async_trait;
 use ethers::types::Address;
 use jsonrpsee::core::RpcResult;
 
-#[cfg(debug_assertions)]
 pub struct DebugApiServerImpl {
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 }
 
-#[cfg(debug_assertions)]
 #[async_trait]
 impl DebugApiServer for DebugApiServerImpl {
     async fn clear_state(&self) -> RpcResult<()> {

@@ -190,19 +190,16 @@ impl Reputation for MemoryReputation {
         Ok(())
     }
 
-    #[cfg(debug_assertions)]
     fn set(&mut self, reputation_entries: Self::ReputationEntries) {
         for reputation in reputation_entries {
             self.entities.insert(reputation.address, reputation);
         }
     }
 
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::ReputationEntries {
         self.entities.values().cloned().collect()
     }
 
-    #[cfg(debug_assertions)]
     fn clear(&mut self) {
         self.entities.clear();
     }

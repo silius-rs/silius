@@ -25,7 +25,7 @@ RUN make build
 # run
 FROM frolvlad/alpine-glibc
 
-COPY --from=builder /aa-bundler/target/debug/bundler /usr/local/bin/bundler
+COPY --from=builder /aa-bundler/target/release/bundler /usr/local/bin/bundler
 
 EXPOSE 3000
 

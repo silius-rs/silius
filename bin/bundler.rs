@@ -16,7 +16,7 @@ use ethers::{
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
-use std::{future::pending, panic, sync::Arc};
+use std::{collections::HashSet, future::pending, panic, sync::Arc};
 
 #[derive(Parser)]
 #[clap(
@@ -44,6 +44,9 @@ pub struct Opt {
 
     #[clap(long, default_value = "127.0.0.1:3000")]
     pub rpc_listen_address: String,
+
+    #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
+    pub rpc_api: Vec<String>,
 
     // execution client rpc endpoint
     #[clap(long, default_value = "http://127.0.0.1:8545")]
@@ -125,20 +128,22 @@ fn main() -> Result<()> {
 
                             let mut api = Methods::new();
 
-                            #[cfg(debug_assertions)]
-                            api.merge(
-                                DebugApiServerImpl {
-                                    uopool_grpc_client: uopool_grpc_client.clone(),
-                                }
-                                .into_rpc(),
-                            )?;
-                            api.merge(
-                                EthApiServerImpl {
-                                    call_gas_limit: 100_000_000,
-                                    uopool_grpc_client,
-                                }
-                                .into_rpc(),
-                            )?;
+                            let rpc_api: HashSet<String> =
+                                HashSet::from_iter(opt.rpc_api.iter().cloned());
+
+                            if rpc_api.contains("eth") {
+                                api.merge(
+                                    EthApiServerImpl {
+                                        call_gas_limit: 100_000_000,
+                                        uopool_grpc_client: uopool_grpc_client.clone(),
+                                    }
+                                    .into_rpc(),
+                                )?;
+                            }
+
+                            if rpc_api.contains("debug") {
+                                api.merge(DebugApiServerImpl { uopool_grpc_client }.into_rpc())?;
+                            }
 
                             let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
                             info!("JSON-RPC server listening on {}", opt.rpc_listen_address);

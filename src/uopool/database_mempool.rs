@@ -180,7 +180,6 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .map_err(DBError::DBInternalError)
     }
 
-    #[cfg(debug_assertions)]
     fn get_all(&self) -> Self::UserOperations {
         self.env
             .tx()
@@ -196,7 +195,6 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .unwrap_or_else(|_| vec![])
     }
 
-    #[cfg(debug_assertions)]
     fn clear(&mut self) {
         self.env
             .tx_mut()

@@ -2,7 +2,6 @@ use crate::types::{reputation::ReputationEntry, user_operation::UserOperation};
 use ethers::types::Address;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
-#[cfg(debug_assertions)]
 #[rpc(server, namespace = "debug_bundler")]
 pub trait DebugApi {
     #[method(name = "clearState")]
