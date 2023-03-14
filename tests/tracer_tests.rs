@@ -99,7 +99,7 @@ async fn count_opcode_depth_bigger_than_1() -> anyhow::Result<()> {
             .topics
             .clone()
             .into_iter()
-            .map(|i| H256::from(TryInto::<[u8; 32]>::try_into(i.to_vec()).unwrap()))
+            .map(|i| H256::from_str(i.as_str()).unwrap())
             .collect::<Vec<H256>>(),
         ret.logs[0].data.to_vec(),
     )))?;
@@ -145,7 +145,7 @@ async fn trace_exec_self_should_revert() -> anyhow::Result<()> {
             .topics
             .clone()
             .into_iter()
-            .map(|i| H256::from(TryInto::<[u8; 32]>::try_into(i.to_vec()).unwrap()))
+            .map(|i| H256::from_str(i.as_str()).unwrap())
             .collect::<Vec<H256>>(),
         ret.logs[0].data.to_vec(),
     )))?;
@@ -169,7 +169,7 @@ async fn trace_exec_self_call_itself() -> anyhow::Result<()> {
             l.topics
                 .clone()
                 .into_iter()
-                .map(|i| H256::from(TryInto::<[u8; 32]>::try_into(i.to_vec()).unwrap()))
+                .map(|i| H256::from_str(i.as_str()).unwrap())
                 .collect::<Vec<H256>>(),
             l.data.to_vec(),
         )))
