@@ -40,7 +40,7 @@ pub struct ReadsAndWrites {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct Log {
-    pub topics: Vec<Bytes>,
+    pub topics: Vec<String>,
     pub data: Bytes,
 }
 
