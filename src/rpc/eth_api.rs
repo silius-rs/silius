@@ -2,8 +2,8 @@ use ethers::types::{Address, U64};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 use crate::types::user_operation::{
-    UserOperation, UserOperationGasEstimation, UserOperationHash, UserOperationPartial,
-    UserOperationReceipt,
+    UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+    UserOperationPartial, UserOperationReceipt,
 };
 
 #[rpc(server, namespace = "eth")]
@@ -33,4 +33,10 @@ pub trait EthApi {
         &self,
         user_operation_hash: UserOperationHash,
     ) -> RpcResult<Option<UserOperationReceipt>>;
+
+    #[method(name = "getUserOperationByHash")]
+    async fn get_user_operation_by_hash(
+        &self,
+        user_operation_hash: UserOperationHash,
+    ) -> RpcResult<Option<UserOperationByHash>>;
 }

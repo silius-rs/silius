@@ -1,8 +1,8 @@
 use crate::{
     rpc::eth_api::EthApiServer,
     types::user_operation::{
-        UserOperation, UserOperationGasEstimation, UserOperationHash, UserOperationPartial,
-        UserOperationReceipt,
+        UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+        UserOperationPartial, UserOperationReceipt,
     },
     uopool::server::uopool::{
         uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
@@ -122,6 +122,14 @@ impl EthApiServer for EthApiServerImpl {
         &self,
         user_operation_hash: UserOperationHash,
     ) -> RpcResult<Option<UserOperationReceipt>> {
+        info!("{:?}", user_operation_hash);
+        Ok(None)
+    }
+
+    async fn get_user_operation_by_hash(
+        &self,
+        user_operation_hash: UserOperationHash,
+    ) -> RpcResult<Option<UserOperationByHash>> {
         info!("{:?}", user_operation_hash);
         Ok(None)
     }
