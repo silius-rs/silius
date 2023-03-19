@@ -325,13 +325,7 @@ where
                     } else {
                         let method: Option<String> = {
                             if let Some(method) = top.method {
-                                if let Some(function_name) =
-                                    CONTRACTS_FUNCTIONS.get(method.as_ref())
-                                {
-                                    Some(function_name.clone())
-                                } else {
-                                    None
-                                }
+                                CONTRACTS_FUNCTIONS.get(method.as_ref()).cloned()
                             } else {
                                 None
                             }
@@ -385,27 +379,29 @@ where
                 });
 
                 if let Some(call) = call {
-                    let validate_paymaster_return: ValidatePaymasterUserOpReturn =
-                        AbiDecode::decode(call.ret.as_ref().unwrap()).map_err(|_| {
-                            SimulateValidationError::UserOperationRejected {
-                                message: "unknown error".to_string(),
-                            }
-                        })?;
-                    let context = validate_paymaster_return.context;
+                    if let Some(ret) = call.ret.as_ref() {
+                        let validate_paymaster_return: ValidatePaymasterUserOpReturn =
+                            AbiDecode::decode(ret).map_err(|_| {
+                                SimulateValidationError::UserOperationRejected {
+                                    message: "unknown error".to_string(),
+                                }
+                            })?;
+                        let context = validate_paymaster_return.context;
 
-                    if !context.is_empty() {
-                        let mempool_id = mempool_id(entry_point, &self.chain_id);
+                        if !context.is_empty() {
+                            let mempool_id = mempool_id(entry_point, &self.chain_id);
 
-                        if let Some(reputation) = self.reputations.read().get(&mempool_id) {
-                            if !reputation
-                                .verify_stake("paymaster", Some(stake_info.clone()))
-                                .is_ok()
-                            {
-                                return Err(SimulateValidationError::CallStackValidation {
-                                    message:
-                                        "Paymaster that is not staked should not return context"
-                                            .to_string(),
-                                });
+                            if let Some(reputation) = self.reputations.read().get(&mempool_id) {
+                                if reputation
+                                    .verify_stake("paymaster", Some(*stake_info))
+                                    .is_err()
+                                {
+                                    return Err(SimulateValidationError::CallStackValidation {
+                                        message:
+                                            "Paymaster that is not staked should not return context"
+                                                .to_string(),
+                                    });
+                                }
                             }
                         }
                     }
