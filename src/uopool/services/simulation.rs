@@ -1,17 +1,23 @@
 use super::UoPoolService;
 use crate::{
-    contracts::{tracer::JsTracerFrame, EntryPointErr, SimulateValidationResult},
+    contracts::{
+        gen::{ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS},
+        tracer::{Call, CallEntry, JsTracerFrame},
+        EntryPointErr, SimulateValidationResult,
+    },
     types::{
         reputation::StakeInfo,
         simulation::{
-            SimulateValidationError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY,
-            NUMBER_LEVELS,
+            SimulateValidationError, CREATE2_OPCODE, CREATE_OPCODE, FORBIDDEN_OPCODES,
+            LEVEL_TO_ENTITY, NUMBER_LEVELS, PAYMASTER_VALIDATION_FUNCTION, RETURN_OPCODE,
+            REVERT_OPCODE,
         },
         user_operation::UserOperation,
     },
     uopool::mempool_id,
 };
 use ethers::{
+    abi::AbiDecode,
     providers::Middleware,
     types::{Address, Bytes, GethTrace, U256},
     utils::keccak256,
@@ -294,6 +300,122 @@ where
         Ok(())
     }
 
+    fn parse_call_stack(
+        &self,
+        trace: &JsTracerFrame,
+        calls: &mut Vec<CallEntry>,
+    ) -> Result<(), SimulateValidationError<M>> {
+        let mut stack: Vec<Call> = vec![];
+
+        for call in trace.calls.iter() {
+            if call.typ == *REVERT_OPCODE || call.typ == *RETURN_OPCODE {
+                let top = stack.pop();
+
+                if let Some(top) = top {
+                    if top.typ.contains(CREATE_OPCODE.as_str()) {
+                        calls.push(CallEntry {
+                            typ: top.typ,
+                            from: top.from,
+                            to: top.to,
+                            method: None,
+                            ret: None,
+                            rev: None,
+                            value: None,
+                        });
+                    } else {
+                        let method: Option<String> = {
+                            if let Some(method) = top.method {
+                                if let Some(function_name) =
+                                    CONTRACTS_FUNCTIONS.get(method.as_ref())
+                                {
+                                    Some(function_name.clone())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        };
+
+                        if call.typ == *REVERT_OPCODE {
+                            calls.push(CallEntry {
+                                typ: top.typ,
+                                from: top.from,
+                                to: top.to,
+                                method,
+                                ret: None,
+                                rev: call.data.clone(),
+                                value: top.value,
+                            });
+                        } else {
+                            calls.push(CallEntry {
+                                typ: top.typ,
+                                from: top.from,
+                                to: top.to,
+                                method,
+                                ret: call.data.clone(),
+                                rev: None,
+                                value: None,
+                            });
+                        }
+                    }
+                }
+            } else {
+                stack.push(call.clone());
+            }
+        }
+
+        Ok(())
+    }
+
+    fn call_stack(
+        &self,
+        entry_point: &Address,
+        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
+        trace: &JsTracerFrame,
+    ) -> Result<(), SimulateValidationError<M>> {
+        let mut calls: Vec<CallEntry> = vec![];
+        self.parse_call_stack(trace, &mut calls)?;
+
+        for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
+            if LEVEL_TO_ENTITY[index] == "paymaster" {
+                let call = calls.iter().find(|call| {
+                    call.method == Some(PAYMASTER_VALIDATION_FUNCTION.clone())
+                        && call.to == Some(stake_info.address)
+                });
+
+                if let Some(call) = call {
+                    let validate_paymaster_return: ValidatePaymasterUserOpReturn =
+                        AbiDecode::decode(call.ret.as_ref().unwrap()).map_err(|_| {
+                            SimulateValidationError::UserOperationRejected {
+                                message: "unknown error".to_string(),
+                            }
+                        })?;
+                    let context = validate_paymaster_return.context;
+
+                    if !context.is_empty() {
+                        let mempool_id = mempool_id(entry_point, &self.chain_id);
+
+                        if let Some(reputation) = self.reputations.read().get(&mempool_id) {
+                            if !reputation
+                                .verify_stake("paymaster", Some(stake_info.clone()))
+                                .is_ok()
+                            {
+                                return Err(SimulateValidationError::CallStackValidation {
+                                    message:
+                                        "Paymaster that is not staked should not return context"
+                                            .to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
@@ -330,6 +452,9 @@ where
             &stake_info_by_entity,
             &js_trace,
         )?;
+
+        // verify call stack
+        self.call_stack(entry_point, &stake_info_by_entity, &js_trace)?;
 
         Ok(simulate_validation_result)
     }

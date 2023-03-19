@@ -40,6 +40,10 @@ lazy_static! {
         set
     };
     pub static ref CREATE2_OPCODE: String = "CREATE2".to_string();
+    pub static ref RETURN_OPCODE: String = "RETURN".to_string();
+    pub static ref REVERT_OPCODE: String = "REVERT".to_string();
+    pub static ref CREATE_OPCODE: String = "CREATE".to_string();
+    pub static ref PAYMASTER_VALIDATION_FUNCTION: String = "validatePaymasterUserOp".to_string();
 }
 
 pub struct StakeInfo {
@@ -53,6 +57,7 @@ pub enum SimulateValidationError<M: Middleware> {
     OpcodeValidation { entity: String, opcode: String },
     UserOperationExecution { message: String },
     StorageAccessValidation { slot: String },
+    CallStackValidation { message: String },
     Middleware(M::Error),
     UnknownError { error: String },
 }
@@ -76,6 +81,9 @@ impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
                 format!("Storage access validation failed for slot: {slot}"),
                 None::<bool>,
             ),
+            SimulateValidationError::CallStackValidation { message } => {
+                SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
+            }
             SimulateValidationError::Middleware(_) => {
                 SimulationError::from(ErrorCode::InternalError)
             }

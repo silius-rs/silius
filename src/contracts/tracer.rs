@@ -1,5 +1,5 @@
 use anyhow::format_err;
-use ethers::types::{Address, Bytes, GethTrace};
+use ethers::types::{Address, Bytes, GethTrace, U256};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -55,6 +55,18 @@ pub struct Call {
     pub to: Option<Address>,
     pub method: Option<Bytes>,
     pub gas: Option<u64>,
+    pub value: Option<U256>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct CallEntry {
+    pub typ: String,
+    pub from: Option<Address>,
+    pub to: Option<Address>,
+    pub method: Option<String>,
+    pub ret: Option<Bytes>,
+    pub rev: Option<Bytes>,
+    pub value: Option<U256>,
 }
 
 // https://github.com/eth-infinitism/bundler/blob/main/packages/bundler/src/BundlerCollectorTracer.ts
