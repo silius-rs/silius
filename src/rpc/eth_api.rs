@@ -31,12 +31,12 @@ pub trait EthApi {
     #[method(name = "getUserOperationReceipt")]
     async fn get_user_operation_receipt(
         &self,
-        user_operation_hash: UserOperationHash,
+        user_operation_hash: String,
     ) -> RpcResult<Option<UserOperationReceipt>>;
 
     #[method(name = "getUserOperationByHash")]
     async fn get_user_operation_by_hash(
         &self,
-        user_operation_hash: UserOperationHash,
+        user_operation_hash: String,
     ) -> RpcResult<Option<UserOperationByHash>>;
 }
