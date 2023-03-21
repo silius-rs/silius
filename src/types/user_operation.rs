@@ -1,7 +1,7 @@
 use crate::contracts::gen::entry_point_api;
 use ethers::abi::{AbiDecode, AbiEncode};
 use ethers::prelude::{EthAbiCodec, EthAbiType};
-use ethers::types::{Address, Bytes, TransactionReceipt, H256, U256};
+use ethers::types::{Address, BlockNumber, Bytes, TransactionReceipt, H256, U256};
 use ethers::utils::keccak256;
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use rustc_hex::FromHexError;
@@ -154,6 +154,16 @@ pub struct UserOperationReceipt {
     pub reason: String,
     pub logs: Vec<String>,
     pub receipt: TransactionReceipt,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserOperationByHash {
+    #[serde(flatten)]
+    pub user_operation: UserOperation,
+    pub entry_point: Address,
+    pub block_number: BlockNumber,
+    pub block_hash: H256,
+    pub transaction_hash: H256,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

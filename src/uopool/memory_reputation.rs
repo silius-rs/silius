@@ -160,31 +160,33 @@ impl Reputation for MemoryReputation {
             }
 
             if let Some(entity) = self.entities.get(&stake_info.address) {
-                let error = if entity.status == ReputationStatus::BANNED {
-                    BadReputationError::EntityBanned {
+                if entity.status == ReputationStatus::BANNED {
+                    return Err(BadReputationError::EntityBanned {
                         address: stake_info.address,
                         title: title.to_string(),
-                    }
-                } else if stake_info.stake < self.min_stake {
-                    BadReputationError::StakeTooLow {
-                        address: stake_info.address,
-                        title: title.to_string(),
-                        min_stake: self.min_stake,
-                        min_unstake_delay: self.min_unstake_delay,
-                    }
-                } else if stake_info.unstake_delay < self.min_unstake_delay {
-                    BadReputationError::UnstakeDelayTooLow {
-                        address: stake_info.address,
-                        title: title.to_string(),
-                        min_stake: self.min_stake,
-                        min_unstake_delay: self.min_unstake_delay,
-                    }
-                } else {
-                    return Ok(());
-                };
-
-                return Err(error);
+                    });
+                }
             }
+
+            let error = if stake_info.stake < self.min_stake {
+                BadReputationError::StakeTooLow {
+                    address: stake_info.address,
+                    title: title.to_string(),
+                    min_stake: self.min_stake,
+                    min_unstake_delay: self.min_unstake_delay,
+                }
+            } else if stake_info.unstake_delay < self.min_unstake_delay {
+                BadReputationError::UnstakeDelayTooLow {
+                    address: stake_info.address,
+                    title: title.to_string(),
+                    min_stake: self.min_stake,
+                    min_unstake_delay: self.min_unstake_delay,
+                }
+            } else {
+                return Ok(());
+            };
+
+            return Err(error);
         }
 
         Ok(())

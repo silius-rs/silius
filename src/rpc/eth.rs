@@ -1,8 +1,8 @@
 use crate::{
     rpc::eth_api::EthApiServer,
     types::user_operation::{
-        UserOperation, UserOperationGasEstimation, UserOperationHash, UserOperationPartial,
-        UserOperationReceipt,
+        UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+        UserOperationPartial, UserOperationReceipt,
     },
     uopool::server::uopool::{
         uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
@@ -17,9 +17,10 @@ use ethers::{
 };
 use jsonrpsee::{
     core::RpcResult,
-    tracing::info,
     types::{error::CallError, ErrorObject},
 };
+
+const USER_OPERATION_HASH_ERROR_CODE: i32 = -32601;
 
 pub struct EthApiServerImpl {
     pub call_gas_limit: u64,
@@ -120,9 +121,39 @@ impl EthApiServer for EthApiServerImpl {
 
     async fn get_user_operation_receipt(
         &self,
-        user_operation_hash: UserOperationHash,
+        user_operation_hash: String,
     ) -> RpcResult<Option<UserOperationReceipt>> {
-        info!("{:?}", user_operation_hash);
-        Ok(None)
+        match serde_json::from_str::<UserOperationHash>(&user_operation_hash) {
+            Ok(_user_operation_hash) => {
+                // TODO: implement
+                Ok(None)
+            }
+            Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
+                ErrorObject::owned(
+                    USER_OPERATION_HASH_ERROR_CODE,
+                    "Missing/invalid userOpHash".to_string(),
+                    None::<bool>,
+                ),
+            ))),
+        }
+    }
+
+    async fn get_user_operation_by_hash(
+        &self,
+        user_operation_hash: String,
+    ) -> RpcResult<Option<UserOperationByHash>> {
+        match serde_json::from_str::<UserOperationHash>(&user_operation_hash) {
+            Ok(_user_operation_hash) => {
+                // TODO: implement
+                Ok(None)
+            }
+            Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
+                ErrorObject::owned(
+                    USER_OPERATION_HASH_ERROR_CODE,
+                    "Missing/invalid userOpHash".to_string(),
+                    None::<bool>,
+                ),
+            ))),
+        }
     }
 }
