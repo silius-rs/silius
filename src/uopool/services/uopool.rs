@@ -44,10 +44,7 @@ pub struct UoPoolService<M: Middleware> {
     pub chain_id: U256,
 }
 
-impl<M: Middleware + 'static> UoPoolService<M>
-where
-    EntryPointErr<M>: From<<M as Middleware>::Error>,
-{
+impl<M: Middleware + 'static> UoPoolService<M> {
     pub fn new(
         entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
         mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,

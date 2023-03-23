@@ -1,15 +1,6 @@
+use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
-
-use anyhow;
-use ethers::abi::AbiDecode;
-use ethers::providers::{FromErr, Middleware, ProviderError};
-use ethers::types::{
-    Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-    GethTrace, TransactionRequest, U256,
-};
-use regex::Regex;
-use serde::Deserialize;
 
 use super::gen::entry_point_api::{
     EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult,
@@ -18,6 +9,17 @@ use super::gen::entry_point_api::{
 use super::gen::stake_manager_api::DepositInfo;
 use super::gen::{EntryPointAPI, StakeManagerAPI};
 use super::tracer::JS_TRACER;
+use anyhow;
+use ethers::abi::AbiDecode;
+use ethers::providers::{Middleware, ProviderError};
+use ethers::types::{
+    Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
+    GethTrace, TransactionRequest, U256,
+};
+use ethers_providers::MiddlewareError;
+use regex::Regex;
+use serde::Deserialize;
+use thiserror::Error;
 
 pub struct EntryPoint<M: Middleware> {
     provider: Arc<M>,
@@ -26,10 +28,7 @@ pub struct EntryPoint<M: Middleware> {
     stake_manager_api: StakeManagerAPI<M>,
 }
 
-impl<M: Middleware + 'static> EntryPoint<M>
-where
-    EntryPointErr<M>: From<<M as Middleware>::Error>,
-{
+impl<M: Middleware + 'static> EntryPoint<M> {
     pub fn new(provider: Arc<M>, address: Address) -> Self {
         let entry_point_api = EntryPointAPI::new(address, provider.clone());
         let stake_manager_api = StakeManagerAPI::new(address, provider.clone());
@@ -126,7 +125,8 @@ where
                     },
                 },
             )
-            .await?;
+            .await
+            .map_err(|e| EntryPointErr::MiddlewareErr(e))?;
         Ok(request_result)
     }
 
@@ -246,7 +246,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum EntryPointErr<M: Middleware> {
     FailedOp(FailedOp),
     ProviderErr(ProviderError),
@@ -257,15 +257,30 @@ pub enum EntryPointErr<M: Middleware> {
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
 }
 
+impl<M: Middleware> Display for EntryPointErr<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 impl<M: Middleware> From<ProviderError> for EntryPointErr<M> {
     fn from(e: ProviderError) -> Self {
         EntryPointErr::ProviderErr(e)
     }
 }
 
-impl<M: Middleware> FromErr<M::Error> for EntryPointErr<M> {
-    fn from(src: M::Error) -> Self {
+impl<M: Middleware> MiddlewareError for EntryPointErr<M> {
+    type Inner = M::Error;
+
+    fn from_err(src: M::Error) -> Self {
         EntryPointErr::MiddlewareErr(src)
+    }
+
+    fn as_inner(&self) -> Option<&Self::Inner> {
+        match self {
+            EntryPointErr::MiddlewareErr(e) => Some(e),
+            _ => None,
+        }
     }
 }
 

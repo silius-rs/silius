@@ -24,10 +24,7 @@ use ethers::{
 };
 use std::collections::{HashMap, HashSet};
 
-impl<M: Middleware + 'static> UoPoolService<M>
-where
-    EntryPointErr<M>: From<<M as Middleware>::Error>,
-{
+impl<M: Middleware + 'static> UoPoolService<M> {
     async fn simulate_validation(
         &self,
         user_operation: &UserOperation,
