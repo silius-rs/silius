@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use super::gen::entry_point_api::{
@@ -9,16 +8,14 @@ use super::gen::entry_point_api::{
 use super::gen::stake_manager_api::DepositInfo;
 use super::gen::{EntryPointAPI, StakeManagerAPI};
 use super::tracer::JS_TRACER;
-use anyhow;
 use ethers::abi::AbiDecode;
+use ethers::prelude::ContractError;
 use ethers::providers::{Middleware, ProviderError};
 use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
     GethTrace, TransactionRequest, U256,
 };
 use ethers_providers::MiddlewareError;
-use regex::Regex;
-use serde::Deserialize;
 use thiserror::Error;
 
 pub struct EntryPoint<M: Middleware> {
@@ -48,25 +45,27 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         self.address
     }
 
-    fn deserialize_error_msg(err_msg: &str) -> Result<EntryPointAPIErrors, EntryPointErr<M>> {
-        JsonRpcError::from_str(err_msg)
-            .map_err(|_| {
-                EntryPointErr::DecodeErr(format!("{err_msg:?} is not a valid JsonRpcError message"))
-            })
-            .and_then(|json_error| {
-                json_error.data.ok_or_else(|| {
-                    EntryPointErr::DecodeErr(
-                        "{json_error:?} doesn't have valid data field".to_string(),
-                    )
-                })
-            })
-            .and_then(|data: String| {
-                AbiDecode::decode_hex(data).map_err(|_| {
-                    EntryPointErr::DecodeErr(format!(
-                        "{err_msg:?} data field could not be deserialize to EntryPointAPIErrors"
-                    ))
-                })
-            })
+    fn deserialize_error_msg(
+        err_msg: ContractError<M>,
+    ) -> Result<EntryPointAPIErrors, EntryPointErr<M>> {
+        match err_msg {
+            ContractError::DecodingError(e) => Err(EntryPointErr::DecodeErr(format!(
+                "Decoding error on msg: {e:?}"
+            ))),
+            ContractError::AbiError(e) => Err(EntryPointErr::UnknownErr(format!(
+                "Contract call with abi error: {e:?} ",
+            ))),
+            ContractError::MiddlewareError { e } => Err(EntryPointErr::MiddlewareErr(e)),
+            ContractError::ProviderError { e } => Err(EntryPointErr::ProviderErr(e)),
+            ContractError::Revert(data) => AbiDecode::decode(data).map_err(|e| {
+                EntryPointErr::DecodeErr(format!(
+                    "{e:?} data field could not be deserialize to EntryPointAPIErrors",
+                ))
+            }),
+            _ => Err(EntryPointErr::UnknownErr(format!(
+                "Unkown error: {err_msg:?}",
+            ))),
+        }
     }
 
     pub async fn simulate_validation<U: Into<UserOperation>>(
@@ -81,23 +80,18 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Simulate validation should expect revert".to_string(),
             )),
-            Err(e) => {
-                let err_msg = e.to_string();
-                Self::deserialize_error_msg(&err_msg).and_then(|op| match op {
-                    EntryPointAPIErrors::FailedOp(failed_op) => {
-                        Err(EntryPointErr::FailedOp(failed_op))
-                    }
-                    EntryPointAPIErrors::ValidationResult(res) => {
-                        Ok(SimulateValidationResult::ValidationResult(res))
-                    }
-                    EntryPointAPIErrors::ValidationResultWithAggregation(res) => Ok(
-                        SimulateValidationResult::ValidationResultWithAggregation(res),
-                    ),
-                    _ => Err(EntryPointErr::UnknownErr(format!(
-                        "Simulate validation with invalid error: {op:?}"
-                    ))),
-                })
-            }
+            Err(e) => Self::deserialize_error_msg(e).and_then(|op| match op {
+                EntryPointAPIErrors::FailedOp(failed_op) => Err(EntryPointErr::FailedOp(failed_op)),
+                EntryPointAPIErrors::ValidationResult(res) => {
+                    Ok(SimulateValidationResult::ValidationResult(res))
+                }
+                EntryPointAPIErrors::ValidationResultWithAggregation(res) => Ok(
+                    SimulateValidationResult::ValidationResultWithAggregation(res),
+                ),
+                _ => Err(EntryPointErr::UnknownErr(format!(
+                    "Simulate validation with invalid error: {op:?}"
+                ))),
+            }),
         }
     }
 
@@ -140,8 +134,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             .call()
             .await
             .or_else(|e| {
-                let err_msg = e.to_string();
-                Self::deserialize_error_msg(&err_msg).and_then(|op| match op {
+                Self::deserialize_error_msg(e).and_then(|op| match op {
                     EntryPointAPIErrors::FailedOp(failed_op) => {
                         Err(EntryPointErr::FailedOp(failed_op))
                     }
@@ -184,18 +177,13 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Get sender address should expect revert".to_string(),
             )),
-            Err(e) => {
-                let err_msg = e.to_string();
-                Self::deserialize_error_msg(&err_msg).and_then(|op| match op {
-                    EntryPointAPIErrors::SenderAddressResult(res) => Ok(res),
-                    EntryPointAPIErrors::FailedOp(failed_op) => {
-                        Err(EntryPointErr::FailedOp(failed_op))
-                    }
-                    _ => Err(EntryPointErr::UnknownErr(format!(
-                        "Simulate validation with invalid error: {op:?}"
-                    ))),
-                })
-            }
+            Err(e) => Self::deserialize_error_msg(e).and_then(|op| match op {
+                EntryPointAPIErrors::SenderAddressResult(res) => Ok(res),
+                EntryPointAPIErrors::FailedOp(failed_op) => Err(EntryPointErr::FailedOp(failed_op)),
+                _ => Err(EntryPointErr::UnknownErr(format!(
+                    "Simulate validation with invalid error: {op:?}"
+                ))),
+            }),
         }
     }
 
@@ -222,17 +210,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
             match result {
                 Ok(gas) => Ok(gas),
-                Err(e) => {
-                    let err_msg = e.to_string();
-
-                    JsonRpcError::from_str(&err_msg)
-                        .map_err(|_| {
-                            EntryPointErr::DecodeErr(format!(
-                                "{err_msg:?} is not a valid JsonRpcError message"
-                            ))
-                        })
-                        .and_then(|json_error| Err(EntryPointErr::JsonRpcError(json_error)))
-                }
+                Err(e) => Err(EntryPointErr::MiddlewareErr(e)),
             }
         }
     }
@@ -251,7 +229,6 @@ pub enum EntryPointErr<M: Middleware> {
     FailedOp(FailedOp),
     ProviderErr(ProviderError),
     MiddlewareErr(M::Error),
-    JsonRpcError(JsonRpcError),
     NetworkErr, // TODO
     DecodeErr(String),
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
@@ -290,39 +267,6 @@ pub enum SimulateValidationResult {
     ValidationResultWithAggregation(ValidationResultWithAggregation),
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct JsonRpcError {
-    /// The error code
-    pub code: u64,
-    /// The error message
-    pub message: String,
-    /// Additional data
-    pub data: Option<String>,
-}
-
-impl FromStr for JsonRpcError {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let re = Regex::new(
-            r###"code: (\d+), message: ([^,]*), data: (None|Some\(String\("([^)]*)"\))"###,
-        )?;
-        let captures = re
-            .captures(s)
-            .ok_or_else(|| anyhow::anyhow!("The return error is not a valid JsonRpcError"))?;
-        let code = captures[1].parse::<u64>()?;
-        let message = &captures[2];
-        let data = match &captures[3] {
-            "None" => None,
-            _ => Some(captures[4].to_string()),
-        };
-        Ok(JsonRpcError {
-            code,
-            message: message.to_string(),
-            data,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use ethers::{
@@ -334,33 +278,6 @@ mod tests {
 
     use super::*;
     use std::{str::FromStr, sync::Arc};
-
-    #[test]
-    fn json_rpc_err_parse() {
-        let some_data =
-            "(code: 3, message: execution reverted: , data: Some(String(\"0x00fa072b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000001941413230206163636f756e74206e6f74206465706c6f79656400000000000000\")))";
-        let err = JsonRpcError::from_str(some_data);
-
-        assert_eq!(
-            err.unwrap(),
-            JsonRpcError {
-                code: 3,
-                message: "execution reverted: ".to_string(),
-                data: Some("0x00fa072b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000001941413230206163636f756e74206e6f74206465706c6f79656400000000000000".to_string())
-            }
-        );
-
-        let none_data = "(code: 3, message: execution reverted, data: None)";
-        let err2 = JsonRpcError::from_str(none_data);
-        assert_eq!(
-            err2.unwrap(),
-            JsonRpcError {
-                code: 3,
-                message: "execution reverted".to_string(),
-                data: None
-            }
-        );
-    }
 
     #[tokio::test]
     #[ignore]
