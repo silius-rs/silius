@@ -1,6 +1,6 @@
 # <h1 align="center"> AA - Bundler </h1>
 
-<p align="center">Rust implementation for Bundler - EIP-4337 (Account Abstraction).</p>
+<p align="center">Rust implementation for Bundler - ERC-4337 (Account Abstraction).</p>
 
 <p align="center">
     <img src="./docs/images/logo.jpeg" width="300" height="300">
@@ -21,7 +21,7 @@ Rust version: 1.67.1
 
 ## How to run?
 
-Set up third-party dependencies (EIP-4337 smart contracts and bundler tests):
+Set up third-party dependencies (ERC-4337 smart contracts and bundler tests):
 
 ```bash
 make fetch-thirdparty
