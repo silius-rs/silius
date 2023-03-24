@@ -1,6 +1,5 @@
 use crate::{
     chain::gas::Overhead,
-    contracts::EntryPointErr,
     types::{
         reputation::{ReputationStatus, StakeInfo},
         sanity_check::BadUserOperationError,
@@ -119,15 +118,8 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             let call_gas_estimation = entry_point
                 .estimate_call_gas(user_operation.clone())
                 .await
-                .map_err(|error| match error {
-                    EntryPointErr::JsonRpcError(err) => {
-                        BadUserOperationError::UserOperationExecution {
-                            message: err.message,
-                        }
-                    }
-                    _ => BadUserOperationError::UnknownError {
-                        error: format!("{error:?}"),
-                    },
+                .map_err(|error| BadUserOperationError::UnknownError {
+                    error: format!("{error:?}"),
                 })?;
 
             if user_operation.call_gas_limit >= call_gas_estimation {
