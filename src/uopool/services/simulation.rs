@@ -29,7 +29,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
-    ) -> Result<SimulateValidationResult, SimulateValidationError<M>> {
+    ) -> Result<SimulateValidationResult, SimulateValidationError> {
         let mempool_id = mempool_id(entry_point, &self.chain_id);
 
         if let Some(entry_point) = self.entry_points.get(&mempool_id) {
@@ -39,9 +39,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             {
                 Ok(simulate_validation_result) => Ok(simulate_validation_result),
                 Err(entry_point_error) => match entry_point_error {
-                    EntryPointErr::MiddlewareErr(middleware_error) => {
-                        Err(SimulateValidationError::Middleware(middleware_error))
-                    }
                     EntryPointErr::FailedOp(failed_op) => {
                         Err(SimulateValidationError::UserOperationRejected {
                             message: format!("{failed_op}"),
@@ -63,7 +60,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
-    ) -> Result<GethTrace, SimulateValidationError<M>> {
+    ) -> Result<GethTrace, SimulateValidationError> {
         let mempool_id = mempool_id(entry_point, &self.chain_id);
 
         if let Some(entry_point) = self.entry_points.get(&mempool_id) {
@@ -73,9 +70,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             {
                 Ok(geth_trace) => Ok(geth_trace),
                 Err(entry_point_error) => match entry_point_error {
-                    EntryPointErr::MiddlewareErr(middleware_error) => {
-                        Err(SimulateValidationError::Middleware(middleware_error))
-                    }
                     EntryPointErr::FailedOp(failed_op) => {
                         Err(SimulateValidationError::UserOperationRejected {
                             message: format!("{failed_op}"),
@@ -144,7 +138,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         };
     }
 
-    fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError<M>> {
+    fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError> {
         for (index, _) in LEVEL_TO_ENTITY.iter().enumerate() {
             if let Some(level) = trace.number_levels.get(index) {
                 for opcode in level.opcodes.keys() {
@@ -204,7 +198,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         address: &Address,
         slot: &String,
         slots_by_entity: &HashMap<Address, HashSet<Bytes>>,
-    ) -> Result<bool, SimulateValidationError<M>> {
+    ) -> Result<bool, SimulateValidationError> {
         if *slot == address.to_string() {
             return Ok(true);
         }
@@ -237,7 +231,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         entry_point: &Address,
         stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError<M>> {
+    ) -> Result<(), SimulateValidationError> {
         let mut slots_by_entity = HashMap::new();
         self.parse_slots(
             trace.keccak.clone(),
@@ -301,7 +295,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         trace: &JsTracerFrame,
         calls: &mut Vec<CallEntry>,
-    ) -> Result<(), SimulateValidationError<M>> {
+    ) -> Result<(), SimulateValidationError> {
         let mut stack: Vec<Call> = vec![];
 
         for call in trace.calls.iter() {
@@ -364,7 +358,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         entry_point: &Address,
         stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError<M>> {
+    ) -> Result<(), SimulateValidationError> {
         let mut calls: Vec<CallEntry> = vec![];
         self.parse_call_stack(trace, &mut calls)?;
 
@@ -413,7 +407,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         &self,
         user_operation: &UserOperation,
         entry_point: &Address,
-    ) -> Result<SimulateValidationResult, SimulateValidationError<M>> {
+    ) -> Result<SimulateValidationResult, SimulateValidationError> {
         let simulate_validation_result = self
             .simulate_validation(user_operation, entry_point)
             .await?;

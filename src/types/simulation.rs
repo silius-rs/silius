@@ -1,7 +1,4 @@
-use ethers::{
-    providers::Middleware,
-    types::{Address, U256},
-};
+use ethers::types::{Address, U256};
 use jsonrpsee::types::{error::ErrorCode, ErrorObject};
 use lazy_static::lazy_static;
 use std::collections::HashSet;
@@ -52,18 +49,17 @@ pub struct StakeInfo {
 }
 
 #[derive(Debug)]
-pub enum SimulateValidationError<M: Middleware> {
+pub enum SimulateValidationError {
     UserOperationRejected { message: String },
     OpcodeValidation { entity: String, opcode: String },
     UserOperationExecution { message: String },
     StorageAccessValidation { slot: String },
     CallStackValidation { message: String },
-    Middleware(M::Error),
     UnknownError { error: String },
 }
 
-impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
-    fn from(error: SimulateValidationError<M>) -> Self {
+impl From<SimulateValidationError> for SimulationError {
+    fn from(error: SimulateValidationError) -> Self {
         match error {
             SimulateValidationError::UserOperationRejected { message } => {
                 SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, message, None::<bool>)
@@ -84,11 +80,8 @@ impl<M: Middleware> From<SimulateValidationError<M>> for SimulationError {
             SimulateValidationError::CallStackValidation { message } => {
                 SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
             }
-            SimulateValidationError::Middleware(_) => {
-                SimulationError::from(ErrorCode::InternalError)
-            }
             SimulateValidationError::UnknownError { error } => {
-                SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, error, None::<bool>)
+                SimulationError::owned(ErrorCode::InternalError.code(), error, None::<bool>)
             }
         }
     }

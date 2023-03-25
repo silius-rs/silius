@@ -15,8 +15,9 @@ use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
     GethTrace, TransactionRequest, U256,
 };
-use ethers_providers::MiddlewareError;
+use ethers_providers::{JsonRpcError, MiddlewareError};
 use thiserror::Error;
+use tracing::trace;
 
 pub struct EntryPoint<M: Middleware> {
     provider: Arc<M>,
@@ -47,7 +48,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     fn deserialize_error_msg(
         err_msg: ContractError<M>,
-    ) -> Result<EntryPointAPIErrors, EntryPointErr<M>> {
+    ) -> Result<EntryPointAPIErrors, EntryPointErr> {
         match err_msg {
             ContractError::DecodingError(e) => Err(EntryPointErr::DecodeErr(format!(
                 "Decoding error on msg: {e:?}"
@@ -55,8 +56,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             ContractError::AbiError(e) => Err(EntryPointErr::UnknownErr(format!(
                 "Contract call with abi error: {e:?} ",
             ))),
-            ContractError::MiddlewareError { e } => Err(EntryPointErr::MiddlewareErr(e)),
-            ContractError::ProviderError { e } => Err(EntryPointErr::ProviderErr(e)),
+            ContractError::MiddlewareError { e } => Err(EntryPointErr::from_middleware_err::<M>(e)),
+            ContractError::ProviderError { e } => Err(e.into()),
             ContractError::Revert(data) => AbiDecode::decode(data).map_err(|e| {
                 EntryPointErr::DecodeErr(format!(
                     "{e:?} data field could not be deserialize to EntryPointAPIErrors",
@@ -71,7 +72,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn simulate_validation<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<SimulateValidationResult, EntryPointErr<M>> {
+    ) -> Result<SimulateValidationResult, EntryPointErr> {
         let request_result = self
             .entry_point_api
             .simulate_validation(user_operation.into())
@@ -98,7 +99,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn simulate_validation_trace<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<GethTrace, EntryPointErr<M>> {
+    ) -> Result<GethTrace, EntryPointErr> {
         let call = self
             .entry_point_api
             .simulate_validation(user_operation.into());
@@ -120,7 +121,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                 },
             )
             .await
-            .map_err(|e| EntryPointErr::MiddlewareErr(e))?;
+            .map_err(|e| EntryPointErr::from_middleware_err::<M>(e))?;
         Ok(request_result)
     }
 
@@ -128,7 +129,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         ops: Vec<U>,
         beneficiary: Address,
-    ) -> Result<(), EntryPointErr<M>> {
+    ) -> Result<(), EntryPointErr> {
         self.entry_point_api
             .handle_ops(ops.into_iter().map(|u| u.into()).collect(), beneficiary)
             .call()
@@ -145,10 +146,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             })
     }
 
-    pub async fn get_deposit_info(
-        &self,
-        address: &Address,
-    ) -> Result<DepositInfo, EntryPointErr<M>> {
+    pub async fn get_deposit_info(&self, address: &Address) -> Result<DepositInfo, EntryPointErr> {
         let result = self
             .stake_manager_api
             .get_deposit_info(*address)
@@ -166,7 +164,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn get_sender_address(
         &self,
         initcode: Bytes,
-    ) -> Result<SenderAddressResult, EntryPointErr<M>> {
+    ) -> Result<SenderAddressResult, EntryPointErr> {
         let result = self
             .entry_point_api
             .get_sender_address(initcode)
@@ -190,7 +188,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn estimate_call_gas<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<U256, EntryPointErr<M>> {
+    ) -> Result<U256, EntryPointErr> {
         let user_operation = user_operation.into();
 
         if user_operation.call_data.is_empty() {
@@ -207,10 +205,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                     None,
                 )
                 .await;
-
+            trace!("Estimate call gas on {user_operation:?} returned {result:?}");
             match result {
                 Ok(gas) => Ok(gas),
-                Err(e) => Err(EntryPointErr::MiddlewareErr(e)),
+                Err(e) => Err(EntryPointErr::from_middleware_err::<M>(e)),
             }
         }
     }
@@ -219,45 +217,58 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         _ops_per_aggregator: Vec<U>,
         _beneficiary: Address,
-    ) -> Result<(), EntryPointErr<M>> {
+    ) -> Result<(), EntryPointErr> {
         todo!()
     }
 }
 
 #[derive(Debug, Error)]
-pub enum EntryPointErr<M: Middleware> {
+pub enum EntryPointErr {
     FailedOp(FailedOp),
-    ProviderErr(ProviderError),
-    MiddlewareErr(M::Error),
-    NetworkErr, // TODO
+    JsonRpcError(JsonRpcError),
+    NetworkErr(String),
     DecodeErr(String),
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
 }
 
-impl<M: Middleware> Display for EntryPointErr<M> {
+impl Display for EntryPointErr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
     }
 }
 
-impl<M: Middleware> From<ProviderError> for EntryPointErr<M> {
+impl From<ProviderError> for EntryPointErr {
     fn from(e: ProviderError) -> Self {
-        EntryPointErr::ProviderErr(e)
+        Self::from_provider_err(&e)
     }
 }
 
-impl<M: Middleware> MiddlewareError for EntryPointErr<M> {
-    type Inner = M::Error;
-
-    fn from_err(src: M::Error) -> Self {
-        EntryPointErr::MiddlewareErr(src)
+impl EntryPointErr {
+    fn from_provider_err(e: &ProviderError) -> Self {
+        match e {
+            ProviderError::JsonRpcClientError(err) => err
+                .as_error_response()
+                .map(|e| EntryPointErr::JsonRpcError(e.clone()))
+                .unwrap_or(EntryPointErr::UnknownErr(format!(
+                    "Unknown json rpc client error: {err:?}"
+                ))),
+            ProviderError::HTTPError(err) => {
+                EntryPointErr::NetworkErr(format!("Entrypoint HTTP error: {err:?}"))
+            }
+            _ => EntryPointErr::UnknownErr(format!("Unknown error in provider: {e:?}")),
+        }
     }
 
-    fn as_inner(&self) -> Option<&Self::Inner> {
-        match self {
-            EntryPointErr::MiddlewareErr(e) => Some(e),
-            _ => None,
+    fn from_middleware_err<M: Middleware>(value: M::Error) -> Self {
+        if let Some(json_err) = value.as_error_response() {
+            return EntryPointErr::JsonRpcError(json_err.clone());
         }
+
+        if let Some(provider_err) = value.as_provider_error() {
+            return EntryPointErr::from_provider_err(provider_err);
+        }
+
+        EntryPointErr::UnknownErr(format!("Unknown middlerware error: {value:?}"))
     }
 }
 

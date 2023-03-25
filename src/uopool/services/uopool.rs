@@ -85,7 +85,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 #[async_trait]
 impl<M: Middleware + 'static> UoPool for UoPoolService<M>
 where
-    EntryPointErr<M>: From<<M as Middleware>::Error>,
+    EntryPointErr: From<<M as Middleware>::Error>,
 {
     async fn add(
         &self,
@@ -220,14 +220,22 @@ where
                             }
                             Err(error) => {
                                 res.set_result(EstimateUserOperationGasResult::NotEstimated);
-                                res.data = serde_json::to_string(&SimulationError::from(
-                                    SimulateValidationError::<M>::UnknownError {
-                                        error: format!("{error:?}"),
-                                    },
-                                ))
-                                .map_err(|_| {
-                                    tonic::Status::internal("error estimating user operation gas")
-                                })?;
+                                res.data =
+                                    serde_json::to_string(&SimulationError::from(match error {
+                                        EntryPointErr::JsonRpcError(err) => {
+                                            SimulateValidationError::UserOperationExecution {
+                                                message: err.message,
+                                            }
+                                        }
+                                        _ => SimulateValidationError::UnknownError {
+                                            error: format!("{error:?}"),
+                                        },
+                                    }))
+                                    .map_err(|_| {
+                                        tonic::Status::internal(
+                                            "error estimating user operation gas",
+                                        )
+                                    })?;
                             }
                         }
                     }
