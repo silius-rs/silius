@@ -1,5 +1,5 @@
 use ethers::types::{Address, U256};
-use jsonrpsee::types::ErrorObject;
+use jsonrpsee::types::{error::ErrorCode, ErrorObject};
 use lazy_static::lazy_static;
 use std::collections::HashSet;
 
@@ -81,7 +81,7 @@ impl From<SimulateValidationError> for SimulationError {
                 SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
             }
             SimulateValidationError::UnknownError { error } => {
-                SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, error, None::<bool>)
+                SimulationError::owned(ErrorCode::InternalError.code(), error, None::<bool>)
             }
         }
     }
