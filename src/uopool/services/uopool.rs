@@ -392,7 +392,7 @@ where
                         }
                     },
                     Err(e) => {
-                        debug!("Failed in 2nd validation: {e:?} ");
+                        debug!("Failed in 2nd simulation: {e:?} ");
                         remove_user_op(uo)?;
                         continue;
                     }
