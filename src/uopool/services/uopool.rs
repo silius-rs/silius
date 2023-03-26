@@ -3,7 +3,7 @@ use crate::{
     contracts::{EntryPoint, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::{ReputationEntry, ReputationStatus, THROTTLED_MAX_INCLUDE},
-        simulation::{SimulateValidationError, SimulationError},
+        simulation::{CodeHash, SimulateValidationError, SimulationError},
         user_operation::{UserOperation, UserOperationGasEstimation},
     },
     uopool::{
@@ -33,10 +33,12 @@ use tonic::Response;
 use tracing::debug;
 
 pub type UoPoolError = ErrorObject<'static>;
+type VecUo = Vec<UserOperation>;
+type VecCh = Vec<CodeHash>;
 
 pub struct UoPoolService<M: Middleware> {
     pub entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
-    pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+    pub mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<VecUo, VecCh>>>>,
     pub reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
     pub eth_provider: Arc<M>,
     pub max_verification_gas: U256,
@@ -47,7 +49,7 @@ pub struct UoPoolService<M: Middleware> {
 impl<M: Middleware + 'static> UoPoolService<M> {
     pub fn new(
         entry_points: Arc<HashMap<MempoolId, EntryPoint<M>>>,
-        mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<Vec<UserOperation>>>>>,
+        mempools: Arc<RwLock<HashMap<MempoolId, MempoolBox<VecUo, VecCh>>>>,
         reputations: Arc<RwLock<HashMap<MempoolId, ReputationBox<Vec<ReputationEntry>>>>>,
         eth_provider: Arc<M>,
         max_verification_gas: U256,

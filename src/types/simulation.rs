@@ -1,6 +1,13 @@
-use ethers::types::{Address, U256};
+use ethers::abi::{AbiDecode, AbiEncode};
+use ethers::prelude::EthAbiType;
+use ethers::{
+    prelude::EthAbiCodec,
+    types::{Address, Bytes, H256, U256},
+};
 use jsonrpsee::types::{error::ErrorCode, ErrorObject};
 use lazy_static::lazy_static;
+use reth_db::table::{Compress, Decompress};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 const SIMULATE_VALIDATION_ERROR_CODE: i32 = -32500;
@@ -48,6 +55,25 @@ pub struct StakeInfo {
     pub stake: (U256, U256),
 }
 
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize, EthAbiCodec, EthAbiType)]
+pub struct CodeHash {
+    pub address: Address,
+    pub code_hash: H256,
+}
+
+impl Compress for CodeHash {
+    type Compressed = Bytes;
+    fn compress(self) -> Self::Compressed {
+        Bytes::from(self.encode())
+    }
+}
+
+impl Decompress for CodeHash {
+    fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        Self::decode(value.into()).map_err(|_e| reth_db::Error::DecodeError)
+    }
+}
+
 #[derive(Debug)]
 pub enum SimulateValidationError {
     UserOperationRejected { message: String },
@@ -55,6 +81,7 @@ pub enum SimulateValidationError {
     UserOperationExecution { message: String },
     StorageAccessValidation { slot: String },
     CallStackValidation { message: String },
+    CodeHashesValidation { message: String },
     UnknownError { error: String },
 }
 
@@ -78,6 +105,9 @@ impl From<SimulateValidationError> for SimulationError {
                 None::<bool>,
             ),
             SimulateValidationError::CallStackValidation { message } => {
+                SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
+            }
+            SimulateValidationError::CodeHashesValidation { message } => {
                 SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
             }
             SimulateValidationError::UnknownError { error } => {

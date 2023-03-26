@@ -403,6 +403,58 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
+    // async fn get_code_hash(&self, address: &Address) -> Result<H256, SimulateValidationError> {
+    //     let code = self
+    //         .eth_provider
+    //         .get_code(*address, None)
+    //         .await
+    //         .map_err(|error| SimulateValidationError::CodeHashesValidation {
+    //             message: error.to_string(),
+    //         })?;
+    //     Ok(keccak256(&code).into())
+    // }
+
+    // fn code_hashes(
+    //     &self,
+    //     user_operation: &UserOperation,
+    //     entry_point: &Address,
+    //     trace: &JsTracerFrame,
+    // ) -> Result<(), SimulateValidationError> {
+    //     let contract_addresses = trace.number_levels.iter().map(|level| {
+    //         level
+    //             .contract_size
+    //             .iter()
+    //             .map(|(address, _)| address)
+    //             .collect::<Vec<&Address>>()
+    //     });
+
+    //     // chech if exists (then 2nd simulation)
+    //     // else 1st simulation
+    //     // async call get code hashes
+    //     // store code hashes to self entry shit
+
+    //     Ok(())
+    // }
+
+    // fn handle_code_hashes(
+    //     &mut self,
+    //     user_operation_hash: &UserOperationHash,
+    //     code_hashes: &Vec<CodeHash>,
+    // ) -> bool {
+    //     if let Some(old_code_hashes) = self.code_hashes_by_user_operation.get(user_operation_hash) {
+    //         if (old_code_hashes.len() != code_hashes.len())
+    //             || old_code_hashes.iter().zip(code_hashes).any(|(a, b)| a != b)
+    //         {
+    //             return false;
+    //         }
+    //     } else {
+    //         self.code_hashes_by_user_operation
+    //             .insert(user_operation_hash.clone(), code_hashes.clone());
+    //     }
+
+    //     true
+    // }
+
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
@@ -442,6 +494,10 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 
         // verify call stack
         self.call_stack(entry_point, &stake_info_by_entity, &js_trace)?;
+
+        // verify code hashes
+        // should be last verification because code hashes are stored in the 1st simulation
+        // self.code_hashes(user_operation, entry_point, &js_trace);
 
         Ok(simulate_validation_result)
     }

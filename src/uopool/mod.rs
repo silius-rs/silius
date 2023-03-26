@@ -5,6 +5,7 @@ use crate::{
             BadReputationError, ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
             MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
         },
+        simulation::CodeHash,
         user_operation::{UserOperation, UserOperationHash},
     },
     uopool::{
@@ -35,7 +36,8 @@ pub mod utils;
 
 pub type MempoolId = H256;
 
-pub type MempoolBox<T> = Box<dyn Mempool<UserOperations = T, Error = anyhow::Error> + Send + Sync>;
+pub type MempoolBox<T, U> =
+    Box<dyn Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync>;
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
 
 pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
@@ -46,6 +48,7 @@ pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
 
 pub trait Mempool: Debug {
     type UserOperations: IntoIterator<Item = UserOperation>;
+    type CodeHashes: IntoIterator<Item = CodeHash>;
     type Error;
     fn add(
         &mut self,
@@ -59,6 +62,14 @@ pub trait Mempool: Debug {
     ) -> Result<Option<UserOperation>, Self::Error>;
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, sender: &Address) -> usize;
+    fn has_code_hashes(&self, user_operation_hash: &UserOperationHash)
+        -> Result<bool, Self::Error>;
+    fn set_code_hashes(
+        &mut self,
+        user_operation_hash: &UserOperationHash,
+        code_hashes: &Self::CodeHashes,
+    ) -> Result<(), Self::Error>;
+    fn get_code_hashes(&self, user_operation_hash: &UserOperationHash) -> Self::CodeHashes;
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), Self::Error>;
     // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
     fn get_sorted(&self) -> Result<Self::UserOperations, Self::Error>;
@@ -145,7 +156,8 @@ pub async fn run(
         let mut builder = tonic::transport::Server::builder();
 
         let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
-        let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
+        let mut mempools =
+            HashMap::<MempoolId, MempoolBox<Vec<UserOperation>, Vec<CodeHash>>>::new();
         let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
 
         for entry_point in entry_points {
