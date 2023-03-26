@@ -120,12 +120,27 @@ where
             {
                 Ok(_) => {
                     // TODO: update reputation
-                    // TODO: add to mempool
 
-                    res.set_result(AddResult::Added);
-                    res.data =
-                        serde_json::to_string(&user_operation.hash(&entry_point, &self.chain_id))
-                            .map_err(|_| tonic::Status::internal("error adding user operation"))?;
+                    if let Some(mempool) = self.mempools.write().get_mut(&mempool_id) {
+                        match mempool.add(user_operation.clone(), &entry_point, &self.chain_id) {
+                            Ok(_) => {
+                                res.set_result(AddResult::Added);
+                                res.data = serde_json::to_string(
+                                    &user_operation.hash(&entry_point, &self.chain_id),
+                                )
+                                .map_err(|_| {
+                                    tonic::Status::internal("error adding user operation")
+                                })?;
+                            }
+                            Err(error) => {
+                                res.set_result(AddResult::NotAdded);
+                                res.data =
+                                    serde_json::to_string(&error.to_string()).map_err(|_| {
+                                        tonic::Status::internal("error adding user operation")
+                                    })?;
+                            }
+                        }
+                    }
                 }
                 Err(error) => {
                     res.set_result(AddResult::NotAdded);

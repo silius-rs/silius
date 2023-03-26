@@ -10,6 +10,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::vec;
 
+use super::utils::as_checksum;
+
 #[derive(
     Eq, Hash, PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Default, PartialOrd, Ord,
 )]
@@ -50,6 +52,7 @@ impl Encode for UserOperationHash {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, EthAbiCodec, EthAbiType)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperation {
+    #[serde(serialize_with = "as_checksum")]
     pub sender: Address,
     pub nonce: U256,
     pub init_code: Bytes,

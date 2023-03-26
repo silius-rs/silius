@@ -1,6 +1,16 @@
-use ethers::types::{Address, Bytes};
+use ethers::{
+    types::{Address, Bytes},
+    utils::to_checksum,
+};
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use serde::{Deserialize, Serialize};
+
+pub fn as_checksum<S>(val: &Address, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&to_checksum(val, None))
+}
 
 macro_rules! construct_wrap_hash {
     ($type:ty, $name:ident, $n_bytes:expr ) => {

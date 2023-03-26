@@ -423,7 +423,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         }
 
         while let Some(result) = tasks.join_next().await {
-            println!("result: {:?}", result);
             match result {
                 Ok(Some(code_hash)) => code_hashes.push(CodeHash {
                     address: code_hash.0,
