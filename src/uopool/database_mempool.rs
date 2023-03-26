@@ -203,22 +203,12 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
         Ok(())
     }
 
-    // fn set_code_hashes(
-    //     &mut self,
-    //     user_operation_hash: &UserOperationHash,
-    //     code_hashes: std::collections::HashMap<Address, H256>,
-    // ) {
-    //     let hash = user_operation.hash(entry_point, chain_id);
-    //     let tx = self.env.tx_mut()?;
-    //     tx.put::<CodeHashDB>(hash, code_hashes)?;
-    //     tx.commit()?;
-    // }
-
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), DBError> {
         let tx = self.env.tx_mut()?;
         if let Some(user_op) = tx.get::<UserOperationDB>(*user_operation_hash)? {
             tx.delete::<UserOperationDB>(*user_operation_hash, None)?;
             tx.delete::<SenderUserOperationDB>(user_op.sender.into(), Some(user_op))?;
+            tx.delete::<CodeHashDB>(*user_operation_hash, None)?;
             tx.commit()?;
             Ok(())
         } else {

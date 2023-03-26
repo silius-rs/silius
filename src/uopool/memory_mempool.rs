@@ -112,6 +112,9 @@ impl Mempool for MemoryMempool {
             }
         }
 
+        self.code_hashes_by_user_operation
+            .remove(user_operation_hash);
+
         Ok(())
     }
 

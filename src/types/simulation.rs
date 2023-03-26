@@ -58,7 +58,7 @@ pub struct StakeInfo {
 #[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize, EthAbiCodec, EthAbiType)]
 pub struct CodeHash {
     pub address: Address,
-    pub code_hash: H256,
+    pub hash: H256,
 }
 
 impl Compress for CodeHash {

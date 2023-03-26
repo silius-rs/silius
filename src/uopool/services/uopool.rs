@@ -287,10 +287,10 @@ where
             }?;
 
             let remove_user_op = |uo: &UserOperation| -> Result<(), tonic::Status> {
-                let mut memory_pool = self.mempools.write();
-                if let Some(pool) = memory_pool.get_mut(&mempool_id) {
+                let mut mempools = self.mempools.write();
+                if let Some(mempool) = mempools.get_mut(&mempool_id) {
                     let user_op_hash = uo.hash(&entry_point, &self.chain_id);
-                    pool.remove(&user_op_hash).map_err(|e| {
+                    mempool.remove(&user_op_hash).map_err(|e| {
                         tonic::Status::unknown(format!(
                             "remove a banned user operation {user_op_hash:x?} failed with {e:?}."
                         ))
