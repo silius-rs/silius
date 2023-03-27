@@ -415,7 +415,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             let eth_provider = self.eth_provider.clone();
 
             tasks.spawn(async move {
-                match eth_provider.get_code(contract_address.clone(), None).await {
+                match eth_provider.get_code(contract_address, None).await {
                     Ok(code) => Some((contract_address, keccak256(&code).into())),
                     Err(_) => None,
                 }
@@ -444,11 +444,26 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         code_hashes: &Vec<CodeHash>,
         prev_code_hashes: &Vec<CodeHash>,
     ) -> bool {
-        prev_code_hashes.len() == code_hashes.len()
-            && prev_code_hashes
-                .iter()
-                .zip(code_hashes)
-                .all(|(a, b)| a == b)
+        if prev_code_hashes.len() != code_hashes.len() {
+            return false;
+        }
+
+        let code_hashes_map = code_hashes
+            .iter()
+            .map(|code_hash| (code_hash.address, code_hash.hash))
+            .collect::<HashMap<Address, H256>>();
+
+        for code_hash in prev_code_hashes {
+            if let Some(hash) = code_hashes_map.get(&code_hash.address) {
+                if hash != &code_hash.hash {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        true
     }
 
     async fn code_hashes(
@@ -460,14 +475,13 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         let contract_addresses = trace
             .number_levels
             .iter()
-            .map(|level| {
+            .flat_map(|level| {
                 level
                     .contract_size
-                    .iter()
-                    .map(|(address, _)| address.clone())
+                    .keys()
+                    .copied()
                     .collect::<Vec<Address>>()
             })
-            .flatten()
             .collect::<Vec<Address>>();
 
         let code_hashes: &mut Vec<CodeHash> = &mut vec![];
