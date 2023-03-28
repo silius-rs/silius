@@ -118,7 +118,16 @@ fn main() -> Result<()> {
                     opt.bundler_opts.bundle_interval,
                 );
                 info!("Starting bundler manager");
-                bundler_manager.start();
+                bundler_manager.start_bundling();
+                info!("Starting bundler rpc server");
+                aa_bundler::bundler::server::run_server(
+                    bundler_manager,
+                    opt.bundler_opts.bundler_grpc_listen_address,
+                );
+                info!(
+                    "Starting bundler rpc server at {:}",
+                    opt.bundler_opts.bundler_grpc_listen_address
+                );
 
                 if !opt.no_rpc {
                     info!("Starting rpc server with bundler");

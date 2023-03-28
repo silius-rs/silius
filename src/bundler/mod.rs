@@ -1,6 +1,6 @@
 pub mod server;
 
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use clap::Parser;
 use ethers::{
@@ -26,7 +26,9 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub enum Mode {
+    #[serde(rename = "auto")]
     Auto,
+    #[serde(rename = "manual")]
     Manual,
 }
 
@@ -51,7 +53,7 @@ pub struct BundlerOpts {
     pub min_balance: U256,
 
     #[clap(long, default_value = "127.0.0.1:3002")]
-    pub bundler_grpc_listen_address: String,
+    pub bundler_grpc_listen_address: SocketAddr,
 
     #[clap(long, default_value = "10")]
     pub bundle_interval: u64,
@@ -176,7 +178,9 @@ impl BundlerManager {
         }
     }
 
-    pub fn stop(&self) {
+    pub fn start_server(&self) {}
+
+    pub fn stop_bundling(&self) {
         let mut r = self.running.lock();
         *r = false;
     }
@@ -185,7 +189,7 @@ impl BundlerManager {
         is_running(self.running.clone())
     }
 
-    pub fn start(&self) {
+    pub fn start_bundling(&self) {
         if !self.is_running() {
             for bundler in self.bundlers.iter() {
                 let bundler_own = bundler.clone();
@@ -211,7 +215,10 @@ impl BundlerManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        str::FromStr,
+    };
 
     #[test]
     fn bundler_opts() {
@@ -234,7 +241,10 @@ mod tests {
                     .unwrap(),
                 gas_factor: U256::from(600),
                 min_balance: U256::from(1),
-                bundler_grpc_listen_address: String::from("127.0.0.1:3002"),
+                bundler_grpc_listen_address: SocketAddr::new(
+                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                    3002
+                ),
                 bundle_interval: 10,
             },
             BundlerOpts::try_parse_from(args).unwrap()

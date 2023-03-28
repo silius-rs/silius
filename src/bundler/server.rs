@@ -1,10 +1,12 @@
+use std::net::SocketAddr;
+
 use async_trait::async_trait;
 use tonic::Response;
 
 use crate::uopool::server::{
     bundler::{
-        bundler_server::Bundler as BundlerServer, Mode, SetModeRequest, SetModeResponse,
-        SetModeResult,
+        bundler_server::{Bundler, BundlerServer},
+        Mode, SetModeRequest, SetModeResponse, SetModeResult,
     },
     types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
 };
@@ -12,7 +14,7 @@ use crate::uopool::server::{
 use super::BundlerManager;
 
 #[async_trait]
-impl BundlerServer for BundlerManager {
+impl Bundler for BundlerManager {
     async fn chain_id(
         &self,
         _request: tonic::Request<()>,
@@ -34,17 +36,25 @@ impl BundlerServer for BundlerManager {
         let req = request.into_inner();
         match req.mode() {
             Mode::Manual => {
-                self.stop();
+                self.stop_bundling();
                 Ok(Response::new(SetModeResponse {
                     result: SetModeResult::Ok.into(),
                 }))
             }
             Mode::Auto => {
-                self.start();
+                self.start_bundling();
                 Ok(Response::new(SetModeResponse {
                     result: SetModeResult::Ok.into(),
                 }))
             }
         }
     }
+}
+
+pub fn run_server(bundler_manager: BundlerManager, listen_address: SocketAddr) {
+    tokio::spawn(async move {
+        let mut builder = tonic::transport::Server::builder();
+        let svc = BundlerServer::new(bundler_manager);
+        builder.add_service(svc).serve(listen_address).await
+    });
 }
