@@ -14,7 +14,7 @@ use crate::{
         },
         user_operation::UserOperation,
     },
-    uopool::mempool_id,
+    uopool::{mempool_id, utils::equal_code_hashes},
 };
 use ethers::{
     abi::AbiDecode,
@@ -439,33 +439,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
-    fn compare_code_hashes(
-        &self,
-        code_hashes: &Vec<CodeHash>,
-        prev_code_hashes: &Vec<CodeHash>,
-    ) -> bool {
-        if prev_code_hashes.len() != code_hashes.len() {
-            return false;
-        }
-
-        let code_hashes_map = code_hashes
-            .iter()
-            .map(|code_hash| (code_hash.address, code_hash.hash))
-            .collect::<HashMap<Address, H256>>();
-
-        for code_hash in prev_code_hashes {
-            if let Some(hash) = code_hashes_map.get(&code_hash.address) {
-                if hash != &code_hash.hash {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
-
-        true
-    }
-
     async fn code_hashes(
         &self,
         user_operation: &UserOperation,
@@ -496,7 +469,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                 Ok(true) => {
                     // 2nd simulation
                     let prev_code_hashes = mempool.get_code_hashes(&user_operation_hash);
-                    if !self.compare_code_hashes(code_hashes, &prev_code_hashes) {
+                    if !equal_code_hashes(code_hashes, &prev_code_hashes) {
                         return Err(SimulateValidationError::CodeHashesValidation {
                             message: "modified code after 1st simulation".to_string(),
                         });
