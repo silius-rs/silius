@@ -8,7 +8,9 @@ use aa_bundler::{
         debug::DebugApiServerImpl, debug_api::DebugApiServer, eth::EthApiServerImpl,
         eth_api::EthApiServer,
     },
-    uopool::server::uopool::uo_pool_client::UoPoolClient,
+    uopool::server::{
+        bundler::bundler_client::BundlerClient, uopool::uo_pool_client::UoPoolClient,
+    },
 };
 
 #[derive(Parser)]
@@ -22,6 +24,9 @@ pub struct Opt {
 
     #[clap(long, default_value = "127.0.0.1:3001")]
     pub uopool_grpc_listen_address: String,
+
+    #[clap(long, default_value = "127.0.0.1:3002")]
+    pub bundler_grpc_listen_address: String,
 
     #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
     pub rpc_api: Vec<String>,
@@ -54,7 +59,15 @@ async fn main() -> Result<()> {
     }
 
     if rpc_api.contains("debug") {
-        api.merge(DebugApiServerImpl { uopool_grpc_client }.into_rpc())?;
+        let bundler_grpc_client =
+            BundlerClient::connect(format!("http://{}", opt.bundler_grpc_listen_address)).await?;
+        api.merge(
+            DebugApiServerImpl {
+                uopool_grpc_client,
+                bundler_grpc_client,
+            }
+            .into_rpc(),
+        )?;
     }
 
     let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;

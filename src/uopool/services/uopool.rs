@@ -8,14 +8,16 @@ use crate::{
     },
     uopool::{
         mempool_id,
-        server::uopool::{
-            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearResponse, ClearResult,
-            EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
-            EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
-            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
-            GetChainIdResponse, GetSortedRequest, GetSortedResponse,
-            GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse, SetReputationRequest,
-            SetReputationResponse, SetReputationResult,
+        server::{
+            types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
+            uopool::{
+                uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearResponse,
+                ClearResult, EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
+                EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
+                GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
+                GetSortedRequest, GetSortedResponse, RemoveRequest, RemoveResponse,
+                SetReputationRequest, SetReputationResponse, SetReputationResult,
+            },
         },
         utils::get_addr,
         MempoolBox, MempoolId, ReputationBox,

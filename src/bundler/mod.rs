@@ -1,3 +1,5 @@
+pub mod server;
+
 use std::{sync::Arc, time::Duration};
 
 use clap::Parser;
@@ -7,16 +9,35 @@ use ethers::{
     signers::Signer,
     types::{transaction::eip2718::TypedTransaction, Address, U256},
 };
-use tokio::time;
-use tracing::debug;
+use parking_lot::Mutex;
+use serde::Deserialize;
+use tracing::{debug, error};
 
 use crate::{
     contracts::gen::EntryPointAPI,
     models::wallet::Wallet,
     types::user_operation::UserOperation,
-    uopool::server::uopool::{uo_pool_client::UoPoolClient, GetSortedRequest},
+    uopool::server::{
+        bundler::Mode as GrpcMode,
+        uopool::{uo_pool_client::UoPoolClient, GetSortedRequest},
+    },
     utils::{parse_address, parse_u256},
 };
+
+#[derive(Debug, Deserialize)]
+pub enum Mode {
+    Auto,
+    Manual,
+}
+
+impl From<Mode> for GrpcMode {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Auto => Self::Auto,
+            Mode::Manual => Self::Manual,
+        }
+    }
+}
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerOpts {
@@ -36,21 +57,20 @@ pub struct BundlerOpts {
     pub bundle_interval: u64,
 }
 
-pub struct Bundler<'a> {
-    pub wallet: &'a Wallet,
+#[derive(Clone)]
+pub struct Bundler {
+    pub wallet: Wallet,
     pub beneficiary: Address,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
-    pub bundle_interval: u64,
     pub entry_point: Address,
     pub eth_client_address: String,
 }
 
-impl<'a> Bundler<'a> {
+impl Bundler {
     pub fn new(
-        wallet: &'a Wallet,
+        wallet: Wallet,
         beneficiary: Address,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
-        bundle_interval: u64,
         entry_point: Address,
         eth_client_address: String,
     ) -> Self {
@@ -58,27 +78,18 @@ impl<'a> Bundler<'a> {
             wallet,
             beneficiary,
             uopool_grpc_client,
-            bundle_interval,
             entry_point,
             eth_client_address,
         }
     }
 
-    pub async fn run(mut self) -> anyhow::Result<()> {
-        let mut interval = time::interval(Duration::from_secs(self.bundle_interval));
-
-        loop {
-            interval.tick().await;
-            self.send_next_bundle().await?;
-        }
-    }
-
-    async fn create_bundle(&mut self) -> anyhow::Result<Vec<UserOperation>> {
+    async fn create_bundle(&self) -> anyhow::Result<Vec<UserOperation>> {
         let request = tonic::Request::new(GetSortedRequest {
             entry_point: Some(self.entry_point.into()),
         });
         let response = self
             .uopool_grpc_client
+            .clone()
             .get_sorted_user_operations(request)
             .await?;
         let user_operations: Vec<UserOperation> = response
@@ -90,7 +101,7 @@ impl<'a> Bundler<'a> {
         Ok(user_operations)
     }
 
-    async fn send_next_bundle(&mut self) -> anyhow::Result<()> {
+    async fn send_next_bundle(&self) -> anyhow::Result<()> {
         let bundles = self.create_bundle().await?;
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(provider, self.wallet.signer.clone()));
@@ -125,6 +136,78 @@ impl<'a> Bundler<'a> {
     }
 }
 
+pub struct BundlerManager {
+    pub bundlers: Vec<Bundler>,
+    pub bundle_interval: u64,
+    pub running: Arc<Mutex<bool>>,
+}
+
+fn is_running(running: Arc<Mutex<bool>>) -> bool {
+    let r = running.lock();
+    *r
+}
+
+impl BundlerManager {
+    pub fn new(
+        wallet: Wallet,
+        beneficiary: Address,
+        uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
+        entry_points: Vec<Address>,
+        eth_client_address: String,
+        bundle_interval: u64,
+    ) -> Self {
+        let bundlers: Vec<Bundler> = entry_points
+            .iter()
+            .map(|entry_point| {
+                Bundler::new(
+                    wallet.clone(),
+                    beneficiary,
+                    uopool_grpc_client.clone(),
+                    *entry_point,
+                    eth_client_address.clone(),
+                )
+            })
+            .collect();
+
+        Self {
+            bundlers,
+            bundle_interval,
+            running: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn stop(&self) {
+        let mut r = self.running.lock();
+        *r = false;
+    }
+
+    pub fn is_running(&self) -> bool {
+        is_running(self.running.clone())
+    }
+
+    pub fn start(&self) {
+        if !self.is_running() {
+            for bundler in self.bundlers.iter() {
+                let bundler_own = bundler.clone();
+                let interval = self.bundle_interval;
+                let running_lock = self.running.clone();
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(Duration::from_secs(interval));
+                    loop {
+                        if !is_running(running_lock.clone()) {
+                            break;
+                        }
+                        interval.tick().await;
+
+                        if let Err(e) = bundler_own.send_next_bundle().await {
+                            error!("Error while sending bundle: {e:?}");
+                        }
+                    }
+                });
+            }
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

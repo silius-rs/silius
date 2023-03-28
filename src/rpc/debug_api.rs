@@ -1,4 +1,7 @@
-use crate::types::{reputation::ReputationEntry, user_operation::UserOperation};
+use crate::{
+    bundler::Mode,
+    types::{reputation::ReputationEntry, user_operation::UserOperation},
+};
 use ethers::types::Address;
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
@@ -19,4 +22,7 @@ pub trait DebugApi {
 
     #[method(name = "dumpReputation")]
     async fn dump_reputation(&self, entry_point: Address) -> RpcResult<Vec<ReputationEntry>>;
+
+    #[method(name = "setBundlingMode")]
+    async fn set_bundling_mode(&self, mode: Mode) -> RpcResult<()>;
 }
