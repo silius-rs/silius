@@ -51,3 +51,25 @@ Run only JSON-RPC API:
 ```bash
 cargo run --release --bin bundler-rpc
 ```
+
+## Contributing
+
+Thank you for showing interest in contributing to the project!
+
+There is [a contributing guide](./CONTRIBUTING.md) to help get you started.
+
+There are some additional prerequisites for testing:
+
+1. [`geth`](https://geth.ethereum.org/docs/getting-started/installing-geth)
+
+Before making a PR, make sure to run the following commands:
+
+```bash
+make format
+make lint
+make test
+```
+
+## Contact
+
+The best place for the discussion is the dedicated [Telegram channel](https://t.me/aabundler).
