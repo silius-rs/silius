@@ -264,8 +264,11 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 mod tests {
     use crate::{
         contracts::EntryPoint,
-        types::reputation::{
-            ReputationEntry, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+        types::{
+            reputation::{
+                ReputationEntry, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+            },
+            simulation::CodeHash,
         },
         uopool::{
             memory_mempool::MemoryMempool, memory_reputation::MemoryReputation, mempool_id,
@@ -290,7 +293,8 @@ mod tests {
         let eth_provider = Arc::new(Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap());
 
         let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
-        let mut mempools = HashMap::<MempoolId, MempoolBox<Vec<UserOperation>>>::new();
+        let mut mempools =
+            HashMap::<MempoolId, MempoolBox<Vec<UserOperation>, Vec<CodeHash>>>::new();
         let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
 
         let m_id = mempool_id(&entry_point, &chain_id);

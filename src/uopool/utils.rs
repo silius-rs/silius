@@ -1,4 +1,8 @@
-use ethers::types::{Address, Bytes};
+use std::collections::HashMap;
+
+use ethers::types::{Address, Bytes, H256};
+
+use crate::types::simulation::CodeHash;
 
 // Try to get the address from first 20 bytes. Return None if length of bytes < 20.
 pub fn get_addr(bytes: &Bytes) -> Option<Address> {
@@ -8,6 +12,30 @@ pub fn get_addr(bytes: &Bytes) -> Option<Address> {
         None
     }
 }
+
+pub fn equal_code_hashes(code_hashes: &Vec<CodeHash>, prev_code_hashes: &Vec<CodeHash>) -> bool {
+    if prev_code_hashes.len() != code_hashes.len() {
+        return false;
+    }
+
+    let code_hashes_map = code_hashes
+        .iter()
+        .map(|code_hash| (code_hash.address, code_hash.hash))
+        .collect::<HashMap<Address, H256>>();
+
+    for code_hash in prev_code_hashes {
+        if let Some(hash) = code_hashes_map.get(&code_hash.address) {
+            if hash != &code_hash.hash {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    true
+}
+
 #[cfg(test)]
 pub mod tests {
     use std::fmt::Debug;

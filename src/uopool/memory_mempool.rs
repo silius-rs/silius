@@ -2,7 +2,10 @@ use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
 
-use crate::types::user_operation::{UserOperation, UserOperationHash};
+use crate::types::{
+    simulation::CodeHash,
+    user_operation::{UserOperation, UserOperationHash},
+};
 
 use super::Mempool;
 
@@ -11,10 +14,12 @@ use super::Mempool;
 pub struct MemoryMempool {
     user_operations: HashMap<UserOperationHash, UserOperation>, // user_operation_hash -> user_operation
     user_operations_by_sender: HashMap<Address, HashSet<UserOperationHash>>, // sender -> user_operations
+    code_hashes_by_user_operation: HashMap<UserOperationHash, Vec<CodeHash>>, // user_operation_hash -> (contract_address -> code_hash)
 }
 
 impl Mempool for MemoryMempool {
     type UserOperations = Vec<UserOperation>;
+    type CodeHashes = Vec<CodeHash>;
     type Error = anyhow::Error;
 
     fn add(
@@ -60,6 +65,30 @@ impl Mempool for MemoryMempool {
         };
     }
 
+    fn has_code_hashes(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<bool> {
+        Ok(self
+            .code_hashes_by_user_operation
+            .contains_key(user_operation_hash))
+    }
+
+    fn set_code_hashes(
+        &mut self,
+        user_operation_hash: &UserOperationHash,
+        code_hashes: &Self::CodeHashes,
+    ) -> anyhow::Result<(), Self::Error> {
+        self.code_hashes_by_user_operation
+            .insert(*user_operation_hash, code_hashes.clone());
+        Ok(())
+    }
+
+    fn get_code_hashes(&self, user_operation_hash: &UserOperationHash) -> Self::CodeHashes {
+        if let Some(code_hashes) = self.code_hashes_by_user_operation.get(user_operation_hash) {
+            code_hashes.clone()
+        } else {
+            vec![]
+        }
+    }
+
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()> {
         let user_operation: UserOperation;
 
@@ -83,6 +112,9 @@ impl Mempool for MemoryMempool {
             }
         }
 
+        self.code_hashes_by_user_operation
+            .remove(user_operation_hash);
+
         Ok(())
     }
 
@@ -100,6 +132,7 @@ impl Mempool for MemoryMempool {
     fn clear(&mut self) {
         self.user_operations.clear();
         self.user_operations_by_sender.clear();
+        self.code_hashes_by_user_operation.clear();
     }
 }
 

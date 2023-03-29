@@ -25,8 +25,8 @@ page_size = "0.5.0"
 parking_lot = "0.12"
 prost = "0.11"
 regex = "1"
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "314ea0883b1062375ad86577be1fccc39233739d" }
-reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "314ea0883b1062375ad86577be1fccc39233739d" }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
+reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
 ron = "0.8"
 rustc-hex = "^2.0.1"
 serde = "1"
@@ -66,3 +66,7 @@ name = "bundler-rpc"
 [[bin]]
 path = "bin/create-wallet.rs"
 name = "create-wallet"
+
+[patch.crates-io]
+revm = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }
+revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }

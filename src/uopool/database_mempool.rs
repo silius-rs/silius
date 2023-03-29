@@ -2,6 +2,7 @@ use std::{fmt::Display, path::PathBuf};
 
 use super::Mempool;
 use crate::types::{
+    simulation::CodeHash,
     user_operation::{UserOperation, UserOperationHash},
     utils::WrapAddress,
 };
@@ -9,6 +10,7 @@ use ethers::types::{Address, U256};
 use reth_db::{
     cursor::{DbCursorRO, DbDupCursorRO},
     database::{Database, DatabaseGAT},
+    dupsort,
     mdbx::{
         tx::{self, Tx},
         DatabaseFlags, Environment, EnvironmentFlags, EnvironmentKind, Geometry, Mode, PageSize,
@@ -23,18 +25,24 @@ use reth_db::{
 table!(
     /// UserOperation DB
     ( UserOperationDB ) UserOperationHash | UserOperation
-    // Sender to UserOperationHash
 );
 
 table!(
+    /// SenderUserOperation DB
     /// Benefit for merklization is that hashed addresses/keys are sorted.
     ( SenderUserOperationDB ) WrapAddress | UserOperation
 );
 
+dupsort!(
+    /// CodeHash DB
+    ( CodeHashDB ) UserOperationHash | [WrapAddress] CodeHash
+);
+
 /// Default tables that should be present inside database.
-pub const TABLES: [(TableType, &str); 2] = [
+pub const TABLES: [(TableType, &str); 3] = [
     (TableType::Table, UserOperationDB::const_name()),
     (TableType::DupSort, SenderUserOperationDB::const_name()),
+    (TableType::DupSort, CodeHashDB::const_name()),
 ];
 
 impl DupSort for SenderUserOperationDB {
@@ -96,6 +104,7 @@ impl Display for DBError {
 
 impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     type UserOperations = Vec<UserOperation>;
+    type CodeHashes = Vec<CodeHash>;
     type Error = DBError;
     fn add(
         &mut self,
@@ -128,7 +137,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .and_then(|tx| {
                 let mut cursor = tx.cursor_dup_read::<SenderUserOperationDB>()?;
                 let res = cursor
-                    .walk_dup(wrap_sender.clone(), Address::default().into())?
+                    .walk_dup(Some(wrap_sender.clone()), Some(Address::default().into()))?
                     .map(|a| a.map(|(_, v)| v))
                     .collect::<Result<Vec<_>, _>>()?;
                 tx.commit()?;
@@ -144,7 +153,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .and_then(|tx| {
                 let mut cursor = tx.cursor_dup_read::<SenderUserOperationDB>()?;
                 let res = cursor
-                    .walk_dup(wrap_sender.clone(), Address::default().into())?
+                    .walk_dup(Some(wrap_sender.clone()), Some(Address::default().into()))?
                     .count();
                 tx.commit()?;
                 Ok(res)
@@ -152,11 +161,54 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .unwrap_or(0)
     }
 
+    fn has_code_hashes(
+        &self,
+        user_operation_hash: &UserOperationHash,
+    ) -> anyhow::Result<bool, Self::Error> {
+        let tx = self.env.tx()?;
+        let res = tx.get::<CodeHashDB>(*user_operation_hash)?;
+        tx.commit()?;
+        Ok(res.is_some())
+    }
+
+    fn get_code_hashes(&self, user_operation_hash: &UserOperationHash) -> Self::CodeHashes {
+        self.env
+            .tx()
+            .and_then(|tx| {
+                let mut cursor = tx.cursor_dup_read::<CodeHashDB>()?;
+                let res = cursor
+                    .walk_dup(Some(*user_operation_hash), Some(Address::default().into()))?
+                    .map(|a| a.map(|(_, v)| v))
+                    .collect::<Result<Vec<_>, _>>()?;
+                tx.commit()?;
+                Ok(res)
+            })
+            .unwrap_or_else(|_| vec![])
+    }
+
+    fn set_code_hashes(
+        &mut self,
+        user_operation_hash: &UserOperationHash,
+        code_hashes: &Self::CodeHashes,
+    ) -> anyhow::Result<(), Self::Error> {
+        let tx = self.env.tx_mut()?;
+        let res = tx.get::<CodeHashDB>(*user_operation_hash)?;
+        if res.is_some() {
+            tx.delete::<CodeHashDB>(*user_operation_hash, None)?;
+        }
+        for code_hash in code_hashes {
+            tx.put::<CodeHashDB>(*user_operation_hash, code_hash.clone())?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), DBError> {
         let tx = self.env.tx_mut()?;
         if let Some(user_op) = tx.get::<UserOperationDB>(*user_operation_hash)? {
             tx.delete::<UserOperationDB>(*user_operation_hash, None)?;
             tx.delete::<SenderUserOperationDB>(user_op.sender.into(), Some(user_op))?;
+            tx.delete::<CodeHashDB>(*user_operation_hash, None)?;
             tx.commit()?;
             Ok(())
         } else {
@@ -170,7 +222,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .and_then(|tx| {
                 let mut cursor = tx.cursor_read::<UserOperationDB>()?;
                 let mut user_ops = cursor
-                    .walk(UserOperationHash::default())?
+                    .walk(Some(UserOperationHash::default()))?
                     .map(|a| a.map(|(_, uo)| uo))
                     .collect::<Result<Vec<_>, _>>()?;
                 user_ops
@@ -186,7 +238,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .and_then(|tx| {
                 let mut c = tx.cursor_read::<UserOperationDB>()?;
                 let res = c
-                    .walk(UserOperationHash::default())?
+                    .walk(Some(UserOperationHash::default()))?
                     .map(|a| a.map(|(_, v)| v))
                     .collect::<Result<Vec<_>, _>>()?;
                 tx.commit()?;
@@ -280,7 +332,7 @@ mod tests {
 
     #[allow(clippy::unit_cmp)]
     #[tokio::test]
-    async fn memory_mempool() {
+    async fn database_mempool() {
         let dir = TempDir::new("test-userop-db").unwrap();
         let mempool: DatabaseMempool<NoWriteMap> = DatabaseMempool::new(dir.into_path()).unwrap();
         mempool

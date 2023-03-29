@@ -8,21 +8,22 @@ use crate::{
     types::{
         reputation::StakeInfo,
         simulation::{
-            SimulateValidationError, CREATE2_OPCODE, CREATE_OPCODE, FORBIDDEN_OPCODES,
+            CodeHash, SimulateValidationError, CREATE2_OPCODE, CREATE_OPCODE, FORBIDDEN_OPCODES,
             LEVEL_TO_ENTITY, NUMBER_LEVELS, PAYMASTER_VALIDATION_FUNCTION, RETURN_OPCODE,
             REVERT_OPCODE,
         },
         user_operation::UserOperation,
     },
-    uopool::mempool_id,
+    uopool::{mempool_id, utils::equal_code_hashes},
 };
 use ethers::{
     abi::AbiDecode,
     providers::Middleware,
-    types::{Address, Bytes, GethTrace, U256},
+    types::{Address, Bytes, GethTrace, H256, U256},
     utils::keccak256,
 };
 use std::collections::{HashMap, HashSet};
+use tokio::task::JoinSet;
 
 impl<M: Middleware + 'static> UoPoolService<M> {
     async fn simulate_validation(
@@ -403,6 +404,99 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         Ok(())
     }
 
+    async fn get_code_hashes(
+        &self,
+        contract_addresses: Vec<Address>,
+        code_hashes: &mut Vec<CodeHash>,
+    ) -> Result<(), SimulateValidationError> {
+        let mut tasks: JoinSet<Option<(Address, H256)>> = JoinSet::new();
+
+        for contract_address in contract_addresses {
+            let eth_provider = self.eth_provider.clone();
+
+            tasks.spawn(async move {
+                match eth_provider.get_code(contract_address, None).await {
+                    Ok(code) => Some((contract_address, keccak256(&code).into())),
+                    Err(_) => None,
+                }
+            });
+        }
+
+        while let Some(result) = tasks.join_next().await {
+            match result {
+                Ok(Some(code_hash)) => code_hashes.push(CodeHash {
+                    address: code_hash.0,
+                    hash: code_hash.1,
+                }),
+                Ok(None) | Err(_) => {
+                    return Err(SimulateValidationError::UnknownError {
+                        error: "failed to get code hashes".to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn code_hashes(
+        &self,
+        user_operation: &UserOperation,
+        entry_point: &Address,
+        trace: &JsTracerFrame,
+    ) -> Result<(), SimulateValidationError> {
+        let contract_addresses = trace
+            .number_levels
+            .iter()
+            .flat_map(|level| {
+                level
+                    .contract_size
+                    .keys()
+                    .copied()
+                    .collect::<Vec<Address>>()
+            })
+            .collect::<Vec<Address>>();
+
+        let code_hashes: &mut Vec<CodeHash> = &mut vec![];
+        self.get_code_hashes(contract_addresses, code_hashes)
+            .await?;
+
+        let mempool_id = mempool_id(entry_point, &self.chain_id);
+        let user_operation_hash = user_operation.hash(entry_point, &self.chain_id);
+
+        if let Some(mempool) = self.mempools.write().get_mut(&mempool_id) {
+            match mempool.has_code_hashes(&user_operation_hash) {
+                Ok(true) => {
+                    // 2nd simulation
+                    let prev_code_hashes = mempool.get_code_hashes(&user_operation_hash);
+                    if !equal_code_hashes(code_hashes, &prev_code_hashes) {
+                        return Err(SimulateValidationError::CodeHashesValidation {
+                            message: "modified code after 1st simulation".to_string(),
+                        });
+                    }
+                }
+                Ok(false) => {
+                    // 1st simulation
+                    match mempool.set_code_hashes(&user_operation_hash, code_hashes) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            return Err(SimulateValidationError::UnknownError {
+                                error: error.to_string(),
+                            });
+                        }
+                    }
+                }
+                Err(error) => {
+                    return Err(SimulateValidationError::UnknownError {
+                        error: error.to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
@@ -442,6 +536,11 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 
         // verify call stack
         self.call_stack(entry_point, &stake_info_by_entity, &js_trace)?;
+
+        // verify code hashes
+        // should be last verification because code hashes are stored in the 1st simulation
+        self.code_hashes(user_operation, entry_point, &js_trace)
+            .await?;
 
         Ok(simulate_validation_result)
     }
