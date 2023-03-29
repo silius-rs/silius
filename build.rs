@@ -13,6 +13,7 @@ fn make_protos(protos: &[&str]) {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     tonic_build::configure()
         .server_mod_attribute("uopool", r#"#[allow(clippy::unwrap_used)]"#)
+        .server_mod_attribute("bundler", r#"#[allow(clippy::unwrap_used)]"#)
         .file_descriptor_set_path(out_dir.join("descriptor.bin"))
         .compile_with_config(config(), protos, &["./src/proto"])
         .unwrap();
