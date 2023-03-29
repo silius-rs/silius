@@ -115,10 +115,9 @@ fn main() -> Result<()> {
                     uopool_grpc_client.clone(),
                     opt.entry_points,
                     opt.eth_client_address.clone(),
-                    opt.bundler_opts.bundle_interval,
                 );
                 info!("Starting bundler manager");
-                bundler_manager.start_bundling();
+                bundler_manager.start_bundling(opt.bundler_opts.bundle_interval);
                 info!("Starting bundler rpc server");
                 aa_bundler::bundler::service::run_server(
                     bundler_manager,

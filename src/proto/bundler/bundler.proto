@@ -12,6 +12,7 @@ enum Mode {
 
 message SetModeRequest {
     Mode mode = 1;
+    uint64 interval = 2; // if the mode is auto, bundle will be sent every interval seconds
 }
 
 enum SetModeResult{

@@ -17,6 +17,7 @@ use ethers::types::{Address, H256};
 use jsonrpsee::core::RpcResult;
 use tracing::{debug, trace};
 
+const DEFAULT_INTERVAL: u64 = 10;
 pub struct DebugApiServerImpl {
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     pub bundler_grpc_client: BundlerClient<tonic::transport::Channel>,
@@ -118,6 +119,7 @@ impl DebugApiServer for DebugApiServerImpl {
 
         let request = tonic::Request::new(SetModeRequest {
             mode: Into::<GrpcMode>::into(mode).into(),
+            interval: DEFAULT_INTERVAL,
         });
 
         match bundler_grpc_client.set_bundler_mode(request).await {

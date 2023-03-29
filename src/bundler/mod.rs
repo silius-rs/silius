@@ -145,7 +145,6 @@ impl Bundler {
 
 pub struct BundlerService {
     pub bundlers: Vec<Bundler>,
-    pub bundle_interval: u64,
     pub running: Arc<Mutex<bool>>,
 }
 
@@ -161,7 +160,6 @@ impl BundlerService {
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
         entry_points: Vec<Address>,
         eth_client_address: String,
-        bundle_interval: u64,
     ) -> Self {
         let bundlers: Vec<Bundler> = entry_points
             .iter()
@@ -178,7 +176,6 @@ impl BundlerService {
 
         Self {
             bundlers,
-            bundle_interval,
             running: Arc::new(Mutex::new(false)),
         }
     }
@@ -210,7 +207,7 @@ impl BundlerService {
         is_running(self.running.clone())
     }
 
-    pub fn start_bundling(&self) {
+    pub fn start_bundling(&self, interval: u64) {
         if !self.is_running() {
             for bundler in self.bundlers.iter() {
                 info!(
@@ -218,7 +215,6 @@ impl BundlerService {
                     bundler.entry_point
                 );
                 let bundler_own = bundler.clone();
-                let interval = self.bundle_interval;
                 let running_lock = self.running.clone();
                 tokio::spawn(async move {
                     let mut interval = tokio::time::interval(Duration::from_secs(interval));

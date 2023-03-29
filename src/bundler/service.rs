@@ -44,7 +44,8 @@ impl Bundler for BundlerService {
                 }))
             }
             Mode::Auto => {
-                self.start_bundling();
+                let interval = req.interval;
+                self.start_bundling(interval);
                 Ok(Response::new(SetModeResponse {
                     result: SetModeResult::Ok.into(),
                 }))
