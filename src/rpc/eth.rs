@@ -19,6 +19,7 @@ use jsonrpsee::{
     core::RpcResult,
     types::{error::CallError, ErrorObject},
 };
+use tracing::trace;
 
 const USER_OPERATION_HASH_ERROR_CODE: i32 = -32601;
 
@@ -63,6 +64,7 @@ impl EthApiServer for EthApiServerImpl {
         entry_point: Address,
     ) -> RpcResult<UserOperationHash> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+        trace!("Receive user operation {user_operation:?} from {entry_point:x?}");
 
         let request = tonic::Request::new(AddRequest {
             uo: Some(user_operation.into()),
@@ -74,7 +76,7 @@ impl EthApiServer for EthApiServerImpl {
             .await
             .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
             .into_inner();
-
+        trace!("Send user operation response: {response:?}");
         if response.result == AddResult::Added as i32 {
             let user_operation_hash = serde_json::from_str::<UserOperationHash>(&response.data)
                 .map_err(|err| format_err!("error parsing user operation hash: {}", err))?;

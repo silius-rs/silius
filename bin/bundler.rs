@@ -1,5 +1,5 @@
 use aa_bundler::{
-    bundler::BundlerManager,
+    bundler::BundlerService,
     models::wallet::Wallet,
     rpc::{
         debug::DebugApiServerImpl, debug_api::DebugApiServer, eth::EthApiServerImpl,
@@ -109,7 +109,7 @@ fn main() -> Result<()> {
                 .await?;
                 info!("Connected to uopool grpc");
 
-                let bundler_manager = BundlerManager::new(
+                let bundler_manager = BundlerService::new(
                     wallet,
                     opt.bundler_opts.beneficiary,
                     uopool_grpc_client.clone(),
@@ -120,7 +120,7 @@ fn main() -> Result<()> {
                 info!("Starting bundler manager");
                 bundler_manager.start_bundling();
                 info!("Starting bundler rpc server");
-                aa_bundler::bundler::server::run_server(
+                aa_bundler::bundler::service::run_server(
                     bundler_manager,
                     opt.bundler_opts.bundler_grpc_listen_address,
                 );

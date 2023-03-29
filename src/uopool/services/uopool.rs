@@ -32,7 +32,7 @@ use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
-use tracing::debug;
+use tracing::{debug, trace};
 
 pub type UoPoolError = ErrorObject<'static>;
 
@@ -101,6 +101,7 @@ where
             ep: Some(entry_point),
         } = req
         {
+            trace!("Receive grpc request to add user operation: {user_operation:?} on entry point: {entry_point:?}");
             let user_operation: UserOperation = user_operation
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
@@ -440,6 +441,7 @@ where
                     .iter()
                     .map(|uo| uo.clone().into())
                     .collect();
+                trace!("Get all user operations in the mempool: {:?}", res.uos);
             } else {
                 res.result = GetAllResult::NotGotAll as i32;
             }

@@ -1,4 +1,4 @@
-pub mod server;
+pub mod service;
 
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
@@ -143,7 +143,7 @@ impl Bundler {
     }
 }
 
-pub struct BundlerManager {
+pub struct BundlerService {
     pub bundlers: Vec<Bundler>,
     pub bundle_interval: u64,
     pub running: Arc<Mutex<bool>>,
@@ -154,7 +154,7 @@ fn is_running(running: Arc<Mutex<bool>>) -> bool {
     *r
 }
 
-impl BundlerManager {
+impl BundlerService {
     pub fn new(
         wallet: Wallet,
         beneficiary: Address,

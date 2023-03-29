@@ -12,10 +12,10 @@ use crate::uopool::server::{
     types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
 };
 
-use super::BundlerManager;
+use super::BundlerService;
 
 #[async_trait]
-impl Bundler for BundlerManager {
+impl Bundler for BundlerService {
     async fn chain_id(
         &self,
         _request: tonic::Request<()>,
@@ -66,7 +66,7 @@ impl Bundler for BundlerManager {
     }
 }
 
-pub fn run_server(bundler_manager: BundlerManager, listen_address: SocketAddr) {
+pub fn run_server(bundler_manager: BundlerService, listen_address: SocketAddr) {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = BundlerServer::new(bundler_manager);
