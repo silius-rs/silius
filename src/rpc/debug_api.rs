@@ -2,7 +2,7 @@ use crate::{
     bundler::Mode,
     types::{reputation::ReputationEntry, user_operation::UserOperation},
 };
-use ethers::types::Address;
+use ethers::types::{Address, H256};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 #[rpc(server, namespace = "debug_bundler")]
@@ -25,4 +25,7 @@ pub trait DebugApi {
 
     #[method(name = "setBundlingMode")]
     async fn set_bundling_mode(&self, mode: Mode) -> RpcResult<()>;
+
+    #[method(name = "sendBundleNow")]
+    async fn send_bundle_now(&self) -> RpcResult<H256>;
 }

@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::format_err;
 use async_trait::async_trait;
-use ethers::types::Address;
+use ethers::types::{Address, H256};
 use jsonrpsee::core::RpcResult;
 use tracing::{debug, trace};
 
@@ -122,6 +122,22 @@ impl DebugApiServer for DebugApiServerImpl {
 
         match bundler_grpc_client.set_bundler_mode(request).await {
             Ok(_) => Ok(()),
+            Err(status) => Err(jsonrpsee::core::Error::Custom(format!(
+                "GRPC error (bundler): {}",
+                status.message()
+            ))),
+        }
+    }
+
+    async fn send_bundle_now(&self) -> RpcResult<H256> {
+        let mut bundler_grpc_client = self.bundler_grpc_client.clone();
+        let request = tonic::Request::new(());
+        match bundler_grpc_client.send_bundle_now(request).await {
+            Ok(response) => Ok(response
+                .into_inner()
+                .result
+                .expect("Must return send bundle now tx data")
+                .into()),
             Err(status) => Err(jsonrpsee::core::Error::Custom(format!(
                 "GRPC error (bundler): {}",
                 status.message()

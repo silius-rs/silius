@@ -2,11 +2,12 @@ use std::net::SocketAddr;
 
 use async_trait::async_trait;
 use tonic::Response;
+use tracing::info;
 
 use crate::uopool::server::{
     bundler::{
         bundler_server::{Bundler, BundlerServer},
-        Mode, SetModeRequest, SetModeResponse, SetModeResult,
+        Mode, SendBundleNowResponse, SetModeRequest, SetModeResponse, SetModeResult,
     },
     types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
 };
@@ -36,6 +37,7 @@ impl Bundler for BundlerManager {
         let req = request.into_inner();
         match req.mode() {
             Mode::Manual => {
+                info!("Stopping auto bundling");
                 self.stop_bundling();
                 Ok(Response::new(SetModeResponse {
                     result: SetModeResult::Ok.into(),
@@ -48,6 +50,19 @@ impl Bundler for BundlerManager {
                 }))
             }
         }
+    }
+
+    async fn send_bundle_now(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<Response<SendBundleNowResponse>, tonic::Status> {
+        let res = self
+            .send_bundles_now()
+            .await
+            .map_err(|e| tonic::Status::internal(format!("Send bundle now with error: {e:?}")))?;
+        Ok(Response::new(SendBundleNowResponse {
+            result: Some(res.into()),
+        }))
     }
 }
 

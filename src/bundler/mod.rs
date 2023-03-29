@@ -7,11 +7,11 @@ use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
-    types::{transaction::eip2718::TypedTransaction, Address, U256},
+    types::{transaction::eip2718::TypedTransaction, Address, H256, U256},
 };
 use parking_lot::Mutex;
 use serde::Deserialize;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::{
     contracts::gen::EntryPointAPI,
@@ -103,8 +103,10 @@ impl Bundler {
         Ok(user_operations)
     }
 
-    async fn send_next_bundle(&self) -> anyhow::Result<()> {
+    async fn send_next_bundle(&self) -> anyhow::Result<H256> {
+        info!("Creating the next bundle");
         let bundles = self.create_bundle().await?;
+        info!("Got {} bundles", bundles.len());
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(provider, self.wallet.signer.clone()));
         let entry_point = EntryPointAPI::new(self.entry_point, client.clone());
@@ -131,10 +133,13 @@ impl Bundler {
                 tx.set_gas_price(max_fee_per_gas);
             }
         };
-        let res = client.send_transaction(tx, None).await?.await?;
+        let tx = client.send_transaction(tx, None).await?;
+        let tx_hash = tx.tx_hash();
+        debug!("Send bundles with transaction: {tx:?}");
 
-        debug!("Send bundles with ret: {res:?}");
-        Ok(())
+        let res = tx.await?;
+        debug!("Send bundles with receipt: {res:?}");
+        Ok(tx_hash)
     }
 }
 
@@ -178,9 +183,25 @@ impl BundlerManager {
         }
     }
 
-    pub fn start_server(&self) {}
+    pub async fn send_bundles_now(&self) -> anyhow::Result<H256> {
+        info!("Sending bundle now");
+        let mut tx_hashes: Vec<H256> = vec![];
+        for bundler in self.bundlers.iter() {
+            info!("Sending bundle for entry point: {:?}", bundler.entry_point);
+            let tx_hash = bundler.send_next_bundle().await?;
+            tx_hashes.push(tx_hash)
+        }
+
+        // FIXME: Because currently the bundler support multiple bundler and
+        // we don't have a way to know which bundler is the one that is
+        Ok(tx_hashes
+            .into_iter()
+            .next()
+            .expect("Must have at least one tx hash"))
+    }
 
     pub fn stop_bundling(&self) {
+        info!("Stopping auto bundling");
         let mut r = self.running.lock();
         *r = false;
     }
@@ -192,6 +213,10 @@ impl BundlerManager {
     pub fn start_bundling(&self) {
         if !self.is_running() {
             for bundler in self.bundlers.iter() {
+                info!(
+                    "Starting auto bundling process for entry point: {:?}",
+                    bundler.entry_point
+                );
                 let bundler_own = bundler.clone();
                 let interval = self.bundle_interval;
                 let running_lock = self.running.clone();

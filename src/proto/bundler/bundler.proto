@@ -22,10 +22,15 @@ message SetModeResponse{
     SetModeResult result = 1;
 }
 
+message SendBundleNowResponse{
+    types.H256 result = 1;
+}
+
 
 service Bundler {
     rpc ChainId(google.protobuf.Empty) returns (types.GetChainIdResponse);
     rpc SupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
     // debug
     rpc SetBundlerMode(SetModeRequest) returns (SetModeResponse);
+    rpc SendBundleNow(google.protobuf.Empty) returns (SendBundleNowResponse);
 }
