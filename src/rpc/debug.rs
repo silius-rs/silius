@@ -1,6 +1,6 @@
 use super::debug_api::DebugApiServer;
 use crate::{
-    bundler::Mode,
+    bundler::{Mode, DEFAULT_INTERVAL},
     types::{reputation::ReputationEntry, user_operation::UserOperation},
     uopool::server::{
         bundler::{bundler_client::BundlerClient, Mode as GrpcMode, SetModeRequest},
@@ -17,7 +17,6 @@ use ethers::types::{Address, H256};
 use jsonrpsee::core::RpcResult;
 use tracing::{debug, trace};
 
-const DEFAULT_INTERVAL: u64 = 10;
 pub struct DebugApiServerImpl {
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     pub bundler_grpc_client: BundlerClient<tonic::transport::Channel>,
