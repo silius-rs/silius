@@ -24,6 +24,8 @@ use crate::{
     utils::{parse_address, parse_u256},
 };
 
+pub const DEFAULT_INTERVAL: u64 = 10;
+
 #[derive(Debug, Deserialize)]
 pub enum Mode {
     #[serde(rename = "auto")]
