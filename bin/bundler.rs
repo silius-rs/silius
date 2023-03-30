@@ -109,7 +109,7 @@ fn main() -> Result<()> {
                 .await?;
                 info!("Connected to uopool grpc");
 
-                let bundler_manager = BundlerService::new(
+                let bundler_service = BundlerService::new(
                     wallet,
                     opt.bundler_opts.beneficiary,
                     uopool_grpc_client.clone(),
@@ -117,10 +117,10 @@ fn main() -> Result<()> {
                     opt.eth_client_address.clone(),
                 );
                 info!("Starting bundler manager");
-                bundler_manager.start_bundling(opt.bundler_opts.bundle_interval);
+                bundler_service.start_bundling(opt.bundler_opts.bundle_interval);
                 info!("Starting bundler rpc server");
                 aa_bundler::bundler::service::run_server(
-                    bundler_manager,
+                    bundler_service,
                     opt.bundler_opts.bundler_grpc_listen_address,
                 );
                 info!(

@@ -67,10 +67,10 @@ impl Bundler for BundlerService {
     }
 }
 
-pub fn run_server(bundler_manager: BundlerService, listen_address: SocketAddr) {
+pub fn run_server(bundler_service: BundlerService, listen_address: SocketAddr) {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
-        let svc = BundlerServer::new(bundler_manager);
+        let svc = BundlerServer::new(bundler_service);
         builder.add_service(svc).serve(listen_address).await
     });
 }
