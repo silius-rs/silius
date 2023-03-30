@@ -1,11 +1,13 @@
 use aa_bundler::{
-    bundler::Bundler,
+    bundler::BundlerService,
     models::wallet::Wallet,
     rpc::{
         debug::DebugApiServerImpl, debug_api::DebugApiServer, eth::EthApiServerImpl,
         eth_api::EthApiServer,
     },
-    uopool::server::uopool::uo_pool_client::UoPoolClient,
+    uopool::server::{
+        bundler::bundler_client::BundlerClient, uopool::uo_pool_client::UoPoolClient,
+    },
     utils::{parse_address, parse_u256},
 };
 use anyhow::Result;
@@ -107,16 +109,24 @@ fn main() -> Result<()> {
                 .await?;
                 info!("Connected to uopool grpc");
 
-                for entry_point in opt.entry_points.iter() {
-                    let _bundler = Bundler::new(
-                        &wallet,
-                        opt.bundler_opts.beneficiary,
-                        uopool_grpc_client.clone(),
-                        opt.bundler_opts.bundle_interval,
-                        *entry_point,
-                        opt.eth_client_address.clone(),
-                    );
-                }
+                let bundler_manager = BundlerService::new(
+                    wallet,
+                    opt.bundler_opts.beneficiary,
+                    uopool_grpc_client.clone(),
+                    opt.entry_points,
+                    opt.eth_client_address.clone(),
+                );
+                info!("Starting bundler manager");
+                bundler_manager.start_bundling(opt.bundler_opts.bundle_interval);
+                info!("Starting bundler rpc server");
+                aa_bundler::bundler::service::run_server(
+                    bundler_manager,
+                    opt.bundler_opts.bundler_grpc_listen_address,
+                );
+                info!(
+                    "Starting bundler rpc server at {:}",
+                    opt.bundler_opts.bundler_grpc_listen_address
+                );
 
                 if !opt.no_rpc {
                     info!("Starting rpc server with bundler");
@@ -142,7 +152,18 @@ fn main() -> Result<()> {
                             }
 
                             if rpc_api.contains("debug") {
-                                api.merge(DebugApiServerImpl { uopool_grpc_client }.into_rpc())?;
+                                let bundler_grpc_client = BundlerClient::connect(format!(
+                                    "http://{}",
+                                    opt.bundler_opts.bundler_grpc_listen_address
+                                ))
+                                .await?;
+                                api.merge(
+                                    DebugApiServerImpl {
+                                        uopool_grpc_client,
+                                        bundler_grpc_client,
+                                    }
+                                    .into_rpc(),
+                                )?;
                             }
 
                             let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;

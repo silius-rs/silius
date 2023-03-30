@@ -5,15 +5,33 @@ import "types/types.proto";
 
 package bundler;
 
-message ChainIdResponse {
-    uint64 chain_id = 1;
+enum Mode {
+    AUTO = 0;
+    MANUAL = 1;
 }
 
-message SupportedEntryPointsResponse {
-    repeated types.SupportedEntryPoint supported_entry_points = 1;
+message SetModeRequest {
+    Mode mode = 1;
+    uint64 interval = 2; // if the mode is auto, bundle will be sent every interval seconds
 }
+
+enum SetModeResult{
+    OK = 0;
+}
+
+message SetModeResponse{
+    SetModeResult result = 1;
+}
+
+message SendBundleNowResponse{
+    types.H256 result = 1;
+}
+
 
 service Bundler {
-    rpc ChainId(google.protobuf.Empty) returns (ChainIdResponse);
-    rpc SupportedEntryPoints(google.protobuf.Empty) returns (SupportedEntryPointsResponse);
+    rpc ChainId(google.protobuf.Empty) returns (types.GetChainIdResponse);
+    rpc SupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
+    // debug
+    rpc SetBundlerMode(SetModeRequest) returns (SetModeResponse);
+    rpc SendBundleNow(google.protobuf.Empty) returns (SendBundleNowResponse);
 }

@@ -6,6 +6,7 @@ use ethers::{
 use expanded_pathbuf::ExpandedPathBuf;
 use std::fs;
 
+#[derive(Clone)]
 pub struct Wallet {
     pub signer: ethers::signers::Wallet<SigningKey>,
 }

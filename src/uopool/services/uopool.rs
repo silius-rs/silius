@@ -8,14 +8,16 @@ use crate::{
     },
     uopool::{
         mempool_id,
-        server::uopool::{
-            uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearResponse, ClearResult,
-            EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
-            EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
-            GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
-            GetChainIdResponse, GetSortedRequest, GetSortedResponse,
-            GetSupportedEntryPointsResponse, RemoveRequest, RemoveResponse, SetReputationRequest,
-            SetReputationResponse, SetReputationResult,
+        server::{
+            types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
+            uopool::{
+                uo_pool_server::UoPool, AddRequest, AddResponse, AddResult, ClearResponse,
+                ClearResult, EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
+                EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
+                GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
+                GetSortedRequest, GetSortedResponse, RemoveRequest, RemoveResponse,
+                SetReputationRequest, SetReputationResponse, SetReputationResult,
+            },
         },
         utils::get_addr,
         MempoolBox, MempoolId, ReputationBox,
@@ -30,7 +32,7 @@ use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
-use tracing::debug;
+use tracing::{debug, trace};
 
 pub type UoPoolError = ErrorObject<'static>;
 type VecUo = Vec<UserOperation>;
@@ -101,6 +103,7 @@ where
             ep: Some(entry_point),
         } = req
         {
+            trace!("Receive grpc request to add user operation: {user_operation:?} on entry point: {entry_point:?}");
             let user_operation: UserOperation = user_operation
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
@@ -455,6 +458,7 @@ where
                     .iter()
                     .map(|uo| uo.clone().into())
                     .collect();
+                trace!("Get all user operations in the mempool: {:?}", res.uos);
             } else {
                 res.result = GetAllResult::NotGotAll as i32;
             }

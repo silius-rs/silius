@@ -33,14 +33,6 @@ message RemoveResponse {
     RemoveResult result = 1;
 }
 
-message GetChainIdResponse {
-    uint64 chain_id = 1;
-}
-
-message GetSupportedEntryPointsResponse {
-    repeated types.H160 eps = 1;
-}
-
 message EstimateUserOperationGasRequest {
     types.UserOperation uo = 1;
     types.H160 ep = 2;
@@ -118,8 +110,8 @@ message GetSortedResponse{
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
-    rpc GetChainId(google.protobuf.Empty) returns (GetChainIdResponse);
-    rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (GetSupportedEntryPointsResponse);
+    rpc GetChainId(google.protobuf.Empty) returns (types.GetChainIdResponse);
+    rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
 

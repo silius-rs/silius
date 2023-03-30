@@ -47,3 +47,11 @@ message ReputationEntry {
     uint64 uo_included = 3;
     ReputationStatus status = 4;
 }
+
+message GetChainIdResponse {
+    uint64 chain_id = 1;
+}
+
+message GetSupportedEntryPointsResponse {
+    repeated H160 eps = 1;
+}

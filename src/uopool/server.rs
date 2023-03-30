@@ -162,3 +162,7 @@ pub mod types {
 pub mod uopool {
     tonic::include_proto!("uopool");
 }
+
+pub mod bundler {
+    tonic::include_proto!("bundler");
+}
