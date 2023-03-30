@@ -114,6 +114,7 @@ fn main() -> Result<()> {
                     opt.bundler_opts.beneficiary,
                     uopool_grpc_client.clone(),
                     opt.entry_points,
+                    chain_id,
                     opt.eth_client_address.clone(),
                 );
                 info!("Starting bundler manager");
