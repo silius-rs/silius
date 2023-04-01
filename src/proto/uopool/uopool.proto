@@ -21,7 +21,8 @@ message AddResponse {
 }
 
 message RemoveRequest {
-    repeated types.H256 hash = 1;
+    repeated types.H256 hashes = 1;
+    types.H160 ep = 2;
 }
 
 enum RemoveResult {

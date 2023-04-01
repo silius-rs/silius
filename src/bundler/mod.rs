@@ -19,7 +19,7 @@ use crate::{
     types::user_operation::UserOperation,
     uopool::server::{
         bundler::Mode as GrpcMode,
-        uopool::{uo_pool_client::UoPoolClient, GetSortedRequest},
+        uopool::{uo_pool_client::UoPoolClient, GetSortedRequest, RemoveRequest, RemoveResult},
     },
     utils::{parse_address, parse_u256},
 };
@@ -67,6 +67,7 @@ pub struct Bundler {
     pub beneficiary: Address,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     pub entry_point: Address,
+    pub chain_id: U256,
     pub eth_client_address: String,
 }
 
@@ -76,6 +77,7 @@ impl Bundler {
         beneficiary: Address,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
         entry_point: Address,
+        chain_id: U256,
         eth_client_address: String,
     ) -> Self {
         Self {
@@ -83,6 +85,7 @@ impl Bundler {
             beneficiary,
             uopool_grpc_client,
             entry_point,
+            chain_id,
             eth_client_address,
         }
     }
@@ -105,42 +108,37 @@ impl Bundler {
         Ok(user_operations)
     }
 
-    async fn send_next_bundle(&self) -> anyhow::Result<H256> {
-        info!("Creating the next bundle");
-        let bundles = self.create_bundle().await?;
-        info!("Got {} bundles", bundles.len());
+    async fn send_next_bundle(&self, bundle: &Vec<UserOperation>) -> anyhow::Result<H256> {
+        info!(
+            "Creating the next bundle, got {} user operations",
+            bundle.len()
+        );
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
-        let client = Arc::new(SignerMiddleware::new(provider, self.wallet.signer.clone()));
+        let client = Arc::new(SignerMiddleware::new(
+            provider.clone(),
+            self.wallet.signer.clone(),
+        ));
         let entry_point = EntryPointAPI::new(self.entry_point, client.clone());
         let nonce = client
             .clone()
             .get_transaction_count(self.wallet.signer.address(), None)
             .await?;
-        let (max_fee_per_gas, max_priority_fee_per_gas) =
-            client.clone().estimate_eip1559_fees(None).await?;
         let mut tx: TypedTransaction = entry_point
             .handle_ops(
-                bundles.into_iter().map(Into::into).collect(),
+                bundle.clone().into_iter().map(Into::into).collect(),
                 self.beneficiary,
             )
             .tx
             .clone();
-        tx.set_gas(U256::from(1000000)).set_nonce(nonce);
-        match tx {
-            TypedTransaction::Eip1559(ref mut inner) => {
-                inner.max_fee_per_gas = Some(max_fee_per_gas);
-                inner.max_priority_fee_per_gas = Some(max_priority_fee_per_gas)
-            }
-            _ => {
-                tx.set_gas_price(max_fee_per_gas);
-            }
-        };
+        tx.set_nonce(nonce).set_chain_id(self.chain_id.as_u64());
+
         let tx = client.send_transaction(tx, None).await?;
         let tx_hash = tx.tx_hash();
-        debug!("Send bundles with transaction: {tx:?}");
+        debug!("Send bundle with transaction: {tx:?}");
 
-        let res = tx.await?;
-        debug!("Send bundles with receipt: {res:?}");
+        // TODO: check if bundle was included on-chain
+        // let res = tx.await?;
+        // debug!("Send bundle with receipt: {res:?}");
         Ok(tx_hash)
     }
 }
@@ -161,6 +159,7 @@ impl BundlerService {
         beneficiary: Address,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
         entry_points: Vec<Address>,
+        chain_id: U256,
         eth_client_address: String,
     ) -> Self {
         let bundlers: Vec<Bundler> = entry_points
@@ -171,6 +170,7 @@ impl BundlerService {
                     beneficiary,
                     uopool_grpc_client.clone(),
                     *entry_point,
+                    chain_id,
                     eth_client_address.clone(),
                 )
             })
@@ -183,11 +183,31 @@ impl BundlerService {
     }
 
     pub async fn send_bundles_now(&self) -> anyhow::Result<H256> {
-        info!("Sending bundle now");
+        info!("Sending bundles now");
         let mut tx_hashes: Vec<H256> = vec![];
         for bundler in self.bundlers.iter() {
             info!("Sending bundle for entry point: {:?}", bundler.entry_point);
-            let tx_hash = bundler.send_next_bundle().await?;
+
+            let bundle = bundler.create_bundle().await?;
+            let tx_hash = bundler.send_next_bundle(&bundle).await?;
+
+            let response = bundler
+                .uopool_grpc_client
+                .clone()
+                .remove(tonic::Request::new(RemoveRequest {
+                    hashes: bundle
+                        .iter()
+                        .map(|u| u.hash(&bundler.entry_point, &bundler.chain_id).0.into())
+                        .collect(),
+                    ep: Some(bundler.entry_point.into()),
+                }))
+                .await?;
+
+            match response.into_inner().result() {
+                RemoveResult::Removed => info!("Bundle removed from pool"),
+                RemoveResult::NotRemoved => info!("Bundle not removed from pool"),
+            }
+
             tx_hashes.push(tx_hash)
         }
 
@@ -226,8 +246,15 @@ impl BundlerService {
                         }
                         interval.tick().await;
 
-                        if let Err(e) = bundler_own.send_next_bundle().await {
-                            error!("Error while sending bundle: {e:?}");
+                        match bundler_own.create_bundle().await {
+                            Ok(bundle) => {
+                                if let Err(e) = bundler_own.send_next_bundle(&bundle).await {
+                                    error!("Error while sending bundle: {e:?}");
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error while creating bundle: {e:?}");
+                            }
                         }
                     }
                 });

@@ -15,7 +15,7 @@ use crate::{
                 ClearResult, EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
                 EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
                 GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
-                GetSortedRequest, GetSortedResponse, RemoveRequest, RemoveResponse,
+                GetSortedRequest, GetSortedResponse, RemoveRequest, RemoveResponse, RemoveResult,
                 SetReputationRequest, SetReputationResponse, SetReputationResult,
             },
         },
@@ -26,7 +26,7 @@ use crate::{
 use async_trait::async_trait;
 use ethers::{
     providers::Middleware,
-    types::{Address, U256},
+    types::{Address, H256, U256},
 };
 use jsonrpsee::types::ErrorObject;
 use parking_lot::RwLock;
@@ -160,9 +160,45 @@ where
 
     async fn remove(
         &self,
-        _request: tonic::Request<RemoveRequest>,
+        request: tonic::Request<RemoveRequest>,
     ) -> Result<Response<RemoveResponse>, tonic::Status> {
-        Err(tonic::Status::unimplemented("todo"))
+        let req = request.into_inner();
+
+        if let RemoveRequest {
+            hashes,
+            ep: Some(entry_point),
+        } = req
+        {
+            let entry_point = entry_point
+                .try_into()
+                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+
+            if let Some(mempool) = self.mempools.write().get_mut(&mempool_id) {
+                for hash in hashes {
+                    let hash: H256 = hash.try_into().map_err(|_| {
+                        tonic::Status::invalid_argument("invalid user operation hash")
+                    })?;
+
+                    match mempool.remove(&hash.into()) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            return Ok(tonic::Response::new(RemoveResponse {
+                                result: RemoveResult::NotRemoved as i32,
+                            }));
+                        }
+                    }
+                }
+
+                return Ok(tonic::Response::new(RemoveResponse {
+                    result: RemoveResult::Removed as i32,
+                }));
+            }
+        }
+
+        Err(tonic::Status::invalid_argument(
+            "missing user operations or entry point",
+        ))
     }
 
     async fn get_chain_id(
