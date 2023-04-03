@@ -1,4 +1,4 @@
-use super::UoPoolService;
+use super::UoPool;
 use crate::{
     contracts::{
         gen::{ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS},
@@ -14,7 +14,7 @@ use crate::{
         },
         user_operation::UserOperation,
     },
-    uopool::{mempool_id, utils::equal_code_hashes},
+    uopool::utils::equal_code_hashes,
 };
 use ethers::{
     abi::AbiDecode,
@@ -25,67 +25,57 @@ use ethers::{
 use std::collections::{HashMap, HashSet};
 use tokio::task::JoinSet;
 
-impl<M: Middleware + 'static> UoPoolService<M> {
+#[derive(Debug)]
+pub struct SimulationResult {
+    pub simulate_validation_result: SimulateValidationResult,
+    pub code_hashes: Vec<CodeHash>,
+}
+
+impl<M: Middleware + 'static> UoPool<M> {
     async fn simulate_validation(
         &self,
         user_operation: &UserOperation,
-        entry_point: &Address,
     ) -> Result<SimulateValidationResult, SimulateValidationError> {
-        let mempool_id = mempool_id(entry_point, &self.chain_id);
-
-        if let Some(entry_point) = self.entry_points.get(&mempool_id) {
-            return match entry_point
-                .simulate_validation(user_operation.clone())
-                .await
-            {
-                Ok(simulate_validation_result) => Ok(simulate_validation_result),
-                Err(entry_point_error) => match entry_point_error {
-                    EntryPointErr::FailedOp(failed_op) => {
-                        Err(SimulateValidationError::UserOperationRejected {
-                            message: format!("{failed_op}"),
-                        })
-                    }
-                    _ => Err(SimulateValidationError::UserOperationRejected {
-                        message: "unknown error".to_string(),
-                    }),
-                },
-            };
-        }
-
-        Err(SimulateValidationError::UserOperationRejected {
-            message: "invalid entry point".to_string(),
-        })
+        return match self
+            .entry_point
+            .simulate_validation(user_operation.clone())
+            .await
+        {
+            Ok(simulate_validation_result) => Ok(simulate_validation_result),
+            Err(entry_point_error) => match entry_point_error {
+                EntryPointErr::FailedOp(failed_op) => {
+                    Err(SimulateValidationError::UserOperationRejected {
+                        message: format!("{failed_op}"),
+                    })
+                }
+                _ => Err(SimulateValidationError::UserOperationRejected {
+                    message: "unknown error".to_string(),
+                }),
+            },
+        };
     }
 
     async fn simulate_validation_trace(
         &self,
         user_operation: &UserOperation,
-        entry_point: &Address,
     ) -> Result<GethTrace, SimulateValidationError> {
-        let mempool_id = mempool_id(entry_point, &self.chain_id);
-
-        if let Some(entry_point) = self.entry_points.get(&mempool_id) {
-            return match entry_point
-                .simulate_validation_trace(user_operation.clone())
-                .await
-            {
-                Ok(geth_trace) => Ok(geth_trace),
-                Err(entry_point_error) => match entry_point_error {
-                    EntryPointErr::FailedOp(failed_op) => {
-                        Err(SimulateValidationError::UserOperationRejected {
-                            message: format!("{failed_op}"),
-                        })
-                    }
-                    _ => Err(SimulateValidationError::UserOperationRejected {
-                        message: "unknown error".to_string(),
-                    }),
-                },
-            };
-        }
-
-        Err(SimulateValidationError::UserOperationRejected {
-            message: "invalid entry point".to_string(),
-        })
+        return match self
+            .entry_point
+            .simulate_validation_trace(user_operation.clone())
+            .await
+        {
+            Ok(geth_trace) => Ok(geth_trace),
+            Err(entry_point_error) => match entry_point_error {
+                EntryPointErr::FailedOp(failed_op) => {
+                    Err(SimulateValidationError::UserOperationRejected {
+                        message: format!("{failed_op}"),
+                    })
+                }
+                _ => Err(SimulateValidationError::UserOperationRejected {
+                    message: "unknown error".to_string(),
+                }),
+            },
+        };
     }
 
     fn extract_stake_info(
@@ -229,7 +219,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     fn storage_access(
         &self,
         user_operation: &UserOperation,
-        entry_point: &Address,
         stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
     ) -> Result<(), SimulateValidationError> {
@@ -245,7 +234,7 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
             if let Some(level) = trace.number_levels.get(index) {
                 for (address, access) in &level.access {
-                    if *address == user_operation.sender || *address == *entry_point {
+                    if *address == user_operation.sender || *address == self.entry_point.address() {
                         continue;
                     }
 
@@ -356,7 +345,6 @@ impl<M: Middleware + 'static> UoPoolService<M> {
 
     fn call_stack(
         &self,
-        entry_point: &Address,
         stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
     ) -> Result<(), SimulateValidationError> {
@@ -380,21 +368,16 @@ impl<M: Middleware + 'static> UoPoolService<M> {
                             })?;
                         let context = validate_paymaster_return.context;
 
-                        if !context.is_empty() {
-                            let mempool_id = mempool_id(entry_point, &self.chain_id);
-
-                            if let Some(reputation) = self.reputations.read().get(&mempool_id) {
-                                if reputation
-                                    .verify_stake("paymaster", Some(*stake_info))
-                                    .is_err()
-                                {
-                                    return Err(SimulateValidationError::CallStackValidation {
-                                        message:
-                                            "Paymaster that is not staked should not return context"
-                                                .to_string(),
-                                    });
-                                }
-                            }
+                        if !context.is_empty()
+                            && self
+                                .reputation
+                                .verify_stake("paymaster", Some(*stake_info))
+                                .is_err()
+                        {
+                            return Err(SimulateValidationError::CallStackValidation {
+                                message: "Paymaster that is not staked should not return context"
+                                    .to_string(),
+                            });
                         }
                     }
                 }
@@ -442,9 +425,8 @@ impl<M: Middleware + 'static> UoPoolService<M> {
     async fn code_hashes(
         &self,
         user_operation: &UserOperation,
-        entry_point: &Address,
         trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError> {
+    ) -> Result<Vec<CodeHash>, SimulateValidationError> {
         let contract_addresses = trace
             .number_levels
             .iter()
@@ -461,54 +443,37 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         self.get_code_hashes(contract_addresses, code_hashes)
             .await?;
 
-        let mempool_id = mempool_id(entry_point, &self.chain_id);
-        let user_operation_hash = user_operation.hash(entry_point, &self.chain_id);
+        let user_operation_hash = user_operation.hash(&self.entry_point.address(), &self.chain_id);
 
-        if let Some(mempool) = self.mempools.write().get_mut(&mempool_id) {
-            match mempool.has_code_hashes(&user_operation_hash) {
-                Ok(true) => {
-                    // 2nd simulation
-                    let prev_code_hashes = mempool.get_code_hashes(&user_operation_hash);
-                    if !equal_code_hashes(code_hashes, &prev_code_hashes) {
-                        return Err(SimulateValidationError::CodeHashesValidation {
-                            message: "modified code after 1st simulation".to_string(),
-                        });
-                    }
-                }
-                Ok(false) => {
-                    // 1st simulation
-                    match mempool.set_code_hashes(&user_operation_hash, code_hashes) {
-                        Ok(_) => {}
-                        Err(error) => {
-                            return Err(SimulateValidationError::UnknownError {
-                                error: error.to_string(),
-                            });
-                        }
-                    }
-                }
-                Err(error) => {
-                    return Err(SimulateValidationError::UnknownError {
-                        error: error.to_string(),
-                    });
+        match self.mempool.has_code_hashes(&user_operation_hash) {
+            Ok(true) => {
+                // 2nd simulation
+                let prev_code_hashes = self.mempool.get_code_hashes(&user_operation_hash);
+                if !equal_code_hashes(code_hashes, &prev_code_hashes) {
+                    Err(SimulateValidationError::CodeHashesValidation {
+                        message: "modified code after 1st simulation".to_string(),
+                    })
+                } else {
+                    Ok(code_hashes.to_vec())
                 }
             }
+            Ok(false) => {
+                // 1st simulation
+                Ok(code_hashes.to_vec())
+            }
+            Err(error) => Err(SimulateValidationError::UnknownError {
+                error: error.to_string(),
+            }),
         }
-
-        Ok(())
     }
 
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
-        entry_point: &Address,
-    ) -> Result<SimulateValidationResult, SimulateValidationError> {
-        let simulate_validation_result = self
-            .simulate_validation(user_operation, entry_point)
-            .await?;
+    ) -> Result<SimulationResult, SimulateValidationError> {
+        let simulate_validation_result = self.simulate_validation(user_operation).await?;
 
-        let geth_trace = self
-            .simulate_validation_trace(user_operation, entry_point)
-            .await?;
+        let geth_trace = self.simulate_validation_trace(user_operation).await?;
 
         let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
             SimulateValidationError::UserOperationRejected {
@@ -527,21 +492,17 @@ impl<M: Middleware + 'static> UoPoolService<M> {
         self.forbidden_opcodes(&js_trace)?;
 
         // verify storage access
-        self.storage_access(
-            user_operation,
-            entry_point,
-            &stake_info_by_entity,
-            &js_trace,
-        )?;
+        self.storage_access(user_operation, &stake_info_by_entity, &js_trace)?;
 
         // verify call stack
-        self.call_stack(entry_point, &stake_info_by_entity, &js_trace)?;
+        self.call_stack(&stake_info_by_entity, &js_trace)?;
 
         // verify code hashes
-        // should be last verification because code hashes are stored in the 1st simulation
-        self.code_hashes(user_operation, entry_point, &js_trace)
-            .await?;
+        let code_hashes = self.code_hashes(user_operation, &js_trace).await?;
 
-        Ok(simulate_validation_result)
+        Ok(SimulationResult {
+            simulate_validation_result,
+            code_hashes,
+        })
     }
 }
