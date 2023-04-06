@@ -11,7 +11,8 @@ use ethers::{
 };
 use parking_lot::Mutex;
 use serde::Deserialize;
-use tracing::{debug, error, info};
+use tonic::Request;
+use tracing::{error, info, trace, warn};
 
 use crate::{
     contracts::gen::EntryPointAPI,
@@ -19,7 +20,10 @@ use crate::{
     types::user_operation::UserOperation,
     uopool::server::{
         bundler::Mode as GrpcMode,
-        uopool::{uo_pool_client::UoPoolClient, GetSortedRequest, RemoveRequest, RemoveResult},
+        uopool::{
+            uo_pool_client::UoPoolClient, GetSortedRequest, HandlePastEventRequest, RemoveRequest,
+            RemoveResult,
+        },
     },
     utils::{parse_address, parse_u256},
 };
@@ -130,15 +134,29 @@ impl Bundler {
             )
             .tx
             .clone();
-        tx.set_nonce(nonce).set_chain_id(self.chain_id.as_u64());
+        let gas = client.clone().estimate_gas(&tx, None).await?;
+        tx.set_gas(gas)
+            .set_nonce(nonce)
+            .set_chain_id(self.chain_id.as_u64());
 
+        trace!("Prepare the transaction {tx:?} send to execution client!");
         let tx = client.send_transaction(tx, None).await?;
         let tx_hash = tx.tx_hash();
-        debug!("Send bundle with transaction: {tx:?}");
+        trace!("Send bundle with transaction: {tx:?}");
 
-        // TODO: check if bundle was included on-chain
-        // let res = tx.await?;
-        // debug!("Send bundle with receipt: {res:?}");
+        info!("Send handlePastEvents request");
+        if let Some(e) = self
+            .uopool_grpc_client
+            .clone()
+            .handle_past_events(Request::new(HandlePastEventRequest {
+                entry_point: Some(self.entry_point.into()),
+                chain_id: self.chain_id.as_u64(),
+            }))
+            .await
+            .err()
+        {
+            warn!("Failed to handle past events: {:?}", e)
+        };
         Ok(tx_hash)
     }
 }

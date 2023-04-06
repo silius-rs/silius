@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use async_trait::async_trait;
 use tonic::Response;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::uopool::server::{
     bundler::{
@@ -57,10 +57,10 @@ impl Bundler for BundlerService {
         &self,
         _request: tonic::Request<()>,
     ) -> Result<Response<SendBundleNowResponse>, tonic::Status> {
-        let res = self
-            .send_bundles_now()
-            .await
-            .map_err(|e| tonic::Status::internal(format!("Send bundle now with error: {e:?}")))?;
+        let res = self.send_bundles_now().await.map_err(|e| {
+            error!("Send bundle manually with response {e:?}");
+            tonic::Status::internal(format!("Send bundle now with error: {e:?}"))
+        })?;
         Ok(Response::new(SendBundleNowResponse {
             result: Some(res.into()),
         }))
