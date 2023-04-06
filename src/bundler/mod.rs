@@ -20,10 +20,7 @@ use crate::{
     types::user_operation::UserOperation,
     uopool::server::{
         bundler::Mode as GrpcMode,
-        uopool::{
-            uo_pool_client::UoPoolClient, GetSortedRequest, HandlePastEventRequest, RemoveRequest,
-            RemoveResult,
-        },
+        uopool::{uo_pool_client::UoPoolClient, GetSortedRequest, HandlePastEventRequest},
     },
     utils::{parse_address, parse_u256},
 };
@@ -208,23 +205,6 @@ impl BundlerService {
 
             let bundle = bundler.create_bundle().await?;
             let tx_hash = bundler.send_next_bundle(&bundle).await?;
-
-            let response = bundler
-                .uopool_grpc_client
-                .clone()
-                .remove(tonic::Request::new(RemoveRequest {
-                    hashes: bundle
-                        .iter()
-                        .map(|u| u.hash(&bundler.entry_point, &bundler.chain_id).0.into())
-                        .collect(),
-                    ep: Some(bundler.entry_point.into()),
-                }))
-                .await?;
-
-            match response.into_inner().result() {
-                RemoveResult::Removed => info!("Bundle removed from pool"),
-                RemoveResult::NotRemoved => info!("Bundle not removed from pool"),
-            }
 
             tx_hashes.push(tx_hash)
         }
