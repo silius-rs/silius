@@ -1,5 +1,6 @@
 // Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
+    use crate::types::user_operation::UserOperationHash;
     use arrayref::array_ref;
     use ethers::types::{Address, Bytes, U256};
 
@@ -66,6 +67,12 @@ pub mod types {
                 .copy_from_slice(H::from(value.lo.unwrap_or_default()).as_fixed_bytes());
 
             v.into()
+        }
+    }
+
+    impl From<H256> for UserOperationHash {
+        fn from(value: H256) -> Self {
+            Self::from(ethers::types::H256::from(value))
         }
     }
 
