@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     rpc::eth_api::EthApiServer,
     types::user_operation::{
@@ -6,7 +8,7 @@ use crate::{
     },
     uopool::server::uopool::{
         uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
-        EstimateUserOperationGasResult,
+        EstimateUserOperationGasResult, GetUserOperationByHashRequest,
     },
 };
 use anyhow::format_err;
@@ -19,7 +21,7 @@ use jsonrpsee::{
     core::RpcResult,
     types::{error::CallError, ErrorObject},
 };
-use tracing::trace;
+use tracing::{debug, trace};
 
 const USER_OPERATION_HASH_ERROR_CODE: i32 = -32601;
 
@@ -144,10 +146,40 @@ impl EthApiServer for EthApiServerImpl {
         &self,
         user_operation_hash: String,
     ) -> RpcResult<Option<UserOperationByHash>> {
-        match serde_json::from_str::<UserOperationHash>(&user_operation_hash) {
-            Ok(_user_operation_hash) => {
-                // TODO: implement
-                Ok(None)
+        trace!("Receive getUserOperationByHash request {user_operation_hash:?}");
+        match UserOperationHash::from_str(&user_operation_hash) {
+            Ok(user_operation_hash) => {
+                let request = tonic::Request::new(GetUserOperationByHashRequest {
+                    hash: Some(user_operation_hash.into()),
+                });
+                let res = self
+                    .uopool_grpc_client
+                    .clone()
+                    .get_user_operation_by_hash(request)
+                    .await
+                    .map_err(|e| {
+                        debug!("getUserOperationByHash with GRPC error  {e:?}");
+                        jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
+                            USER_OPERATION_HASH_ERROR_CODE,
+                            "Missing/invalid userOpHash".to_string(),
+                            None::<bool>,
+                        )))
+                    })?;
+                let result = res.into_inner();
+                let uo: Option<UserOperationByHash> =
+                    result.user_operation.and_then(|user_operation| {
+                        let entry_point = result.entry_point?.into();
+                        let block_hash = result.block_hash?.into();
+                        let transaction_hash = result.transaction_hash?.into();
+                        Some(UserOperationByHash {
+                            user_operation: user_operation.into(),
+                            entry_point,
+                            block_number: result.block_number.into(),
+                            block_hash,
+                            transaction_hash,
+                        })
+                    });
+                Ok(uo)
             }
             Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
                 ErrorObject::owned(

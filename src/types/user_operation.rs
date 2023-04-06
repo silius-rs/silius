@@ -1,4 +1,4 @@
-use crate::contracts::gen::entry_point_api;
+use crate::contracts::gen::entry_point_api::{self, EntryPointAPICalls};
 use ethers::abi::{AbiDecode, AbiEncode};
 use ethers::prelude::{EthAbiCodec, EthAbiType};
 use ethers::types::{Address, BlockNumber, Bytes, TransactionReceipt, H256, U256};
@@ -26,6 +26,12 @@ impl From<H256> for UserOperationHash {
 impl From<UserOperationHash> for H256 {
     fn from(value: UserOperationHash) -> Self {
         value.0
+    }
+}
+
+impl From<UserOperationHash> for crate::uopool::server::types::H256 {
+    fn from(value: UserOperationHash) -> Self {
+        Self::from(value.0)
     }
 }
 
@@ -80,6 +86,24 @@ impl From<UserOperation> for entry_point_api::UserOperation {
             max_priority_fee_per_gas: user_operation.max_priority_fee_per_gas,
             paymaster_and_data: user_operation.paymaster_and_data,
             signature: user_operation.signature,
+        }
+    }
+}
+
+impl From<entry_point_api::UserOperation> for UserOperation {
+    fn from(value: entry_point_api::UserOperation) -> Self {
+        Self {
+            sender: value.sender,
+            nonce: value.nonce,
+            init_code: value.init_code,
+            call_data: value.call_data,
+            call_gas_limit: value.call_gas_limit,
+            verification_gas_limit: value.verification_gas_limit,
+            pre_verification_gas: value.pre_verification_gas,
+            max_fee_per_gas: value.max_fee_per_gas,
+            max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+            paymaster_and_data: value.paymaster_and_data,
+            signature: value.signature,
         }
     }
 }
@@ -160,9 +184,10 @@ pub struct UserOperationReceipt {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserOperationByHash {
-    #[serde(flatten)]
     pub user_operation: UserOperation,
+    #[serde(serialize_with = "as_checksum")]
     pub entry_point: Address,
     pub block_number: BlockNumber,
     pub block_hash: H256,
@@ -264,6 +289,17 @@ pub struct UserOperationGasEstimation {
     #[serde(rename = "verificationGas")]
     pub verification_gas_limit: U256,
     pub call_gas_limit: U256,
+}
+
+pub fn parse_from_input_data(data: Bytes) -> Option<Vec<UserOperation>> {
+    EntryPointAPICalls::decode(data)
+        .ok()
+        .and_then(|call| match call {
+            EntryPointAPICalls::HandleOps(ops) => {
+                Some(ops.ops.into_iter().map(|op| op.into()).collect())
+            }
+            _ => None,
+        })
 }
 
 #[cfg(test)]
@@ -392,5 +428,13 @@ mod tests {
                 .unwrap()
                 .into()
         );
+    }
+
+    #[test]
+    fn parse_input_data() {
+        let data = Bytes::from_str("0x1fad948c0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000690b9a9e9aa1c9db991c7721a92d351db4fac990000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000001ec271771e84999634e5e0330970feeb1c75f35200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000493e000000000000000000000000000000000000000000000000000000000000f424000000000000000000000000000000000000000000000000000000000000493e00000000000000000000000000000000000000000000000000000000077359400000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024a9e966b7000000000000000000000000000000000000000000000000000000000010f4470000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002face000000000000000000000000000000000000000000000000000000000000")
+            .unwrap();
+        let res = parse_from_input_data(data);
+        assert!(matches!(res, Some(..)), "No user operation found")
     }
 }
