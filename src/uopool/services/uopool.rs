@@ -21,9 +21,9 @@ use crate::{
                 EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
                 GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
                 GetSortedRequest, GetSortedResponse, GetUserOperationByHashRequest,
-                GetUserOperationByHashResponse, HandlePastEventRequest, HandlePastEventResponse,
-                RemoveRequest, RemoveResponse, RemoveResult, SetReputationRequest,
-                SetReputationResponse, SetReputationResult,
+                GetUserOperationByHashResponse, HandlePastEventRequest, RemoveRequest,
+                RemoveResponse, RemoveResult, SetReputationRequest, SetReputationResponse,
+                SetReputationResult,
             },
         },
         utils::get_addr,
@@ -41,6 +41,8 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
 use tracing::{debug, info, trace, warn};
+
+const LATEST_SCAN_DEPTH: u64 = 1000;
 
 pub type UoPoolError = ErrorObject<'static>;
 type VecUo = Vec<UserOperation>;
@@ -500,13 +502,12 @@ where
     async fn handle_past_events(
         &self,
         request: tonic::Request<HandlePastEventRequest>,
-    ) -> Result<Response<HandlePastEventResponse>, tonic::Status> {
+    ) -> Result<Response<()>, tonic::Status> {
         let req = request.into_inner();
         let HandlePastEventRequest {
             entry_point: entry_point_opt,
-            chain_id,
         } = req;
-        let lastest_block = self
+        let latest_block = self
             .eth_provider
             .clone()
             .get_block_number()
@@ -516,14 +517,14 @@ where
             })?;
         let last_block = std::cmp::max(
             1u64,
-            lastest_block
-                .checked_sub(U64::from(1000))
+            latest_block
+                .checked_sub(U64::from(LATEST_SCAN_DEPTH))
                 .unwrap_or(U64::from(0))
                 .as_u64(),
         );
         let entry_point =
             entry_point_opt.ok_or(tonic::Status::invalid_argument("entry point is missing"))?;
-        let mempool_id = mempool_id(&entry_point.into(), &U256::from(chain_id));
+        let mempool_id = mempool_id(&entry_point.into(), &self.chain_id);
 
         if let Some(ep) = self.entry_points.get(&mempool_id) {
             let events_filter = ep.events().from_block(last_block);
@@ -559,7 +560,7 @@ where
             }
         }
 
-        Ok(Response::new(HandlePastEventResponse {}))
+        Ok(Response::new(()))
     }
 
     async fn get_user_operation_by_hash(

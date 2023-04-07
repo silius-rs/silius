@@ -122,10 +122,8 @@ message GetUserOperationByHashResponse{
 
 message HandlePastEventRequest{
     types.H160 entry_point = 1;
-    uint64 chain_id = 2;
 }
 
-message HandlePastEventResponse{}
 
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
@@ -135,7 +133,7 @@ service UoPool {
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
     rpc GetUserOperationByHash(GetUserOperationByHashRequest) returns (GetUserOperationByHashResponse);
-    rpc HandlePastEvents(HandlePastEventRequest) returns (HandlePastEventResponse);
+    rpc HandlePastEvents(HandlePastEventRequest) returns (google.protobuf.Empty);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);

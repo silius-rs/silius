@@ -147,7 +147,6 @@ impl Bundler {
             .clone()
             .handle_past_events(Request::new(HandlePastEventRequest {
                 entry_point: Some(self.entry_point.into()),
-                chain_id: self.chain_id.as_u64(),
             }))
             .await
             .err()
