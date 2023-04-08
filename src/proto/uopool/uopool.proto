@@ -108,6 +108,18 @@ message GetSortedResponse{
     repeated types.UserOperation user_operations = 1;
 }
 
+message GetUserOperationByHashRequest{
+    types.H256 hash = 1;
+}
+
+message GetUserOperationByHashResponse{
+    types.UserOperation user_operation = 1;
+    types.H160 entry_point = 2;
+    types.H256 transaction_hash = 3;
+    types.H256 block_hash = 4;
+    uint64 block_number = 5;
+}
+
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
@@ -115,6 +127,7 @@ service UoPool {
     rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
+    rpc GetUserOperationByHash(GetUserOperationByHashRequest) returns (GetUserOperationByHashResponse);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);

@@ -38,6 +38,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         }
     }
 
+    pub fn entry_point_api(&self) -> &EntryPointAPI<M> {
+        &self.entry_point_api
+    }
+
     pub fn provider(&self) -> Arc<M> {
         self.provider.clone()
     }
