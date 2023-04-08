@@ -233,7 +233,11 @@ pub async fn run(
             );
         }
 
-        let svc = UoPoolServer::new(UoPoolService::new(mempools_map.clone(), chain_id));
+        let svc = UoPoolServer::new(UoPoolService::new(
+            mempools_map.clone(),
+            eth_provider.clone(),
+            chain_id,
+        ));
 
         tokio::spawn(async move {
             loop {

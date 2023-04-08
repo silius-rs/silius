@@ -1,10 +1,10 @@
 use crate::{
     chain::gas::Overhead,
-    contracts::{EntryPointErr, SimulateValidationResult},
+    contracts::{gen::UserOperationEventFilter, EntryPointErr, SimulateValidationResult},
     types::{
         reputation::{ReputationStatus, THROTTLED_MAX_INCLUDE},
         simulation::{SimulateValidationError, SimulationError},
-        user_operation::{UserOperation, UserOperationGasEstimation},
+        user_operation::{parse_from_input_data, UserOperation, UserOperationGasEstimation},
     },
     uopool::{
         mempool_id,
@@ -26,23 +26,36 @@ use crate::{
 use async_trait::async_trait;
 use dashmap::DashMap;
 use ethers::{
+    prelude::LogMeta,
     providers::Middleware,
     types::{Address, H256, U256},
 };
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
-use super::UoPool as UserOperationPool;
+use super::{
+    server::uopool::{GetUserOperationByHashRequest, GetUserOperationByHashResponse},
+    UoPool as UserOperationPool,
+};
 
 pub struct UoPoolService<M: Middleware> {
     pub mempools: Arc<DashMap<MempoolId, UserOperationPool<M>>>,
+    pub eth_provider: Arc<M>,
     pub chain_id: U256,
 }
 
 impl<M: Middleware + 'static> UoPoolService<M> {
-    pub fn new(mempools: Arc<DashMap<MempoolId, UserOperationPool<M>>>, chain_id: U256) -> Self {
-        Self { mempools, chain_id }
+    pub fn new(
+        mempools: Arc<DashMap<MempoolId, UserOperationPool<M>>>,
+        eth_provider: Arc<M>,
+        chain_id: U256,
+    ) -> Self {
+        Self {
+            mempools,
+            eth_provider,
+            chain_id,
+        }
     }
 }
 
@@ -458,6 +471,76 @@ where
             return Err(tonic::Status::invalid_argument(format!(
                 "invalid GetSortedRequest {req:?}"
             )));
+        }
+    }
+
+    async fn get_user_operation_by_hash(
+        &self,
+        request: tonic::Request<GetUserOperationByHashRequest>,
+    ) -> Result<Response<GetUserOperationByHashResponse>, tonic::Status> {
+        let req = request.into_inner();
+        let user_operation_hash: H256 = req
+            .hash
+            .ok_or(tonic::Status::invalid_argument(
+                "User operation hash is missing",
+            ))?
+            .into();
+        let mut event: Option<(UserOperationEventFilter, LogMeta)> = None;
+
+        for mempool in self.mempools.iter() {
+            let filter = mempool
+                .value()
+                .entry_point
+                .entry_point_api()
+                .event::<UserOperationEventFilter>()
+                .topic1(user_operation_hash);
+            let res: Vec<(UserOperationEventFilter, LogMeta)> =
+                filter.query_with_meta().await.map_err(|e| {
+                    tonic::Status::internal(format!("Getting event logs with error: {e:?}"))
+                })?;
+            if res.len() >= 2 {
+                warn!("There are duplicate user operations with the same hash: {user_operation_hash:x?}");
+            }
+            // It is possible have two same user operatation in same bundle
+            // see https://twitter.com/leekt216/status/1636414866662785024
+            for log_meta in res.iter() {
+                event = Some(log_meta.clone());
+            }
+        }
+
+        match event {
+            Some((event, log_meta)) => {
+                if let Some((user_operation, entry_point)) = self
+                    .eth_provider
+                    .get_transaction(log_meta.transaction_hash)
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!(
+                            "Getting transaction by hash with error: {e:?}"
+                        ))
+                    })?
+                    .and_then(|tx| {
+                        let user_ops = parse_from_input_data(tx.input)?;
+                        let entry_point = tx.to?;
+                        user_ops
+                            .iter()
+                            .find(|uo| uo.sender == event.sender && uo.nonce == event.nonce)
+                            .map(|uo| (uo.clone(), entry_point))
+                    })
+                {
+                    let response = Response::new(GetUserOperationByHashResponse {
+                        user_operation: Some(user_operation.into()),
+                        entry_point: Some(entry_point.into()),
+                        transaction_hash: Some(log_meta.transaction_hash.into()),
+                        block_hash: Some(log_meta.block_hash.into()),
+                        block_number: log_meta.block_number.as_u64(),
+                    });
+                    Ok(response)
+                } else {
+                    Err(tonic::Status::not_found("User operation not found"))
+                }
+            }
+            None => Err(tonic::Status::not_found("User operation not found")),
         }
     }
 
