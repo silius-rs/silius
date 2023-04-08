@@ -36,7 +36,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<SimulateValidationResult, SimulateValidationError> {
-        return match self
+        match self
             .entry_point
             .simulate_validation(user_operation.clone())
             .await
@@ -52,14 +52,14 @@ impl<M: Middleware + 'static> UoPool<M> {
                     message: "unknown error".to_string(),
                 }),
             },
-        };
+        }
     }
 
     async fn simulate_validation_trace(
         &self,
         user_operation: &UserOperation,
     ) -> Result<GethTrace, SimulateValidationError> {
-        return match self
+        match self
             .entry_point
             .simulate_validation_trace(user_operation.clone())
             .await
@@ -75,7 +75,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                     message: "unknown error".to_string(),
                 }),
             },
-        };
+        }
     }
 
     fn extract_stake_info(
