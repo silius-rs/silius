@@ -120,6 +120,11 @@ message GetUserOperationByHashResponse{
     uint64 block_number = 5;
 }
 
+message HandlePastEventRequest{
+    types.H160 entry_point = 1;
+}
+
+
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
@@ -128,6 +133,7 @@ service UoPool {
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
     rpc GetUserOperationByHash(GetUserOperationByHashRequest) returns (GetUserOperationByHashResponse);
+    rpc HandlePastEvents(HandlePastEventRequest) returns (google.protobuf.Empty);
 
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);

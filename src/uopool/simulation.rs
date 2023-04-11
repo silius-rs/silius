@@ -24,6 +24,7 @@ use ethers::{
 };
 use std::collections::{HashMap, HashSet};
 use tokio::task::JoinSet;
+use tracing::trace;
 
 #[derive(Debug)]
 pub struct SimulationResult {
@@ -472,8 +473,9 @@ impl<M: Middleware + 'static> UoPool<M> {
         user_operation: &UserOperation,
     ) -> Result<SimulationResult, SimulateValidationError> {
         let simulate_validation_result = self.simulate_validation(user_operation).await?;
-
         let geth_trace = self.simulate_validation_trace(user_operation).await?;
+
+        trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");
 
         let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
             SimulateValidationError::UserOperationRejected {

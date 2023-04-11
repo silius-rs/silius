@@ -1,10 +1,15 @@
 use crate::{
     chain::gas::Overhead,
-    contracts::{gen::UserOperationEventFilter, EntryPointErr, SimulateValidationResult},
+    contracts::{
+        gen::EntryPointAPIEvents, gen::UserOperationEventFilter, EntryPointErr,
+        SimulateValidationResult,
+    },
     types::{
         reputation::{ReputationStatus, THROTTLED_MAX_INCLUDE},
         simulation::{SimulateValidationError, SimulationError},
-        user_operation::{parse_from_input_data, UserOperation, UserOperationGasEstimation},
+        user_operation::{
+            parse_from_input_data, UserOperation, UserOperationGasEstimation, UserOperationHash,
+        },
     },
     uopool::{
         mempool_id,
@@ -15,8 +20,10 @@ use crate::{
                 ClearResult, EstimateUserOperationGasRequest, EstimateUserOperationGasResponse,
                 EstimateUserOperationGasResult, GetAllReputationRequest, GetAllReputationResponse,
                 GetAllReputationResult, GetAllRequest, GetAllResponse, GetAllResult,
-                GetSortedRequest, GetSortedResponse, RemoveRequest, RemoveResponse, RemoveResult,
-                SetReputationRequest, SetReputationResponse, SetReputationResult,
+                GetSortedRequest, GetSortedResponse, GetUserOperationByHashRequest,
+                GetUserOperationByHashResponse, HandlePastEventRequest, RemoveRequest,
+                RemoveResponse, RemoveResult, SetReputationRequest, SetReputationResponse,
+                SetReputationResult,
             },
         },
         utils::get_addr,
@@ -28,16 +35,15 @@ use dashmap::DashMap;
 use ethers::{
     prelude::LogMeta,
     providers::Middleware,
-    types::{Address, H256, U256},
+    types::{Address, H256, U256, U64},
 };
 use std::{collections::HashMap, sync::Arc};
 use tonic::Response;
-use tracing::{debug, trace, warn};
+use tracing::{debug, info, trace, warn};
 
-use super::{
-    server::uopool::{GetUserOperationByHashRequest, GetUserOperationByHashResponse},
-    UoPool as UserOperationPool,
-};
+const LATEST_SCAN_DEPTH: u64 = 1000;
+
+use super::UoPool as UserOperationPool;
 
 pub struct UoPoolService<M: Middleware> {
     pub mempools: Arc<DashMap<MempoolId, UserOperationPool<M>>>,
@@ -56,6 +62,20 @@ impl<M: Middleware + 'static> UoPoolService<M> {
             eth_provider,
             chain_id,
         }
+    }
+
+    pub fn remove_user_operation(
+        &self,
+        uopool: &mut UserOperationPool<M>,
+        user_operation_hash: &UserOperationHash,
+    ) -> Option<()> {
+        uopool.mempool.remove(user_operation_hash).ok();
+        None
+    }
+
+    pub fn include_address(&self, uopool: &mut UserOperationPool<M>, addr: Address) -> Option<()> {
+        uopool.reputation.increment_included(&addr);
+        Some(())
     }
 }
 
@@ -472,6 +492,73 @@ where
                 "invalid GetSortedRequest {req:?}"
             )));
         }
+    }
+
+    async fn handle_past_events(
+        &self,
+        request: tonic::Request<HandlePastEventRequest>,
+    ) -> Result<Response<()>, tonic::Status> {
+        let req = request.into_inner();
+        let HandlePastEventRequest {
+            entry_point: entry_point_opt,
+        } = req;
+        let latest_block = self
+            .eth_provider
+            .clone()
+            .get_block_number()
+            .await
+            .map_err(|e| {
+                tonic::Status::internal(format!("Getting the latest block number error: {e:?}"))
+            })?;
+        let last_block = std::cmp::max(
+            1u64,
+            latest_block
+                .checked_sub(U64::from(LATEST_SCAN_DEPTH))
+                .unwrap_or(U64::from(0))
+                .as_u64(),
+        );
+        let entry_point =
+            entry_point_opt.ok_or(tonic::Status::invalid_argument("entry point is missing"))?;
+        let mempool_id = mempool_id(&entry_point.into(), &self.chain_id);
+
+        let mut uopool = self
+            .mempools
+            .get_mut(&mempool_id)
+            .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+
+        let events_filter = uopool.entry_point.events().from_block(last_block);
+        let events = events_filter.query().await.map_err(|e| {
+            tonic::Status::internal(format!("Getting event logs with error: {e:?}"))
+        })?;
+        for event in events {
+            match event {
+                EntryPointAPIEvents::UserOperationEventFilter(user_operation_event) => {
+                    self.remove_user_operation(
+                        &mut uopool,
+                        &user_operation_event.user_op_hash.into(),
+                    )
+                    .unwrap_or_else(|| {
+                        // This could be possible when other bundler submit the user operations
+                        info!(
+                            "Unable to remove user operation {:?} from mempool {:?}",
+                            user_operation_event.user_op_hash, mempool_id
+                        )
+                    });
+                    self.include_address(&mut uopool, user_operation_event.sender);
+                    self.include_address(&mut uopool, user_operation_event.paymaster);
+                    // TODO: include event aggregator
+                }
+                EntryPointAPIEvents::AccountDeployedFilter(account_deploy_event) => {
+                    self.include_address(&mut uopool, account_deploy_event.factory);
+                }
+                EntryPointAPIEvents::SignatureAggregatorChangedFilter(_) => {
+                    warn!("Aggregate signature is not supported currently");
+                }
+                _ => (),
+            }
+        }
+
+        Ok(Response::new(()))
     }
 
     async fn get_user_operation_by_hash(
