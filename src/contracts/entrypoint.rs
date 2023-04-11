@@ -6,10 +6,10 @@ use super::gen::entry_point_api::{
     ValidationResultWithAggregation,
 };
 use super::gen::stake_manager_api::DepositInfo;
-use super::gen::{EntryPointAPI, StakeManagerAPI};
+use super::gen::{EntryPointAPI, EntryPointAPIEvents, StakeManagerAPI};
 use super::tracer::JS_TRACER;
 use ethers::abi::AbiDecode;
-use ethers::prelude::ContractError;
+use ethers::prelude::{ContractError, Event};
 use ethers::providers::{Middleware, ProviderError};
 use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
@@ -40,6 +40,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub fn entry_point_api(&self) -> &EntryPointAPI<M> {
         &self.entry_point_api
+    }
+
+    pub fn events(&self) -> Event<Arc<M>, M, EntryPointAPIEvents> {
+        self.entry_point_api.events()
     }
 
     pub fn provider(&self) -> Arc<M> {

@@ -29,6 +29,12 @@ impl From<UserOperationHash> for H256 {
     }
 }
 
+impl From<[u8; 32]> for UserOperationHash {
+    fn from(value: [u8; 32]) -> Self {
+        Self(H256::from_slice(&value))
+    }
+}
+
 impl From<UserOperationHash> for crate::uopool::server::types::H256 {
     fn from(value: UserOperationHash) -> Self {
         Self::from(value.0)
