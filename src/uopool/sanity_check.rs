@@ -184,7 +184,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             .find(|user_operation_prev| user_operation_prev.nonce == user_operation.nonce)
             .cloned();
 
-        return match user_operation_prev {
+        match user_operation_prev {
             Some(user_operation_prev) => {
                 if user_operation.max_fee_per_gas
                     >= calculate_valid_gas(
@@ -234,7 +234,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                     }),
                 }
             }
-        };
+        }
     }
 
     pub async fn validate_user_operation(
