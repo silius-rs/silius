@@ -131,10 +131,7 @@ impl Bundler {
             )
             .tx
             .clone();
-        let gas = client.clone().estimate_gas(&tx, None).await?;
-        tx.set_gas(gas)
-            .set_nonce(nonce)
-            .set_chain_id(self.chain_id.as_u64());
+        tx.set_nonce(nonce).set_chain_id(self.chain_id.as_u64());
 
         trace!("Prepare the transaction {tx:?} send to execution client!");
         let tx = client.send_transaction(tx, None).await?;

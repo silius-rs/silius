@@ -1,3 +1,4 @@
+use self::simulation::SimulationResult;
 use crate::{
     contracts::EntryPoint,
     types::{
@@ -10,28 +11,29 @@ use crate::{
     },
     uopool::{
         memory_mempool::MemoryMempool, memory_reputation::MemoryReputation,
-        server::uopool::uo_pool_server::UoPoolServer, services::UoPoolService,
+        server::uopool::uo_pool_server::UoPoolServer, service::UoPoolService,
     },
     utils::parse_u256,
 };
 use anyhow::Result;
 use clap::Parser;
-use educe::Educe;
+use dashmap::DashMap;
 use ethers::{
     abi::AbiEncode,
     providers::{Http, Middleware, Provider},
     types::{Address, Bytes, H256, U256},
     utils::{keccak256, to_checksum},
 };
-use jsonrpsee::tracing::info;
-use parking_lot::RwLock;
-use std::{collections::HashMap, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
+use jsonrpsee::{tracing::info, types::ErrorObject};
+use std::{fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
 pub mod database_mempool;
 pub mod memory_mempool;
 pub mod memory_reputation;
+pub mod sanity_check;
 pub mod server;
-pub mod services;
+pub mod service;
+pub mod simulation;
 pub mod utils;
 
 pub type MempoolId = H256;
@@ -39,6 +41,10 @@ pub type MempoolId = H256;
 pub type MempoolBox<T, U> =
     Box<dyn Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync>;
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;
+
+pub type UoPoolError = ErrorObject<'static>;
+type VecUo = Vec<UserOperation>;
+type VecCh = Vec<CodeHash>;
 
 pub fn mempool_id(entry_point: &Address, chain_id: &U256) -> MempoolId {
     H256::from_slice(
@@ -123,10 +129,54 @@ pub trait Reputation: Debug {
     fn clear(&mut self);
 }
 
-#[derive(Educe)]
-#[educe(Debug)]
-pub struct UserOperationPool<M: Mempool> {
-    pub pool: Arc<M>,
+#[derive(Debug)]
+pub struct VerificationResult {
+    pub simulation_result: SimulationResult,
+}
+
+pub struct UoPool<M: Middleware> {
+    pub entry_point: EntryPoint<M>,
+    pub mempool: MempoolBox<VecUo, VecCh>,
+    pub reputation: ReputationBox<Vec<ReputationEntry>>,
+    pub eth_provider: Arc<M>,
+    pub max_verification_gas: U256,
+    pub min_priority_fee_per_gas: U256,
+    pub chain_id: U256,
+}
+
+impl<M: Middleware + 'static> UoPool<M> {
+    pub fn new(
+        entry_point: EntryPoint<M>,
+        mempool: MempoolBox<VecUo, VecCh>,
+        reputation: ReputationBox<Vec<ReputationEntry>>,
+        eth_provider: Arc<M>,
+        max_verification_gas: U256,
+        min_priority_fee_per_gas: U256,
+        chain_id: U256,
+    ) -> Self {
+        Self {
+            entry_point,
+            mempool,
+            reputation,
+            eth_provider,
+            max_verification_gas,
+            min_priority_fee_per_gas,
+            chain_id,
+        }
+    }
+
+    async fn verify_user_operation(
+        &self,
+        user_operation: &UserOperation,
+    ) -> Result<VerificationResult, ErrorObject<'static>> {
+        // sanity check
+        self.validate_user_operation(user_operation).await?;
+
+        // simulation
+        let simulation_result = self.simulate_user_operation(user_operation).await?;
+
+        Ok(VerificationResult { simulation_result })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Parser, PartialEq)]
@@ -155,48 +205,45 @@ pub async fn run(
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
-        let mut entry_points_map = HashMap::<MempoolId, EntryPoint<Provider<Http>>>::new();
-        let mut mempools =
-            HashMap::<MempoolId, MempoolBox<Vec<UserOperation>, Vec<CodeHash>>>::new();
-        let mut reputations = HashMap::<MempoolId, ReputationBox<Vec<ReputationEntry>>>::new();
+        let mempools_map = Arc::new(DashMap::<MempoolId, UoPool<Provider<Http>>>::new());
 
         for entry_point in entry_points {
             let id = mempool_id(&entry_point, &chain_id);
-            mempools.insert(id, Box::<MemoryMempool>::default());
 
-            reputations.insert(id, Box::<MemoryReputation>::default());
-            if let Some(reputation) = reputations.get_mut(&id) {
-                reputation.init(
-                    MIN_INCLUSION_RATE_DENOMINATOR,
-                    THROTTLING_SLACK,
-                    BAN_SLACK,
-                    opts.min_stake,
-                    opts.min_unstake_delay,
-                );
-            }
-            entry_points_map.insert(
+            let mut reputation = Box::<MemoryReputation>::default();
+            reputation.init(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                opts.min_stake,
+                opts.min_unstake_delay,
+            );
+
+            mempools_map.insert(
                 id,
-                EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
+                UoPool::<Provider<Http>>::new(
+                    EntryPoint::<Provider<Http>>::new(eth_provider.clone(), entry_point),
+                    Box::<MemoryMempool>::default(),
+                    reputation,
+                    eth_provider.clone(),
+                    max_verification_gas,
+                    opts.min_priority_fee_per_gas,
+                    chain_id,
+                ),
             );
         }
 
-        let reputations = Arc::new(RwLock::new(reputations));
-
         let svc = UoPoolServer::new(UoPoolService::new(
-            Arc::new(entry_points_map),
-            Arc::new(RwLock::new(mempools)),
-            reputations.clone(),
-            eth_provider,
-            max_verification_gas,
-            opts.min_priority_fee_per_gas,
+            mempools_map.clone(),
+            eth_provider.clone(),
             chain_id,
         ));
 
         tokio::spawn(async move {
             loop {
-                for reputation in reputations.write().values_mut() {
-                    reputation.update_hourly();
-                }
+                mempools_map
+                    .iter_mut()
+                    .for_each(|mut mempool| mempool.value_mut().reputation.update_hourly());
                 tokio::time::sleep(Duration::from_secs(60 * 60)).await;
             }
         });
