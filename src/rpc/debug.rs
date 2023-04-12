@@ -56,7 +56,10 @@ impl DebugApiServer for DebugApiServerImpl {
             .into_inner();
         trace!("Getall from mempool: {response:?}");
         if response.result == GetAllResult::GotAll as i32 {
-            return Ok(response.uos.iter().map(|uo| uo.clone().into()).collect());
+            let mut uos: Vec<UserOperation> =
+                response.uos.iter().map(|uo| uo.clone().into()).collect();
+            uos.sort_by(|a, b| a.nonce.cmp(&b.nonce));
+            return Ok(uos);
         }
 
         Err(jsonrpsee::core::Error::Custom(

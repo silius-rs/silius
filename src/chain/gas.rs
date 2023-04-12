@@ -53,6 +53,12 @@ impl Overhead {
     }
 }
 
+pub fn calculate_valid_gas(gas_price: U256, gas_increase_perc: U256) -> U256 {
+    let gas_price = gas_price.as_u64() as f64;
+    let gas_increase_perc = gas_increase_perc.as_u64() as f64;
+    U256::from((gas_price * (1.0 + gas_increase_perc / 100.0)).ceil() as u64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -121,7 +121,13 @@ impl Mempool for MemoryMempool {
     fn get_sorted(&self) -> anyhow::Result<Self::UserOperations> {
         let mut user_operations: Vec<UserOperation> =
             self.user_operations.values().cloned().collect();
-        user_operations.sort_by(|a, b| b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas));
+        user_operations.sort_by(|a, b| {
+            if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
+                b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas)
+            } else {
+                a.nonce.cmp(&b.nonce)
+            }
+        });
         Ok(user_operations)
     }
 
