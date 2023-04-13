@@ -1,6 +1,6 @@
 pub mod service;
 
-use std::{net::SocketAddr, sync::Arc, thread, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use clap::Parser;
 use ethers::{
@@ -134,12 +134,15 @@ impl Bundler {
         tx.set_nonce(nonce).set_chain_id(self.chain_id.as_u64());
 
         trace!("Prepare the transaction {tx:?} send to execution client!");
-        let tx = client.send_transaction(tx, None).await?;
+        let tx = client
+            .send_transaction(tx, None)
+            .await?
+            .interval(Duration::from_millis(100));
         let tx_hash = tx.tx_hash();
         trace!("Send bundle with transaction: {tx:?}");
 
-        // wait some time, otherwise sometimes events for this bundle are not yet detected
-        thread::sleep(Duration::from_millis(25));
+        let tx_receipt = tx.await?;
+        trace!("Bundle transaction receipt: {tx_receipt:?}");
 
         info!("Send handlePastEvents request");
         if let Some(e) = self
