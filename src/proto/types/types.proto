@@ -17,6 +17,10 @@ message H256 {
     types.H128 lo = 2;
 }
 
+message PbU256 {
+    bytes data = 1;
+}
+
 message SupportedEntryPoint {
     types.H160 entry_point = 1;
 }
@@ -54,4 +58,33 @@ message GetChainIdResponse {
 
 message GetSupportedEntryPointsResponse {
     repeated H160 eps = 1;
+}
+
+message TransactionReceipt{
+    H160 to  =1;
+    H160 from =2;
+    H160 contract_address = 3;
+    uint64 transaction_index = 4;
+    H256 root = 5;
+    PbU256 gas_used = 6;
+    string logs_bloom  = 7;
+    H256 block_hash = 8;
+    H256 transaction_hash = 9;
+    repeated Log logs = 10;
+    uint64 block_number = 11;
+    PbU256 cumulative_gas_used=12;
+    PbU256 effective_gas_price= 13;
+    uint64 status = 14;
+}
+
+message Log{
+    uint64 block_number = 1;
+    H256 block_hash = 2;
+    uint64 transaction_index = 3;
+    bool removed = 4;
+    H160 address = 5;
+    bytes data = 6;
+    repeated H256 topics = 7;
+    H256 transaction_hash = 8;
+    PbU256 log_index = 9;
 }

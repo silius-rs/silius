@@ -8,7 +8,7 @@ use crate::{
     },
     uopool::server::uopool::{
         uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
-        EstimateUserOperationGasResult, GetUserOperationByHashRequest,
+        EstimateUserOperationGasResult, UserOperationHashRequest,
     },
 };
 use anyhow::format_err;
@@ -127,10 +127,51 @@ impl EthApiServer for EthApiServerImpl {
         &self,
         user_operation_hash: String,
     ) -> RpcResult<Option<UserOperationReceipt>> {
-        match serde_json::from_str::<UserOperationHash>(&user_operation_hash) {
-            Ok(_user_operation_hash) => {
-                // TODO: implement
-                Ok(None)
+        trace!("Receive getUserOperationReceipt request {user_operation_hash:?}");
+        match UserOperationHash::from_str(&user_operation_hash) {
+            Ok(user_operation_hash) => {
+                let request = tonic::Request::new(UserOperationHashRequest {
+                    hash: Some(user_operation_hash.into()),
+                });
+                match self
+                    .uopool_grpc_client
+                    .clone()
+                    .get_user_operation_receipt(request)
+                    .await
+                {
+                    Ok(res) => {
+                        let result = res.into_inner();
+                        trace!("Got grpc result from getUserOperationReceipt endpoint {result:?}");
+                        let receipt = result.user_operation_hash.and_then(|user_op_hash| {
+                            Some(UserOperationReceipt {
+                                user_op_hash: user_op_hash.into(),
+                                sender: result.sender?.into(),
+                                nonce: result.nonce?.into(),
+                                paymaster: result.paymaster.map(|p| p.into()),
+                                actual_gas_cost: result.actual_gas_cost?.into(),
+                                actual_gas_used: result.actual_gas_used?.into(),
+                                success: result.success,
+                                reason: String::new(),
+                                logs: result.logs.into_iter().map(|l| l.into()).collect(),
+                                receipt: result.transaction_receipt?.into(),
+                            })
+                        });
+                        Ok(receipt)
+                    }
+                    Err(e) => match e.code() {
+                        tonic::Code::NotFound => Ok(None),
+                        _ => {
+                            debug!("getUserOperationByHash with GRPC error {e:?}");
+                            Err(jsonrpsee::core::Error::Call(CallError::Custom(
+                                ErrorObject::owned(
+                                    USER_OPERATION_HASH_ERROR_CODE,
+                                    "Missing/invalid userOpHash".to_string(),
+                                    None::<bool>,
+                                ),
+                            )))
+                        }
+                    },
+                }
             }
             Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
                 ErrorObject::owned(
@@ -149,37 +190,47 @@ impl EthApiServer for EthApiServerImpl {
         trace!("Receive getUserOperationByHash request {user_operation_hash:?}");
         match UserOperationHash::from_str(&user_operation_hash) {
             Ok(user_operation_hash) => {
-                let request = tonic::Request::new(GetUserOperationByHashRequest {
+                let request = tonic::Request::new(UserOperationHashRequest {
                     hash: Some(user_operation_hash.into()),
                 });
-                let res = self
+                match self
                     .uopool_grpc_client
                     .clone()
                     .get_user_operation_by_hash(request)
                     .await
-                    .map_err(|e| {
-                        debug!("getUserOperationByHash with GRPC error  {e:?}");
-                        jsonrpsee::core::Error::Call(CallError::Custom(ErrorObject::owned(
-                            USER_OPERATION_HASH_ERROR_CODE,
-                            "Missing/invalid userOpHash".to_string(),
-                            None::<bool>,
-                        )))
-                    })?;
-                let result = res.into_inner();
-                let uo: Option<UserOperationByHash> =
-                    result.user_operation.and_then(|user_operation| {
-                        let entry_point = result.entry_point?.into();
-                        let block_hash = result.block_hash?.into();
-                        let transaction_hash = result.transaction_hash?.into();
-                        Some(UserOperationByHash {
-                            user_operation: user_operation.into(),
-                            entry_point,
-                            block_number: result.block_number.into(),
-                            block_hash,
-                            transaction_hash,
-                        })
-                    });
-                Ok(uo)
+                {
+                    Ok(res) => {
+                        let result = res.into_inner();
+                        trace!("Got grpc result from getUserOperationByHash endpoint {result:?}");
+                        let uo: Option<UserOperationByHash> =
+                            result.user_operation.and_then(|user_operation| {
+                                let entry_point = result.entry_point?.into();
+                                let block_hash = result.block_hash?.into();
+                                let transaction_hash = result.transaction_hash?.into();
+                                Some(UserOperationByHash {
+                                    user_operation: user_operation.into(),
+                                    entry_point,
+                                    block_number: result.block_number.into(),
+                                    block_hash,
+                                    transaction_hash,
+                                })
+                            });
+                        Ok(uo)
+                    }
+                    Err(e) => match e.code() {
+                        tonic::Code::NotFound => Ok(None),
+                        _ => {
+                            debug!("getUserOperationByHash with GRPC error {e:?}");
+                            Err(jsonrpsee::core::Error::Call(CallError::Custom(
+                                ErrorObject::owned(
+                                    USER_OPERATION_HASH_ERROR_CODE,
+                                    "Missing/invalid userOpHash".to_string(),
+                                    None::<bool>,
+                                ),
+                            )))
+                        }
+                    },
+                }
             }
             Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
                 ErrorObject::owned(
