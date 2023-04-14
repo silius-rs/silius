@@ -225,8 +225,13 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
                     .walk(Some(UserOperationHash::default()))?
                     .map(|a| a.map(|(_, uo)| uo))
                     .collect::<Result<Vec<_>, _>>()?;
-                user_ops
-                    .sort_by(|a, b| b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas));
+                user_ops.sort_by(|a, b| {
+                    if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
+                        b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas)
+                    } else {
+                        a.nonce.cmp(&b.nonce)
+                    }
+                });
                 Ok(user_ops)
             })
             .map_err(DBError::DBInternalError)

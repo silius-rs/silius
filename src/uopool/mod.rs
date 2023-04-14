@@ -1,4 +1,4 @@
-use self::simulation::SimulationResult;
+use self::{sanity_check::SanityCheckResult, simulation::SimulationResult};
 use crate::{
     contracts::EntryPoint,
     types::{
@@ -131,6 +131,7 @@ pub trait Reputation: Debug {
 
 #[derive(Debug)]
 pub struct VerificationResult {
+    pub sanity_check_result: SanityCheckResult,
     pub simulation_result: SimulationResult,
 }
 
@@ -170,12 +171,15 @@ impl<M: Middleware + 'static> UoPool<M> {
         user_operation: &UserOperation,
     ) -> Result<VerificationResult, ErrorObject<'static>> {
         // sanity check
-        self.validate_user_operation(user_operation).await?;
+        let sanity_check_result = self.validate_user_operation(user_operation).await?;
 
         // simulation
         let simulation_result = self.simulate_user_operation(user_operation).await?;
 
-        Ok(VerificationResult { simulation_result })
+        Ok(VerificationResult {
+            sanity_check_result,
+            simulation_result,
+        })
     }
 }
 

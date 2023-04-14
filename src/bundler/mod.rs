@@ -134,9 +134,15 @@ impl Bundler {
         tx.set_nonce(nonce).set_chain_id(self.chain_id.as_u64());
 
         trace!("Prepare the transaction {tx:?} send to execution client!");
-        let tx = client.send_transaction(tx, None).await?;
+        let tx = client
+            .send_transaction(tx, None)
+            .await?
+            .interval(Duration::from_millis(100));
         let tx_hash = tx.tx_hash();
         trace!("Send bundle with transaction: {tx:?}");
+
+        let tx_receipt = tx.await?;
+        trace!("Bundle transaction receipt: {tx_receipt:?}");
 
         info!("Send handlePastEvents request");
         if let Some(e) = self

@@ -37,9 +37,12 @@ use ethers::{
     providers::Middleware,
     types::{Address, H256, U256, U64},
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tonic::Response;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, trace, warn};
 
 const LATEST_SCAN_DEPTH: u64 = 1000;
 
@@ -119,6 +122,20 @@ where
                     let mut uopool = self.mempools.get_mut(&mempool_id).ok_or_else(|| {
                         tonic::Status::invalid_argument("entry point not supported")
                     })?;
+
+                    if let Some(user_operation_hash) =
+                        verification_result.sanity_check_result.user_operation_hash
+                    {
+                        self.remove_user_operation(&mut uopool, &user_operation_hash)
+                            .unwrap_or_else(|| {
+                                trace!(
+                                    "Unable to remove user operation {:?} from mempool {:?}",
+                                    user_operation_hash,
+                                    mempool_id
+                                )
+                            });
+                    }
+
                     match uopool
                         .mempool
                         .add(user_operation.clone(), &entry_point, &self.chain_id)
@@ -359,10 +376,15 @@ where
             };
 
             let mut valid_user_operations = vec![];
+            let mut senders: HashSet<Address> = HashSet::new();
             let mut total_gas = U256::zero();
             let mut paymaster_deposit: HashMap<Address, U256> = HashMap::new();
             let mut staked_entity_count: HashMap<Address, u64> = HashMap::new();
             for uo in uos.iter() {
+                if senders.contains(&uo.sender) {
+                    continue;
+                }
+
                 let paymaster_opt = get_addr(&uo.paymaster_and_data);
                 let factory_opt = get_addr(&uo.init_code);
                 let (paymaster_status, factory_status) = {
@@ -477,7 +499,8 @@ where
                     }
                 }
 
-                valid_user_operations.push(uo.to_owned())
+                valid_user_operations.push(uo.to_owned());
+                senders.insert(uo.sender);
             }
 
             let response = GetSortedResponse {
@@ -539,9 +562,10 @@ where
                     )
                     .unwrap_or_else(|| {
                         // This could be possible when other bundler submit the user operations
-                        info!(
+                        trace!(
                             "Unable to remove user operation {:?} from mempool {:?}",
-                            user_operation_event.user_op_hash, mempool_id
+                            user_operation_event.user_op_hash,
+                            mempool_id
                         )
                     });
                     self.include_address(&mut uopool, user_operation_event.sender);

@@ -16,8 +16,8 @@ Rust version: 1.67.1
 
 1. libclang, `libclang-dev` on Debian/Ubuntu.
 2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode; so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
-3. [solc](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
-4. [cargo-sort](https://crates.io/crates/cargo-sort).
+3. [`solc`](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
+4. [`cargo-sort`](https://crates.io/crates/cargo-sort).
 
 ## How to run?
 
@@ -58,7 +58,7 @@ Thank you for showing interest in contributing to the project!
 
 There is [a contributing guide](./CONTRIBUTING.md) to help get you started.
 
-There are some additional prerequisites for testing:
+There are some additional prerequisites for **testing**:
 
 1. [`geth`](https://geth.ethereum.org/docs/getting-started/installing-geth)
 

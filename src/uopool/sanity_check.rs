@@ -1,9 +1,9 @@
 use crate::{
-    chain::gas::Overhead,
+    chain::gas::{calculate_valid_gas, Overhead},
     types::{
         reputation::{ReputationStatus, StakeInfo},
         sanity_check::BadUserOperationError,
-        user_operation::UserOperation,
+        user_operation::{UserOperation, UserOperationHash},
     },
 };
 use ethers::{
@@ -12,6 +12,14 @@ use ethers::{
 };
 
 use super::UoPool;
+
+const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
+const GAS_INCREASE_PERC: u64 = 10;
+
+#[derive(Debug)]
+pub struct SanityCheckResult {
+    pub user_operation_hash: Option<UserOperationHash>,
+}
 
 impl<M: Middleware + 'static> UoPool<M> {
     async fn sender_or_init_code(
@@ -164,57 +172,75 @@ impl<M: Middleware + 'static> UoPool<M> {
     async fn verify_sender(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), BadUserOperationError<M>> {
+    ) -> Result<Option<UserOperationHash>, BadUserOperationError<M>> {
         if self.mempool.get_number_by_sender(&user_operation.sender) == 0 {
-            return Ok(());
+            return Ok(None);
         }
 
-        let deposit_info = self
-            .entry_point
-            .get_deposit_info(&user_operation.sender)
-            .await
-            .map_err(|_| BadUserOperationError::SenderVerification {
-                sender: user_operation.sender,
-            })?;
+        let user_operation_prev = self
+            .mempool
+            .get_all_by_sender(&user_operation.sender)
+            .iter()
+            .find(|user_operation_prev| user_operation_prev.nonce == user_operation.nonce)
+            .cloned();
 
-        if self
-            .reputation
-            .verify_stake(
-                "account",
-                Some(StakeInfo {
-                    address: user_operation.sender,
-                    stake: U256::from(deposit_info.stake),
-                    unstake_delay: U256::from(deposit_info.unstake_delay_sec),
-                }),
-            )
-            .is_ok()
-        {
-            return Ok(());
+        match user_operation_prev {
+            Some(user_operation_prev) => {
+                if user_operation.max_fee_per_gas
+                    >= calculate_valid_gas(
+                        user_operation_prev.max_fee_per_gas,
+                        U256::from(GAS_INCREASE_PERC),
+                    )
+                    && user_operation.max_priority_fee_per_gas
+                        >= calculate_valid_gas(
+                            user_operation_prev.max_priority_fee_per_gas,
+                            U256::from(GAS_INCREASE_PERC),
+                        )
+                {
+                    Ok(Some(
+                        user_operation_prev.hash(&self.entry_point.address(), &self.chain_id),
+                    ))
+                } else {
+                    Err(BadUserOperationError::SenderVerification {
+                        sender: user_operation.sender,
+                    })
+                }
+            }
+            None => {
+                if self.mempool.get_number_by_sender(&user_operation.sender)
+                    < MAX_UOS_PER_UNSTAKED_SENDER
+                {
+                    return Ok(None);
+                }
+
+                let deposit_info = self
+                    .entry_point
+                    .get_deposit_info(&user_operation.sender)
+                    .await
+                    .map_err(|_| BadUserOperationError::SenderVerification {
+                        sender: user_operation.sender,
+                    })?;
+                match self.reputation.verify_stake(
+                    "account",
+                    Some(StakeInfo {
+                        address: user_operation.sender,
+                        stake: U256::from(deposit_info.stake),
+                        unstake_delay: U256::from(deposit_info.unstake_delay_sec),
+                    }),
+                ) {
+                    Ok(_) => Ok(None),
+                    Err(_) => Err(BadUserOperationError::SenderVerification {
+                        sender: user_operation.sender,
+                    }),
+                }
+            }
         }
-
-        let user_operation_prev = self.mempool.get_all_by_sender(&user_operation.sender)[0].clone();
-        let fee_per_gas_diff =
-            user_operation.max_priority_fee_per_gas - user_operation_prev.max_priority_fee_per_gas;
-
-        if user_operation.sender == user_operation_prev.sender
-            && user_operation.nonce == user_operation_prev.nonce
-            && user_operation.max_priority_fee_per_gas
-                > user_operation_prev.max_priority_fee_per_gas
-            && (user_operation.max_fee_per_gas - user_operation_prev.max_fee_per_gas)
-                == fee_per_gas_diff
-        {
-            return Ok(());
-        }
-
-        Err(BadUserOperationError::SenderVerification {
-            sender: user_operation.sender,
-        })
     }
 
     pub async fn validate_user_operation(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<(), BadUserOperationError<M>> {
+    ) -> Result<SanityCheckResult, BadUserOperationError<M>> {
         // Either the sender is an existing contract, or the initCode is not empty (but not both)
         self.sender_or_init_code(user_operation).await?;
 
@@ -231,9 +257,11 @@ impl<M: Middleware + 'static> UoPool<M> {
         self.max_fee_per_gas(user_operation).await?;
 
         // The sender doesn't have another UserOperation already present in the pool (or it replaces an existing entry with the same sender and nonce, with a higher maxPriorityFeePerGas and an equally increased maxFeePerGas). Only one UserOperation per sender may be included in a single batch. A sender is exempt from this rule and may have multiple UserOperations in the pool and in a batch if it is staked (see reputation, throttling and banning section below), but this exception is of limited use to normal accounts.
-        self.verify_sender(user_operation).await?;
+        let user_operation_prev_hash = self.verify_sender(user_operation).await?;
 
-        Ok(())
+        Ok(SanityCheckResult {
+            user_operation_hash: user_operation_prev_hash,
+        })
     }
 }
 
@@ -421,7 +449,10 @@ mod tests {
             user_operation_sv.hash(&entry_point, &chain_id)
         );
         assert!(uo_pool
-            .validate_user_operation(&user_operation_sv)
+            .validate_user_operation(&UserOperation {
+                nonce: U256::from(1),
+                ..user_operation_sv.clone()
+            })
             .await
             .is_ok());
     }
