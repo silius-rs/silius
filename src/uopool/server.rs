@@ -1,8 +1,12 @@
 // Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
+
+    use std::str::FromStr;
+
     use crate::types::user_operation::UserOperationHash;
     use arrayref::array_ref;
-    use ethers::types::{Address, Bytes, U256};
+    use ethers::types::{Address, Bloom, Bytes, U256};
+    use prost::bytes::Buf;
 
     tonic::include_proto!("types");
 
@@ -73,6 +77,22 @@ pub mod types {
     impl From<H256> for UserOperationHash {
         fn from(value: H256) -> Self {
             Self::from(ethers::types::H256::from(value))
+        }
+    }
+
+    impl From<PbU256> for ethers::types::U256 {
+        fn from(value: PbU256) -> Self {
+            ethers::types::U256::from_big_endian(value.data.chunk())
+        }
+    }
+
+    impl From<ethers::types::U256> for PbU256 {
+        fn from(value: ethers::types::U256) -> Self {
+            let mut bytes: [u8; 32] = [0; 32];
+            value.to_big_endian(bytes.as_mut());
+            PbU256 {
+                data: prost::bytes::Bytes::copy_from_slice(&bytes),
+            }
         }
     }
 
@@ -161,6 +181,97 @@ pub mod types {
                     }
                     _ => crate::types::reputation::ReputationStatus::OK,
                 },
+            }
+        }
+    }
+
+    impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
+        fn from(value: ethers::types::TransactionReceipt) -> Self {
+            Self {
+                transaction_hash: Some(value.transaction_hash.into()),
+                transaction_index: value.transaction_index.as_u64(),
+                block_hash: value.block_hash.map(|hash| hash.into()),
+                block_number: value.block_number.unwrap_or_default().as_u64(),
+                from: Some(value.from.into()),
+                to: value.to.map(|address| address.into()),
+                cumulative_gas_used: Some(value.cumulative_gas_used.into()),
+                gas_used: value.gas_used.map(|gas| gas.into()),
+                contract_address: value.contract_address.map(|address| address.into()),
+                logs: value.logs.into_iter().map(|log| log.into()).collect(),
+                logs_bloom: format!("{:}", value.logs_bloom),
+                status: value.status.unwrap_or_default().as_u64(),
+                root: value.root.map(|root| root.into()),
+                effective_gas_price: value
+                    .effective_gas_price
+                    .map(|effective_gas_price| effective_gas_price.into()),
+            }
+        }
+    }
+
+    impl From<TransactionReceipt> for ethers::types::TransactionReceipt {
+        fn from(value: TransactionReceipt) -> Self {
+            Self {
+                transaction_hash: value.transaction_hash.unwrap_or_default().into(),
+                transaction_index: value.transaction_index.into(),
+                block_hash: value.block_hash.map(|h| h.into()),
+                block_number: Some(value.block_number.into()),
+                from: value.from.unwrap_or_default().into(),
+                to: value.to.map(|v| v.into()),
+                cumulative_gas_used: value
+                    .cumulative_gas_used
+                    .map(|g| g.into())
+                    .unwrap_or_default(),
+                gas_used: value.gas_used.map(|g| g.into()),
+                contract_address: value.contract_address.map(|a| a.into()),
+                logs: value.logs.into_iter().map(|l| l.into()).collect(),
+                status: Some(value.status.into()),
+                root: value.root.map(|r| r.into()),
+                logs_bloom: Bloom::from_str(&value.logs_bloom).unwrap_or_default(),
+                transaction_type: None, // default type for eth now
+                effective_gas_price: value.effective_gas_price.map(|g| g.into()),
+                other: Default::default(),
+            }
+        }
+    }
+
+    impl From<ethers::types::Log> for Log {
+        fn from(value: ethers::types::Log) -> Self {
+            Self {
+                address: Some(value.address.into()),
+                topics: value.topics.into_iter().map(|topic| topic.into()).collect(),
+                data: value.data.0,
+                block_number: value
+                    .block_number
+                    .map(|block_number| block_number.as_u64())
+                    .unwrap_or(0),
+                transaction_hash: value
+                    .transaction_hash
+                    .map(|transaction_hash| transaction_hash.into()),
+                transaction_index: value
+                    .transaction_index
+                    .map(|transaction_index| transaction_index.as_u64())
+                    .unwrap_or(0),
+                block_hash: value.block_hash.map(|block_hash| block_hash.into()),
+                log_index: value.log_index.map(|log_index| log_index.into()),
+                removed: value.removed.unwrap_or(false),
+            }
+        }
+    }
+
+    impl From<Log> for ethers::types::Log {
+        fn from(value: Log) -> Self {
+            Self {
+                address: value.address.unwrap_or_default().into(),
+                topics: value.topics.into_iter().map(|t| t.into()).collect(),
+                data: value.data.into(),
+                block_hash: value.block_hash.map(|b| b.into()),
+                block_number: Some(value.block_number.into()),
+                transaction_hash: value.transaction_hash.map(|t| t.into()),
+                transaction_index: Some(value.transaction_index.into()),
+                log_index: value.log_index.map(|l| l.into()),
+                transaction_log_index: Some(value.transaction_index.into()),
+                log_type: None,
+                removed: Some(value.removed),
             }
         }
     }

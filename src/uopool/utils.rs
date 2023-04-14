@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use ethers::types::{Address, Bytes, H256};
+use ethers::types::{Address, H256};
 
 use crate::types::simulation::CodeHash;
 
 // Try to get the address from first 20 bytes. Return None if length of bytes < 20.
-pub fn get_addr(bytes: &Bytes) -> Option<Address> {
+pub fn get_addr(bytes: &[u8]) -> Option<Address> {
     if bytes.len() >= 20 {
         Some(Address::from_slice(&bytes[0..20]))
     } else {

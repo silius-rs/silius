@@ -1,7 +1,7 @@
 use crate::contracts::gen::entry_point_api::{self, EntryPointAPICalls};
 use ethers::abi::{AbiDecode, AbiEncode};
 use ethers::prelude::{EthAbiCodec, EthAbiType};
-use ethers::types::{Address, BlockNumber, Bytes, TransactionReceipt, H256, U256};
+use ethers::types::{Address, BlockNumber, Bytes, Log, TransactionReceipt, H256, U256};
 use ethers::utils::keccak256;
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use rustc_hex::FromHexError;
@@ -175,17 +175,20 @@ impl Decompress for UserOperation {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct UserOperationReceipt {
     pub user_op_hash: UserOperationHash,
+    #[serde(serialize_with = "as_checksum")]
     pub sender: Address,
     pub nonce: U256,
-    pub paymaster: Address,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paymaster: Option<Address>,
     pub actual_gas_cost: U256,
     pub actual_gas_used: U256,
     pub success: bool,
     pub reason: String,
-    pub logs: Vec<String>,
+    pub logs: Vec<Log>,
     pub receipt: TransactionReceipt,
 }
 

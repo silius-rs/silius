@@ -108,7 +108,7 @@ message GetSortedResponse{
     repeated types.UserOperation user_operations = 1;
 }
 
-message GetUserOperationByHashRequest{
+message UserOperationHashRequest{
     types.H256 hash = 1;
 }
 
@@ -124,6 +124,17 @@ message HandlePastEventRequest{
     types.H160 entry_point = 1;
 }
 
+message GetUserOperationReceiptResponse{
+    types.H256 user_operation_hash = 1;
+    types.H160 sender = 2;
+    types.PbU256 nonce = 3;
+    types.H160 paymaster = 4;
+    types.PbU256 actual_gas_cost = 5;
+    types.PbU256 actual_gas_used = 6;
+    bool success = 7;
+    types.TransactionReceipt transaction_receipt = 8;
+    repeated types.Log logs = 9;
+}
 
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
@@ -132,9 +143,10 @@ service UoPool {
     rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
-    rpc GetUserOperationByHash(GetUserOperationByHashRequest) returns (GetUserOperationByHashResponse);
+    rpc GetUserOperationByHash(UserOperationHashRequest) returns (GetUserOperationByHashResponse);
     rpc HandlePastEvents(HandlePastEventRequest) returns (google.protobuf.Empty);
-
+    rpc GetUserOperationReceipt(UserOperationHashRequest) returns (GetUserOperationReceiptResponse);
+    
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);
     rpc Clear(google.protobuf.Empty) returns (ClearResponse);

@@ -1,6 +1,6 @@
 use self::{sanity_check::SanityCheckResult, simulation::SimulationResult};
 use crate::{
-    contracts::EntryPoint,
+    contracts::{gen::UserOperationEventFilter, EntryPoint},
     types::{
         reputation::{
             BadReputationError, ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,
@@ -20,12 +20,15 @@ use clap::Parser;
 use dashmap::DashMap;
 use ethers::{
     abi::AbiEncode,
+    prelude::LogMeta,
     providers::{Http, Middleware, Provider},
     types::{Address, Bytes, H256, U256},
     utils::{keccak256, to_checksum},
 };
 use jsonrpsee::{tracing::info, types::ErrorObject};
+use lazy_static::__Deref;
 use std::{fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
+use tracing::warn;
 
 pub mod database_mempool;
 pub mod memory_mempool;
@@ -116,7 +119,7 @@ pub trait Reputation: Debug {
     // This is useful in getting the reputation directly from paymaster_and_data field and init_code field in user operation.
     // If the address is not found in the first 20 bytes, it would return ReputationStatus::OK directly.
     fn get_status_from_bytes(&self, bytes: &Bytes) -> ReputationStatus {
-        let address_opt = utils::get_addr(bytes);
+        let address_opt = utils::get_addr(bytes.deref());
         if let Some(address) = address_opt {
             self.get_status(&address)
         } else {
@@ -180,6 +183,30 @@ impl<M: Middleware + 'static> UoPool<M> {
             sanity_check_result,
             simulation_result,
         })
+    }
+
+    async fn get_user_operation_event_meta(
+        &self,
+        user_operation_hash: H256,
+    ) -> anyhow::Result<Option<(UserOperationEventFilter, LogMeta)>> {
+        let mut event: Option<(UserOperationEventFilter, LogMeta)> = None;
+        let filter = self
+            .entry_point
+            .entry_point_api()
+            .event::<UserOperationEventFilter>()
+            .topic1(user_operation_hash);
+        let res: Vec<(UserOperationEventFilter, LogMeta)> = filter.query_with_meta().await?;
+        if res.len() >= 2 {
+            warn!(
+                "There are duplicate user operations with the same hash: {user_operation_hash:x?}"
+            );
+        }
+        // It is possible have two same user operatation in same bundle
+        // see https://twitter.com/leekt216/status/1636414866662785024
+        for log_meta in res.iter() {
+            event = Some(log_meta.clone());
+        }
+        Ok(event)
     }
 }
 
