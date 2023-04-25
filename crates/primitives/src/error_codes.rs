@@ -1,0 +1,13 @@
+// simulation
+pub const SIMULATE_VALIDATION_ERROR_CODE: i32 = -32500;
+pub const OPCODE_VALIDATION_ERROR_CODE: i32 = -32502;
+
+// reputation
+pub const ENTITY_BANNED_ERROR_CODE: i32 = -32504;
+pub const STAKE_TOO_LOW_ERROR_CODE: i32 = -32505;
+
+// sanity check
+pub const USER_OPERATION_HASH_ERROR_CODE: i32 = -32601;
+pub const SANITY_CHECK_ERROR_CODE: i32 = -32602;
+
+pub const EXECUTION_ERROR_CODE: i32 = -32521;

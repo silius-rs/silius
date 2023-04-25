@@ -1,0 +1,43 @@
+[package]
+name = "aa-bundler"
+version = "0.1.0"
+authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Vid201/aa-bundler"
+readme = "README.md"
+description = """
+AA (ERC-4337) Bundler
+"""
+default-run = "bundler"
+rust-version = "1.67.1"
+
+[dependencies]
+aa-bundler-grpc = { path = "../../crates/grpc" }
+aa-bundler-primitives = { path = "../../crates/primitives" }
+aa-bundler-rpc = { path = "../../crates/rpc" }
+
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+dirs = "4.0"
+ethers = { version = "2.0.1", features = ["solc-full"] }
+expanded-pathbuf = "0.1"
+jsonrpsee = { version = "0.16", features = ["server", "macros"] }
+tokio = { version = "1.18", features = ["full"] }
+tracing-subscriber = "0.3"
+
+[[bin]]
+path = "src/bundler.rs"
+name = "bundler"
+
+[[bin]]
+path = "src/bundler-uopool.rs"
+name = "bundler-uopool"
+
+[[bin]]
+path = "src/bundler-rpc.rs"
+name = "bundler-rpc"
+
+[[bin]]
+path = "src/create-wallet.rs"
+name = "create-wallet"

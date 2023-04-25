@@ -24,7 +24,7 @@ setup-thirdparty:
 	cd thirdparty/bundler && yarn install --frozen-lockfile --immutable && yarn preprocess && cd ../..
 
 test:
-	cargo test 
+	cargo test --workspace
 
 format:
 	cargo fmt --all

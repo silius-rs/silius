@@ -1,0 +1,21 @@
+[package]
+name = "aa-bundler-tests"
+version = "0.1.0"
+authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Vid201/aa-bundler"
+readme = "README.md"
+description = """
+AA (ERC-4337) Bundler integration tests
+"""
+rust-version = "1.67.1"
+
+[dev-dependencies]
+aa-bundler-contracts = { path = "../crates/contracts" }
+aa-bundler-primitives = { path = "../crates/primitives" }
+
+anyhow = "1"
+ethers = { version = "2.0.1", features = ["solc-full"] }
+tempdir = "0.3.7"
+tokio = { version = "1.18", features = ["full"] }
