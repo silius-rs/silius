@@ -9,7 +9,7 @@ readme = "README.md"
 description = """
 AA (ERC-4337) Bundler integration tests
 """
-rust-version = "1.67.1"
+rust-version = "1.69.0"
 
 [dev-dependencies]
 aa-bundler-contracts = { path = "../crates/contracts" }
