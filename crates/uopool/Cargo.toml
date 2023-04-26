@@ -1,0 +1,33 @@
+[package]
+name = "aa-bundler-uopool"
+version = "0.1.0"
+authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Vid201/aa-bundler"
+readme = "README.md"
+description = """
+AA (ERC-4337) Bundler uopool implementation
+"""
+rust-version = "1.67.1"
+
+[dependencies]
+aa-bundler-contracts = { path = "../contracts" }
+aa-bundler-primitives = { path = "../primitives" }
+
+anyhow = "1"
+educe = { version = "0.4", features = ["Debug", "Default"] }
+ethers = { version = "2.0.1", features = ["solc-full"] }
+jsonrpsee = { version = "0.16", features = ["server", "macros"] }
+lazy_static = "1.4.0"
+page_size = "0.5.0"
+prost = "0.11"
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
+reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
+serde = "1"
+tokio = { version = "1.18", features = ["full"] }
+tracing = "0.1"
+
+[dev-dependencies]
+aa-bundler-primitives = { path = "../primitives", features = ["test-utils"] }
+tempdir = "0.3.7"
