@@ -1,5 +1,7 @@
 on:
-  push:
+  pull_request:
+    types:
+      - closed
     branches:
       - main
 
@@ -12,6 +14,7 @@ env:
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     permissions:
       contents: read
       packages: write
@@ -27,6 +30,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get Git Tag
+        run: echo ::set-output name=tags::$(git describe --tags)
+        id: tag
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
@@ -40,5 +47,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.tag.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
