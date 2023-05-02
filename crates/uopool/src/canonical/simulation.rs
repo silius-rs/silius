@@ -4,7 +4,7 @@ use aa_bundler_contracts::{
 };
 use aa_bundler_primitives::{
     CodeHash, SimulationError, StakeInfo, UserOperation, EXECUTION_ERROR_CODE,
-    OPCODE_VALIDATION_ERROR_CODE, SIMULATE_VALIDATION_ERROR_CODE,
+    OPCODE_VALIDATION_ERROR_CODE, SIGNATURE_FAILED_ERROR_CODE, SIMULATE_VALIDATION_ERROR_CODE,
 };
 use ethers::{
     abi::AbiDecode,
@@ -56,6 +56,7 @@ lazy_static! {
 
 #[derive(Debug)]
 pub enum SimulateValidationError {
+    SignatureValidation {},
     UserOperationRejected { message: String },
     OpcodeValidation { entity: String, opcode: String },
     UserOperationExecution { message: String },
@@ -68,6 +69,11 @@ pub enum SimulateValidationError {
 impl From<SimulateValidationError> for SimulationError {
     fn from(error: SimulateValidationError) -> Self {
         match error {
+            SimulateValidationError::SignatureValidation {} => SimulationError::owned(
+                SIGNATURE_FAILED_ERROR_CODE,
+                "Invalid UserOp signature or paymaster signature",
+                None::<bool>,
+            ),
             SimulateValidationError::UserOperationRejected { message } => {
                 SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, message, None::<bool>)
             }
@@ -148,6 +154,26 @@ impl<M: Middleware + 'static> UoPool<M> {
                 }),
             },
         }
+    }
+
+    fn signature(
+        &self,
+        simulate_validation_result: &SimulateValidationResult,
+    ) -> Result<(), SimulateValidationError> {
+        let signature_check = match simulate_validation_result {
+            SimulateValidationResult::ValidationResult(validation_result) => {
+                validation_result.return_info.2
+            }
+            SimulateValidationResult::ValidationResultWithAggregation(
+                validation_result_with_aggregation,
+            ) => validation_result_with_aggregation.return_info.2,
+        };
+
+        if signature_check {
+            return Err(SimulateValidationError::SignatureValidation {});
+        }
+
+        Ok(())
     }
 
     fn extract_stake_info(
@@ -544,6 +570,10 @@ impl<M: Middleware + 'static> UoPool<M> {
         user_operation: &UserOperation,
     ) -> Result<SimulationResult, SimulateValidationError> {
         let simulate_validation_result = self.simulate_validation(user_operation).await?;
+
+        // check signature
+        self.signature(&simulate_validation_result)?;
+
         let geth_trace = self.simulate_validation_trace(user_operation).await?;
 
         trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");
