@@ -3,7 +3,7 @@ on:
     workflows: ["Create and publish a Docker image"]
     types: [completed]
 
-name: run bundler test spec
+name: Run bundler spec tests
 
 jobs:
   rub:
@@ -39,5 +39,5 @@ jobs:
       - run: "cd bundler-spec-tests && pdm install && pdm update-deps"
         name: update submodules of bundler-spec-tests
 
-      - run: ./runall.sh launchers/aabundler-launcher.sh
+      - run: ./runall.sh launchers/aa-bundler-rust-launcher.sh
         name: Run tests.
