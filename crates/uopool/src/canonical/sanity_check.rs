@@ -305,7 +305,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 
         let block = self
             .eth_provider
-            .get_block(BlockNumber::Pending)
+            .get_block(BlockNumber::Latest)
             .await
             .map_err(|error| BadUserOperationError::Middleware(error))?;
 
@@ -458,11 +458,12 @@ mod tests {
 
     #[tokio::test]
     async fn user_operation_sanity_check() {
-        let chain_id = U256::from(5);
-        let entry_point = "0x602aB3881Ff3Fa8dA60a8F44Cf633e91bA1FdB69"
+        let entry_point = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
             .parse::<Address>()
             .unwrap();
-        let eth_provider = Arc::new(Provider::try_from("https://rpc.ankr.com/eth_goerli").unwrap());
+        let eth_provider =
+            Arc::new(Provider::try_from("https://eth-goerli.public.blastapi.io").unwrap());
+        let chain_id = eth_provider.get_chainid().await.unwrap();
 
         let mut reputation = Box::<MemoryReputation>::default();
         reputation.init(
@@ -557,7 +558,7 @@ mod tests {
 
         // paymaster verification
         let user_operation_pv = UserOperation {
-            paymaster_and_data: Bytes::from_str("0x83DAc8e36D8FDeCF69CD78f9f86f25664EEE72f4")
+            paymaster_and_data: Bytes::from_str("0x8bd4Ec4D7B6D7BC9fFA742A87AA134Bb6806e621")
                 .unwrap(),
             ..user_operation_valid.clone()
         };
@@ -612,7 +613,7 @@ mod tests {
 
         // sender verification
         let user_operation_sv = UserOperation {
-            sender: "0x1a31f86F876a8b1c90E7DC2aB77A5335D43392Eb"
+            sender: "0x36503f2a3Fc1CF2ED2C6640eBc3632bCbb30EF1D"
                 .parse()
                 .unwrap(),
             ..user_operation_valid.clone()
