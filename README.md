@@ -37,13 +37,13 @@ cargo run --release --bin create-wallet -- --output-path ${HOME}/.aa-bundler --c
 Run bundler (with user operation pool and JSON-RPC API): 
 
 ```bash
-cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.aa-bundler/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x0576a174D229E3cFA37253523E645A78A0C91B57 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
+cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.aa-bundler/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
 ```
 
 Run only user operation pool:
 
 ```bash
-cargo run --release --bin bundler-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x0576a174D229E3cFA37253523E645A78A0C91B57 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
+cargo run --release --bin bundler-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
 ```
 
 Run only JSON-RPC API: 

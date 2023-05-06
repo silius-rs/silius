@@ -100,7 +100,7 @@ pub mod types {
         fn from(user_operation: aa_bundler_primitives::UserOperation) -> Self {
             Self {
                 sender: Some(user_operation.sender.into()),
-                nonce: user_operation.nonce.as_u64(),
+                nonce: Some(user_operation.nonce.into()),
                 init_code: prost::bytes::Bytes::copy_from_slice(user_operation.init_code.as_ref()),
                 call_data: prost::bytes::Bytes::copy_from_slice(user_operation.call_data.as_ref()),
                 call_gas_limit: user_operation.call_gas_limit.as_u64(),
@@ -126,7 +126,13 @@ pub mod types {
                         Address::zero()
                     }
                 },
-                nonce: U256::from(user_operation.nonce),
+                nonce: {
+                    if let Some(nonce) = user_operation.nonce {
+                        nonce.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
                 init_code: Bytes::from(user_operation.init_code),
                 call_data: Bytes::from(user_operation.call_data),
                 call_gas_limit: U256::from(user_operation.call_gas_limit),

@@ -4,7 +4,7 @@ use aa_bundler_primitives::{
 };
 use ethers::{
     providers::Middleware,
-    types::{Address, Bytes, U256},
+    types::{Address, BlockNumber, Bytes, U256},
 };
 use jsonrpsee::types::error::ErrorCode;
 
@@ -296,12 +296,6 @@ impl<M: Middleware + 'static> UoPool<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), BadUserOperationError<M>> {
-        let base_fee_estimation = self
-            .eth_provider
-            .get_gas_price()
-            .await
-            .map_err(|error| BadUserOperationError::Middleware(error))?;
-
         if user_operation.max_priority_fee_per_gas > user_operation.max_fee_per_gas {
             return Err(BadUserOperationError::HighMaxPriorityFeePerGas {
                 max_priority_fee_per_gas: user_operation.max_priority_fee_per_gas,
@@ -309,12 +303,32 @@ impl<M: Middleware + 'static> UoPool<M> {
             });
         }
 
-        if base_fee_estimation + user_operation.max_priority_fee_per_gas
+        let block = self
+            .eth_provider
+            .get_block(BlockNumber::Pending)
+            .await
+            .map_err(|error| BadUserOperationError::Middleware(error))?;
+
+        let base_fee_per_gas = if let Some(block) = block {
+            if let Some(base_fee_per_gas) = block.base_fee_per_gas {
+                base_fee_per_gas
+            } else {
+                return Err(BadUserOperationError::UnknownError {
+                    error: "Can't get base fee per gas".to_string(),
+                });
+            }
+        } else {
+            return Err(BadUserOperationError::UnknownError {
+                error: "Can't get base fee per gas".to_string(),
+            });
+        };
+
+        if base_fee_per_gas + user_operation.max_priority_fee_per_gas
             > user_operation.max_fee_per_gas
         {
             return Err(BadUserOperationError::LowMaxFeePerGas {
                 max_fee_per_gas: user_operation.max_fee_per_gas,
-                max_fee_per_gas_estimated: base_fee_estimation
+                max_fee_per_gas_estimated: base_fee_per_gas
                     + user_operation.max_priority_fee_per_gas,
             });
         }
