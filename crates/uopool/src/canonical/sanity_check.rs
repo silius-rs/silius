@@ -625,12 +625,13 @@ mod tests {
                 .unwrap(),
             user_operation_sv.hash(&entry_point, &chain_id)
         );
-        assert!(uo_pool
-            .validate_user_operation(&UserOperation {
-                nonce: U256::from(1),
-                ..user_operation_sv.clone()
-            })
-            .await
-            .is_ok());
+        // TODO: this test is valid if sender is staked
+        // assert!(uo_pool
+        //     .validate_user_operation(&UserOperation {
+        //         nonce: U256::from(1),
+        //         ..user_operation_sv.clone()
+        //     })
+        //     .await
+        //     .is_ok());
     }
 }
