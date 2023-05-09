@@ -27,7 +27,7 @@ message SupportedEntryPoint {
 
 message UserOperation {
     types.H160 sender = 1;
-    uint64 nonce = 2;
+    PbU256 nonce = 2;
     bytes init_code = 3;
     bytes call_data = 4;
     uint64 call_gas_limit = 5;

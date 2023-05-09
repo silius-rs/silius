@@ -304,7 +304,7 @@ mod tests {
         let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let entry_point = EntryPoint::<Provider<Http>>::new(
             eth_provider.clone(),
-            Address::from_str("0x0576a174D229E3cFA37253523E645A78A0C91B57").unwrap(),
+            Address::from_str("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789").unwrap(),
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);
