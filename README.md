@@ -72,7 +72,7 @@ make test
 
 ## Contact
 
-The best place for the discussion is the dedicated [Telegram channel](https://t.me/aabundler).
+The best place for the discussion is the dedicated [Telegram group](https://t.me/+sKeRcN4j3MM3NmNk).
 
 ## Licenses
 
