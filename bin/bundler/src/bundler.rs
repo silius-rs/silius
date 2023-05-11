@@ -4,7 +4,7 @@ use aa_bundler_grpc::{
 };
 use aa_bundler_primitives::{parse_address, parse_u256, Wallet};
 use aa_bundler_rpc::{DebugApiServer, DebugApiServerImpl, EthApiServer, EthApiServerImpl};
-use anyhow::Result;
+use anyhow::{format_err, Result};
 use clap::Parser;
 use ethers::{
     providers::{Http, Middleware, Provider},
@@ -78,7 +78,8 @@ fn main() -> Result<()> {
 
                 let chain_id = eth_provider.get_chainid().await?;
 
-                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)?;
+                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)
+                    .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
                 info!("{:?}", wallet.signer);
 
                 let eth_provider =
