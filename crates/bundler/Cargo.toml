@@ -16,5 +16,5 @@ aa-bundler-contracts = { path = "../contracts" }
 aa-bundler-primitives = { path = "../primitives" }
 
 anyhow = "1"
-ethers = { version = "2.0.1", features = ["solc-full"] }
+ethers = { version = "2.0.4", features = ["solc-full"] }
 tracing = "0.1"
