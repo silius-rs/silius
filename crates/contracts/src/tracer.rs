@@ -17,7 +17,7 @@ impl TryFrom<GethTrace> for JsTracerFrame {
     type Error = anyhow::Error;
     fn try_from(value: GethTrace) -> Result<Self, Self::Error> {
         match value {
-            GethTrace::Known(value) => Err(format_err!("invalid geth trace: {:?}", value)),
+            GethTrace::Known(value) => Err(format_err!("invalid geth trace: {value:?}")),
             GethTrace::Unknown(value) => serde_json::from_value(value)
                 .map_err(|error| format_err!("failed to parse geth trace: {error}")),
         }

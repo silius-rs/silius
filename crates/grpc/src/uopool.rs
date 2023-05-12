@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-
+use aa_bundler_bundler::UoPoolError;
 use aa_bundler_contracts::{
     parse_from_input_data, EntryPoint, EntryPointAPIEvents, EntryPointErr,
     SimulateValidationResult, UserOperationEventFilter,
