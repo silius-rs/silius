@@ -138,6 +138,7 @@ dependencies = [
  "reth-db",
  "reth-libmdbx",
  "serde",
+ "serde_json",
  "tempdir",
  "tokio",
  "tracing",

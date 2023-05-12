@@ -1,6 +1,7 @@
 // simulation
 pub const SIMULATE_VALIDATION_ERROR_CODE: i32 = -32500;
 pub const OPCODE_VALIDATION_ERROR_CODE: i32 = -32502;
+pub const TIMESTAMP_VALIDATION_ERROR_CODE: i32 = -32503;
 
 // reputation
 pub const ENTITY_BANNED_ERROR_CODE: i32 = -32504;

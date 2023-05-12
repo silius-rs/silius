@@ -16,7 +16,7 @@ pub use reputation::{
     MIN_INCLUSION_RATE_DENOMINATOR, THROTTLED_MAX_INCLUDE, THROTTLING_SLACK,
 };
 pub use sanity_check::SanityCheckError;
-pub use simulation::{CodeHash, SimulationError};
+pub use simulation::{CodeHash, SimulationError, EXPIRATION_TIMESTAMP_DIFF};
 pub use user_operation::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationPartial, UserOperationReceipt,
