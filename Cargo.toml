@@ -11,6 +11,9 @@ members = [
 ]
 default-members = ["bin/bundler"]
 
+[workspace.dependencies]
+ethers = { version = "2.0.4" }
+
 [profile.debug-fast]
 inherits = "release"
 debug = true

@@ -4,7 +4,8 @@ use aa_bundler_contracts::{
 };
 use aa_bundler_primitives::{
     CodeHash, SimulationError, StakeInfo, UserOperation, EXECUTION_ERROR_CODE,
-    OPCODE_VALIDATION_ERROR_CODE, SIGNATURE_FAILED_ERROR_CODE, SIMULATE_VALIDATION_ERROR_CODE,
+    EXPIRATION_TIMESTAMP_DIFF, OPCODE_VALIDATION_ERROR_CODE, SIGNATURE_FAILED_ERROR_CODE,
+    SIMULATE_VALIDATION_ERROR_CODE, TIMESTAMP_VALIDATION_ERROR_CODE,
 };
 use ethers::{
     abi::AbiDecode,
@@ -14,7 +15,11 @@ use ethers::{
 };
 use jsonrpsee::types::error::ErrorCode;
 use lazy_static::lazy_static;
-use std::collections::{HashMap, HashSet};
+use serde_json::json;
+use std::{
+    collections::{HashMap, HashSet},
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tokio::task::JoinSet;
 use tracing::trace;
 
@@ -57,13 +62,33 @@ lazy_static! {
 #[derive(Debug)]
 pub enum SimulateValidationError {
     SignatureValidation {},
-    UserOperationRejected { message: String },
-    OpcodeValidation { entity: String, opcode: String },
-    UserOperationExecution { message: String },
-    StorageAccessValidation { slot: String },
-    CallStackValidation { message: String },
-    CodeHashesValidation { message: String },
-    UnknownError { error: String },
+    ExpirationValidation {
+        valid_after: u64,
+        valid_until: u64,
+        paymaster: Option<Address>,
+    },
+    UserOperationRejected {
+        message: String,
+    },
+    OpcodeValidation {
+        entity: String,
+        opcode: String,
+    },
+    UserOperationExecution {
+        message: String,
+    },
+    StorageAccessValidation {
+        slot: String,
+    },
+    CallStackValidation {
+        message: String,
+    },
+    CodeHashesValidation {
+        message: String,
+    },
+    UnknownError {
+        error: String,
+    },
 }
 
 impl From<SimulateValidationError> for SimulationError {
@@ -73,6 +98,25 @@ impl From<SimulateValidationError> for SimulationError {
                 SIGNATURE_FAILED_ERROR_CODE,
                 "Invalid UserOp signature or paymaster signature",
                 None::<bool>,
+            ),
+            SimulateValidationError::ExpirationValidation {
+                valid_after,
+                valid_until,
+                paymaster,
+            } => SimulationError::owned(
+                TIMESTAMP_VALIDATION_ERROR_CODE,
+                "User operation is expired or will expire soon",
+                {
+                    if let Some(paymaster) = paymaster {
+                        Some(json!({
+                            "valid_after": valid_after, "valid_until": valid_until, "paymaster": paymaster,
+                        }))
+                    } else {
+                        Some(json!({
+                            "valid_after": valid_after, "valid_until": valid_until,
+                        }))
+                    }
+                },
             ),
             SimulateValidationError::UserOperationRejected { message } => {
                 SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, message, None::<bool>)
@@ -107,6 +151,7 @@ impl From<SimulateValidationError> for SimulationError {
 pub struct SimulationResult {
     pub simulate_validation_result: SimulateValidationResult,
     pub code_hashes: Vec<CodeHash>,
+    pub valid_after: Option<u64>,
 }
 
 impl<M: Middleware + 'static> UoPool<M> {
@@ -174,6 +219,45 @@ impl<M: Middleware + 'static> UoPool<M> {
         }
 
         Ok(())
+    }
+
+    fn timestamps(
+        &self,
+        simulate_validation_result: &SimulateValidationResult,
+    ) -> Result<Option<u64>, SimulateValidationError> {
+        let (valid_after, valid_until) = match simulate_validation_result {
+            SimulateValidationResult::ValidationResult(validation_result) => (
+                validation_result.return_info.3,
+                validation_result.return_info.4,
+            ),
+            SimulateValidationResult::ValidationResultWithAggregation(
+                validation_result_with_aggregation,
+            ) => (
+                validation_result_with_aggregation.return_info.3,
+                validation_result_with_aggregation.return_info.4,
+            ),
+        };
+
+        let current_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| SimulateValidationError::UnknownError {
+                error: "Failed to get current timestamp".to_string(),
+            })?
+            .as_secs();
+
+        if valid_until <= current_timestamp + EXPIRATION_TIMESTAMP_DIFF {
+            return Err(SimulateValidationError::ExpirationValidation {
+                valid_after,
+                valid_until,
+                paymaster: None, // TODO: fill with paymaster address this error was triggered by the paymaster
+            });
+        }
+
+        if valid_after > current_timestamp {
+            return Ok(Some(valid_after));
+        }
+
+        Ok(None)
     }
 
     fn extract_stake_info(
@@ -574,6 +658,9 @@ impl<M: Middleware + 'static> UoPool<M> {
         // check signature
         self.signature(&simulate_validation_result)?;
 
+        // check timestamps
+        let valid_after = self.timestamps(&simulate_validation_result)?;
+
         let geth_trace = self.simulate_validation_trace(user_operation).await?;
 
         trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");
@@ -606,6 +693,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         Ok(SimulationResult {
             simulate_validation_result,
             code_hashes,
+            valid_after,
         })
     }
 }

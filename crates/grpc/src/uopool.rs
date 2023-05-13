@@ -439,6 +439,10 @@ where
 
                 match simulation_result {
                     Ok(simulation_result) => {
+                        if simulation_result.valid_after.is_some() {
+                            continue;
+                        }
+
                         match simulation_result.simulate_validation_result {
                             SimulateValidationResult::ValidationResult(res) => {
                                 // TODO

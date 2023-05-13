@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 
 pub type SimulationError = ErrorObject<'static>;
 
+pub const EXPIRATION_TIMESTAMP_DIFF: u64 = 30;
+
 #[derive(
     Debug,
     Default,

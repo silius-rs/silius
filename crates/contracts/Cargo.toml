@@ -15,7 +15,7 @@ rust-version = "1.69.0"
 aa-bundler-primitives = { path = "../primitives" }
 
 anyhow = "1"
-ethers = { version = "2.0.1", features = ["solc-full"] }
+ethers = { workspace = true }
 ethers-providers = "2.0.1"
 lazy_static = "1.4.0"
 serde = "1"
@@ -28,4 +28,4 @@ tokio = { version = "1.18", features = ["full"] }
 
 [build-dependencies]
 anyhow = "1"
-ethers = { version = "2.0.1", features = ["solc-full"] }
+ethers = { workspace = true, features = ["solc-full"] }
