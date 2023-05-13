@@ -1,12 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
 use aa_bundler_contracts::EntryPointAPI;
-use aa_bundler_primitives::{UserOperation, Wallet};
+use aa_bundler_primitives::{Chain, UserOperation, Wallet};
 use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
-    types::{transaction::eip2718::TypedTransaction, Address, H256, U256},
+    types::{transaction::eip2718::TypedTransaction, Address, H256},
 };
 use tracing::{info, trace};
 
@@ -15,7 +15,7 @@ pub struct Bundler {
     pub wallet: Wallet,
     pub beneficiary: Address,
     pub entry_point: Address,
-    pub chain_id: U256,
+    pub chain: Chain,
     pub eth_client_address: String,
 }
 
@@ -24,14 +24,14 @@ impl Bundler {
         wallet: Wallet,
         beneficiary: Address,
         entry_point: Address,
-        chain_id: U256,
+        chain: Chain,
         eth_client_address: String,
     ) -> Self {
         Self {
             wallet,
             beneficiary,
             entry_point,
-            chain_id,
+            chain,
             eth_client_address,
         }
     }
@@ -58,7 +58,7 @@ impl Bundler {
             )
             .tx
             .clone();
-        tx.set_nonce(nonce).set_chain_id(self.chain_id.as_u64());
+        tx.set_nonce(nonce).set_chain_id(self.chain.id());
 
         trace!("Prepare the transaction {tx:?} send to execution client!");
         let tx = client

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod bundler;
+mod chain;
 mod error_codes;
 mod reputation;
 mod sanity_check;
@@ -10,6 +11,7 @@ mod utils;
 mod wallet;
 
 pub use bundler::{Mode, DEFAULT_INTERVAL};
+pub use chain::{Chain, SUPPORTED_CHAINS};
 pub use error_codes::*;
 pub use reputation::{
     BadReputationError, ReputationEntry, ReputationStatus, StakeInfo, BAN_SLACK,

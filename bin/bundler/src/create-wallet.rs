@@ -9,7 +9,7 @@ use jsonrpsee::tracing::info;
 #[derive(Parser)]
 #[clap(
     name = "aa-bundler-create-wallet",
-    about = "Bundler's wallet creation for EIP-4337 Account Abstraction"
+    about = "Bundler's wallet creation for ERC-4337 Account Abstraction"
 )]
 pub struct Opt {
     #[clap(long)]

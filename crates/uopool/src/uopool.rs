@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use aa_bundler_contracts::{EntryPoint, UserOperationEventFilter};
-use aa_bundler_primitives::{CodeHash, ReputationEntry, UserOperation, UserOperationHash};
+use aa_bundler_primitives::{Chain, CodeHash, ReputationEntry, UserOperation, UserOperationHash};
 use ethers::{
     prelude::LogMeta,
     providers::Middleware,
@@ -32,7 +32,7 @@ pub struct UoPool<M: Middleware> {
     pub eth_provider: Arc<M>,
     pub max_verification_gas: U256,
     pub min_priority_fee_per_gas: U256,
-    pub chain_id: U256,
+    pub chain: Chain,
 }
 
 impl<M: Middleware + 'static> UoPool<M> {
@@ -43,7 +43,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         eth_provider: Arc<M>,
         max_verification_gas: U256,
         min_priority_fee_per_gas: U256,
-        chain_id: U256,
+        chain: Chain,
     ) -> Self {
         Self {
             entry_point,
@@ -52,7 +52,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             eth_provider,
             max_verification_gas,
             min_priority_fee_per_gas,
-            chain_id,
+            chain,
         }
     }
 

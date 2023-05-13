@@ -2,9 +2,6 @@ on:
   pull_request:
     types:
       - closed
-  push:
-    tags:
-      - "*"
 
 name: Create and publish a Docker image
 
