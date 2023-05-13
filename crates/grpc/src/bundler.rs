@@ -240,7 +240,7 @@ impl bundler_server::Bundler for BundlerService {
     ) -> Result<Response<SendBundleNowResponse>, tonic::Status> {
         let res = self.send_bundles_now().await.map_err(|e| {
             error!("Send bundle manually with response {e:?}");
-            tonic::Status::internal("Failed to send bundle manually")
+            tonic::Status::internal(format!("Send bundle now with error: {e:?}"))
         })?;
         Ok(Response::new(SendBundleNowResponse {
             result: Some(res.into()),
