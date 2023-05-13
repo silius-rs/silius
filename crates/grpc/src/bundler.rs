@@ -14,6 +14,7 @@ use crate::{GetChainIdResponse, GetSupportedEntryPointsResponse};
 
 use crate::proto::bundler::*;
 use crate::uo_pool_client::UoPoolClient;
+use crate::error::GrpcErrors;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerServiceOpts {
@@ -198,21 +199,21 @@ impl bundler_server::Bundler for BundlerService {
     async fn chain_id(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
+    ) -> Result<Response<GetChainIdResponse>, GrpcErrors> {
         todo!()
     }
 
     async fn supported_entry_points(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
+    ) -> Result<Response<GetSupportedEntryPointsResponse>, GrpcErrors> {
         todo!()
     }
 
     async fn set_bundler_mode(
         &self,
         request: tonic::Request<SetModeRequest>,
-    ) -> Result<Response<SetModeResponse>, tonic::Status> {
+    ) -> Result<Response<SetModeResponse>, GrpcErrors> {
         let req = request.into_inner();
         match req.mode() {
             Mode::Manual => {
@@ -235,10 +236,10 @@ impl bundler_server::Bundler for BundlerService {
     async fn send_bundle_now(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<SendBundleNowResponse>, tonic::Status> {
+    ) -> Result<Response<SendBundleNowResponse>, GrpcErrors> {
         let res = self.send_bundles_now().await.map_err(|e| {
             error!("Send bundle manually with response {e:?}");
-            tonic::Status::internal(format!("Send bundle now with error: {e:?}"))
+            GrpcErrors::InternalError(format!("Send bundle now with error: {e:?}"))            
         })?;
         Ok(Response::new(SendBundleNowResponse {
             result: Some(res.into()),

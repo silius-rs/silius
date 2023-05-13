@@ -3,6 +3,7 @@
 mod bundler;
 mod proto;
 mod uopool;
+mod error;
 
 pub use proto::bundler::*;
 pub use proto::types::*;

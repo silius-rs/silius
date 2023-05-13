@@ -34,6 +34,7 @@ const LATEST_SCAN_DEPTH: u64 = 1000;
 
 use crate::proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse};
 use crate::proto::uopool::*;
+use crate::error::GrpcErrors;
 
 #[derive(Clone, Copy, Debug, Parser, PartialEq)]
 pub struct UoPoolServiceOpts {
@@ -95,7 +96,7 @@ where
     async fn add(
         &self,
         request: tonic::Request<AddRequest>,
-    ) -> Result<Response<AddResponse>, tonic::Status> {
+    ) -> Result<Response<AddResponse>, GrpcErrors> {
         let req = request.into_inner();
         let mut res = AddResponse::default();
 
@@ -107,10 +108,10 @@ where
             trace!("Receive grpc request to add user operation: {user_operation:?} on entry point: {entry_point:?}");
             let user_operation: UserOperation = user_operation
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid user operaton".to_string()))?;
             let entry_point: Address = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
@@ -118,14 +119,14 @@ where
                 let uopool = self
                     .mempools
                     .get(&mempool_id)
-                    .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                    .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
                 uopool.verify_user_operation(&user_operation).await
             };
 
             match verification_result {
                 Ok(verification_result) => {
                     let mut uopool = self.mempools.get_mut(&mempool_id).ok_or_else(|| {
-                        tonic::Status::invalid_argument("entry point not supported")
+                        GrpcError::InvalidArgument("entry point not supported".to_string())
                     })?;
 
                     if let Some(user_operation_hash) =
@@ -161,12 +162,12 @@ where
                             res.data = serde_json::to_string(
                                 &user_operation.hash(&entry_point, &self.chain_id),
                             )
-                            .map_err(|_| tonic::Status::internal("error adding user operation"))?;
+                            .map_err(|_| GrpcErrors::Internal("error adding user operation".to_string()))?;
                         }
                         Err(error) => {
                             res.set_result(AddResult::NotAdded);
                             res.data = serde_json::to_string(&error.to_string()).map_err(|_| {
-                                tonic::Status::internal("error adding user operation")
+                                GrpcErrors::Internal("error adding user operation".to_string())
                             })?;
                         }
                     }
@@ -174,20 +175,19 @@ where
                 Err(error) => {
                     res.set_result(AddResult::NotAdded);
                     res.data = serde_json::to_string(&error)
-                        .map_err(|_| tonic::Status::internal("error adding user operation"))?;
+                        .map_err(|_| GrpcErrors::Internal("error adding user operation".to_string()))?;
                 }
             }
 
             return Ok(Response::new(res));
         }
-
-        Err(tonic::Status::invalid_argument("missing user operation"))
+        Err(GrpcErrors::InvalidArgument("missing user operation".to_string()))
     }
 
     async fn remove(
         &self,
         request: tonic::Request<RemoveRequest>,
-    ) -> Result<Response<RemoveResponse>, tonic::Status> {
+    ) -> Result<Response<RemoveResponse>, GrpcErrors> {
         let req = request.into_inner();
 
         if let RemoveRequest {
@@ -197,18 +197,18 @@ where
         {
             let entry_point = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             let mut uopool = self
                 .mempools
                 .get_mut(&mempool_id)
-                .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                .ok_or_else(|| GrpcErrors::InvalidArgument("entry point is not supported ".to_string()))?;
 
             for hash in hashes {
                 let hash: H256 = hash
                     .try_into()
-                    .map_err(|_| tonic::Status::invalid_argument("invalid user operation hash"))?;
+                    .map_err(|_| GrpcErrors::InvalidArgument("invalid user operation hash".to_string()))?;
 
                 match uopool.mempool.remove(&hash.into()) {
                     Ok(_) => {}
@@ -225,15 +225,15 @@ where
             }));
         }
 
-        Err(tonic::Status::invalid_argument(
-            "missing user operations or entry point",
+        Err(GrpcErrors::InvalidArgument(
+            "missing user operations or entry point".to_string(),
         ))
     }
 
     async fn get_chain_id(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
+    ) -> Result<Response<GetChainIdResponse>, GrpcErrors> {
         Ok(tonic::Response::new(GetChainIdResponse {
             chain_id: self.chain_id.as_u64(),
         }))
@@ -242,7 +242,7 @@ where
     async fn get_supported_entry_points(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
+    ) -> Result<Response<GetSupportedEntryPointsResponse>, GrpcErrors> {
         Ok(tonic::Response::new(GetSupportedEntryPointsResponse {
             eps: self
                 .mempools
@@ -255,7 +255,7 @@ where
     async fn estimate_user_operation_gas(
         &self,
         request: tonic::Request<EstimateUserOperationGasRequest>,
-    ) -> Result<Response<EstimateUserOperationGasResponse>, tonic::Status> {
+    ) -> Result<Response<EstimateUserOperationGasResponse>, GrpcErrors> {
         let req = request.into_inner();
         let mut res = EstimateUserOperationGasResponse::default();
 
@@ -266,17 +266,17 @@ where
         {
             let user_operation: UserOperation = user_operation
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid user operation"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid user operation".to_string()))?;
             let entry_point: Address = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             let uopool = self
                 .mempools
                 .get(&mempool_id)
-                .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
 
             match uopool.simulate_user_operation(&user_operation).await {
                 Ok(simulation_result) => {
@@ -306,7 +306,7 @@ where
                                 call_gas_limit,
                             })
                             .map_err(|_| {
-                                tonic::Status::internal("error estimating user operation gas")
+                                GrpcErrors::Internal("error estimating user operation gas".to_string())
                             })?;
                         }
                         Err(error) => {
@@ -322,7 +322,7 @@ where
                                 },
                             }))
                             .map_err(|_| {
-                                tonic::Status::internal("error estimating user operation gas")
+                                GrpcErrors::Internal("error estimating user operation gas".to_string())
                             })?;
                         }
                     }
@@ -331,7 +331,7 @@ where
                     res.set_result(EstimateUserOperationGasResult::NotEstimated);
                     res.data =
                         serde_json::to_string(&SimulationError::from(error)).map_err(|_| {
-                            tonic::Status::internal("error estimating user operation gas")
+                            GrpcErrors::Internal("error estimating user operation gas".to_string())
                         })?;
                 }
             }
@@ -339,13 +339,13 @@ where
             return Ok(tonic::Response::new(res));
         }
 
-        Err(tonic::Status::invalid_argument("missing user operation"))
+        Err(GrpcErrors::InvalidArgument("missing user operation".to_string()))
     }
 
     async fn get_sorted_user_operations(
         &self,
         request: tonic::Request<GetSortedRequest>,
-    ) -> Result<Response<GetSortedResponse>, tonic::Status> {
+    ) -> Result<Response<GetSortedResponse>, GrpcErrors> {
         let req = request.into_inner();
         if let GetSortedRequest {
             entry_point: Some(entry_point),
@@ -353,7 +353,7 @@ where
         {
             let entry_point: Address = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
@@ -361,20 +361,20 @@ where
                 let uopool = self
                     .mempools
                     .get(&mempool_id)
-                    .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                    .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
                 uopool.mempool.get_sorted().map_err(|e| {
-                    tonic::Status::internal(format!("Get sorted uos internal error: {e:?}"))
+                    GrpcErrors::Internal(format!("Get sorted uos internal error: {e:?}"))
                 })?
             };
 
-            let remove_user_op = |uo: &UserOperation| -> Result<(), tonic::Status> {
+            let remove_user_op = |uo: &UserOperation| -> Result<(), GrpcErrors> {
                 let user_op_hash = uo.hash(&entry_point, &self.chain_id);
                 let mut uopool = self
                     .mempools
                     .get_mut(&mempool_id)
-                    .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                    .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
                 uopool.mempool.remove(&user_op_hash).map_err(|e| {
-                    tonic::Status::unknown(format!(
+                    GrpcErrors::Unknown(format!(
                         "remove a banned user operation {user_op_hash:x?} failed with {e:?}."
                     ))
                 })?;
@@ -395,7 +395,7 @@ where
                 let factory_opt = get_addr(uo.init_code.0.as_ref());
                 let (paymaster_status, factory_status) = {
                     let uopool = self.mempools.get(&mempool_id).ok_or_else(|| {
-                        tonic::Status::invalid_argument("entry point not supported")
+                        GrpcErrors::InvalidArgument("entry point not supported".to_string())
                     })?;
 
                     let paymaster_status = uopool
@@ -429,7 +429,7 @@ where
 
                 let (simulation_result, max_verification_gas) = {
                     let uopool = self.mempools.get(&mempool_id).ok_or_else(|| {
-                        tonic::Status::invalid_argument("entry point not supported")
+                        GrpcErrors::InvalidArgument("entry point not supported".to_string())
                     })?;
                     (
                         uopool.simulate_user_operation(uo).await,
@@ -443,7 +443,7 @@ where
                             SimulateValidationResult::ValidationResult(res) => {
                                 // TODO
                                 // it would be better to use estimate_gas instead of call_gas_limit
-                                // The result of call_gas_limit is usesally higher and less user op would be included
+                                // The result of call_gas_limit is usually higher and less user op would be included
                                 let user_op_gas_cost =
                                     res.return_info.0.saturating_add(uo.call_gas_limit);
                                 let new_total_gas = total_gas.saturating_add(user_op_gas_cost);
@@ -458,8 +458,8 @@ where
                                                 .mempools
                                                 .get(&mempool_id)
                                                 .ok_or_else(|| {
-                                                    tonic::Status::invalid_argument(
-                                                        "entry point not supported",
+                                                    GrpcErrors::InvalidArgument(
+                                                        "entry point not supported".to_string(),
                                                     )
                                                 })?;
                                             uopool
@@ -467,7 +467,7 @@ where
                                             .get_balance(paymaster, None)
                                             .await
                                             .map_err(|e| {
-                                                tonic::Status::internal(
+                                                GrpcErrors::Internal(
                                                     format!("Could not get paymaster {paymaster:?} balance because of {e:?}")
                                                 )
                                             })
@@ -517,7 +517,7 @@ where
             };
             return Ok(tonic::Response::new(response));
         } else {
-            return Err(tonic::Status::invalid_argument(format!(
+            return Err(GrpcErrors::InvalidArgument(format!(
                 "invalid GetSortedRequest {req:?}"
             )));
         }
@@ -526,7 +526,7 @@ where
     async fn handle_past_events(
         &self,
         request: tonic::Request<HandlePastEventRequest>,
-    ) -> Result<Response<()>, tonic::Status> {
+    ) -> Result<Response<()>, GrpcErrors> {
         let req = request.into_inner();
         let HandlePastEventRequest {
             entry_point: entry_point_opt,
@@ -537,7 +537,7 @@ where
             .get_block_number()
             .await
             .map_err(|e| {
-                tonic::Status::internal(format!("Getting the latest block number error: {e:?}"))
+                GrpcErrors::Internal(format!("Getting the latest block number error: {e:?}"))
             })?;
         let last_block = std::cmp::max(
             1u64,
@@ -547,17 +547,17 @@ where
                 .as_u64(),
         );
         let entry_point =
-            entry_point_opt.ok_or(tonic::Status::invalid_argument("entry point is missing"))?;
+            entry_point_opt.ok_or(GrpcErrors::InvalidArgument("entry point is missing".to_string()))?;
         let mempool_id = mempool_id(&entry_point.into(), &self.chain_id);
 
         let mut uopool = self
             .mempools
             .get_mut(&mempool_id)
-            .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+            .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
 
         let events_filter = uopool.entry_point.events().from_block(last_block);
         let events = events_filter.query().await.map_err(|e| {
-            tonic::Status::internal(format!("Getting event logs with error: {e:?}"))
+            GrpcErrors::Internal(format!("Getting event logs with error: {e:?}"))
         })?;
         for event in events {
             match event {
@@ -592,19 +592,19 @@ where
     async fn get_user_operation_by_hash(
         &self,
         request: tonic::Request<UserOperationHashRequest>,
-    ) -> Result<Response<GetUserOperationByHashResponse>, tonic::Status> {
+    ) -> Result<Response<GetUserOperationByHashResponse>, GrpcErrors> {
         let req = request.into_inner();
         let user_operation_hash: H256 = req
             .hash
-            .ok_or(tonic::Status::invalid_argument(
-                "User operation hash is missing",
+            .ok_or(GrpcErrors::InvalidArgument(
+                "User operation hash is missing".to_string(),
             ))?
             .into();
         let event: Option<(UserOperationEventFilter, LogMeta)> = self
             .find_user_operation_event(user_operation_hash)
             .await
             .map_err(|e| {
-                tonic::Status::internal(format!(
+                GrpcErrors::Internal(format!(
                     "Getting user operation event meta with error: {e:?}"
                 ))
             })?;
@@ -616,7 +616,7 @@ where
                     .get_transaction(log_meta.transaction_hash)
                     .await
                     .map_err(|e| {
-                        tonic::Status::internal(format!(
+                        GrpcErrors::Internal(format!(
                             "Getting transaction by hash with error: {e:?}"
                         ))
                     })?
@@ -638,23 +638,23 @@ where
                     });
                     Ok(response)
                 } else {
-                    Err(tonic::Status::not_found("User operation not found"))
+                    Err(GrpcErrors::NotFound("User operation not found".to_string()))
                 }
             }
-            None => Err(tonic::Status::not_found("User operation not found")),
+            None => Err(GrpcErrors::NotFound("User operation not found".to_string())),
         }
     }
 
     async fn get_user_operation_receipt(
         &self,
         request: tonic::Request<UserOperationHashRequest>,
-    ) -> Result<Response<GetUserOperationReceiptResponse>, tonic::Status> {
+    ) -> Result<Response<GetUserOperationReceiptResponse>, GrpcErrors> {
         let req = request.into_inner();
         let user_operation_hash: H256 = req
             .clone()
             .hash
-            .ok_or(tonic::Status::invalid_argument(
-                "User operation hash is missing",
+            .ok_or(GrpcErrors::InvalidArgument(
+                "User operation hash is missing".to_string(),
             ))?
             .into();
 
@@ -662,7 +662,7 @@ where
             .find_user_operation_event(user_operation_hash)
             .await
             .map_err(|e| {
-                tonic::Status::internal(format!(
+                GrpcErrors::Internal(format!(
                     "Getting user operation event meta with error: {e:?}"
                 ))
             })?;
@@ -674,7 +674,7 @@ where
                     .get_transaction_receipt(log_meta.transaction_hash)
                     .await
                     .map_err(|e| {
-                        tonic::Status::internal(format!(
+                        GrpcErrors::Internal(format!(
                             "Getting transaction by hash with error: {e:?}"
                         ))
                     })?
@@ -704,31 +704,31 @@ where
                     });
                     Ok(response)
                 } else {
-                    Err(tonic::Status::not_found("User operation not found"))
+                    Err(GrpcErrors::NotFound("User operation not found".to_string()))
                 }
             }
-            None => Err(tonic::Status::not_found("User operation not found")),
+            None => Err(GrpcErrors::NotFound("User operation not found".to_string())),
         }
     }
 
     async fn get_all(
         &self,
         request: tonic::Request<GetAllRequest>,
-    ) -> Result<Response<GetAllResponse>, tonic::Status> {
+    ) -> Result<Response<GetAllResponse>, GrpcErrors> {
         let req = request.into_inner();
         let mut res = GetAllResponse::default();
 
         if let Some(entry_point) = req.ep {
             let entry_point: Address = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             let uopool = self
                 .mempools
                 .get(&mempool_id)
-                .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
 
             res.result = GetAllResult::GotAll as i32;
             res.uos = uopool
@@ -742,13 +742,13 @@ where
             return Ok(tonic::Response::new(res));
         }
 
-        Err(tonic::Status::invalid_argument("missing entry point"))
+        Err(GrpcErrors::InvalidArgument("missing entry point".to_string()))
     }
 
     async fn clear(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<ClearResponse>, tonic::Status> {
+    ) -> Result<Response<ClearResponse>, GrpcErrors> {
         self.mempools.iter_mut().for_each(|mut mempool| {
             let mempool = mempool.value_mut();
             mempool.mempool.clear();
@@ -763,21 +763,21 @@ where
     async fn get_all_reputation(
         &self,
         request: tonic::Request<GetAllReputationRequest>,
-    ) -> Result<Response<GetAllReputationResponse>, tonic::Status> {
+    ) -> Result<Response<GetAllReputationResponse>, GrpcErrors> {
         let req = request.into_inner();
         let mut res = GetAllReputationResponse::default();
 
         if let Some(entry_point) = req.ep {
             let entry_point: Address = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             let uopool = self
                 .mempools
                 .get(&mempool_id)
-                .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
 
             res.result = GetAllReputationResult::GotAllReputation as i32;
             res.res = uopool
@@ -790,27 +790,27 @@ where
             return Ok(tonic::Response::new(res));
         };
 
-        Err(tonic::Status::invalid_argument("missing entry point"))
+        Err(GrpcErrors::InvalidArgument("missing entry point".to_string()))
     }
 
     async fn set_reputation(
         &self,
         request: tonic::Request<SetReputationRequest>,
-    ) -> Result<Response<SetReputationResponse>, tonic::Status> {
+    ) -> Result<Response<SetReputationResponse>, GrpcErrors> {
         let req = request.into_inner();
         let mut res = SetReputationResponse::default();
 
         if let Some(entry_point) = req.ep {
             let entry_point: Address = entry_point
                 .try_into()
-                .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
+                .map_err(|_| GrpcErrors::InvalidArgument("invalid entry point".to_string()))?;
 
             let mempool_id = mempool_id(&entry_point, &self.chain_id);
 
             let mut uopool = self
                 .mempools
                 .get_mut(&mempool_id)
-                .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
+                .ok_or_else(|| GrpcErrors::InvalidArgument("entry point not supported".to_string()))?;
 
             uopool
                 .reputation
@@ -820,7 +820,7 @@ where
             return Ok(tonic::Response::new(res));
         }
 
-        Err(tonic::Status::invalid_argument("missing entry point"))
+        Err(GrpcErrors::InvalidArgument("missing entry point".to_string()))
     }
 }
 
