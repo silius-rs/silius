@@ -1,9 +1,3 @@
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    sync::Arc,
-    time::Duration,
-};
 use aa_bundler_contracts::{
     parse_from_input_data, EntryPoint, EntryPointAPIEvents, EntryPointErr,
     SimulateValidationResult, UserOperationEventFilter,
@@ -25,6 +19,12 @@ use ethers::{
     prelude::LogMeta,
     providers::{Http, Middleware, Provider},
     types::{Address, H256, U256, U64},
+};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
 };
 use tonic::Response;
 use tracing::{debug, info, trace, warn};
@@ -174,7 +174,7 @@ where
                     res.set_result(AddResult::NotAdded);
                     res.data = serde_json::to_string(&error)
                         .map_err(|_| tonic::Status::internal("error adding user operation"))?;
-            }
+                }
             }
 
             return Ok(Response::new(res));
@@ -457,7 +457,7 @@ where
                                                 .get(&mempool_id)
                                                 .ok_or_else(|| {
                                                     tonic::Status::invalid_argument(
-                                                        "entry point not supported".to_string(),
+                                                        "entry point not supported",
                                                     )
                                                 })?;
                                             uopool
@@ -545,7 +545,7 @@ where
                 .as_u64(),
         );
         let entry_point =
-        entry_point_opt.ok_or(tonic::Status::invalid_argument("entry point is missing"))?;
+            entry_point_opt.ok_or(tonic::Status::invalid_argument("entry point is missing"))?;
         let mempool_id = mempool_id(&entry_point.into(), &self.chain_id);
 
         let mut uopool = self
@@ -595,7 +595,7 @@ where
         let user_operation_hash: H256 = req
             .hash
             .ok_or(tonic::Status::invalid_argument(
-                "User operation hash is missing".to_string(),
+                "User operation hash is missing",
             ))?
             .into();
         let event: Option<(UserOperationEventFilter, LogMeta)> = self
@@ -652,7 +652,7 @@ where
             .clone()
             .hash
             .ok_or(tonic::Status::invalid_argument(
-                "User operation hash is missing".to_string(),
+                "User operation hash is missing",
             ))?
             .into();
 

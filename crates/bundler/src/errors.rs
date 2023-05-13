@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fmt::{Result, Formatter, Display};
+use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug)]
 pub enum UoPoolError {
@@ -15,7 +15,7 @@ impl Display for UoPoolError {
         match self {
             UoPoolError::InvalidUO => {
                 write!(f, "Invalid UO")
-            } 
+            }
             UoPoolError::InvalidEntryPoint => {
                 write!(f, "Invalid entry point")
             }
@@ -23,6 +23,5 @@ impl Display for UoPoolError {
                 write!(f, "Error adding UO")
             }
         }
-
-    } 
+    }
 }

@@ -12,9 +12,9 @@ use tracing::{error, info, warn};
 use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
 use crate::{GetChainIdResponse, GetSupportedEntryPointsResponse};
 
+use crate::errors::GrpcErrors;
 use crate::proto::bundler::*;
 use crate::uo_pool_client::UoPoolClient;
-use crate::errors::GrpcErrors;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerServiceOpts {
@@ -85,8 +85,7 @@ impl BundlerService {
             .clone()
             .get_sorted_user_operations(request)
             .await
-            .map_err(|e| 
-                GrpcErrors::BundleExists(e.to_string()))?;
+            .map_err(|e| GrpcErrors::BundleExists(e.to_string()))?;
         let user_operations: Vec<UserOperation> = response
             .into_inner()
             .user_operations

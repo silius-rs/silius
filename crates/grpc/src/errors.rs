@@ -1,5 +1,5 @@
 use thiserror::Error;
-use tonic::{Status, Code};
+use tonic::{Code, Status};
 
 #[derive(Debug, Error)]
 pub enum GrpcErrors {
@@ -20,8 +20,8 @@ pub enum GrpcErrors {
 }
 
 impl From<Status> for GrpcErrors {
-   fn from(status: Status) -> Self {
-         match status.code() {
+    fn from(status: Status) -> Self {
+        match status.code() {
             Code::Aborted => GrpcErrors::Aborted(status.message().to_string()),
             Code::DeadlineExceeded => GrpcErrors::DeadlineExceeded(status.message().to_string()),
             Code::InvalidArgument => GrpcErrors::InvalidArgument(status.message().to_string()),
@@ -29,9 +29,7 @@ impl From<Status> for GrpcErrors {
             Code::NotFound => GrpcErrors::UserOperationMissing(status.message().to_string()),
             Code::Unknown => GrpcErrors::Unknown(status.message().to_string()),
             Code::OutOfRange => GrpcErrors::BadGrpcStatusCode(status.message().to_string()),
-             _ => GrpcErrors::Aborted(status.message().to_string()),
-         }
-
-   }
+            _ => GrpcErrors::Aborted(status.message().to_string()),
+        }
+    }
 }
-

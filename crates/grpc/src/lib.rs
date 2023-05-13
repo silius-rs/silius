@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
 mod bundler;
+mod errors;
 mod proto;
 mod uopool;
-mod errors;
 
 pub use proto::bundler::*;
 pub use proto::types::*;
