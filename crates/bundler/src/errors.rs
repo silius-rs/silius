@@ -26,5 +26,3 @@ impl Display for UoPoolError {
 
     } 
 }
-
-type UoPoolResult<T> = Result<T, UoPoolError>;

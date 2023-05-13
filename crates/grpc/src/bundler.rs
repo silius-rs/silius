@@ -14,7 +14,7 @@ use crate::{GetChainIdResponse, GetSupportedEntryPointsResponse};
 
 use crate::proto::bundler::*;
 use crate::uo_pool_client::UoPoolClient;
-use crate::error::GrpcErrors;
+use crate::errors::GrpcErrors;
 
 #[derive(Debug, Parser, PartialEq)]
 pub struct BundlerServiceOpts {
@@ -77,14 +77,16 @@ impl BundlerService {
     async fn create_bundle(
         uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
         entry_point: &Address,
-    ) -> anyhow::Result<Vec<UserOperation>> {
+    ) -> anyhow::Result<Vec<UserOperation>, GrpcErrors> {
         let request = tonic::Request::new(GetSortedRequest {
             entry_point: Some((*entry_point).into()),
         });
         let response = uopool_grpc_client
             .clone()
             .get_sorted_user_operations(request)
-            .await?;
+            .await
+            .map_err(|e| 
+                GrpcErrors::BundleExists(e.to_string()))?;
         let user_operations: Vec<UserOperation> = response
             .into_inner()
             .user_operations
@@ -199,21 +201,21 @@ impl bundler_server::Bundler for BundlerService {
     async fn chain_id(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<GetChainIdResponse>, GrpcErrors> {
+    ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
         todo!()
     }
 
     async fn supported_entry_points(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<GetSupportedEntryPointsResponse>, GrpcErrors> {
+    ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
         todo!()
     }
 
     async fn set_bundler_mode(
         &self,
         request: tonic::Request<SetModeRequest>,
-    ) -> Result<Response<SetModeResponse>, GrpcErrors> {
+    ) -> Result<Response<SetModeResponse>, tonic::Status> {
         let req = request.into_inner();
         match req.mode() {
             Mode::Manual => {
@@ -236,10 +238,10 @@ impl bundler_server::Bundler for BundlerService {
     async fn send_bundle_now(
         &self,
         _request: tonic::Request<()>,
-    ) -> Result<Response<SendBundleNowResponse>, GrpcErrors> {
+    ) -> Result<Response<SendBundleNowResponse>, tonic::Status> {
         let res = self.send_bundles_now().await.map_err(|e| {
             error!("Send bundle manually with response {e:?}");
-            GrpcErrors::InternalError(format!("Send bundle now with error: {e:?}"))            
+            tonic::Status::internal("Failed to send bundle manually")
         })?;
         Ok(Response::new(SendBundleNowResponse {
             result: Some(res.into()),

@@ -75,6 +75,7 @@ dependencies = [
  "prost-build",
  "protobuf-src",
  "serde_json",
+ "thiserror",
  "tokio",
  "tonic",
  "tonic-build",
