@@ -1,13 +1,13 @@
 version: '2'
 
 services:
-  bundler:
-    image: ghcr.io/vid201/aa-bundler:latest
-    command: --rpc-listen-address 0.0.0.0:3000 --eth-client-address http://geth-dev:8545 --mnemonic-file /root/${BUNDLER_ACCOUNT} --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000 --rpc-api eth,debug
-    ports: [ '3000:3000' ]
-    volumes:
-      - ./keys:/root
-    depends_on: [ geth-dev ]
   geth-dev:
     build: geth-dev
-    ports: [ '8545:8545' ]
+    ports:
+      - 8545:8545
+  fund-signer:
+    image: ethereum/client-go:release-1.10
+    entrypoint: 'geth --exec "eth.sendTransaction({from: eth.accounts[0], to: \"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266\", value: web3.toWei(10000, \"ether\")})" attach http://geth-dev:8545'
+    depends_on:
+      geth-dev:
+        condition: service_started

@@ -59,7 +59,13 @@ jobs:
       - name: Build
         run: |
           make build
-      
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundler
+          path: target/release/bundler
+
       - name: Lint
         run: |
           make lint
@@ -67,3 +73,40 @@ jobs:
       - name: Test
         run: |
           make test
+  
+  bundler_spec_tests:
+    name: Run bundler spec tests
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: eth-infinitism/bundler-spec-tests
+          submodules: true
+      - uses: actions/checkout@v3
+        with:
+          path:
+            aa-bundler
+      - run: curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3 -
+
+      - run: pip install jq yq
+
+      - run: pdm install && pdm run update-deps
+  
+      - uses: actions/download-artifact@v3
+        with:
+          name: bundler
+          path: bundler-artifact
+      - run: mv bundler-artifact/bundler /usr/local/bin/
+      - run: chmod a+x /usr/local/bin/bundler
+      - run: chmod a+x aa-bundler/bundler-spec-test/launcher.sh
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.17'
+      - run: npm install -g yarn
+
+      - name: Run tests
+        run: pdm run test --launcher-script aa-bundler/bundler-spec-test/launcher.sh --url http://localhost:3000
+
+      
