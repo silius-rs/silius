@@ -1,8 +1,8 @@
 on:
   pull_request:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
 
 name: Create and publish a Docker image
 
