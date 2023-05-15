@@ -1,5 +1,7 @@
 on:
   pull_request:
+    types:
+      - closed
   push:
     tags:
       - "*"
@@ -21,6 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Log in to the Container registry
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
@@ -29,13 +33,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get Git Tag
+        run: echo "tags=$(git describe --tags)" >> $GITHUB_OUTPUT
+        id: tag
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver
           labels: org.opencontainers.image.source=https://github.com/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
@@ -43,5 +49,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
