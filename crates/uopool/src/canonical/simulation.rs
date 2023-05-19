@@ -625,7 +625,8 @@ impl<M: Middleware + 'static> UoPool<M> {
         self.get_code_hashes(contract_addresses, code_hashes)
             .await?;
 
-        let user_operation_hash = user_operation.hash(&self.entry_point.address(), &self.chain_id);
+        let user_operation_hash =
+            user_operation.hash(&self.entry_point.address(), &U256::from(self.chain.id()));
 
         match self.mempool.has_code_hashes(&user_operation_hash) {
             Ok(true) => {

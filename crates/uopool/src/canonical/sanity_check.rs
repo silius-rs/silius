@@ -371,9 +371,10 @@ impl<M: Middleware + 'static> UoPool<M> {
                             U256::from(GAS_INCREASE_PERC),
                         )
                 {
-                    Ok(Some(
-                        user_operation_prev.hash(&self.entry_point.address(), &self.chain_id),
-                    ))
+                    Ok(Some(user_operation_prev.hash(
+                        &self.entry_point.address(),
+                        &U256::from(self.chain.id()),
+                    )))
                 } else {
                     Err(BadUserOperationError::SenderVerification {
                         sender: user_operation.sender,
@@ -442,7 +443,9 @@ impl<M: Middleware + 'static> UoPool<M> {
 #[cfg(test)]
 mod tests {
     use aa_bundler_contracts::EntryPoint;
-    use aa_bundler_primitives::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK};
+    use aa_bundler_primitives::{
+        Chain, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+    };
     use ethers::{
         providers::{Http, Provider},
         types::{Address, Bytes, U256},
@@ -464,6 +467,7 @@ mod tests {
         let eth_provider =
             Arc::new(Provider::try_from("https://eth-goerli.public.blastapi.io").unwrap());
         let chain_id = eth_provider.get_chainid().await.unwrap();
+        let chain = Chain::from(chain_id);
 
         let mut reputation = Box::<MemoryReputation>::default();
         reputation.init(
@@ -481,7 +485,7 @@ mod tests {
             eth_provider.clone(),
             U256::from(1500000),
             U256::from(2),
-            chain_id,
+            chain,
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);

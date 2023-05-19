@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use aa_bundler_bundler::Bundler as BundlerCore;
-use aa_bundler_primitives::{parse_address, parse_u256, UserOperation, Wallet};
+use aa_bundler_primitives::{parse_address, parse_u256, Chain, UserOperation, Wallet};
 use async_trait::async_trait;
 use clap::Parser;
 use ethers::types::{Address, H256, U256};
@@ -15,7 +15,7 @@ use crate::{GetChainIdResponse, GetSupportedEntryPointsResponse};
 use crate::proto::bundler::*;
 use crate::uo_pool_client::UoPoolClient;
 
-#[derive(Debug, Parser, PartialEq)]
+#[derive(Clone, Copy, Debug, Parser, PartialEq)]
 pub struct BundlerServiceOpts {
     #[clap(long, value_parser=parse_address)]
     pub beneficiary: Address,
@@ -50,7 +50,7 @@ impl BundlerService {
         beneficiary: Address,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
         entry_points: Vec<Address>,
-        chain_id: U256,
+        chain: Chain,
         eth_client_address: String,
     ) -> Self {
         let bundlers: Vec<BundlerCore> = entry_points
@@ -60,7 +60,7 @@ impl BundlerService {
                     wallet.clone(),
                     beneficiary,
                     *entry_point,
-                    chain_id,
+                    chain,
                     eth_client_address.clone(),
                 )
             })
@@ -246,11 +246,34 @@ impl bundler_server::Bundler for BundlerService {
     }
 }
 
-pub fn bundler_service_run(bundler_service: BundlerService, listen_address: SocketAddr) {
+pub fn bundler_service_run(
+    opts: BundlerServiceOpts,
+    wallet: Wallet,
+    entry_points: Vec<Address>,
+    chain: Chain,
+    eth_client_address: String,
+    uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
+) {
+    let bundler_service = BundlerService::new(
+        wallet,
+        opts.beneficiary,
+        uopool_grpc_client,
+        entry_points,
+        chain,
+        eth_client_address,
+    );
+
+    info!("Starting bundler manager");
+
+    bundler_service.start_bundling(opts.bundle_interval);
+
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = bundler_server::BundlerServer::new(bundler_service);
-        builder.add_service(svc).serve(listen_address).await
+        builder
+            .add_service(svc)
+            .serve(opts.bundler_grpc_listen_address)
+            .await
     });
 }
 

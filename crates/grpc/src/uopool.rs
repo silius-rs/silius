@@ -10,7 +10,7 @@ use aa_bundler_contracts::{
     SimulateValidationResult, UserOperationEventFilter,
 };
 use aa_bundler_primitives::{
-    get_addr, parse_u256, ReputationStatus, SimulationError, UserOperation,
+    get_addr, parse_u256, Chain, ReputationStatus, SimulationError, UserOperation,
     UserOperationGasEstimation, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLED_MAX_INCLUDE,
     THROTTLING_SLACK,
 };
@@ -53,19 +53,19 @@ pub struct UoPoolServiceOpts {
 pub struct UoPoolService<M: Middleware> {
     pub mempools: Arc<DashMap<MempoolId, UserOperationPool<M>>>,
     pub eth_provider: Arc<M>,
-    pub chain_id: U256,
+    pub chain: Chain,
 }
 
 impl<M: Middleware + 'static> UoPoolService<M> {
     pub fn new(
         mempools: Arc<DashMap<MempoolId, UserOperationPool<M>>>,
         eth_provider: Arc<M>,
-        chain_id: U256,
+        chain: Chain,
     ) -> Self {
         Self {
             mempools,
             eth_provider,
-            chain_id,
+            chain,
         }
     }
 
@@ -112,7 +112,7 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let verification_result = {
                 let uopool = self
@@ -142,14 +142,15 @@ where
                             });
                     }
 
-                    match uopool
-                        .mempool
-                        .add(user_operation.clone(), &entry_point, &self.chain_id)
-                    {
+                    match uopool.mempool.add(
+                        user_operation.clone(),
+                        &entry_point,
+                        &U256::from(self.chain.id()),
+                    ) {
                         Ok(_) => {
                             // TODO: find better way to atomically store user operation and code hashes
                             match uopool.mempool.set_code_hashes(
-                                &user_operation.hash(&entry_point, &self.chain_id),
+                                &user_operation.hash(&entry_point, &U256::from(self.chain.id())),
                                 &verification_result.simulation_result.code_hashes,
                             ) {
                                 Ok(()) | Err(_) => {}
@@ -159,7 +160,7 @@ where
 
                             res.set_result(AddResult::Added);
                             res.data = serde_json::to_string(
-                                &user_operation.hash(&entry_point, &self.chain_id),
+                                &user_operation.hash(&entry_point, &U256::from(self.chain.id())),
                             )
                             .map_err(|_| tonic::Status::internal("error adding user operation"))?;
                         }
@@ -198,7 +199,7 @@ where
             let entry_point = entry_point
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let mut uopool = self
                 .mempools
@@ -235,7 +236,7 @@ where
         _request: tonic::Request<()>,
     ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
         Ok(tonic::Response::new(GetChainIdResponse {
-            chain_id: self.chain_id.as_u64(),
+            chain_id: self.chain.id(),
         }))
     }
 
@@ -271,7 +272,7 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let uopool = self
                 .mempools
@@ -355,7 +356,7 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let uos = {
                 let uopool = self
@@ -368,7 +369,7 @@ where
             };
 
             let remove_user_op = |uo: &UserOperation| -> Result<(), tonic::Status> {
-                let user_op_hash = uo.hash(&entry_point, &self.chain_id);
+                let user_op_hash = uo.hash(&entry_point, &U256::from(self.chain.id()));
                 let mut uopool = self
                     .mempools
                     .get_mut(&mempool_id)
@@ -552,7 +553,7 @@ where
         );
         let entry_point =
             entry_point_opt.ok_or(tonic::Status::invalid_argument("entry point is missing"))?;
-        let mempool_id = mempool_id(&entry_point.into(), &self.chain_id);
+        let mempool_id = mempool_id(&entry_point.into(), &U256::from(self.chain.id()));
 
         let mut uopool = self
             .mempools
@@ -727,7 +728,7 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let uopool = self
                 .mempools
@@ -776,7 +777,7 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let uopool = self
                 .mempools
@@ -809,7 +810,7 @@ where
                 .try_into()
                 .map_err(|_| tonic::Status::invalid_argument("invalid entry point"))?;
 
-            let mempool_id = mempool_id(&entry_point, &self.chain_id);
+            let mempool_id = mempool_id(&entry_point, &U256::from(self.chain.id()));
 
             let mut uopool = self
                 .mempools
@@ -832,17 +833,16 @@ pub async fn uopool_service_run(
     opts: UoPoolServiceOpts,
     entry_points: Vec<Address>,
     eth_provider: Arc<Provider<Http>>,
+    chain: Chain,
     max_verification_gas: U256,
 ) -> Result<()> {
-    let chain_id = eth_provider.get_chainid().await?;
-
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
         let mempools_map = Arc::new(DashMap::<MempoolId, UserOperationPool<Provider<Http>>>::new());
 
         for entry_point in entry_points {
-            let id = mempool_id(&entry_point, &chain_id);
+            let id = mempool_id(&entry_point, &U256::from(chain.id()));
 
             let mut reputation = Box::<MemoryReputation>::default();
             reputation.init(
@@ -862,7 +862,7 @@ pub async fn uopool_service_run(
                     eth_provider.clone(),
                     max_verification_gas,
                     opts.min_priority_fee_per_gas,
-                    chain_id,
+                    chain,
                 ),
             );
         }
@@ -870,7 +870,7 @@ pub async fn uopool_service_run(
         let svc = uo_pool_server::UoPoolServer::new(UoPoolService::new(
             mempools_map.clone(),
             eth_provider.clone(),
-            chain_id,
+            chain,
         ));
 
         tokio::spawn(async move {

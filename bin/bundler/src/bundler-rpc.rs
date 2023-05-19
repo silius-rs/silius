@@ -8,7 +8,7 @@ use std::{collections::HashSet, future::pending};
 #[derive(Parser)]
 #[clap(
     name = "aa-bundler-rpc",
-    about = "JSON-RPC server for EIP-4337 Account Abstraction Bundler"
+    about = "JSON-RPC server for ERC-4337 Account Abstraction Bundler"
 )]
 pub struct Opt {
     #[clap(long, default_value = "127.0.0.1:3000")]
@@ -29,6 +29,8 @@ async fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
 
     tracing_subscriber::fmt::init();
+
+    info!("Starting bundler JSON-RPC server...");
 
     let jsonrpc_server = ServerBuilder::default()
         .build(&opt.rpc_listen_address)
@@ -63,7 +65,10 @@ async fn main() -> Result<()> {
     }
 
     let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
-    info!("JSON-RPC server listening on {}", opt.rpc_listen_address);
+    info!(
+        "Started bundler JSON-RPC server at {:}",
+        opt.rpc_listen_address
+    );
 
     pending().await
 }
