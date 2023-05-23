@@ -67,12 +67,11 @@ impl Overhead {
                 })
                 .sum::<u128>(),
         );
+        let length_in_word = ((user_operation_packed.len() + 31) as f64) / (32 as f64);
         u256_from_f64_saturating(
             (self.fixed.as_u128() as f64) / (self.bundle_size.as_u128() as f64)
-                + (call_data_cost
-                    + self.per_user_op
-                    + self.per_user_op_word * user_operation_packed.len())
-                .as_u128() as f64,
+                + ((call_data_cost + self.per_user_op).as_u128() as f64)
+                + (self.per_user_op_word.as_u128() as f64) * length_in_word,
         )
     }
 }
