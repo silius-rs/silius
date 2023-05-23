@@ -41,6 +41,9 @@ impl Bundler {
             "Creating the next bundle, got {} user operations",
             bundle.len()
         );
+        if bundle.is_empty() {
+            return Ok(H256::default());
+        };
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(
             provider.clone(),
