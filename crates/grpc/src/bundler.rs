@@ -150,6 +150,8 @@ impl BundlerService {
 
     pub fn start_bundling(&self, interval: u64) {
         if !self.is_running() {
+            let mut r = self.running.lock();
+            *r = true;
             for bundler in self.bundlers.iter() {
                 info!(
                     "Starting auto bundling process for entry point: {:?}",
@@ -158,10 +160,15 @@ impl BundlerService {
                 let bundler_own = bundler.clone();
                 let running_lock = self.running.clone();
                 let uopool_grpc_client = self.uopool_grpc_client.clone();
+                let entry_point = bundler.entry_point;
                 tokio::spawn(async move {
                     let mut interval = tokio::time::interval(Duration::from_secs(interval));
                     loop {
                         if !is_running(running_lock.clone()) {
+                            info!(
+                                "Stopping auto bundling process for entry point: {:?}",
+                                entry_point
+                            );
                             break;
                         }
                         interval.tick().await;
