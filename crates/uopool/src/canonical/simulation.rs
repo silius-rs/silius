@@ -155,7 +155,7 @@ pub struct SimulationResult {
 }
 
 impl<M: Middleware + 'static> UoPool<M> {
-    async fn simulate_validation(
+    pub async fn simulate_validation(
         &self,
         user_operation: &UserOperation,
     ) -> Result<SimulateValidationResult, SimulateValidationError> {

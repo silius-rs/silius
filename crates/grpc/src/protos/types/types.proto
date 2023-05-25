@@ -30,11 +30,11 @@ message UserOperation {
     PbU256 nonce = 2;
     bytes init_code = 3;
     bytes call_data = 4;
-    uint64 call_gas_limit = 5;
-    uint64 verification_gas_limit = 6;
-    uint64 pre_verification_gas = 7;
-    uint64 max_fee_per_gas = 8;
-    uint64 max_priority_fee_per_gas = 9;
+    PbU256 call_gas_limit = 5;
+    PbU256 verification_gas_limit = 6;
+    PbU256 pre_verification_gas = 7;
+    PbU256 max_fee_per_gas = 8;
+    PbU256 max_priority_fee_per_gas = 9;
     bytes paymaster_and_data = 10;
     bytes signature = 11;
 }

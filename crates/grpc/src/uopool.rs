@@ -279,13 +279,11 @@ where
                 .get(&mempool_id)
                 .ok_or_else(|| tonic::Status::invalid_argument("entry point not supported"))?;
 
-            match uopool.simulate_user_operation(&user_operation).await {
-                Ok(simulation_result) => {
+            match uopool.simulate_validation(&user_operation).await {
+                Ok(simulate_validation_result) => {
                     let pre_verification_gas =
                         Overhead::default().calculate_pre_verification_gas(&user_operation);
-
-                    let verification_gas_limit = match simulation_result.simulate_validation_result
-                    {
+                    let verification_gas_limit = match simulate_validation_result {
                         SimulateValidationResult::ValidationResult(validation_result) => {
                             validation_result.return_info.0
                         }
