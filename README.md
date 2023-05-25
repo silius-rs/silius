@@ -10,6 +10,8 @@
 
 For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
+<i>This project is still under active development.</i>
+
 ## Prerequisites
 
 Rust version: 1.69.0
@@ -77,6 +79,8 @@ make format
 make lint
 make test
 ```
+
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline. You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
 
 ## Contact
 
