@@ -1,6 +1,6 @@
 # <h1 align="center"> AA - Bundler </h1>
 
-<p align="center">Rust implementation for Bundler - ERC-4337 (Account Abstraction).</p>
+<p align="center">Rust Bundler - <a href="https://eips.ethereum.org/EIPS/eip-4337">ERC-4337 (Account Abstraction)</a>.</p>
 
 <p align="center">
     <img src="./docs/images/logo.jpeg" width="300" height="300">
@@ -9,6 +9,8 @@
 <p align="center"><a href="https://huggingface.co/spaces/stabilityai/stable-diffusion">Stable Diffusion</a> prompt: ethereum bundler account abstraction rust vector logo<p>
 
 For more information: https://hackmd.io/@Vid201/aa-bundler-rust
+
+<i>This project is still under active development.</i>
 
 ## Prerequisites
 
@@ -52,6 +54,14 @@ Run only JSON-RPC API:
 cargo run --release --bin bundler-rpc
 ```
 
+## Supported networks
+
+Bundler was tested on the following networks:
+
+| Chain      | Mainnet   | Testnet                                       |
+| :--------: | :-------: | :-------:                                     |
+| Ethereum   | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
+
 ## Contributing
 
 Thank you for showing interest in contributing to the project!
@@ -70,6 +80,8 @@ make lint
 make test
 ```
 
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline. You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
+
 ## Contact
 
 The best place for the discussion is the dedicated [Telegram group](https://t.me/+sKeRcN4j3MM3NmNk).
@@ -80,3 +92,10 @@ This project is dual-licensed under Apache 2.0 and MIT terms:
 
 - Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+## Acknowledgements
+
+- [Bundler - eth-infinitism](https://github.com/eth-infinitism/bundler)
+- [Akula](https://github.com/akula-bft/akula)
+- [ethers-rs](https://github.com/gakonst/ethers-rs)
+- [Reth](https://github.com/paradigmxyz/reth)
