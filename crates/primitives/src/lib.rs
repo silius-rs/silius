@@ -25,3 +25,4 @@ pub use user_operation::{
 };
 pub use utils::{get_addr, parse_address, parse_u256};
 pub use wallet::Wallet;
+pub const SUPPORT_ENTRYPOINT_VERSION: &str = "0.6.0";

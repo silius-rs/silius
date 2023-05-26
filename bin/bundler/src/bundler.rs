@@ -3,7 +3,10 @@ use aa_bundler_grpc::{
     uopool_service_run, BundlerServiceOpts, UoPoolServiceOpts,
 };
 use aa_bundler_primitives::{parse_address, parse_u256, Chain, Wallet, SUPPORTED_CHAINS};
-use aa_bundler_rpc::{DebugApiServer, DebugApiServerImpl, EthApiServer, EthApiServerImpl};
+use aa_bundler_rpc::{
+    DebugApiServer, DebugApiServerImpl, EthApiServer, EthApiServerImpl, Web3ApiServer,
+    Web3ApiServerImpl,
+};
 use anyhow::{format_err, Result};
 use clap::Parser;
 use ethers::{
@@ -149,6 +152,8 @@ fn main() -> Result<()> {
 
                             let rpc_api: HashSet<String> =
                                 HashSet::from_iter(opt.rpc_api.iter().cloned());
+
+                            api.merge(Web3ApiServerImpl{}.into_rpc())?;
 
                             if rpc_api.contains("eth") {
                                 api.merge(
