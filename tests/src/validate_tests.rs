@@ -1,4 +1,7 @@
-use aa_bundler_primitives::UserOperation;
+use aa_bundler_contracts::EntryPoint;
+use aa_bundler_primitives::{Chain, UserOperation};
+use aa_bundler_uopool::canonical::simulation::{SimulateValidationError, SimulationResult};
+use aa_bundler_uopool::{mempool_id, MemoryMempool, MemoryReputation, UoPool};
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
 use ethers::types::transaction::eip2718::TypedTransaction;
@@ -8,9 +11,11 @@ use ethers::{
     providers::Middleware,
     types::{Bytes, U256},
 };
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use crate::common::deploy_test_coin;
 use crate::common::{
     deploy_entry_point, deploy_test_opcode_account, deploy_test_opcode_account_factory,
     deploy_test_recursion_account, deploy_test_rules_account_factory, deploy_test_storage_account,
@@ -22,7 +27,7 @@ use crate::common::{
     setup_geth, ClientType, DeployedContract,
 };
 
-struct TestContext<M> {
+struct TestContext<M: Middleware> {
     pub client: Arc<M>,
     pub _geth: GethInstance,
     pub entry_point: DeployedContract<EntryPointContract<M>>,
@@ -31,9 +36,11 @@ struct TestContext<M> {
     pub storage_factory: DeployedContract<TestStorageAccountFactory<M>>,
     pub _rules_factory: DeployedContract<TestRulesAccountFactory<M>>,
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
+    pub uopool: UoPool<M>,
 }
 
 async fn setup() -> anyhow::Result<TestContext<ClientType>> {
+    let chain_id = 1337u64;
     let (_geth, _client) = setup_geth().await?;
     let client = Arc::new(_client);
     let entry_point = deploy_entry_point(client.clone()).await?;
@@ -51,8 +58,10 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
         .send()
         .await?;
 
+    let test_coin = deploy_test_coin(client.clone()).await?;
     let opcodes_factory = deploy_test_opcode_account_factory(client.clone()).await?;
-    let storage_factory = deploy_test_storage_account_factory(client.clone()).await?;
+    let storage_factory =
+        deploy_test_storage_account_factory(client.clone(), test_coin.address).await?;
     let rules_factory = deploy_test_rules_account_factory(client.clone()).await?;
 
     let storage_account_call = rules_factory.contract().create("".to_string());
@@ -66,6 +75,25 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
         .value(parse_units("1", "ether").unwrap())
         .send()
         .await?;
+
+    let mempool_id = mempool_id(&entry_point.address, &U256::from(chain_id));
+    let mut entrypoints_map = HashMap::new();
+    entrypoints_map.insert(
+        mempool_id,
+        EntryPoint::new(client.clone(), entry_point.address),
+    );
+    let mempools = Box::new(MemoryMempool::default());
+    let reputation = Box::new(MemoryReputation::default());
+    let pool = UoPool::new(
+        EntryPoint::new(client.clone(), entry_point.address),
+        mempools,
+        reputation,
+        client.clone(),
+        U256::from(1500000000_u64),
+        U256::from(1u64),
+        Chain::from(chain_id),
+    );
+
     Ok(TestContext::<ClientType> {
         client: client.clone(),
         _geth,
@@ -78,6 +106,7 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
             TestRulesAccount::new(storage_account_address, client.clone()),
             storage_account_address,
         ),
+        uopool: pool,
     })
 }
 
@@ -110,14 +139,13 @@ async fn create_opcode_factory_init_code(init_func: String) -> anyhow::Result<(B
 }
 
 async fn create_test_user_op(
+    context: &TestContext<ClientType>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
 ) -> anyhow::Result<UserOperation> {
-    let context = setup().await?;
-
     let paymaster_and_data = if let Some(rule) = pm_rule {
         let mut data = vec![];
         data.extend_from_slice(context.paymaster.address.as_bytes());
@@ -161,18 +189,17 @@ async fn create_test_user_op(
     })
 }
 
-async fn existing_storage_account_user_op(
+fn existing_storage_account_user_op(
+    context: &TestContext<ClientType>,
     validate_rule: String,
     pm_rule: String,
-) -> anyhow::Result<UserOperation> {
-    let context = setup().await?;
-
+) -> UserOperation {
     let mut paymaster_and_data = vec![];
     paymaster_and_data.extend_from_slice(context.paymaster.address.as_bytes());
     paymaster_and_data.extend_from_slice(pm_rule.as_bytes());
 
     let signature = Bytes::from(validate_rule.as_bytes().to_vec());
-    Ok(UserOperation {
+    UserOperation {
         sender: context.storage_account.address,
         nonce: U256::zero(),
         init_code: Bytes::default(),
@@ -184,45 +211,55 @@ async fn existing_storage_account_user_op(
         max_priority_fee_per_gas: U256::from(0),
         paymaster_and_data: Bytes::from(paymaster_and_data),
         signature,
-    })
+    }
 }
 
-fn validate(_user_op: UserOperation) -> anyhow::Result<()> {
-    // TODO
-    Ok(())
+async fn validate(
+    context: &TestContext<ClientType>,
+    user_op: UserOperation,
+) -> Result<SimulationResult, SimulateValidationError> {
+    context.uopool.simulate_user_operation(&user_op).await
 }
 
 async fn test_user_op(
+    context: &TestContext<ClientType>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> anyhow::Result<()> {
+) -> Result<SimulationResult, SimulateValidationError> {
     let user_op = create_test_user_op(
+        &context,
         validate_rule,
         pm_rule,
         init_code,
         init_func,
         factory_address,
     )
-    .await?;
-    validate(user_op)
+    .await
+    .expect("Create test user operation failed.");
+    validate(&context, user_op).await
 }
 
-async fn test_existing_user_op(validate_rule: String, pm_rule: String) -> anyhow::Result<()> {
-    let user_op = existing_storage_account_user_op(validate_rule, pm_rule).await?;
-    validate(user_op)
+async fn test_existing_user_op(
+    validate_rule: String,
+    pm_rule: String,
+) -> Result<SimulationResult, SimulateValidationError> {
+    let context = setup().await.expect("Setup context failed");
+
+    let user_op = existing_storage_account_user_op(&context, validate_rule, pm_rule);
+    validate(&context, user_op).await
 }
 
 #[tokio::test]
-#[ignore]
 async fn accept_plain_request() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
     test_user_op(
+        &context,
         "".to_string(),
         None,
         init_code,
@@ -235,188 +272,213 @@ async fn accept_plain_request() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn reject_unkown_rule() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "<unknown-rule>".to_string(),
         None,
         init_code,
         init_func,
         context.opcodes_factory.address,
     )
-    .await
-    .expect_err("unknown rule");
+    .await;
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::UserOperationRejected { message }) if message.contains("unknown-rule")
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_with_bad_opcode_in_ctr() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("coinbase".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "".to_string(),
         None,
         init_code,
         init_func,
         context.opcodes_factory.address,
     )
-    .await
-    .expect_err("factory uses banned opcode: COINBASE");
+    .await;
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="factory" && opcode == "COINBASE"
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "".to_string(),
         Some("coinbase".to_string()),
         init_code,
         init_func,
         context.opcodes_factory.address,
     )
-    .await
-    .expect_err("paymaster uses banned opcode: COINBASE");
+    .await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="paymaster" && opcode == "COINBASE"
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "blockhash".to_string(),
         None,
         init_code,
         init_func,
         context.opcodes_factory.address,
     )
-    .await
-    .expect_err("account uses banned opcode: BLOCKHASH");
+    .await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="account" && opcode == "BLOCKHASH"
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_if_create_too_many() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "create2".to_string(),
         None,
         init_code,
         init_func,
         context.opcodes_factory.address,
     )
-    .await
-    .expect("account uses banned opcode: CREATE2");
+    .await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="account" && opcode == "CREATE2"
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_referencing_self_token() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "balance-self".to_string(),
         None,
         init_code,
         init_func,
         context.storage_factory.address,
     )
-    .await
-    .expect_err("unstaked account accessed");
+    .await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn account_succeeds_referecing_its_own_balance() {
-    test_existing_user_op("balance-self".to_string(), "".to_string())
-        .await
-        .expect("succeed");
+    let res = test_existing_user_op("balance-self".to_string(), "".to_string()).await;
+    println!("{res:?}");
+    assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
-#[ignore]
 async fn account_fail_to_read_allowance_of_address() {
-    test_existing_user_op("allowance-self-1".to_string(), "".to_string())
-        .await
-        .expect_err("account has forbidden read");
+    let res = test_existing_user_op("allowance-self-1".to_string(), "".to_string()).await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
 }
 
 #[tokio::test]
-#[ignore]
 async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
-    test_existing_user_op("allowance-1-self".to_string(), "".to_string())
-        .await
-        .expect("succeed");
+    let res = test_existing_user_op("allowance-1-self".to_string(), "".to_string()).await;
+    println!("{res:?}");
+    assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
-#[ignore]
 async fn access_self_struct_data() {
-    test_existing_user_op("struct-self".to_string(), "".to_string())
-        .await
-        .expect("succeed");
+    let res = test_existing_user_op("struct-self".to_string(), "".to_string()).await;
+    println!("{res:?}");
+    assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_to_access_other_address_struct_data() {
-    test_existing_user_op("struct-1".to_string(), "".to_string())
-        .await
-        .expect_err("account has forbidden read");
+    let res = test_existing_user_op("struct-1".to_string(), "".to_string()).await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "balance-1".to_string(),
         None,
         init_code,
         init_func,
         context.storage_factory.address,
     )
-    .await
-    .expect_err("account has forbidden read");
+    .await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_if_referencing_self_token_balance_after_wallet_creation() {
-    test_existing_user_op("balance-self".to_string(), "".to_string())
-        .await
-        .expect("succeed");
+    let res = test_existing_user_op("balance-self".to_string(), "".to_string()).await;
+    println!("{res:?}");
+    assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> {
     let context = setup().await?;
     let pm = deploy_test_storage_account(context.client.clone())
@@ -443,12 +505,16 @@ async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> 
         paymaster_and_data: Bytes::from(paymaster_and_data),
         signature: Bytes::default(),
     };
-    validate(user_op).expect_err("unstaked paymaster must not return context");
+    let res = validate(&context, user_op).await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<()> {
     let context = setup().await?;
     let acct = deploy_test_recursion_account(context.client.clone(), context.entry_point.address)
@@ -467,18 +533,23 @@ async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<(
         paymaster_and_data: Bytes::default(),
         signature: Bytes::from("handleOps".as_bytes().to_vec()),
     };
-    validate(user_op).expect_err("illegal call into EntryPoint");
+    let res = validate(&context, user_op).await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
     Ok(())
 }
 
 #[tokio::test]
-#[ignore]
 async fn succeed_with_inner_revert() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
     test_user_op(
+        &context,
         "inner-revert".to_string(),
         None,
         init_code,
@@ -491,20 +562,24 @@ async fn succeed_with_inner_revert() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore]
 async fn fail_with_inner_oog_revert() -> anyhow::Result<()> {
     let context = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
         .unwrap();
-    test_user_op(
+    let res = test_user_op(
+        &context,
         "oog".to_string(),
         None,
         init_code,
         init_func,
         context.storage_factory.address,
     )
-    .await
-    .expect_err("oog");
+    .await;
+    println!("{res:?}");
+    assert!(matches!(
+        res,
+        Err(SimulateValidationError::StorageAccessValidation { .. })
+    ));
     Ok(())
 }

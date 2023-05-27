@@ -118,6 +118,7 @@ version = "0.1.0"
 dependencies = [
  "aa-bundler-contracts",
  "aa-bundler-primitives",
+ "aa-bundler-uopool",
  "anyhow",
  "ethers",
  "tempdir",

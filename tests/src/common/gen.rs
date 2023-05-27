@@ -42,3 +42,7 @@ abigen!(
     TracerTest,
     "$CARGO_WORKSPACE_DIR/thirdparty/bundler/packages/bundler/artifacts/contracts/tests/TracerTest.sol/TracerTest.json"
 );
+abigen!(
+    TestCoin,
+    "$CARGO_WORKSPACE_DIR/thirdparty/bundler/packages/bundler/artifacts/contracts/tests/TestCoin.sol/TestCoin.json"
+);
