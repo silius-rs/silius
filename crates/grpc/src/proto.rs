@@ -325,7 +325,7 @@ pub mod uopool {
 }
 
 pub mod bundler {
-    use aa_bundler_primitives::Mode as GrpcMode;
+    use aa_bundler_primitives::BundlerMode as GrpcMode;
 
     tonic::include_proto!("bundler");
 

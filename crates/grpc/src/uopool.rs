@@ -10,7 +10,7 @@ use aa_bundler_contracts::{
     SimulateValidationResult, UserOperationEventFilter,
 };
 use aa_bundler_primitives::{
-    get_addr, parse_u256, Chain, ReputationStatus, SimulationError, UserOperation,
+    get_addr, parse_u256, Chain, ReputationStatus, SimulationError, UoPoolMode, UserOperation,
     UserOperationGasEstimation, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLED_MAX_INCLUDE,
     THROTTLING_SLACK,
 };
@@ -48,6 +48,9 @@ pub struct UoPoolServiceOpts {
 
     #[clap(long, value_parser=parse_u256, default_value = "0")]
     pub min_priority_fee_per_gas: U256,
+
+    #[clap(value_enum, long, default_value = "auto")]
+    pub uo_pool_mode: UoPoolMode,
 }
 
 pub struct UoPoolService<M: Middleware> {
@@ -861,6 +864,7 @@ pub async fn uopool_service_run(
                     max_verification_gas,
                     opts.min_priority_fee_per_gas,
                     chain,
+                    opts.uo_pool_mode,
                 ),
             );
         }

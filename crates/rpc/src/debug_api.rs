@@ -1,4 +1,4 @@
-use aa_bundler_primitives::{Mode, ReputationEntry, UserOperation};
+use aa_bundler_primitives::{BundlerMode, ReputationEntry, UserOperation};
 use ethers::types::{Address, H256};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
@@ -21,7 +21,7 @@ pub trait DebugApi {
     async fn dump_reputation(&self, entry_point: Address) -> RpcResult<Vec<ReputationEntry>>;
 
     #[method(name = "setBundlingMode")]
-    async fn set_bundling_mode(&self, mode: Mode) -> RpcResult<()>;
+    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<()>;
 
     #[method(name = "sendBundleNow")]
     async fn send_bundle_now(&self) -> RpcResult<H256>;

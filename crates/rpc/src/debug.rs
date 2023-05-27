@@ -3,7 +3,7 @@ use aa_bundler_grpc::{
     GetAllReputationRequest, GetAllReputationResult, GetAllRequest, GetAllResult, Mode as GrpcMode,
     SetModeRequest, SetReputationRequest, SetReputationResult,
 };
-use aa_bundler_primitives::{Mode, ReputationEntry, UserOperation, DEFAULT_INTERVAL};
+use aa_bundler_primitives::{BundlerMode, ReputationEntry, UserOperation, DEFAULT_INTERVAL};
 use anyhow::format_err;
 use async_trait::async_trait;
 use ethers::types::{Address, H256};
@@ -111,7 +111,7 @@ impl DebugApiServer for DebugApiServerImpl {
         ))
     }
 
-    async fn set_bundling_mode(&self, mode: Mode) -> RpcResult<()> {
+    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<()> {
         let mut bundler_grpc_client = self.bundler_grpc_client.clone();
 
         let request = tonic::Request::new(SetModeRequest {
