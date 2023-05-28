@@ -86,6 +86,7 @@ pub enum SimulateValidationError {
     CodeHashesValidation {
         message: String,
     },
+    OutOfGas {},
     UnknownError {
         error: String,
     },
@@ -140,6 +141,11 @@ impl From<SimulateValidationError> for SimulationError {
             SimulateValidationError::CodeHashesValidation { message } => {
                 SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
             }
+            SimulateValidationError::OutOfGas {} => SimulationError::owned(
+                OPCODE_VALIDATION_ERROR_CODE,
+                "UserOperation out of gas",
+                None::<bool>,
+            ),
             SimulateValidationError::UnknownError { error } => {
                 SimulationError::owned(ErrorCode::InternalError.code(), error, None::<bool>)
             }
@@ -309,6 +315,17 @@ impl<M: Middleware + 'static> UoPool<M> {
             stake: paymaster_info.0,
             unstake_delay: paymaster_info.1,
         };
+    }
+
+    fn check_oog(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError> {
+        for (index, _) in LEVEL_TO_ENTITY.iter().enumerate() {
+            if let Some(level) = trace.number_levels.get(index) {
+                if level.oog.unwrap_or(false) {
+                    return Err(SimulateValidationError::OutOfGas {});
+                }
+            }
+        }
+        Ok(())
     }
 
     fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError> {
@@ -681,6 +698,8 @@ impl<M: Middleware + 'static> UoPool<M> {
                 &simulate_validation_result,
                 &mut stake_info_by_entity,
             );
+
+            self.check_oog(&js_trace)?;
 
             // may not invokes any forbidden opcodes
             self.forbidden_opcodes(&js_trace)?;

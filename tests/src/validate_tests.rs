@@ -576,10 +576,6 @@ async fn fail_with_inner_oog_revert() -> anyhow::Result<()> {
         context.storage_factory.address,
     )
     .await;
-    println!("{res:?}");
-    assert!(matches!(
-        res,
-        Err(SimulateValidationError::StorageAccessValidation { .. })
-    ));
+    assert!(matches!(res, Err(SimulateValidationError::OutOfGas { .. })));
     Ok(())
 }
