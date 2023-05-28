@@ -1,7 +1,7 @@
 use aa_bundler_contracts::EntryPoint;
 use aa_bundler_primitives::{Chain, UserOperation};
 use aa_bundler_uopool::canonical::simulation::{SimulateValidationError, SimulationResult};
-use aa_bundler_uopool::{mempool_id, MemoryMempool, MemoryReputation, UoPool};
+use aa_bundler_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoPool};
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
 use ethers::types::transaction::eip2718::TypedTransaction;
@@ -83,7 +83,8 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
         EntryPoint::new(client.clone(), entry_point.address),
     );
     let mempools = Box::new(MemoryMempool::default());
-    let reputation = Box::new(MemoryReputation::default());
+    let mut reputation = Box::new(MemoryReputation::default());
+    reputation.init(10, 10, 10, 1u64.into(), 1u64.into());
     let pool = UoPool::new(
         EntryPoint::new(client.clone(), entry_point.address),
         mempools,
@@ -506,10 +507,9 @@ async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> 
         signature: Bytes::default(),
     };
     let res = validate(&context, user_op).await;
-    println!("{res:?}");
     assert!(matches!(
         res,
-        Err(SimulateValidationError::StorageAccessValidation { .. })
+        Err(SimulateValidationError::CallStackValidation { .. })
     ));
     Ok(())
 }
