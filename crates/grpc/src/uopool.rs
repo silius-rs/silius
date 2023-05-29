@@ -49,7 +49,7 @@ pub struct UoPoolServiceOpts {
     #[clap(long, value_parser=parse_u256, default_value = "0")]
     pub min_priority_fee_per_gas: U256,
 
-    #[clap(value_enum, long, default_value = "auto")]
+    #[clap(value_enum, long, default_value = "standard")]
     pub uo_pool_mode: UoPoolMode,
 }
 

@@ -664,7 +664,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 
         let mut code_hashes: Vec<CodeHash> = vec![];
 
-        if self.mode == UoPoolMode::Auto {
+        if self.mode == UoPoolMode::Standard {
             let geth_trace = self.simulate_validation_trace(user_operation).await?;
 
             trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");

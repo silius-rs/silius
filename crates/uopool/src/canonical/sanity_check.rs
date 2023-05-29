@@ -486,7 +486,7 @@ mod tests {
             U256::from(1500000),
             U256::from(2),
             chain,
-            UoPoolMode::Auto,
+            UoPoolMode::Standard,
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);
