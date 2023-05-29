@@ -444,7 +444,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 mod tests {
     use aa_bundler_contracts::EntryPoint;
     use aa_bundler_primitives::{
-        Chain, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+        Chain, UoPoolMode, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
     };
     use ethers::{
         providers::{Http, Provider},
@@ -486,6 +486,7 @@ mod tests {
             U256::from(1500000),
             U256::from(2),
             chain,
+            UoPoolMode::Standard,
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);

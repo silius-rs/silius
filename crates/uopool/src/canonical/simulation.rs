@@ -3,7 +3,7 @@ use aa_bundler_contracts::{
     ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
 };
 use aa_bundler_primitives::{
-    CodeHash, SimulationError, StakeInfo, UserOperation, EXECUTION_ERROR_CODE,
+    CodeHash, SimulationError, StakeInfo, UoPoolMode, UserOperation, EXECUTION_ERROR_CODE,
     EXPIRATION_TIMESTAMP_DIFF, OPCODE_VALIDATION_ERROR_CODE, SIGNATURE_FAILED_ERROR_CODE,
     SIMULATE_VALIDATION_ERROR_CODE, TIMESTAMP_VALIDATION_ERROR_CODE,
 };
@@ -662,34 +662,38 @@ impl<M: Middleware + 'static> UoPool<M> {
         // check timestamps
         let valid_after = self.timestamps(&simulate_validation_result)?;
 
-        let geth_trace = self.simulate_validation_trace(user_operation).await?;
+        let mut code_hashes: Vec<CodeHash> = vec![];
 
-        trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");
+        if self.mode == UoPoolMode::Standard {
+            let geth_trace = self.simulate_validation_trace(user_operation).await?;
 
-        let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
-            SimulateValidationError::UserOperationRejected {
-                message: error.to_string(),
-            }
-        })?;
+            trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");
 
-        let mut stake_info_by_entity: [StakeInfo; NUMBER_LEVELS] = Default::default();
-        self.extract_stake_info(
-            user_operation,
-            &simulate_validation_result,
-            &mut stake_info_by_entity,
-        );
+            let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
+                SimulateValidationError::UserOperationRejected {
+                    message: error.to_string(),
+                }
+            })?;
 
-        // may not invokes any forbidden opcodes
-        self.forbidden_opcodes(&js_trace)?;
+            let mut stake_info_by_entity: [StakeInfo; NUMBER_LEVELS] = Default::default();
+            self.extract_stake_info(
+                user_operation,
+                &simulate_validation_result,
+                &mut stake_info_by_entity,
+            );
 
-        // verify storage access
-        self.storage_access(user_operation, &stake_info_by_entity, &js_trace)?;
+            // may not invokes any forbidden opcodes
+            self.forbidden_opcodes(&js_trace)?;
 
-        // verify call stack
-        self.call_stack(&stake_info_by_entity, &js_trace)?;
+            // verify storage access
+            self.storage_access(user_operation, &stake_info_by_entity, &js_trace)?;
 
-        // verify code hashes
-        let code_hashes = self.code_hashes(user_operation, &js_trace).await?;
+            // verify call stack
+            self.call_stack(&stake_info_by_entity, &js_trace)?;
+
+            // verify code hashes
+            code_hashes = self.code_hashes(user_operation, &js_trace).await?;
+        }
 
         Ok(SimulationResult {
             simulate_validation_result,

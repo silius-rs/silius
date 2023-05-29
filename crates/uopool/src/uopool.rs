@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use aa_bundler_contracts::{EntryPoint, UserOperationEventFilter};
-use aa_bundler_primitives::{Chain, CodeHash, ReputationEntry, UserOperation, UserOperationHash};
+use aa_bundler_primitives::{
+    Chain, CodeHash, ReputationEntry, UoPoolMode, UserOperation, UserOperationHash,
+};
 use ethers::{
     prelude::LogMeta,
     providers::Middleware,
@@ -33,9 +35,11 @@ pub struct UoPool<M: Middleware> {
     pub max_verification_gas: U256,
     pub min_priority_fee_per_gas: U256,
     pub chain: Chain,
+    pub mode: UoPoolMode,
 }
 
 impl<M: Middleware + 'static> UoPool<M> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         entry_point: EntryPoint<M>,
         mempool: MempoolBox<VecUo, VecCh>,
@@ -44,6 +48,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         max_verification_gas: U256,
         min_priority_fee_per_gas: U256,
         chain: Chain,
+        mode: UoPoolMode,
     ) -> Self {
         Self {
             entry_point,
@@ -53,6 +58,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             max_verification_gas,
             min_priority_fee_per_gas,
             chain,
+            mode,
         }
     }
 

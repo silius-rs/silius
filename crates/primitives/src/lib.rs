@@ -6,11 +6,12 @@ mod error_codes;
 mod reputation;
 mod sanity_check;
 mod simulation;
+mod uopool;
 mod user_operation;
 mod utils;
 mod wallet;
 
-pub use bundler::{Mode, DEFAULT_INTERVAL};
+pub use bundler::{Mode as BundlerMode, DEFAULT_INTERVAL};
 pub use chain::{Chain, SUPPORTED_CHAINS};
 pub use error_codes::*;
 pub use reputation::{
@@ -19,6 +20,7 @@ pub use reputation::{
 };
 pub use sanity_check::SanityCheckError;
 pub use simulation::{CodeHash, SimulationError, EXPIRATION_TIMESTAMP_DIFF};
+pub use uopool::Mode as UoPoolMode;
 pub use user_operation::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationPartial, UserOperationReceipt,

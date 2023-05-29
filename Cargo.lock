@@ -86,6 +86,7 @@ name = "aa-bundler-primitives"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 4.2.4",
  "educe",
  "ethers",
  "expanded-pathbuf",
