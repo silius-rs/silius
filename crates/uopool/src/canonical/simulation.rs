@@ -550,6 +550,21 @@ impl<M: Middleware + 'static> UoPool<M> {
         let mut calls: Vec<CallEntry> = vec![];
         self.parse_call_stack(trace, &mut calls)?;
 
+        // check recursive call entrypoint method
+        let call_into_entry_point = calls.iter().find(|call| {
+            call.to.unwrap_or_default() == self.entry_point.address()
+                && call.from.unwrap_or_default() != self.entry_point.address()
+                && (call.method.is_some()
+                    && call.method.clone().unwrap_or_default() != *"depositTo")
+        });
+        if call_into_entry_point.is_some() {
+            return Err(SimulateValidationError::CallStackValidation {
+                message: format!(
+                    "illegal call into EntryPoint during validation {call_into_entry_point:?}"
+                ),
+            });
+        }
+
         for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
             if LEVEL_TO_ENTITY[index] == "paymaster" {
                 let call = calls.iter().find(|call| {

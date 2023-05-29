@@ -1,5 +1,5 @@
 use aa_bundler_contracts::EntryPoint;
-use aa_bundler_primitives::{Chain, UserOperation};
+use aa_bundler_primitives::{Chain, UoPoolMode, UserOperation};
 use aa_bundler_uopool::canonical::simulation::{SimulateValidationError, SimulationResult};
 use aa_bundler_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoPool};
 use ethers::abi::Token;
@@ -93,6 +93,7 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
         U256::from(1500000000_u64),
         U256::from(1u64),
         Chain::from(chain_id),
+        UoPoolMode::Standard,
     );
 
     Ok(TestContext::<ClientType> {
@@ -331,7 +332,6 @@ async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
         context.opcodes_factory.address,
     )
     .await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="paymaster" && opcode == "COINBASE"
@@ -354,7 +354,6 @@ async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
         context.opcodes_factory.address,
     )
     .await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="account" && opcode == "BLOCKHASH"
@@ -377,7 +376,6 @@ async fn fail_if_create_too_many() -> anyhow::Result<()> {
         context.opcodes_factory.address,
     )
     .await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::OpcodeValidation { entity, opcode }) if entity=="account" && opcode == "CREATE2"
@@ -400,7 +398,6 @@ async fn fail_referencing_self_token() -> anyhow::Result<()> {
         context.storage_factory.address,
     )
     .await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::StorageAccessValidation { .. })
@@ -411,14 +408,12 @@ async fn fail_referencing_self_token() -> anyhow::Result<()> {
 #[tokio::test]
 async fn account_succeeds_referecing_its_own_balance() {
     let res = test_existing_user_op("balance-self".to_string(), "".to_string()).await;
-    println!("{res:?}");
     assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
 async fn account_fail_to_read_allowance_of_address() {
     let res = test_existing_user_op("allowance-self-1".to_string(), "".to_string()).await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::StorageAccessValidation { .. })
@@ -428,21 +423,18 @@ async fn account_fail_to_read_allowance_of_address() {
 #[tokio::test]
 async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
     let res = test_existing_user_op("allowance-1-self".to_string(), "".to_string()).await;
-    println!("{res:?}");
     assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
 async fn access_self_struct_data() {
     let res = test_existing_user_op("struct-self".to_string(), "".to_string()).await;
-    println!("{res:?}");
     assert!(matches!(res, Ok(..)));
 }
 
 #[tokio::test]
 async fn fail_to_access_other_address_struct_data() {
     let res = test_existing_user_op("struct-1".to_string(), "".to_string()).await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::StorageAccessValidation { .. })
@@ -464,7 +456,6 @@ async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
         context.storage_factory.address,
     )
     .await;
-    println!("{res:?}");
     assert!(matches!(
         res,
         Err(SimulateValidationError::StorageAccessValidation { .. })
@@ -475,7 +466,6 @@ async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
 #[tokio::test]
 async fn fail_if_referencing_self_token_balance_after_wallet_creation() {
     let res = test_existing_user_op("balance-self".to_string(), "".to_string()).await;
-    println!("{res:?}");
     assert!(matches!(res, Ok(..)));
 }
 
@@ -534,10 +524,9 @@ async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<(
         signature: Bytes::from("handleOps".as_bytes().to_vec()),
     };
     let res = validate(&context, user_op).await;
-    println!("{res:?}");
     assert!(matches!(
         res,
-        Err(SimulateValidationError::StorageAccessValidation { .. })
+        Err(SimulateValidationError::CallStackValidation { .. })
     ));
     Ok(())
 }
