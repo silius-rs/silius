@@ -3,6 +3,7 @@ use ethers::types::{Address, Bytes, GethTrace, U256};
 use serde::Deserialize;
 use std::collections::HashMap;
 
+/// Object (frame) return the JavaScript tracer when simulating validation of user operation
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct JsTracerFrame {
     #[serde(rename = "numberLevels")]
@@ -15,11 +16,11 @@ pub struct JsTracerFrame {
 
 impl TryFrom<GethTrace> for JsTracerFrame {
     type Error = anyhow::Error;
-    fn try_from(value: GethTrace) -> Result<Self, Self::Error> {
-        match value {
-            GethTrace::Known(value) => Err(format_err!("invalid geth trace: {value:?}")),
-            GethTrace::Unknown(value) => serde_json::from_value(value)
-                .map_err(|error| format_err!("failed to parse geth trace: {error}")),
+    fn try_from(val: GethTrace) -> Result<Self, Self::Error> {
+        match val {
+            GethTrace::Known(val) => Err(format_err!("Invalid geth trace: {val:?}")),
+            GethTrace::Unknown(val) => serde_json::from_value(val)
+                .map_err(|error| format_err!("Failed to parse geth trace: {error}")),
         }
     }
 }

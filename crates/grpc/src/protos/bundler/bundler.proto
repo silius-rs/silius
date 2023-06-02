@@ -20,17 +20,14 @@ enum SetModeResult{
 }
 
 message SetModeResponse{
-    SetModeResult result = 1;
+    SetModeResult res = 1;
 }
 
 message SendBundleNowResponse{
-    types.H256 result = 1;
+    types.H256 res = 1;
 }
 
-
 service Bundler {
-    rpc ChainId(google.protobuf.Empty) returns (types.GetChainIdResponse);
-    rpc SupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
     // debug
     rpc SetBundlerMode(SetModeRequest) returns (SetModeResponse);
     rpc SendBundleNow(google.protobuf.Empty) returns (SendBundleNowResponse);

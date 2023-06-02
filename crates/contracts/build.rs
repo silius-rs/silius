@@ -16,12 +16,12 @@ fn compile_aa_interfaces() -> anyhow::Result<()> {
     let compiled = project.compile()?;
     assert!(
         !compiled.has_compiler_errors(),
-        "Compiling EIP-4337 interfaces failed: {:?}",
+        "Compiling ERC-4337 interfaces failed: {:?}.",
         compiled.output().errors
     );
     Ok(())
 }
 
 fn main() {
-    compile_aa_interfaces().expect("Compiling EIP-4337 interfaces should pass.");
+    compile_aa_interfaces().expect("Compiling ERC-4337 interfaces should pass.");
 }

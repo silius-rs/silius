@@ -12,7 +12,7 @@ pub use memory::{mempool::MemoryMempool, reputation::MemoryReputation};
 pub use mempool::{mempool_id, MempoolId};
 pub use reputation::Reputation;
 pub use uopool::UoPool;
-pub use utils::{calculate_call_gas_limit, Overhead};
+pub use utils::Overhead;
 
 // canonical mempool
 pub mod canonical;

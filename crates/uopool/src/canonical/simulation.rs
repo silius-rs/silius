@@ -1,11 +1,20 @@
+use crate::{utils::equal_code_hashes, UoPool};
 use aa_bundler_contracts::{
-    Call, CallEntry, EntryPointErr, JsTracerFrame, SimulateValidationResult,
-    ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
+    entry_point::{
+        EntryPointErr, SimulateValidationResult, ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
+    },
+    tracer::{Call, CallEntry, JsTracerFrame},
 };
 use aa_bundler_primitives::{
-    CodeHash, SimulationError, StakeInfo, UoPoolMode, UserOperation, EXECUTION_ERROR_CODE,
-    EXPIRATION_TIMESTAMP_DIFF, OPCODE_VALIDATION_ERROR_CODE, SIGNATURE_FAILED_ERROR_CODE,
-    SIMULATION_ERROR_CODE, TIMESTAMP_VALIDATION_ERROR_CODE,
+    consts::entities::{FACTORY, PAYMASTER},
+    get_address,
+    reputation::StakeInfo,
+    simulation::{
+        CodeHash, SimulationError, CREATE2_OPCODE, CREATE_OPCODE, EXPIRATION_TIMESTAMP_DIFF,
+        FORBIDDEN_OPCODES, LEVEL_TO_ENTITY, NUMBER_LEVELS, PAYMASTER_VALIDATION_FUNCTION,
+        RETURN_OPCODE, REVERT_OPCODE,
+    },
+    UoPoolMode, UserOperation,
 };
 use ethers::{
     abi::AbiDecode,
@@ -13,172 +22,34 @@ use ethers::{
     types::{Address, Bytes, GethTrace, H256, U256},
     utils::keccak256,
 };
-use jsonrpsee::types::error::ErrorCode;
-use lazy_static::lazy_static;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::task::JoinSet;
-use tracing::trace;
 
-use crate::{utils::equal_code_hashes, UoPool};
-
-// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/core/EntryPoint.sol#L514
-// 0 - factory, 1 - sender/account, 2 - paymaster
-// opcode NUMBER is marker between levels
-const NUMBER_LEVELS: usize = 3;
-const LEVEL_TO_ENTITY: [&str; NUMBER_LEVELS] = ["factory", "account", "paymaster"];
-
-lazy_static! {
-    static ref FORBIDDEN_OPCODES: HashSet<String> = {
-        let mut set = HashSet::new();
-        set.insert("GASPRICE".to_string());
-        set.insert("GASLIMIT".to_string());
-        set.insert("DIFFICULTY".to_string());
-        set.insert("TIMESTAMP".to_string());
-        set.insert("BASEFEE".to_string());
-        set.insert("BLOCKHASH".to_string());
-        set.insert("NUMBER".to_string());
-        set.insert("SELFBALANCE".to_string());
-        set.insert("BALANCE".to_string());
-        set.insert("ORIGIN".to_string());
-        set.insert("GAS".to_string());
-        set.insert("CREATE".to_string());
-        set.insert("COINBASE".to_string());
-        set.insert("SELFDESTRUCT".to_string());
-        set.insert("RANDOM".to_string());
-        set.insert("PREVRANDAO".to_string());
-        set
-    };
-    static ref CREATE2_OPCODE: String = "CREATE2".to_string();
-    static ref RETURN_OPCODE: String = "RETURN".to_string();
-    static ref REVERT_OPCODE: String = "REVERT".to_string();
-    static ref CREATE_OPCODE: String = "CREATE".to_string();
-    static ref PAYMASTER_VALIDATION_FUNCTION: String = "validatePaymasterUserOp".to_string();
-}
-
-#[derive(Debug)]
-pub enum SimulateValidationError {
-    SignatureValidation {},
-    ExpirationValidation {
-        valid_after: u64,
-        valid_until: u64,
-        paymaster: Option<Address>,
-    },
-    UserOperationRejected {
-        message: String,
-    },
-    OpcodeValidation {
-        entity: String,
-        opcode: String,
-    },
-    UserOperationExecution {
-        message: String,
-    },
-    StorageAccessValidation {
-        slot: String,
-    },
-    CallStackValidation {
-        message: String,
-    },
-    CodeHashesValidation {
-        message: String,
-    },
-    OutOfGas {},
-    UnknownError {
-        error: String,
-    },
-}
-
-impl From<SimulateValidationError> for SimulationError {
-    fn from(error: SimulateValidationError) -> Self {
-        match error {
-            SimulateValidationError::SignatureValidation {} => SimulationError::owned(
-                SIGNATURE_FAILED_ERROR_CODE,
-                "Invalid UserOp signature or paymaster signature",
-                None::<bool>,
-            ),
-            SimulateValidationError::ExpirationValidation {
-                valid_after,
-                valid_until,
-                paymaster,
-            } => SimulationError::owned(
-                TIMESTAMP_VALIDATION_ERROR_CODE,
-                "User operation is expired or will expire soon",
-                {
-                    if let Some(paymaster) = paymaster {
-                        Some(json!({
-                            "valid_after": valid_after, "valid_until": valid_until, "paymaster": paymaster,
-                        }))
-                    } else {
-                        Some(json!({
-                            "valid_after": valid_after, "valid_until": valid_until,
-                        }))
-                    }
-                },
-            ),
-            SimulateValidationError::UserOperationRejected { message } => {
-                SimulationError::owned(SIMULATION_ERROR_CODE, message, None::<bool>)
-            }
-            SimulateValidationError::OpcodeValidation { entity, opcode } => SimulationError::owned(
-                OPCODE_VALIDATION_ERROR_CODE,
-                format!("{entity} uses banned opcode: {opcode}"),
-                None::<bool>,
-            ),
-            SimulateValidationError::UserOperationExecution { message } => {
-                SimulationError::owned(EXECUTION_ERROR_CODE, message, None::<bool>)
-            }
-            SimulateValidationError::StorageAccessValidation { slot } => SimulationError::owned(
-                OPCODE_VALIDATION_ERROR_CODE,
-                format!("Storage access validation failed for slot: {slot}"),
-                None::<bool>,
-            ),
-            SimulateValidationError::CallStackValidation { message } => {
-                SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
-            }
-            SimulateValidationError::CodeHashesValidation { message } => {
-                SimulationError::owned(OPCODE_VALIDATION_ERROR_CODE, message, None::<bool>)
-            }
-            SimulateValidationError::OutOfGas {} => SimulationError::owned(
-                OPCODE_VALIDATION_ERROR_CODE,
-                "UserOperation out of gas",
-                None::<bool>,
-            ),
-            SimulateValidationError::UnknownError { error } => {
-                SimulationError::owned(ErrorCode::InternalError.code(), error, None::<bool>)
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SimulationResult {
-    pub simulate_validation_result: SimulateValidationResult,
     pub code_hashes: Vec<CodeHash>,
     pub valid_after: Option<u64>,
+    pub verification_gas_limit: U256,
+    pub pre_fund: U256,
 }
 
 impl<M: Middleware + 'static> UoPool<M> {
     pub async fn simulate_validation(
         &self,
-        user_operation: &UserOperation,
-    ) -> Result<SimulateValidationResult, SimulateValidationError> {
-        match self
-            .entry_point
-            .simulate_validation(user_operation.clone())
-            .await
-        {
-            Ok(simulate_validation_result) => Ok(simulate_validation_result),
-            Err(entry_point_error) => match entry_point_error {
-                EntryPointErr::FailedOp(failed_op) => {
-                    Err(SimulateValidationError::UserOperationRejected {
-                        message: failed_op.reason,
-                    })
+        uo: &UserOperation,
+    ) -> Result<SimulateValidationResult, SimulationError> {
+        match self.entry_point.simulate_validation(uo.clone()).await {
+            Ok(res) => Ok(res),
+            Err(err) => match err {
+                EntryPointErr::FailedOp(f) => {
+                    Err(SimulationError::Validation { message: f.reason })
                 }
-                _ => Err(SimulateValidationError::UserOperationRejected {
-                    message: "unknown error".to_string(),
+                _ => Err(SimulationError::UnknownError {
+                    message: "Error when simulating validation on entry point".to_string(),
                 }),
             },
         }
@@ -186,80 +57,60 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     async fn simulate_validation_trace(
         &self,
-        user_operation: &UserOperation,
-    ) -> Result<GethTrace, SimulateValidationError> {
-        match self
-            .entry_point
-            .simulate_validation_trace(user_operation.clone())
-            .await
-        {
-            Ok(geth_trace) => Ok(geth_trace),
-            Err(entry_point_error) => match entry_point_error {
-                EntryPointErr::FailedOp(failed_op) => {
-                    Err(SimulateValidationError::UserOperationRejected {
-                        message: failed_op.reason,
-                    })
+        uo: &UserOperation,
+    ) -> Result<GethTrace, SimulationError> {
+        match self.entry_point.simulate_validation_trace(uo.clone()).await {
+            Ok(trace) => Ok(trace),
+            Err(err) => match err {
+                EntryPointErr::FailedOp(f) => {
+                    Err(SimulationError::Validation { message: f.reason })
                 }
-                _ => Err(SimulateValidationError::UserOperationRejected {
-                    message: "unknown error".to_string(),
+                _ => Err(SimulationError::UnknownError {
+                    message: "Error when simulating validation on entry point".to_string(),
                 }),
             },
         }
     }
 
-    fn signature(
-        &self,
-        simulate_validation_result: &SimulateValidationResult,
-    ) -> Result<(), SimulateValidationError> {
-        let signature_check = match simulate_validation_result {
-            SimulateValidationResult::ValidationResult(validation_result) => {
-                validation_result.return_info.2
-            }
-            SimulateValidationResult::ValidationResultWithAggregation(
-                validation_result_with_aggregation,
-            ) => validation_result_with_aggregation.return_info.2,
+    fn signature(&self, res: &SimulateValidationResult) -> Result<(), SimulationError> {
+        let sig_check = match res {
+            SimulateValidationResult::ValidationResult(res) => res.return_info.2,
+            SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.2,
         };
 
-        if signature_check {
-            return Err(SimulateValidationError::SignatureValidation {});
+        if sig_check {
+            return Err(SimulationError::Signature {});
         }
 
         Ok(())
     }
 
-    fn timestamps(
-        &self,
-        simulate_validation_result: &SimulateValidationResult,
-    ) -> Result<Option<u64>, SimulateValidationError> {
-        let (valid_after, valid_until) = match simulate_validation_result {
-            SimulateValidationResult::ValidationResult(validation_result) => (
-                validation_result.return_info.3,
-                validation_result.return_info.4,
-            ),
-            SimulateValidationResult::ValidationResultWithAggregation(
-                validation_result_with_aggregation,
-            ) => (
-                validation_result_with_aggregation.return_info.3,
-                validation_result_with_aggregation.return_info.4,
-            ),
+    fn timestamps(&self, res: &SimulateValidationResult) -> Result<Option<u64>, SimulationError> {
+        let (valid_after, valid_until) = match res {
+            SimulateValidationResult::ValidationResult(res) => {
+                (res.return_info.3, res.return_info.4)
+            }
+            SimulateValidationResult::ValidationResultWithAggregation(res) => {
+                (res.return_info.3, res.return_info.4)
+            }
         };
 
-        let current_timestamp = SystemTime::now()
+        let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|_| SimulateValidationError::UnknownError {
-                error: "Failed to get current timestamp".to_string(),
+            .map_err(|_| SimulationError::UnknownError {
+                message: "Failed to get current timestamp".to_string(),
             })?
             .as_secs();
 
-        if valid_until <= current_timestamp + EXPIRATION_TIMESTAMP_DIFF {
-            return Err(SimulateValidationError::ExpirationValidation {
+        if valid_until <= now + EXPIRATION_TIMESTAMP_DIFF {
+            return Err(SimulationError::Expiration {
                 valid_after,
                 valid_until,
                 paymaster: None, // TODO: fill with paymaster address this error was triggered by the paymaster
             });
         }
 
-        if valid_after > current_timestamp {
+        if valid_after > now {
             return Ok(Some(valid_after));
         }
 
@@ -268,86 +119,72 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     fn extract_stake_info(
         &self,
-        user_operation: &UserOperation,
-        simulate_validation_result: &SimulateValidationResult,
-        stake_info_by_entity: &mut [StakeInfo; NUMBER_LEVELS],
+        uo: &UserOperation,
+        res: &SimulateValidationResult,
+        info: &mut [StakeInfo; NUMBER_LEVELS],
     ) {
-        let (factory_info, sender_info, paymaster_info) = match simulate_validation_result {
-            SimulateValidationResult::ValidationResult(validation_result) => (
-                validation_result.factory_info,
-                validation_result.sender_info,
-                validation_result.paymaster_info,
-            ),
-            SimulateValidationResult::ValidationResultWithAggregation(
-                validation_result_with_aggregation,
-            ) => (
-                validation_result_with_aggregation.factory_info,
-                validation_result_with_aggregation.sender_info,
-                validation_result_with_aggregation.paymaster_info,
-            ),
+        let (f_info, s_info, p_info) = match res {
+            SimulateValidationResult::ValidationResult(res) => {
+                (res.factory_info, res.sender_info, res.paymaster_info)
+            }
+            SimulateValidationResult::ValidationResultWithAggregation(res) => {
+                (res.factory_info, res.sender_info, res.paymaster_info)
+            }
         };
 
         // factory
-        stake_info_by_entity[0] = StakeInfo {
-            address: if user_operation.init_code.len() >= 20 {
-                Address::from_slice(&user_operation.init_code[0..20])
-            } else {
-                Address::zero()
-            },
-            stake: factory_info.0,
-            unstake_delay: factory_info.1,
+        info[0] = StakeInfo {
+            address: get_address(&uo.init_code).unwrap_or(Address::zero()),
+            stake: f_info.0,
+            unstake_delay: f_info.1,
         };
 
         // account
-        stake_info_by_entity[1] = StakeInfo {
-            address: user_operation.sender,
-            stake: sender_info.0,
-            unstake_delay: sender_info.1,
+        info[1] = StakeInfo {
+            address: uo.sender,
+            stake: s_info.0,
+            unstake_delay: s_info.1,
         };
 
         // paymaster
-        stake_info_by_entity[2] = StakeInfo {
-            address: if user_operation.paymaster_and_data.len() >= 20 {
-                Address::from_slice(&user_operation.paymaster_and_data[0..20])
-            } else {
-                Address::zero()
-            },
-            stake: paymaster_info.0,
-            unstake_delay: paymaster_info.1,
+        info[2] = StakeInfo {
+            address: get_address(&uo.paymaster_and_data).unwrap_or(Address::zero()),
+            stake: p_info.0,
+            unstake_delay: p_info.1,
         };
     }
 
-    fn check_oog(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError> {
-        for (index, _) in LEVEL_TO_ENTITY.iter().enumerate() {
-            if let Some(level) = trace.number_levels.get(index) {
-                if level.oog.unwrap_or(false) {
-                    return Err(SimulateValidationError::OutOfGas {});
+    fn check_oog(&self, trace: &JsTracerFrame) -> Result<(), SimulationError> {
+        for (i, _) in LEVEL_TO_ENTITY.iter().enumerate() {
+            if let Some(l) = trace.number_levels.get(i) {
+                if l.oog.unwrap_or(false) {
+                    return Err(SimulationError::OutOfGas {});
                 }
             }
         }
         Ok(())
     }
 
-    fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulateValidationError> {
-        for (index, _) in LEVEL_TO_ENTITY.iter().enumerate() {
-            if let Some(level) = trace.number_levels.get(index) {
-                for opcode in level.opcodes.keys() {
-                    if FORBIDDEN_OPCODES.contains(opcode) {
-                        return Err(SimulateValidationError::OpcodeValidation {
-                            entity: LEVEL_TO_ENTITY[index].to_string(),
-                            opcode: opcode.clone(),
+    fn forbidden_opcodes(&self, trace: &JsTracerFrame) -> Result<(), SimulationError> {
+        for (i, _) in LEVEL_TO_ENTITY.iter().enumerate() {
+            if let Some(l) = trace.number_levels.get(i) {
+                for op in l.opcodes.keys() {
+                    if FORBIDDEN_OPCODES.contains(op) {
+                        return Err(SimulationError::ForbiddenOpcode {
+                            entity: LEVEL_TO_ENTITY[i].to_string(),
+                            opcode: op.clone(),
                         });
                     }
                 }
             }
 
-            if let Some(level) = trace.number_levels.get(index) {
-                if let Some(count) = level.opcodes.get(&*CREATE2_OPCODE) {
-                    if LEVEL_TO_ENTITY[index] == "factory" && *count == 1 {
+            if let Some(l) = trace.number_levels.get(i) {
+                if let Some(c) = l.opcodes.get(&*CREATE2_OPCODE) {
+                    if LEVEL_TO_ENTITY[i] == FACTORY && *c == 1 {
                         continue;
                     }
-                    return Err(SimulateValidationError::OpcodeValidation {
-                        entity: LEVEL_TO_ENTITY[index].to_string(),
+                    return Err(SimulationError::ForbiddenOpcode {
+                        entity: LEVEL_TO_ENTITY[i].to_string(),
                         opcode: CREATE2_OPCODE.to_string(),
                     });
                 }
@@ -360,21 +197,21 @@ impl<M: Middleware + 'static> UoPool<M> {
     fn parse_slots(
         &self,
         keccak: Vec<Bytes>,
-        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
-        slots_by_entity: &mut HashMap<Address, HashSet<Bytes>>,
+        info: &[StakeInfo; NUMBER_LEVELS],
+        slots: &mut HashMap<Address, HashSet<Bytes>>,
     ) {
         for kecc in keccak {
-            for entity in stake_info_by_entity {
+            for entity in info {
                 if entity.address.is_zero() {
                     continue;
                 }
 
-                let entity_address_bytes =
+                let addr_b =
                     Bytes::from([vec![0; 12], entity.address.to_fixed_bytes().to_vec()].concat());
 
-                if kecc.starts_with(&entity_address_bytes) {
+                if kecc.starts_with(&addr_b) {
                     let k = keccak256(kecc.clone());
-                    slots_by_entity
+                    slots
                         .entry(entity.address)
                         .or_insert(HashSet::new())
                         .insert(k.into());
@@ -385,28 +222,26 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     fn associated_with_slot(
         &self,
-        address: &Address,
+        addr: &Address,
         slot: &String,
-        slots_by_entity: &HashMap<Address, HashSet<Bytes>>,
-    ) -> Result<bool, SimulateValidationError> {
-        if *slot == address.to_string() {
+        slots: &HashMap<Address, HashSet<Bytes>>,
+    ) -> Result<bool, SimulationError> {
+        if *slot == addr.to_string() {
             return Ok(true);
         }
 
-        if !slots_by_entity.contains_key(address) {
+        if !slots.contains_key(addr) {
             return Ok(false);
         }
 
-        let slot_as_number = U256::from_str_radix(slot, 16)
-            .map_err(|_| SimulateValidationError::StorageAccessValidation { slot: slot.clone() })?;
+        let slot_num = U256::from_str_radix(slot, 16)
+            .map_err(|_| SimulationError::StorageAccess { slot: slot.clone() })?;
 
-        if let Some(slots) = slots_by_entity.get(address) {
-            for slot_entity in slots {
-                let slot_entity_as_number = U256::from(slot_entity.as_ref());
+        if let Some(slots) = slots.get(addr) {
+            for slot in slots {
+                let slot_ent_num = U256::from(slot.as_ref());
 
-                if slot_as_number >= slot_entity_as_number
-                    && slot_as_number < (slot_entity_as_number + 128)
-                {
+                if slot_num >= slot_ent_num && slot_num < (slot_ent_num + 128) {
                     return Ok(true);
                 }
             }
@@ -417,58 +252,46 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     fn storage_access(
         &self,
-        user_operation: &UserOperation,
-        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
+        uo: &UserOperation,
+        info: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError> {
-        let mut slots_by_entity = HashMap::new();
-        self.parse_slots(
-            trace.keccak.clone(),
-            stake_info_by_entity,
-            &mut slots_by_entity,
-        );
+    ) -> Result<(), SimulationError> {
+        let mut slots = HashMap::new();
+        self.parse_slots(trace.keccak.clone(), info, &mut slots);
 
         let mut slot_staked = String::new();
 
-        for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
-            if let Some(level) = trace.number_levels.get(index) {
-                for (address, access) in &level.access {
-                    if *address == user_operation.sender || *address == self.entry_point.address() {
+        for (i, stake_info) in info.iter().enumerate() {
+            if let Some(l) = trace.number_levels.get(i) {
+                for (addr, acc) in &l.access {
+                    if *addr == uo.sender || *addr == self.entry_point.address() {
                         continue;
                     }
 
                     for slot in [
-                        access.reads.keys().cloned().collect::<Vec<String>>(),
-                        access.writes.keys().cloned().collect(),
+                        acc.reads.keys().cloned().collect::<Vec<String>>(),
+                        acc.writes.keys().cloned().collect(),
                     ]
                     .concat()
                     {
                         slot_staked.clear();
 
-                        if self.associated_with_slot(
-                            &user_operation.sender,
-                            &slot,
-                            &slots_by_entity,
-                        )? {
-                            if user_operation.init_code.len() > 0 {
+                        if self.associated_with_slot(&uo.sender, &slot, &slots)? {
+                            if uo.init_code.len() > 0 {
                                 slot_staked = slot.clone();
                             } else {
                                 continue;
                             }
-                        } else if *address == stake_info.address
-                            || self.associated_with_slot(
-                                &stake_info.address,
-                                &slot,
-                                &slots_by_entity,
-                            )?
+                        } else if *addr == stake_info.address
+                            || self.associated_with_slot(&stake_info.address, &slot, &slots)?
                         {
                             slot_staked = slot.clone();
                         } else {
-                            return Err(SimulateValidationError::StorageAccessValidation { slot });
+                            return Err(SimulationError::StorageAccess { slot });
                         }
 
                         if !slot_staked.is_empty() && stake_info.stake.is_zero() {
-                            return Err(SimulateValidationError::StorageAccessValidation {
+                            return Err(SimulationError::StorageAccess {
                                 slot: slot_staked.clone(),
                             });
                         }
@@ -484,12 +307,12 @@ impl<M: Middleware + 'static> UoPool<M> {
         &self,
         trace: &JsTracerFrame,
         calls: &mut Vec<CallEntry>,
-    ) -> Result<(), SimulateValidationError> {
-        let mut stack: Vec<Call> = vec![];
+    ) -> Result<(), SimulationError> {
+        let mut st: Vec<Call> = vec![];
 
         for call in trace.calls.iter() {
             if call.typ == *REVERT_OPCODE || call.typ == *RETURN_OPCODE {
-                let top = stack.pop();
+                let top = st.pop();
 
                 if let Some(top) = top {
                     if top.typ.contains(CREATE_OPCODE.as_str()) {
@@ -503,9 +326,9 @@ impl<M: Middleware + 'static> UoPool<M> {
                             value: None,
                         });
                     } else {
-                        let method: Option<String> = {
-                            if let Some(method) = top.method {
-                                CONTRACTS_FUNCTIONS.get(method.as_ref()).cloned()
+                        let m: Option<String> = {
+                            if let Some(m) = top.method {
+                                CONTRACTS_FUNCTIONS.get(m.as_ref()).cloned()
                             } else {
                                 None
                             }
@@ -516,7 +339,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                                 typ: top.typ,
                                 from: top.from,
                                 to: top.to,
-                                method,
+                                method: m,
                                 ret: None,
                                 rev: call.data.clone(),
                                 value: top.value,
@@ -526,7 +349,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                                 typ: top.typ,
                                 from: top.from,
                                 to: top.to,
-                                method,
+                                method: m,
                                 ret: call.data.clone(),
                                 rev: None,
                                 value: None,
@@ -535,7 +358,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                     }
                 }
             } else {
-                stack.push(call.clone());
+                st.push(call.clone());
             }
         }
 
@@ -544,29 +367,26 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     fn call_stack(
         &self,
-        stake_info_by_entity: &[StakeInfo; NUMBER_LEVELS],
+        info: &[StakeInfo; NUMBER_LEVELS],
         trace: &JsTracerFrame,
-    ) -> Result<(), SimulateValidationError> {
+    ) -> Result<(), SimulationError> {
         let mut calls: Vec<CallEntry> = vec![];
         self.parse_call_stack(trace, &mut calls)?;
 
-        // check recursive call entrypoint method
-        let call_into_entry_point = calls.iter().find(|call| {
+        let call = calls.iter().find(|call| {
             call.to.unwrap_or_default() == self.entry_point.address()
                 && call.from.unwrap_or_default() != self.entry_point.address()
                 && (call.method.is_some()
                     && call.method.clone().unwrap_or_default() != *"depositTo")
         });
-        if call_into_entry_point.is_some() {
-            return Err(SimulateValidationError::CallStackValidation {
-                message: format!(
-                    "illegal call into EntryPoint during validation {call_into_entry_point:?}"
-                ),
+        if call.is_some() {
+            return Err(SimulationError::CallStack {
+                message: format!("Illegal call into entry point during validation {call:?}"),
             });
         }
 
-        for (index, stake_info) in stake_info_by_entity.iter().enumerate() {
-            if LEVEL_TO_ENTITY[index] == "paymaster" {
+        for (i, stake_info) in info.iter().enumerate() {
+            if LEVEL_TO_ENTITY[i] == PAYMASTER {
                 let call = calls.iter().find(|call| {
                     call.method == Some(PAYMASTER_VALIDATION_FUNCTION.clone())
                         && call.to == Some(stake_info.address)
@@ -575,20 +395,19 @@ impl<M: Middleware + 'static> UoPool<M> {
                 if let Some(call) = call {
                     if let Some(ret) = call.ret.as_ref() {
                         let validate_paymaster_return: ValidatePaymasterUserOpReturn =
-                            AbiDecode::decode(ret).map_err(|_| {
-                                SimulateValidationError::UserOperationRejected {
-                                    message: "unknown error".to_string(),
-                                }
+                            AbiDecode::decode(ret).map_err(|_| SimulationError::Validation {
+                                message: "Error during simulate validation on entry point"
+                                    .to_string(),
                             })?;
                         let context = validate_paymaster_return.context;
 
                         if !context.is_empty()
                             && self
                                 .reputation
-                                .verify_stake("paymaster", Some(*stake_info))
+                                .verify_stake(PAYMASTER, Some(*stake_info))
                                 .is_err()
                         {
-                            return Err(SimulateValidationError::CallStackValidation {
+                            return Err(SimulationError::CallStack {
                                 message: "Paymaster that is not staked should not return context"
                                     .to_string(),
                             });
@@ -603,31 +422,31 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     async fn get_code_hashes(
         &self,
-        contract_addresses: Vec<Address>,
-        code_hashes: &mut Vec<CodeHash>,
-    ) -> Result<(), SimulateValidationError> {
-        let mut tasks: JoinSet<Option<(Address, H256)>> = JoinSet::new();
+        addrs: Vec<Address>,
+        hashes: &mut Vec<CodeHash>,
+    ) -> Result<(), SimulationError> {
+        let mut ts: JoinSet<Option<(Address, H256)>> = JoinSet::new();
 
-        for contract_address in contract_addresses {
+        for addr in addrs {
             let eth_provider = self.eth_provider.clone();
 
-            tasks.spawn(async move {
-                match eth_provider.get_code(contract_address, None).await {
-                    Ok(code) => Some((contract_address, keccak256(&code).into())),
+            ts.spawn(async move {
+                match eth_provider.get_code(addr, None).await {
+                    Ok(code) => Some((addr, keccak256(&code).into())),
                     Err(_) => None,
                 }
             });
         }
 
-        while let Some(result) = tasks.join_next().await {
-            match result {
-                Ok(Some(code_hash)) => code_hashes.push(CodeHash {
-                    address: code_hash.0,
-                    hash: code_hash.1,
+        while let Some(res) = ts.join_next().await {
+            match res {
+                Ok(Some(h)) => hashes.push(CodeHash {
+                    address: h.0,
+                    hash: h.1,
                 }),
                 Ok(None) | Err(_) => {
-                    return Err(SimulateValidationError::UnknownError {
-                        error: "failed to get code hashes".to_string(),
+                    return Err(SimulationError::UnknownError {
+                        message: "Failed to retrieve code hashes".to_string(),
                     });
                 }
             }
@@ -638,46 +457,38 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     async fn code_hashes(
         &self,
-        user_operation: &UserOperation,
+        uo: &UserOperation,
         trace: &JsTracerFrame,
-    ) -> Result<Vec<CodeHash>, SimulateValidationError> {
-        let contract_addresses = trace
+    ) -> Result<Vec<CodeHash>, SimulationError> {
+        let addrs = trace
             .number_levels
             .iter()
-            .flat_map(|level| {
-                level
-                    .contract_size
-                    .keys()
-                    .copied()
-                    .collect::<Vec<Address>>()
-            })
+            .flat_map(|l| l.contract_size.keys().copied().collect::<Vec<Address>>())
             .collect::<Vec<Address>>();
 
-        let code_hashes: &mut Vec<CodeHash> = &mut vec![];
-        self.get_code_hashes(contract_addresses, code_hashes)
-            .await?;
+        let hashes: &mut Vec<CodeHash> = &mut vec![];
+        self.get_code_hashes(addrs, hashes).await?;
 
-        let user_operation_hash =
-            user_operation.hash(&self.entry_point.address(), &U256::from(self.chain.id()));
+        let uo_hash = uo.hash(&self.entry_point.address(), &self.chain.id().into());
 
-        match self.mempool.has_code_hashes(&user_operation_hash) {
+        match self.mempool.has_code_hashes(&uo_hash) {
             Ok(true) => {
                 // 2nd simulation
-                let prev_code_hashes = self.mempool.get_code_hashes(&user_operation_hash);
-                if !equal_code_hashes(code_hashes, &prev_code_hashes) {
-                    Err(SimulateValidationError::CodeHashesValidation {
-                        message: "modified code after 1st simulation".to_string(),
+                let hashes_prev = self.mempool.get_code_hashes(&uo_hash);
+                if !equal_code_hashes(hashes, &hashes_prev) {
+                    Err(SimulationError::CodeHashes {
+                        message: "Modified code hashes after 1st simulation".to_string(),
                     })
                 } else {
-                    Ok(code_hashes.to_vec())
+                    Ok(hashes.to_vec())
                 }
             }
             Ok(false) => {
                 // 1st simulation
-                Ok(code_hashes.to_vec())
+                Ok(hashes.to_vec())
             }
-            Err(error) => Err(SimulateValidationError::UnknownError {
-                error: error.to_string(),
+            Err(err) => Err(SimulationError::UnknownError {
+                message: err.to_string(),
             }),
         }
     }
@@ -685,35 +496,30 @@ impl<M: Middleware + 'static> UoPool<M> {
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
-    ) -> Result<SimulationResult, SimulateValidationError> {
-        let simulate_validation_result = self.simulate_validation(user_operation).await?;
+    ) -> Result<SimulationResult, SimulationError> {
+        let res = self.simulate_validation(user_operation).await?;
 
         // check signature
-        self.signature(&simulate_validation_result)?;
+        self.signature(&res)?;
 
         // check timestamps
-        let valid_after = self.timestamps(&simulate_validation_result)?;
+        let valid_after = self.timestamps(&res)?;
 
         let mut code_hashes: Vec<CodeHash> = vec![];
 
         if self.mode == UoPoolMode::Standard {
             let geth_trace = self.simulate_validation_trace(user_operation).await?;
 
-            trace!("Simulate user operation {user_operation:?} with trace {geth_trace:?}");
-
             let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
-                SimulateValidationError::UserOperationRejected {
+                SimulationError::Validation {
                     message: error.to_string(),
                 }
             })?;
 
             let mut stake_info_by_entity: [StakeInfo; NUMBER_LEVELS] = Default::default();
-            self.extract_stake_info(
-                user_operation,
-                &simulate_validation_result,
-                &mut stake_info_by_entity,
-            );
+            self.extract_stake_info(user_operation, &res, &mut stake_info_by_entity);
 
+            // check if out of gas
             self.check_oog(&js_trace)?;
 
             // may not invokes any forbidden opcodes
@@ -730,9 +536,16 @@ impl<M: Middleware + 'static> UoPool<M> {
         }
 
         Ok(SimulationResult {
-            simulate_validation_result,
             code_hashes,
             valid_after,
+            verification_gas_limit: match res.clone() {
+                SimulateValidationResult::ValidationResult(res) => res.return_info.0,
+                SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.0,
+            },
+            pre_fund: match res {
+                SimulateValidationResult::ValidationResult(res) => res.return_info.1,
+                SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.1,
+            },
         })
     }
 }

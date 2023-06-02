@@ -1,9 +1,8 @@
-use aa_bundler_primitives::{CodeHash, UserOperation, UserOperationHash};
+use crate::mempool::Mempool;
+use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
-
-use crate::mempool::Mempool;
 
 #[derive(Default, Educe)]
 #[educe(Debug)]
@@ -20,111 +19,100 @@ impl Mempool for MemoryMempool {
 
     fn add(
         &mut self,
-        user_operation: UserOperation,
-        entry_point: &Address,
+        uo: UserOperation,
+        ep: &Address,
         chain_id: &U256,
     ) -> anyhow::Result<UserOperationHash> {
-        let hash = user_operation.hash(entry_point, chain_id);
+        let uo_hash = uo.hash(ep, chain_id);
 
         self.user_operations_by_sender
-            .entry(user_operation.sender)
+            .entry(uo.sender)
             .or_insert_with(Default::default)
-            .insert(hash);
-        self.user_operations.insert(hash, user_operation);
+            .insert(uo_hash);
+        self.user_operations.insert(uo_hash, uo);
 
-        Ok(hash)
+        Ok(uo_hash)
     }
 
-    fn get(
-        &self,
-        user_operation_hash: &UserOperationHash,
-    ) -> anyhow::Result<Option<UserOperation>> {
-        Ok(self.user_operations.get(user_operation_hash).cloned())
+    fn get(&self, uo_hash: &UserOperationHash) -> anyhow::Result<Option<UserOperation>> {
+        Ok(self.user_operations.get(uo_hash).cloned())
     }
 
-    fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations {
-        return if let Some(user_operations_by_sender) = self.user_operations_by_sender.get(sender) {
-            user_operations_by_sender
+    fn get_all_by_sender(&self, addr: &Address) -> Self::UserOperations {
+        return if let Some(uos_by_sender) = self.user_operations_by_sender.get(addr) {
+            uos_by_sender
                 .iter()
-                .filter_map(|hash| self.user_operations.get(hash).cloned())
+                .filter_map(|uo_hash| self.user_operations.get(uo_hash).cloned())
                 .collect()
         } else {
             vec![]
         };
     }
 
-    fn get_number_by_sender(&self, sender: &Address) -> usize {
-        return if let Some(user_operations_by_sender) = self.user_operations_by_sender.get(sender) {
-            user_operations_by_sender.len()
+    fn get_number_by_sender(&self, addr: &Address) -> usize {
+        return if let Some(uos_by_sender) = self.user_operations_by_sender.get(addr) {
+            uos_by_sender.len()
         } else {
             0
         };
     }
 
-    fn has_code_hashes(&self, user_operation_hash: &UserOperationHash) -> anyhow::Result<bool> {
-        Ok(self
-            .code_hashes_by_user_operation
-            .contains_key(user_operation_hash))
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> anyhow::Result<bool> {
+        Ok(self.code_hashes_by_user_operation.contains_key(uo_hash))
     }
 
     fn set_code_hashes(
         &mut self,
-        user_operation_hash: &UserOperationHash,
-        code_hashes: &Self::CodeHashes,
+        uo_hash: &UserOperationHash,
+        hashes: &Self::CodeHashes,
     ) -> anyhow::Result<(), Self::Error> {
         self.code_hashes_by_user_operation
-            .insert(*user_operation_hash, code_hashes.clone());
+            .insert(*uo_hash, hashes.clone());
         Ok(())
     }
 
-    fn get_code_hashes(&self, user_operation_hash: &UserOperationHash) -> Self::CodeHashes {
-        if let Some(code_hashes) = self.code_hashes_by_user_operation.get(user_operation_hash) {
-            code_hashes.clone()
+    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Self::CodeHashes {
+        if let Some(hashes) = self.code_hashes_by_user_operation.get(uo_hash) {
+            hashes.clone()
         } else {
             vec![]
         }
     }
 
-    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> anyhow::Result<()> {
-        let user_operation: UserOperation;
+    fn remove(&mut self, uo_hash: &UserOperationHash) -> anyhow::Result<()> {
+        let uo: UserOperation;
 
-        if let Some(uo) = self.user_operations.get(user_operation_hash) {
-            user_operation = uo.clone();
+        if let Some(user_op) = self.user_operations.get(uo_hash) {
+            uo = user_op.clone();
         } else {
             return Err(anyhow::anyhow!("User operation not found"));
         }
 
-        self.user_operations.remove(user_operation_hash);
+        self.user_operations.remove(uo_hash);
 
-        if let Some(uos) = self
-            .user_operations_by_sender
-            .get_mut(&user_operation.sender)
-        {
-            uos.remove(user_operation_hash);
+        if let Some(uos) = self.user_operations_by_sender.get_mut(&uo.sender) {
+            uos.remove(uo_hash);
 
             if uos.is_empty() {
-                self.user_operations_by_sender
-                    .remove(&user_operation.sender);
+                self.user_operations_by_sender.remove(&uo.sender);
             }
         }
 
-        self.code_hashes_by_user_operation
-            .remove(user_operation_hash);
+        self.code_hashes_by_user_operation.remove(uo_hash);
 
         Ok(())
     }
 
     fn get_sorted(&self) -> anyhow::Result<Self::UserOperations> {
-        let mut user_operations: Vec<UserOperation> =
-            self.user_operations.values().cloned().collect();
-        user_operations.sort_by(|a, b| {
+        let mut uos: Vec<UserOperation> = self.user_operations.values().cloned().collect();
+        uos.sort_by(|a, b| {
             if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
                 b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas)
             } else {
                 a.nonce.cmp(&b.nonce)
             }
         });
-        Ok(user_operations)
+        Ok(uos)
     }
 
     fn get_all(&self) -> Self::UserOperations {

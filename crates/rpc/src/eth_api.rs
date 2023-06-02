@@ -1,3 +1,4 @@
+pub use crate::eth::EthApiServerImpl;
 use aa_bundler_primitives::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationPartial, UserOperationReceipt,

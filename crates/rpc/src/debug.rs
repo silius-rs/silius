@@ -1,16 +1,16 @@
+use crate::debug_api::DebugApiServer;
 use aa_bundler_grpc::{
-    bundler_client::BundlerClient, uo_pool_client::UoPoolClient, ClearResult,
-    GetAllReputationRequest, GetAllReputationResult, GetAllRequest, GetAllResult, Mode as GrpcMode,
-    SetModeRequest, SetReputationRequest, SetReputationResult,
+    bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
+    GetAllRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest, SetReputationResult,
 };
-use aa_bundler_primitives::{BundlerMode, ReputationEntry, UserOperation, DEFAULT_INTERVAL};
+use aa_bundler_primitives::{
+    bundler::DEFAULT_BUNDLE_INTERVAL, reputation::ReputationEntry, BundlerMode, UserOperation,
+};
 use anyhow::format_err;
 use async_trait::async_trait;
 use ethers::types::{Address, H256};
 use jsonrpsee::core::RpcResult;
-use tracing::{debug, trace};
-
-use crate::debug_api::DebugApiServer;
+use tonic::Request;
 
 pub struct DebugApiServerImpl {
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
@@ -22,124 +22,103 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn clear_state(&self) -> RpcResult<()> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let response = uopool_grpc_client
-            .clear(tonic::Request::new(()))
+        uopool_grpc_client
+            .clear(Request::new(()))
             .await
-            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
             .into_inner();
 
-        if response.result == ClearResult::Cleared as i32 {
+        Ok(())
+    }
+
+    async fn dump_mempool(&self, ep: Address) -> RpcResult<Vec<UserOperation>> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let req = Request::new(GetAllRequest {
+            ep: Some(ep.into()),
+        });
+
+        let res = uopool_grpc_client
+            .get_all(req)
+            .await
+            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .into_inner();
+
+        let mut uos: Vec<UserOperation> = res.uos.iter().map(|uo| uo.clone().into()).collect();
+        uos.sort_by(|a, b| a.nonce.cmp(&b.nonce));
+        Ok(uos)
+    }
+
+    async fn set_reputation(&self, entries: Vec<ReputationEntry>, ep: Address) -> RpcResult<()> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let req = Request::new(SetReputationRequest {
+            rep: entries.iter().map(|re| (*re).into()).collect(),
+            ep: Some(ep.into()),
+        });
+
+        let res = uopool_grpc_client
+            .set_reputation(req)
+            .await
+            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .into_inner();
+
+        if res.res == SetReputationResult::SetReputation as i32 {
             return Ok(());
         }
 
         Err(jsonrpsee::core::Error::Custom(
-            "error clearing state".to_string(),
+            "Error setting reputation".to_string(),
         ))
     }
 
-    async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperation>> {
+    async fn dump_reputation(&self, ep: Address) -> RpcResult<Vec<ReputationEntry>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let request = tonic::Request::new(GetAllRequest {
-            ep: Some(entry_point.into()),
-        });
-        debug!("Sending getAll request to mempool");
-        let response = uopool_grpc_client
-            .get_all(request)
-            .await
-            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
-            .into_inner();
-        trace!("Getall from mempool: {response:?}");
-        if response.result == GetAllResult::GotAll as i32 {
-            let mut uos: Vec<UserOperation> =
-                response.uos.iter().map(|uo| uo.clone().into()).collect();
-            uos.sort_by(|a, b| a.nonce.cmp(&b.nonce));
-            return Ok(uos);
-        }
-
-        Err(jsonrpsee::core::Error::Custom(
-            "error getting mempool".to_string(),
-        ))
-    }
-
-    async fn set_reputation(
-        &self,
-        reputation_entries: Vec<ReputationEntry>,
-        entry_point: Address,
-    ) -> RpcResult<()> {
-        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
-
-        let request = tonic::Request::new(SetReputationRequest {
-            res: reputation_entries.iter().map(|re| (*re).into()).collect(),
-            ep: Some(entry_point.into()),
+        let request = Request::new(GetAllReputationRequest {
+            ep: Some(ep.into()),
         });
 
-        let response = uopool_grpc_client
-            .set_reputation(request)
-            .await
-            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
-            .into_inner();
-
-        if response.result == SetReputationResult::SetReputation as i32 {
-            return Ok(());
-        }
-
-        Err(jsonrpsee::core::Error::Custom(
-            "error setting reputation".to_string(),
-        ))
-    }
-
-    async fn dump_reputation(&self, entry_point: Address) -> RpcResult<Vec<ReputationEntry>> {
-        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
-
-        let request = tonic::Request::new(GetAllReputationRequest {
-            ep: Some(entry_point.into()),
-        });
-
-        let response = uopool_grpc_client
+        let res = uopool_grpc_client
             .get_all_reputation(request)
             .await
-            .map_err(|status| format_err!("GRPC error (uopool): {}", status.message()))?
+            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
             .into_inner();
 
-        if response.result == GetAllReputationResult::GotAllReputation as i32 {
-            return Ok(response.res.iter().map(|re| re.clone().into()).collect());
-        }
-
-        Err(jsonrpsee::core::Error::Custom(
-            "error getting reputation".to_string(),
-        ))
+        Ok(res.rep.iter().map(|re| re.clone().into()).collect())
     }
 
     async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<()> {
         let mut bundler_grpc_client = self.bundler_grpc_client.clone();
 
-        let request = tonic::Request::new(SetModeRequest {
+        let req = Request::new(SetModeRequest {
             mode: Into::<GrpcMode>::into(mode).into(),
-            interval: DEFAULT_INTERVAL,
+            interval: DEFAULT_BUNDLE_INTERVAL,
         });
 
-        match bundler_grpc_client.set_bundler_mode(request).await {
+        match bundler_grpc_client.set_bundler_mode(req).await {
             Ok(_) => Ok(()),
-            Err(status) => Err(jsonrpsee::core::Error::Custom(format!(
+            Err(s) => Err(jsonrpsee::core::Error::Custom(format!(
                 "GRPC error (bundler): {}",
-                status.message()
+                s.message()
             ))),
         }
     }
 
     async fn send_bundle_now(&self) -> RpcResult<H256> {
         let mut bundler_grpc_client = self.bundler_grpc_client.clone();
-        let request = tonic::Request::new(());
-        match bundler_grpc_client.send_bundle_now(request).await {
-            Ok(response) => Ok(response
+
+        let req = Request::new(());
+
+        match bundler_grpc_client.send_bundle_now(req).await {
+            Ok(res) => Ok(res
                 .into_inner()
-                .result
-                .expect("Must return send bundle now tx data")
+                .res
+                .expect("Must return send bundle tx data")
                 .into()),
-            Err(status) => Err(jsonrpsee::core::Error::Custom(format!(
+            Err(s) => Err(jsonrpsee::core::Error::Custom(format!(
                 "GRPC error (bundler): {}",
-                status.message()
+                s.message()
             ))),
         }
     }

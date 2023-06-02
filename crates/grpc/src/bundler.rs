@@ -1,40 +1,17 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-
-use aa_bundler_bundler::Bundler as BundlerCore;
-use aa_bundler_primitives::{parse_address, parse_u256, Chain, UserOperation, Wallet};
+use crate::proto::bundler::*;
+use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
+use crate::uo_pool_client::UoPoolClient;
+use aa_bundler_bundler::Bundler;
+use aa_bundler_primitives::{Chain, UserOperation, Wallet};
 use async_trait::async_trait;
-use clap::Parser;
 use ethers::types::{Address, H256, U256};
 use parking_lot::Mutex;
-use tonic::Response;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 
-use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
-use crate::{GetChainIdResponse, GetSupportedEntryPointsResponse};
-
-use crate::proto::bundler::*;
-use crate::uo_pool_client::UoPoolClient;
-
-#[derive(Clone, Copy, Debug, Parser, PartialEq)]
-pub struct BundlerServiceOpts {
-    #[clap(long, value_parser=parse_address)]
-    pub beneficiary: Address,
-
-    #[clap(long, default_value = "1", value_parser=parse_u256)]
-    pub gas_factor: U256,
-
-    #[clap(long, value_parser=parse_u256)]
-    pub min_balance: U256,
-
-    #[clap(long, default_value = "127.0.0.1:3002")]
-    pub bundler_grpc_listen_address: SocketAddr,
-
-    #[clap(long, default_value = "10")]
-    pub bundle_interval: u64,
-}
-
 pub struct BundlerService {
-    pub bundlers: Vec<BundlerCore>,
+    pub bundlers: Vec<Bundler>,
     pub running: Arc<Mutex<bool>>,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 }
@@ -46,26 +23,9 @@ fn is_running(running: Arc<Mutex<bool>>) -> bool {
 
 impl BundlerService {
     pub fn new(
-        wallet: Wallet,
-        beneficiary: Address,
+        bundlers: Vec<Bundler>,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
-        entry_points: Vec<Address>,
-        chain: Chain,
-        eth_client_address: String,
     ) -> Self {
-        let bundlers: Vec<BundlerCore> = entry_points
-            .iter()
-            .map(|entry_point| {
-                BundlerCore::new(
-                    wallet.clone(),
-                    beneficiary,
-                    *entry_point,
-                    chain,
-                    eth_client_address.clone(),
-                )
-            })
-            .collect();
-
         Self {
             bundlers,
             running: Arc::new(Mutex::new(false)),
@@ -73,35 +33,29 @@ impl BundlerService {
         }
     }
 
-    async fn create_bundle(
+    async fn get_user_operations(
         uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
-        entry_point: &Address,
+        ep: &Address,
     ) -> anyhow::Result<Vec<UserOperation>> {
-        let request = tonic::Request::new(GetSortedRequest {
-            entry_point: Some((*entry_point).into()),
+        let req = Request::new(GetSortedRequest {
+            ep: Some((*ep).into()),
         });
-        let response = uopool_grpc_client
+        let res = uopool_grpc_client
             .clone()
-            .get_sorted_user_operations(request)
+            .get_sorted_user_operations(req)
             .await?;
-        let user_operations: Vec<UserOperation> = response
-            .into_inner()
-            .user_operations
-            .into_iter()
-            .map(|u| u.into())
-            .collect();
-        Ok(user_operations)
+
+        let uos: Vec<UserOperation> = res.into_inner().uos.into_iter().map(|u| u.into()).collect();
+        Ok(uos)
     }
 
-    pub async fn send_bundles_now(&self) -> anyhow::Result<H256> {
-        info!("Sending bundles now");
+    pub async fn send_bundles(&self) -> anyhow::Result<H256> {
         let mut tx_hashes: Vec<H256> = vec![];
-        for bundler in self.bundlers.iter() {
-            info!("Sending bundle for entry point: {:?}", bundler.entry_point);
 
-            let bundle =
-                Self::create_bundle(&self.uopool_grpc_client, &bundler.entry_point).await?;
-            let tx_hash = bundler.send_next_bundle(&bundle).await?;
+        for bundler in self.bundlers.iter() {
+            let uos =
+                Self::get_user_operations(&self.uopool_grpc_client, &bundler.entry_point).await?;
+            let tx_hash = bundler.send_next_bundle(&uos).await?;
 
             Self::handle_past_events(&self.uopool_grpc_client, &bundler.entry_point).await?;
 
@@ -128,17 +82,15 @@ impl BundlerService {
 
     async fn handle_past_events(
         uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
-        entry_point: &Address,
+        ep: &Address,
     ) -> anyhow::Result<()> {
-        info!("Send handlePastEvents request");
-
-        let request = tonic::Request::new(HandlePastEventRequest {
-            entry_point: Some((*entry_point).into()),
+        let req = Request::new(HandlePastEventRequest {
+            ep: Some((*ep).into()),
         });
 
         if let Some(e) = uopool_grpc_client
             .clone()
-            .handle_past_events(request)
+            .handle_past_events(req)
             .await
             .err()
         {
@@ -148,33 +100,31 @@ impl BundlerService {
         Ok(())
     }
 
-    pub fn start_bundling(&self, interval: u64) {
+    pub fn start_bundling(&self, int: u64) {
         if !self.is_running() {
+            info!("Starting auto bundling");
+
             let mut r = self.running.lock();
             *r = true;
+
             for bundler in self.bundlers.iter() {
-                info!(
-                    "Starting auto bundling process for entry point: {:?}",
-                    bundler.entry_point
-                );
                 let bundler_own = bundler.clone();
                 let running_lock = self.running.clone();
                 let uopool_grpc_client = self.uopool_grpc_client.clone();
-                let entry_point = bundler.entry_point;
+
                 tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(Duration::from_secs(interval));
+                    let mut interval = tokio::time::interval(Duration::from_secs(int));
                     loop {
                         if !is_running(running_lock.clone()) {
-                            info!(
-                                "Stopping auto bundling process for entry point: {:?}",
-                                entry_point
-                            );
                             break;
                         }
                         interval.tick().await;
 
-                        match Self::create_bundle(&uopool_grpc_client, &bundler_own.entry_point)
-                            .await
+                        match Self::get_user_operations(
+                            &uopool_grpc_client,
+                            &bundler_own.entry_point,
+                        )
+                        .await
                         {
                             Ok(bundle) => {
                                 if let Err(e) = bundler_own.send_next_bundle(&bundle).await {
@@ -202,38 +152,24 @@ impl BundlerService {
 
 #[async_trait]
 impl bundler_server::Bundler for BundlerService {
-    async fn chain_id(
-        &self,
-        _request: tonic::Request<()>,
-    ) -> Result<Response<GetChainIdResponse>, tonic::Status> {
-        todo!()
-    }
-
-    async fn supported_entry_points(
-        &self,
-        _request: tonic::Request<()>,
-    ) -> Result<Response<GetSupportedEntryPointsResponse>, tonic::Status> {
-        todo!()
-    }
-
     async fn set_bundler_mode(
         &self,
-        request: tonic::Request<SetModeRequest>,
-    ) -> Result<Response<SetModeResponse>, tonic::Status> {
-        let req = request.into_inner();
+        req: Request<SetModeRequest>,
+    ) -> Result<Response<SetModeResponse>, Status> {
+        let req = req.into_inner();
+
         match req.mode() {
             Mode::Manual => {
-                info!("Stopping auto bundling");
                 self.stop_bundling();
                 Ok(Response::new(SetModeResponse {
-                    result: SetModeResult::Ok.into(),
+                    res: SetModeResult::Ok.into(),
                 }))
             }
             Mode::Auto => {
-                let interval = req.interval;
-                self.start_bundling(interval);
+                let int = req.interval;
+                self.start_bundling(int);
                 Ok(Response::new(SetModeResponse {
-                    result: SetModeResult::Ok.into(),
+                    res: SetModeResult::Ok.into(),
                 }))
             }
         }
@@ -241,85 +177,53 @@ impl bundler_server::Bundler for BundlerService {
 
     async fn send_bundle_now(
         &self,
-        _request: tonic::Request<()>,
-    ) -> Result<Response<SendBundleNowResponse>, tonic::Status> {
-        let res = self.send_bundles_now().await.map_err(|e| {
-            error!("Send bundle manually with response {e:?}");
-            tonic::Status::internal(format!("Send bundle now with error: {e:?}"))
-        })?;
+        _req: Request<()>,
+    ) -> Result<Response<SendBundleNowResponse>, Status> {
+        let res = self
+            .send_bundles()
+            .await
+            .map_err(|e| tonic::Status::internal(format!("Send bundle now with error: {e:?}")))?;
         Ok(Response::new(SendBundleNowResponse {
-            result: Some(res.into()),
+            res: Some(res.into()),
         }))
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn bundler_service_run(
-    opts: BundlerServiceOpts,
+    grpc_listen_address: SocketAddr,
     wallet: Wallet,
-    entry_points: Vec<Address>,
+    eps: Vec<Address>,
+    eth_provider_address: String,
     chain: Chain,
-    eth_client_address: String,
+    beneficiary: Address,
+    _gas_factor: U256,
+    _min_balance: U256,
+    bundle_interval: u64,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 ) {
-    let bundler_service = BundlerService::new(
-        wallet,
-        opts.beneficiary,
-        uopool_grpc_client,
-        entry_points,
-        chain,
-        eth_client_address,
-    );
+    let bundlers: Vec<Bundler> = eps
+        .iter()
+        .map(|ep| {
+            Bundler::new(
+                wallet.clone(),
+                eth_provider_address.clone(),
+                beneficiary,
+                *ep,
+                chain,
+            )
+        })
+        .collect();
 
-    info!("Starting bundler manager");
+    let bundler_service = BundlerService::new(bundlers, uopool_grpc_client);
 
-    bundler_service.start_bundling(opts.bundle_interval);
+    info!("Bundler gRPC server starting on {}", grpc_listen_address);
+
+    bundler_service.start_bundling(bundle_interval);
 
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = bundler_server::BundlerServer::new(bundler_service);
-        builder
-            .add_service(svc)
-            .serve(opts.bundler_grpc_listen_address)
-            .await
+        builder.add_service(svc).serve(grpc_listen_address).await
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{
-        net::{IpAddr, Ipv4Addr},
-        str::FromStr,
-    };
-
-    #[test]
-    fn bundler_opts() {
-        let args = vec![
-            "bundleropts",
-            "--beneficiary",
-            "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
-            "--gas-factor",
-            "600",
-            "--min-balance",
-            "1",
-            "--bundler-grpc-listen-address",
-            "127.0.0.1:3002",
-            "--bundle-interval",
-            "10",
-        ];
-        assert_eq!(
-            BundlerServiceOpts {
-                beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
-                    .unwrap(),
-                gas_factor: U256::from(600),
-                min_balance: U256::from(1),
-                bundler_grpc_listen_address: SocketAddr::new(
-                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                    3002
-                ),
-                bundle_interval: 10,
-            },
-            BundlerServiceOpts::try_parse_from(args).unwrap()
-        );
-    }
 }

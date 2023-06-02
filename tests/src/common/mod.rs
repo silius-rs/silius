@@ -1,22 +1,18 @@
-use std::{ops::Mul, sync::Arc, time::Duration};
-
-use aa_bundler_primitives::UserOperation;
-use ethers::{
-    prelude::{
-        k256::ecdsa::SigningKey, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
-    },
-    providers::{Http, Middleware, Provider},
-    signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer, Wallet},
-    types::{Address, Bytes, TransactionRequest, U256},
-    utils::{Geth, GethInstance},
-};
-use tempdir::TempDir;
-
 use self::gen::{
     EntryPointContract, TestCoin, TestOpcodesAccount, TestOpcodesAccountFactory,
     TestRecursionAccount, TestRulesAccountFactory, TestStorageAccount, TestStorageAccountFactory,
     TracerTest,
 };
+use ethers::{
+    prelude::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
+    providers::{Http, Middleware, Provider},
+    signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer},
+    types::{Address, TransactionRequest, U256},
+    utils::{Geth, GethInstance},
+};
+use std::{ops::Mul, sync::Arc, time::Duration};
+use tempdir::TempDir;
+
 pub mod gen;
 
 pub const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
@@ -27,8 +23,11 @@ pub struct DeployedContract<C> {
     pub address: Address,
 }
 impl<C> DeployedContract<C> {
-    pub fn new(contract: C, address: Address) -> Self {
-        Self { contract, address }
+    pub fn new(contract: C, addr: Address) -> Self {
+        Self {
+            contract,
+            address: addr,
+        }
     }
 
     pub fn contract(&self) -> &C {
@@ -39,21 +38,21 @@ impl<C> DeployedContract<C> {
 pub async fn deploy_entry_point<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<EntryPointContract<M>>> {
-    let (entry_point, receipt) = EntryPointContract::deploy(client, ())?
+    let (ep, receipt) = EntryPointContract::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(entry_point, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(ep, addr))
 }
 
 pub async fn deploy_test_opcode_account<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TestOpcodesAccount<M>>> {
-    let (account, receipt) = TestOpcodesAccount::deploy(client, ())?
+    let (acc, receipt) = TestOpcodesAccount::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(account, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(acc, addr))
 }
 
 pub async fn deploy_test_opcode_account_factory<M: Middleware + 'static>(
@@ -62,8 +61,8 @@ pub async fn deploy_test_opcode_account_factory<M: Middleware + 'static>(
     let (factory, receipt) = TestOpcodesAccountFactory::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(factory, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, addr))
 }
 
 pub async fn deploy_test_storage_account_factory<M: Middleware + 'static>(
@@ -73,29 +72,29 @@ pub async fn deploy_test_storage_account_factory<M: Middleware + 'static>(
     let (factory, receipt) = TestStorageAccountFactory::deploy(client, test_coin_addr)?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(factory, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, addr))
 }
 
 pub async fn deploy_test_storage_account<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TestStorageAccount<M>>> {
-    let (account, receipt) = TestStorageAccount::deploy(client, ())?
+    let (acc, receipt) = TestStorageAccount::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(account, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(acc, addr))
 }
 
 pub async fn deploy_test_recursion_account<M: Middleware + 'static>(
     client: Arc<M>,
-    entry_point_address: Address,
+    ep: Address,
 ) -> anyhow::Result<DeployedContract<TestRecursionAccount<M>>> {
-    let (account, receipt) = TestRecursionAccount::deploy(client, entry_point_address)?
+    let (acc, receipt) = TestRecursionAccount::deploy(client, ep)?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(account, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(acc, addr))
 }
 
 pub async fn deploy_test_rules_account_factory<M: Middleware + 'static>(
@@ -104,36 +103,24 @@ pub async fn deploy_test_rules_account_factory<M: Middleware + 'static>(
     let (factory, receipt) = TestRulesAccountFactory::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(factory, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, addr))
 }
 
 pub async fn deploy_tracer_test<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TracerTest<M>>> {
     let (factory, receipt) = TracerTest::deploy(client, ())?.send_with_receipt().await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(factory, address))
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, addr))
 }
 
 pub async fn deploy_test_coin<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TestCoin<M>>> {
     let (factory, receipt) = TestCoin::deploy(client, ())?.send_with_receipt().await?;
-    let address = receipt.contract_address.unwrap();
-    Ok(DeployedContract::new(factory, address))
-}
-
-pub async fn sign(
-    user_op: &mut UserOperation,
-    entry_point_address: &Address,
-    chain_id: &U256,
-    key: Wallet<SigningKey>,
-) -> anyhow::Result<()> {
-    let user_op_hash = user_op.hash(entry_point_address, chain_id);
-    let signature = key.sign_message(user_op_hash.0.as_bytes()).await?;
-    user_op.signature = Bytes::from(signature.to_vec());
-    Ok(())
+    let addr = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, addr))
 }
 
 pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {

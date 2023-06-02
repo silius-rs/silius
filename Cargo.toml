@@ -7,6 +7,7 @@ members = [
     "crates/primitives",
     "crates/rpc",
     "crates/uopool",
+    "examples",
     "tests",
 ]
 default-members = ["bin/bundler"]

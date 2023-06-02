@@ -1,0 +1,23 @@
+[package]
+name = "aa-bundler-examples"
+version = "0.1.0"
+authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Vid201/aa-bundler"
+readme = "README.md"
+description = """
+AA (ERC-4337) Bundler examples
+"""
+rust-version = "1.69.0"
+
+[dev-dependencies]
+aa-bundler-primitives = { path = "../crates/primitives" }
+
+anyhow = "1"
+ethers = { version = "2.0.4" }
+tokio = { version = "1.18", features = ["full"] }
+
+[[example]]
+name = "user-operation"
+path = "user_operation.rs"

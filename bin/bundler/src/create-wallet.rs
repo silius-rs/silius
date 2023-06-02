@@ -1,10 +1,11 @@
-use aa_bundler_primitives::{parse_u256, Wallet};
+use aa_bundler::utils::parse_u256;
+use aa_bundler_primitives::Wallet;
 use anyhow::Result;
 use clap::Parser;
 use dirs::home_dir;
 use ethers::types::U256;
 use expanded_pathbuf::ExpandedPathBuf;
-use jsonrpsee::tracing::info;
+use tracing::info;
 
 #[derive(Parser)]
 #[clap(
@@ -33,7 +34,7 @@ fn main() -> Result<()> {
             .map(ExpandedPathBuf)?
     };
 
-    let wallet = Wallet::new(path, opt.chain_id)?;
+    let wallet = Wallet::build_random(path, &opt.chain_id)?;
     info!("{:?}", wallet.signer);
 
     Ok(())

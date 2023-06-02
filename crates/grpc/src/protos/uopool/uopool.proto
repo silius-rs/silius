@@ -16,22 +16,13 @@ enum AddResult {
 }
 
 message AddResponse {
-    AddResult result = 1;
+    AddResult res = 1;
     string data = 2;
 }
 
 message RemoveRequest {
     repeated types.H256 hashes = 1;
     types.H160 ep = 2;
-}
-
-enum RemoveResult {
-    REMOVED = 0;
-    NOT_REMOVED = 1;
-}
-
-message RemoveResponse {
-    RemoveResult result = 1;
 }
 
 message EstimateUserOperationGasRequest {
@@ -45,13 +36,8 @@ enum EstimateUserOperationGasResult {
 }
 
 message EstimateUserOperationGasResponse {
-    EstimateUserOperationGasResult result = 1;
+    EstimateUserOperationGasResult res = 1;
     string data = 2;
-}
-
-enum GetAllResult {
-    GOT_ALL = 0;
-    NOT_GOT_ALL = 1;
 }
 
 message GetAllRequest {
@@ -59,22 +45,7 @@ message GetAllRequest {
 }
 
 message GetAllResponse {
-    GetAllResult result = 1;
-    repeated types.UserOperation uos = 2;
-}
-
-enum ClearResult {
-    CLEARED = 0;
-    NOT_CLEARED = 1;
-}
-
-message ClearResponse {
-    ClearResult result = 1;
-}
-
-enum GetAllReputationResult {
-    GOT_ALL_REPUTATION = 0;
-    NOT_GOT_ALL_REPUTATION = 1;
+    repeated types.UserOperation uos = 1;
 }
 
 message GetAllReputationRequest {
@@ -82,8 +53,7 @@ message GetAllReputationRequest {
 }
 
 message GetAllReputationResponse {
-    GetAllReputationResult result = 1;
-    repeated types.ReputationEntry res = 2;
+    repeated types.ReputationEntry rep = 1;
 }
 
 enum SetReputationResult {
@@ -92,20 +62,20 @@ enum SetReputationResult {
 }
 
 message SetReputationRequest {
-    repeated types.ReputationEntry res = 1;
+    repeated types.ReputationEntry rep = 1;
     types.H160 ep = 2;
 }
 
 message SetReputationResponse {
-    SetReputationResult result = 1;
+    SetReputationResult res = 1;
 }
 
 message GetSortedRequest{
-    types.H160 entry_point = 1;
+    types.H160 ep = 1;
 }
 
 message GetSortedResponse{
-    repeated types.UserOperation user_operations = 1;
+    repeated types.UserOperation uos = 1;
 }
 
 message UserOperationHashRequest{
@@ -121,7 +91,7 @@ message GetUserOperationByHashResponse{
 }
 
 message HandlePastEventRequest{
-    types.H160 entry_point = 1;
+    types.H160 ep = 1;
 }
 
 message GetUserOperationReceiptResponse{
@@ -132,13 +102,14 @@ message GetUserOperationReceiptResponse{
     types.PbU256 actual_gas_cost = 5;
     types.PbU256 actual_gas_used = 6;
     bool success = 7;
-    types.TransactionReceipt transaction_receipt = 8;
+    types.TransactionReceipt tx_receipt = 8;
     repeated types.Log logs = 9;
+    string reason = 10;
 }
 
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
-    rpc Remove(RemoveRequest) returns (RemoveResponse);
+    rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
     rpc GetChainId(google.protobuf.Empty) returns (types.GetChainIdResponse);
     rpc GetSupportedEntryPoints(google.protobuf.Empty) returns (types.GetSupportedEntryPointsResponse);
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
@@ -149,7 +120,7 @@ service UoPool {
     
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);
-    rpc Clear(google.protobuf.Empty) returns (ClearResponse);
+    rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc GetAllReputation(GetAllReputationRequest) returns (GetAllReputationResponse);
     rpc SetReputation(SetReputationRequest) returns (SetReputationResponse);
 }

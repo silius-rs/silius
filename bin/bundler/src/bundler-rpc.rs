@@ -1,9 +1,14 @@
 use aa_bundler_grpc::{bundler_client::BundlerClient, uo_pool_client::UoPoolClient};
-use aa_bundler_rpc::{DebugApiServer, DebugApiServerImpl, EthApiServer, EthApiServerImpl};
+use aa_bundler_rpc::{
+    debug_api::{DebugApiServer, DebugApiServerImpl},
+    eth_api::{EthApiServer, EthApiServerImpl},
+    web3_api::{Web3ApiServer, Web3ApiServerImpl},
+};
 use anyhow::Result;
 use clap::Parser;
-use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
+use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder};
 use std::{collections::HashSet, future::pending};
+use tracing::info;
 
 #[derive(Parser)]
 #[clap(
@@ -42,10 +47,11 @@ async fn main() -> Result<()> {
 
     let rpc_api: HashSet<String> = HashSet::from_iter(opt.rpc_api.iter().cloned());
 
+    api.merge(Web3ApiServerImpl {}.into_rpc())?;
+
     if rpc_api.contains("eth") {
         api.merge(
             EthApiServerImpl {
-                call_gas_limit: 100_000_000,
                 uopool_grpc_client: uopool_grpc_client.clone(),
             }
             .into_rpc(),
