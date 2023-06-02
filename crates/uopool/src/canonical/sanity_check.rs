@@ -281,7 +281,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             .await
             .map_err(|entry_point_error| match entry_point_error {
                 EntryPointErr::FailedOp(failed_op) => BadUserOperationError::SimulateHandleOp {
-                    message: format!("{}", failed_op.reason),
+                    message: failed_op.reason,
                 },
                 _ => BadUserOperationError::UnknownError {
                     error: "unknown error".to_string(),
@@ -493,6 +493,7 @@ mod tests {
 
     use super::*;
 
+    #[ignore]
     #[tokio::test]
     async fn user_operation_sanity_check() {
         let entry_point = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
@@ -524,8 +525,11 @@ mod tests {
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);
-        let max_fee_per_gas =
-            max_priority_fee_per_gas + eth_provider.get_gas_price().await.unwrap();
+        let block = eth_provider
+            .get_block(BlockNumber::Latest)
+            .await.unwrap();
+        let base_fee_per_gas = block.unwrap().base_fee_per_gas.unwrap();
+        let max_fee_per_gas = max_priority_fee_per_gas + base_fee_per_gas;
 
         let user_operation_valid = UserOperation {
             sender: "0xeF5b78898D61b7020A6DB5a39608C4B02f95b50f".parse().unwrap(),
@@ -540,6 +544,11 @@ mod tests {
             paymaster_and_data: Bytes::default(),
             signature: Bytes::default(),
         };
+
+        println!(
+            "{:?}",
+            uo_pool.validate_user_operation(&user_operation_valid).await
+        );
 
         // valid user operation
         assert!(uo_pool
