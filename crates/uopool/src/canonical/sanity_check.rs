@@ -1,7 +1,7 @@
 use aa_bundler_contracts::EntryPointErr;
 use aa_bundler_primitives::{
     ReputationStatus, SanityCheckError, StakeInfo, UserOperation, UserOperationHash,
-    EXECUTION_ERROR_CODE, SANITY_CHECK_ERROR_CODE,
+    SANITY_CHECK_ERROR_CODE, SIMULATION_ERROR_CODE,
 };
 use ethers::{
     providers::Middleware,
@@ -10,7 +10,7 @@ use ethers::{
 use jsonrpsee::types::error::ErrorCode;
 
 use crate::{
-    utils::{calculate_valid_gas, Overhead},
+    utils::{calculate_call_gas_limit, calculate_valid_gas, Overhead},
     UoPool,
 };
 
@@ -39,7 +39,7 @@ pub enum BadUserOperationError<M: Middleware> {
     },
     LowCallGasLimit {
         call_gas_limit: U256,
-        call_gas_estimation: U256,
+        call_gas_limit_estimation: U256,
     },
     LowMaxFeePerGas {
         max_fee_per_gas: U256,
@@ -56,7 +56,7 @@ pub enum BadUserOperationError<M: Middleware> {
     SenderVerification {
         sender: Address,
     },
-    UserOperationExecution {
+    SimulateHandleOp {
         message: String,
     },
     Middleware(M::Error),
@@ -113,11 +113,11 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
             },
             BadUserOperationError::LowCallGasLimit {
                 call_gas_limit,
-                call_gas_estimation,
+                call_gas_limit_estimation,
             } => SanityCheckError::owned(
                 SANITY_CHECK_ERROR_CODE,
                 format!(
-                    "Call gas limit {call_gas_limit} is lower than call gas estimation {call_gas_estimation}",
+                    "Call gas limit {call_gas_limit} is lower than call gas estimation {call_gas_limit_estimation}",
                 ),
                 None::<bool>,
             ),
@@ -156,9 +156,9 @@ impl<M: Middleware> From<BadUserOperationError<M>> for SanityCheckError {
                 format!("Sender {sender} is invalid (sender check)",),
                 None::<bool>,
             ),
-            BadUserOperationError::UserOperationExecution { message } => {
+            BadUserOperationError::SimulateHandleOp { message } => {
                 SanityCheckError::owned(
-                    EXECUTION_ERROR_CODE,
+                    SIMULATION_ERROR_CODE,
                     message,
                     None::<bool>,
                 )
@@ -275,28 +275,54 @@ impl<M: Middleware + 'static> UoPool<M> {
         &self,
         user_operation: &UserOperation,
     ) -> Result<(), BadUserOperationError<M>> {
-        let call_gas_estimation = self
+        let execution_result = self
             .entry_point
-            .estimate_call_gas(user_operation.clone())
+            .simulate_handle_op(user_operation.clone())
             .await
             .map_err(|entry_point_error| match entry_point_error {
-                EntryPointErr::FailedOp(failed_op) => {
-                    BadUserOperationError::UserOperationExecution {
-                        message: format!("{}", failed_op.reason),
-                    }
-                }
+                EntryPointErr::FailedOp(failed_op) => BadUserOperationError::SimulateHandleOp {
+                    message: format!("{}", failed_op.reason),
+                },
                 _ => BadUserOperationError::UnknownError {
                     error: "unknown error".to_string(),
                 },
-            },)?;
+            })?;
 
-        if user_operation.call_gas_limit >= call_gas_estimation {
+        let block = self
+            .eth_provider
+            .get_block(BlockNumber::Latest)
+            .await
+            .map_err(|error| BadUserOperationError::Middleware(error))?;
+
+        let base_fee_per_gas = if let Some(block) = block {
+            if let Some(base_fee_per_gas) = block.base_fee_per_gas {
+                base_fee_per_gas
+            } else {
+                return Err(BadUserOperationError::UnknownError {
+                    error: "Can't get base fee per gas".to_string(),
+                });
+            }
+        } else {
+            return Err(BadUserOperationError::UnknownError {
+                error: "Can't get base fee per gas".to_string(),
+            });
+        };
+
+        let call_gas_limit_estimation = calculate_call_gas_limit(
+            execution_result.paid,
+            execution_result.pre_op_gas,
+            user_operation
+                .max_fee_per_gas
+                .min(user_operation.max_priority_fee_per_gas + base_fee_per_gas),
+        );
+
+        if user_operation.call_gas_limit >= call_gas_limit_estimation {
             return Ok(());
         }
 
         Err(BadUserOperationError::LowCallGasLimit {
             call_gas_limit: user_operation.call_gas_limit,
-            call_gas_estimation,
+            call_gas_limit_estimation,
         })
     }
 
@@ -433,11 +459,11 @@ impl<M: Middleware + 'static> UoPool<M> {
         // The paymasterAndData is either empty, or start with the paymaster address, which is a contract that (i) currently has nonempty code on chain, (ii) has a sufficient deposit to pay for the UserOperation, and (iii) is not currently banned. During simulation, the paymaster's stake is also checked, depending on its storage usage - see reputation, throttling and banning section for details.
         self.verify_paymaster(user_operation).await?;
 
-        // The callgas is at least the cost of a CALL with non-zero value.
-        self.call_gas_limit(user_operation).await?;
-
         // The maxFeePerGas and maxPriorityFeePerGas are above a configurable minimum value that the client is willing to accept. At the minimum, they are sufficiently high to be included with the current block.basefee.
         self.max_fee_per_gas(user_operation).await?;
+
+        // The callgas is at least the cost of a CALL with non-zero value.
+        self.call_gas_limit(user_operation).await?;
 
         // The sender doesn't have another UserOperation already present in the pool (or it replaces an existing entry with the same sender and nonce, with a higher maxPriorityFeePerGas and an equally increased maxFeePerGas). Only one UserOperation per sender may be included in a single batch. A sender is exempt from this rule and may have multiple UserOperations in the pool and in a batch if it is staked (see reputation, throttling and banning section below), but this exception is of limited use to normal accounts.
         let user_operation_prev_hash = self.verify_sender(user_operation).await?;

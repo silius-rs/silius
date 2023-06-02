@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use crate::gen::ExecutionResult;
+
 use super::gen::entry_point_api::{
     EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult,
     ValidationResultWithAggregation,
@@ -13,11 +15,10 @@ use ethers::prelude::{ContractError, Event};
 use ethers::providers::{Middleware, ProviderError};
 use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-    GethTrace, TransactionRequest, U256,
+    GethTrace, TransactionRequest,
 };
 use ethers_providers::{JsonRpcError, MiddlewareError};
 use thiserror::Error;
-use tracing::trace;
 
 pub struct EntryPoint<M: Middleware> {
     provider: Arc<M>,
@@ -193,31 +194,48 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         }
     }
 
-    pub async fn estimate_call_gas<U: Into<UserOperation>>(
+    pub async fn simulate_execution<U: Into<UserOperation>>(
         &self,
         user_operation: U,
-    ) -> Result<U256, EntryPointErr> {
-        let user_operation = user_operation.into();
+    ) -> Result<(), EntryPointErr> {
+        let user_operation: UserOperation = user_operation.into();
+        let result = self
+            .provider
+            .call(
+                &TransactionRequest::new()
+                    .from(self.address)
+                    .to(user_operation.sender)
+                    .data(user_operation.call_data.clone())
+                    .into(),
+                None,
+            )
+            .await;
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(EntryPointErr::from_middleware_err::<M>(e)),
+        }
+    }
 
-        if user_operation.call_data.is_empty() {
-            Ok(U256::zero())
-        } else {
-            let result = self
-                .provider
-                .estimate_gas(
-                    &TransactionRequest::new()
-                        .from(self.address)
-                        .to(user_operation.sender)
-                        .data(user_operation.call_data.clone())
-                        .into(),
-                    None,
-                )
-                .await;
-            trace!("Estimate call gas on {user_operation:?} returned {result:?}");
-            match result {
-                Ok(gas) => Ok(gas),
-                Err(e) => Err(EntryPointErr::from_middleware_err::<M>(e)),
-            }
+    pub async fn simulate_handle_op<U: Into<UserOperation>>(
+        &self,
+        user_operation: U,
+    ) -> Result<ExecutionResult, EntryPointErr> {
+        let request_result = self
+            .entry_point_api
+            .simulate_handle_op(user_operation.into(), Address::zero(), Bytes::default())
+            .await;
+
+        match request_result {
+            Ok(_) => Err(EntryPointErr::UnknownErr(
+                "Simulate handle op should expect revert".to_string(),
+            )),
+            Err(e) => Self::deserialize_error_msg(e).and_then(|op| match op {
+                EntryPointAPIErrors::FailedOp(failed_op) => Err(EntryPointErr::FailedOp(failed_op)),
+                EntryPointAPIErrors::ExecutionResult(res) => Ok(res),
+                _ => Err(EntryPointErr::UnknownErr(format!(
+                    "Simulate handle op with invalid error: {op:?}"
+                ))),
+            }),
         }
     }
 

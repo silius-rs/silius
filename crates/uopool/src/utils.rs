@@ -82,6 +82,10 @@ pub fn calculate_valid_gas(gas_price: U256, gas_increase_perc: U256) -> U256 {
     U256::from((gas_price * (1.0 + gas_increase_perc / 100.0)).ceil() as u64)
 }
 
+pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
+    paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
+}
+
 #[cfg(test)]
 pub mod tests {
     use std::{fmt::Debug, str::FromStr};
