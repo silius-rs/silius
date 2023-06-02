@@ -525,9 +525,7 @@ mod tests {
         );
 
         let max_priority_fee_per_gas = U256::from(1500000000_u64);
-        let block = eth_provider
-            .get_block(BlockNumber::Latest)
-            .await.unwrap();
+        let block = eth_provider.get_block(BlockNumber::Latest).await.unwrap();
         let base_fee_per_gas = block.unwrap().base_fee_per_gas.unwrap();
         let max_fee_per_gas = max_priority_fee_per_gas + base_fee_per_gas;
 
