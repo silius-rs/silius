@@ -276,7 +276,7 @@ impl EntryPointErr {
             return EntryPointErr::from_provider_err(provider_err);
         }
 
-        EntryPointErr::UnknownErr(format!("Unknown middlerware error: {value:?}"))
+        EntryPointErr::UnknownErr(format!("Unknown middleware error: {value:?}"))
     }
 }
 

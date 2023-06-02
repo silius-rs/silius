@@ -1,3 +1,4 @@
+use aa_bundler_contracts::EntryPointErr;
 use aa_bundler_primitives::{
     ReputationStatus, SanityCheckError, StakeInfo, UserOperation, UserOperationHash,
     EXECUTION_ERROR_CODE, SANITY_CHECK_ERROR_CODE,
@@ -278,9 +279,16 @@ impl<M: Middleware + 'static> UoPool<M> {
             .entry_point
             .estimate_call_gas(user_operation.clone())
             .await
-            .map_err(|error| BadUserOperationError::UnknownError {
-                error: format!("{error:?}"),
-            })?;
+            .map_err(|entry_point_error| match entry_point_error {
+                EntryPointErr::FailedOp(failed_op) => {
+                    BadUserOperationError::UserOperationExecution {
+                        message: format!("{}", failed_op.reason),
+                    }
+                }
+                _ => BadUserOperationError::UnknownError {
+                    error: "unknown error".to_string(),
+                },
+            },)?;
 
         if user_operation.call_gas_limit >= call_gas_estimation {
             return Ok(());

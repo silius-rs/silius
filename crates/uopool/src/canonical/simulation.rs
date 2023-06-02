@@ -168,7 +168,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             Err(entry_point_error) => match entry_point_error {
                 EntryPointErr::FailedOp(failed_op) => {
                     Err(SimulateValidationError::UserOperationRejected {
-                        message: format!("{failed_op}"),
+                        message: format!("{}", failed_op.reason),
                     })
                 }
                 _ => Err(SimulateValidationError::UserOperationRejected {
@@ -191,7 +191,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             Err(entry_point_error) => match entry_point_error {
                 EntryPointErr::FailedOp(failed_op) => {
                     Err(SimulateValidationError::UserOperationRejected {
-                        message: format!("{failed_op}"),
+                        message: format!("{}", failed_op.reason),
                     })
                 }
                 _ => Err(SimulateValidationError::UserOperationRejected {
