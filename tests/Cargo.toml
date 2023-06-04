@@ -14,6 +14,7 @@ rust-version = "1.69.0"
 [dev-dependencies]
 aa-bundler-contracts = { path = "../crates/contracts" }
 aa-bundler-primitives = { path = "../crates/primitives" }
+aa-bundler-uopool = { path = "../crates/uopool" }
 
 anyhow = "1"
 ethers = { workspace = true }

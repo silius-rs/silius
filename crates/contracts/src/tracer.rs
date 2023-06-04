@@ -30,6 +30,7 @@ pub struct Level {
     pub opcodes: HashMap<String, u64>,
     #[serde(rename = "contractSize")]
     pub contract_size: HashMap<Address, u64>,
+    pub oog: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

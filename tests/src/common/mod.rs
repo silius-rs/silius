@@ -13,8 +13,9 @@ use ethers::{
 use tempdir::TempDir;
 
 use self::gen::{
-    EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRecursionAccount,
-    TestRulesAccountFactory, TestStorageAccount, TestStorageAccountFactory, TracerTest,
+    EntryPointContract, TestCoin, TestOpcodesAccount, TestOpcodesAccountFactory,
+    TestRecursionAccount, TestRulesAccountFactory, TestStorageAccount, TestStorageAccountFactory,
+    TracerTest,
 };
 pub mod gen;
 
@@ -67,8 +68,9 @@ pub async fn deploy_test_opcode_account_factory<M: Middleware + 'static>(
 
 pub async fn deploy_test_storage_account_factory<M: Middleware + 'static>(
     client: Arc<M>,
+    test_coin_addr: Address,
 ) -> anyhow::Result<DeployedContract<TestStorageAccountFactory<M>>> {
-    let (factory, receipt) = TestStorageAccountFactory::deploy(client, ())?
+    let (factory, receipt) = TestStorageAccountFactory::deploy(client, test_coin_addr)?
         .send_with_receipt()
         .await?;
     let address = receipt.contract_address.unwrap();
@@ -110,6 +112,14 @@ pub async fn deploy_tracer_test<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TracerTest<M>>> {
     let (factory, receipt) = TracerTest::deploy(client, ())?.send_with_receipt().await?;
+    let address = receipt.contract_address.unwrap();
+    Ok(DeployedContract::new(factory, address))
+}
+
+pub async fn deploy_test_coin<M: Middleware + 'static>(
+    client: Arc<M>,
+) -> anyhow::Result<DeployedContract<TestCoin<M>>> {
+    let (factory, receipt) = TestCoin::deploy(client, ())?.send_with_receipt().await?;
     let address = receipt.contract_address.unwrap();
     Ok(DeployedContract::new(factory, address))
 }
