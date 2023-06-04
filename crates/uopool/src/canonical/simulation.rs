@@ -5,7 +5,7 @@ use aa_bundler_contracts::{
 use aa_bundler_primitives::{
     CodeHash, SimulationError, StakeInfo, UoPoolMode, UserOperation, EXECUTION_ERROR_CODE,
     EXPIRATION_TIMESTAMP_DIFF, OPCODE_VALIDATION_ERROR_CODE, SIGNATURE_FAILED_ERROR_CODE,
-    SIMULATE_VALIDATION_ERROR_CODE, TIMESTAMP_VALIDATION_ERROR_CODE,
+    SIMULATION_ERROR_CODE, TIMESTAMP_VALIDATION_ERROR_CODE,
 };
 use ethers::{
     abi::AbiDecode,
@@ -119,7 +119,7 @@ impl From<SimulateValidationError> for SimulationError {
                 },
             ),
             SimulateValidationError::UserOperationRejected { message } => {
-                SimulationError::owned(SIMULATE_VALIDATION_ERROR_CODE, message, None::<bool>)
+                SimulationError::owned(SIMULATION_ERROR_CODE, message, None::<bool>)
             }
             SimulateValidationError::OpcodeValidation { entity, opcode } => SimulationError::owned(
                 OPCODE_VALIDATION_ERROR_CODE,
@@ -168,7 +168,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             Err(entry_point_error) => match entry_point_error {
                 EntryPointErr::FailedOp(failed_op) => {
                     Err(SimulateValidationError::UserOperationRejected {
-                        message: format!("{failed_op}"),
+                        message: failed_op.reason,
                     })
                 }
                 _ => Err(SimulateValidationError::UserOperationRejected {
@@ -191,7 +191,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             Err(entry_point_error) => match entry_point_error {
                 EntryPointErr::FailedOp(failed_op) => {
                     Err(SimulateValidationError::UserOperationRejected {
-                        message: format!("{failed_op}"),
+                        message: failed_op.reason,
                     })
                 }
                 _ => Err(SimulateValidationError::UserOperationRejected {

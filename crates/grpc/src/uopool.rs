@@ -15,8 +15,8 @@ use aa_bundler_primitives::{
     THROTTLING_SLACK,
 };
 use aa_bundler_uopool::{
-    canonical::simulation::SimulateValidationError, mempool_id, MemoryMempool, MemoryReputation,
-    MempoolId, Overhead, Reputation, UoPool as UserOperationPool,
+    calculate_call_gas_limit, canonical::simulation::SimulateValidationError, mempool_id,
+    MemoryMempool, MemoryReputation, MempoolId, Overhead, Reputation, UoPool as UserOperationPool,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -25,7 +25,7 @@ use dashmap::DashMap;
 use ethers::{
     prelude::LogMeta,
     providers::{Http, Middleware, Provider},
-    types::{Address, H256, U256, U64},
+    types::{Address, BlockNumber, H256, U256, U64},
 };
 use tonic::Response;
 use tracing::{debug, info, trace, warn};
@@ -297,10 +297,64 @@ where
 
                     match uopool
                         .entry_point
-                        .estimate_call_gas(user_operation.clone())
+                        .simulate_execution(user_operation.clone())
                         .await
                     {
-                        Ok(call_gas_limit) => {
+                        Ok(_) => {}
+                        Err(error) => {
+                            res.set_result(EstimateUserOperationGasResult::NotEstimated);
+                            res.data = serde_json::to_string(&SimulationError::from(match error {
+                                EntryPointErr::JsonRpcError(err) => {
+                                    SimulateValidationError::UserOperationExecution {
+                                        message: err.message,
+                                    }
+                                }
+                                _ => SimulateValidationError::UnknownError {
+                                    error: format!("{error:?}"),
+                                },
+                            }))
+                            .map_err(|_| {
+                                tonic::Status::internal("error estimating user operation gas")
+                            })?;
+                            return Ok(tonic::Response::new(res));
+                        }
+                    }
+
+                    match uopool
+                        .entry_point
+                        .simulate_handle_op(user_operation.clone())
+                        .await
+                    {
+                        Ok(execution_result) => {
+                            let block = self
+                                .eth_provider
+                                .get_block(BlockNumber::Latest)
+                                .await
+                                .map_err(|_| {
+                                    tonic::Status::internal("error estimating user operation gas")
+                                })?;
+
+                            let base_fee_per_gas = if let Some(block) = block {
+                                if let Some(base_fee_per_gas) = block.base_fee_per_gas {
+                                    base_fee_per_gas
+                                } else {
+                                    return Err(tonic::Status::internal(
+                                        "error estimating user operation gas",
+                                    ));
+                                }
+                            } else {
+                                return Err(tonic::Status::internal(
+                                    "error estimating user operation gas",
+                                ));
+                            };
+
+                            let call_gas_limit = calculate_call_gas_limit(
+                                execution_result.paid,
+                                execution_result.pre_op_gas,
+                                user_operation.max_fee_per_gas.min(
+                                    user_operation.max_priority_fee_per_gas + base_fee_per_gas,
+                                ),
+                            );
                             res.set_result(EstimateUserOperationGasResult::Estimated);
                             res.data = serde_json::to_string(&UserOperationGasEstimation {
                                 pre_verification_gas,
