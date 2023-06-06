@@ -38,6 +38,7 @@ dependencies = [
  "aa-bundler-primitives",
  "anyhow",
  "ethers",
+ "tracing",
 ]
 
 [[package]]
@@ -118,7 +119,6 @@ dependencies = [
  "jsonrpsee",
  "serde_json",
  "tonic",
- "tracing",
 ]
 
 [[package]]
@@ -151,6 +151,7 @@ dependencies = [
  "serde_json",
  "tempdir",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

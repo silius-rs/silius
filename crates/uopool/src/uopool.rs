@@ -1,9 +1,10 @@
 use crate::{
     canonical::{sanity_check::SanityCheckResult, simulation::SimulationResult},
     mempool::MempoolBox,
+    mempool_id,
     reputation::ReputationBox,
     utils::calculate_call_gas_limit,
-    Overhead,
+    MempoolId, Overhead,
 };
 use aa_bundler_contracts::{
     entry_point::{EntryPointAPIEvents, EntryPointErr, UserOperationEventFilter},
@@ -29,6 +30,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+use tracing::trace;
 
 type VecUo = Vec<UserOperation>;
 type VecCh = Vec<CodeHash>;
@@ -42,6 +44,7 @@ pub struct VerificationResult {
 }
 
 pub struct UoPool<M: Middleware> {
+    pub id: MempoolId,
     pub entry_point: EntryPoint<M>,
     pub mempool: MempoolBox<VecUo, VecCh>,
     pub reputation: ReputationBox<Vec<ReputationEntry>>,
@@ -65,6 +68,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         mode: UoPoolMode,
     ) -> Self {
         Self {
+            id: mempool_id(&entry_point.address(), &chain.id().into()),
             entry_point,
             mempool,
             reputation,
@@ -111,15 +115,18 @@ impl<M: Middleware + 'static> UoPool<M> {
             self.remove_user_operation(&uo_hash);
         }
 
-        match self
-            .mempool
-            .add(uo, &self.entry_point.address(), &self.chain.id().into())
-        {
+        match self.mempool.add(
+            uo.clone(),
+            &self.entry_point.address(),
+            &self.chain.id().into(),
+        ) {
             Ok(uo_hash) => {
                 // TODO: find better way to do it atomically
                 let _ = self
                     .mempool
                     .set_code_hashes(&uo_hash, &res.simulation_result.code_hashes);
+
+                trace!("User operation {uo:?} added to the mempool {}", self.id);
 
                 // TODO: update reputation
                 Ok(uo_hash)

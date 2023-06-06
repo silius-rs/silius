@@ -25,6 +25,7 @@ reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb
 serde = "1"
 serde_json = "1"
 tokio = { version = "1.18", features = ["full"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
 aa-bundler-primitives = { path = "../primitives", features = ["test-utils"] }
