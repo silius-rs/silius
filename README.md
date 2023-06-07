@@ -62,6 +62,10 @@ Bundler was tested on the following networks:
 | :--------: | :-------: | :-------:                                     |
 | Ethereum   | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
 
+## Examples
+
+To get started, check the examples [here](./examples/). More examples will be added in the future.
+
 ## Contributing
 
 Thank you for showing interest in contributing to the project!

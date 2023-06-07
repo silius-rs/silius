@@ -1,11 +1,16 @@
+use aa_bundler::{
+    cli::{BundlerServiceOpts, UoPoolServiceOpts},
+    utils::{parse_address, parse_u256},
+};
 use aa_bundler_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
-    uopool_service_run, BundlerServiceOpts, UoPoolServiceOpts,
+    uopool_service_run,
 };
-use aa_bundler_primitives::{parse_address, parse_u256, Chain, Wallet, SUPPORTED_CHAINS};
+use aa_bundler_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
 use aa_bundler_rpc::{
-    DebugApiServer, DebugApiServerImpl, EthApiServer, EthApiServerImpl, Web3ApiServer,
-    Web3ApiServerImpl,
+    debug_api::{DebugApiServer, DebugApiServerImpl},
+    eth_api::{EthApiServer, EthApiServerImpl},
+    web3_api::{Web3ApiServer, Web3ApiServerImpl},
 };
 use anyhow::{format_err, Result};
 use clap::Parser;
@@ -14,8 +19,9 @@ use ethers::{
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
-use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder, tracing::info};
+use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder};
 use std::{collections::HashSet, future::pending, panic, sync::Arc};
+use tracing::info;
 
 #[derive(Parser)]
 #[clap(
@@ -95,7 +101,7 @@ fn main() -> Result<()> {
                     }
                 }
 
-                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), chain_id)
+                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id)
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
                 info!("{:?}", wallet.signer);
 
@@ -105,11 +111,15 @@ fn main() -> Result<()> {
                 if !opt.no_uopool {
                     info!("Starting uopool gRPC service...");
                     uopool_service_run(
-                        opt.uopool_opts,
+                        opt.uopool_opts.uopool_grpc_listen_address,
                         opt.entry_points.clone(),
                         eth_provider,
                         chain,
                         opt.max_verification_gas,
+                        opt.uopool_opts.min_stake,
+                        opt.uopool_opts.min_unstake_delay,
+                        opt.uopool_opts.min_priority_fee_per_gas,
+                        opt.uopool_opts.uo_pool_mode,
                     )
                     .await?;
                     info!(
@@ -128,11 +138,15 @@ fn main() -> Result<()> {
 
                 info!("Starting bundler gRPC service...");
                 bundler_service_run(
-                    opt.bundler_opts,
+                    opt.bundler_opts.bundler_grpc_listen_address,
                     wallet,
                     opt.entry_points,
-                    chain,
                     opt.eth_client_address,
+                    chain,
+                    opt.bundler_opts.beneficiary,
+                    opt.bundler_opts.gas_factor,
+                    opt.bundler_opts.min_balance,
+                    opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),
                 );
                 info!(
@@ -158,7 +172,6 @@ fn main() -> Result<()> {
                             if rpc_api.contains("eth") {
                                 api.merge(
                                     EthApiServerImpl {
-                                        call_gas_limit: 100_000_000,
                                         uopool_grpc_client: uopool_grpc_client.clone(),
                                     }
                                     .into_rpc(),

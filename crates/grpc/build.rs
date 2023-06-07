@@ -13,7 +13,7 @@ fn make_protos(protos: &[&str]) {
         .server_mod_attribute("bundler", r#"#[allow(clippy::unwrap_used)]"#)
         .file_descriptor_set_path(out_dir.join("descriptor.bin"))
         .compile_with_config(config(), protos, &["./src/protos"])
-        .expect("Failed to compile protos");
+        .expect("Failed to compile protos.");
 }
 
 fn main() {

@@ -1,15 +1,14 @@
-use std::fmt::Display;
-use std::sync::Arc;
-
-use crate::gen::ExecutionResult;
-
 use super::gen::entry_point_api::{
     EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult,
     ValidationResultWithAggregation,
 };
 use super::gen::stake_manager_api::DepositInfo;
-use super::gen::{EntryPointAPI, EntryPointAPIEvents, StakeManagerAPI};
+pub use super::gen::{
+    EntryPointAPI, EntryPointAPIEvents, StakeManagerAPI, UserOperationEventFilter,
+    ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
+};
 use super::tracer::JS_TRACER;
+use crate::gen::ExecutionResult;
 use ethers::abi::AbiDecode;
 use ethers::prelude::{ContractError, Event};
 use ethers::providers::{Middleware, ProviderError};
@@ -18,21 +17,29 @@ use ethers::types::{
     GethTrace, TransactionRequest,
 };
 use ethers_providers::{JsonRpcError, MiddlewareError};
+use std::fmt::Display;
+use std::sync::Arc;
 use thiserror::Error;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SimulateValidationResult {
+    ValidationResult(ValidationResult),
+    ValidationResultWithAggregation(ValidationResultWithAggregation),
+}
+
 pub struct EntryPoint<M: Middleware> {
-    provider: Arc<M>,
+    eth_provider: Arc<M>,
     address: Address,
     entry_point_api: EntryPointAPI<M>,
     stake_manager_api: StakeManagerAPI<M>,
 }
 
 impl<M: Middleware + 'static> EntryPoint<M> {
-    pub fn new(provider: Arc<M>, address: Address) -> Self {
-        let entry_point_api = EntryPointAPI::new(address, provider.clone());
-        let stake_manager_api = StakeManagerAPI::new(address, provider.clone());
+    pub fn new(eth_provider: Arc<M>, address: Address) -> Self {
+        let entry_point_api = EntryPointAPI::new(address, eth_provider.clone());
+        let stake_manager_api = StakeManagerAPI::new(address, eth_provider.clone());
         Self {
-            provider,
+            eth_provider,
             address,
             entry_point_api,
             stake_manager_api,
@@ -48,7 +55,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     }
 
     pub fn provider(&self) -> Arc<M> {
-        self.provider.clone()
+        self.eth_provider.clone()
     }
 
     pub fn address(&self) -> Address {
@@ -80,18 +87,16 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub async fn simulate_validation<U: Into<UserOperation>>(
         &self,
-        user_operation: U,
+        uo: U,
     ) -> Result<SimulateValidationResult, EntryPointErr> {
-        let request_result = self
-            .entry_point_api
-            .simulate_validation(user_operation.into())
-            .await;
-        match request_result {
+        let res = self.entry_point_api.simulate_validation(uo.into()).await;
+
+        match res {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Simulate validation should expect revert".to_string(),
             )),
             Err(e) => Self::deserialize_error_msg(e).and_then(|op| match op {
-                EntryPointAPIErrors::FailedOp(failed_op) => Err(EntryPointErr::FailedOp(failed_op)),
+                EntryPointAPIErrors::FailedOp(err) => Err(EntryPointErr::FailedOp(err)),
                 EntryPointAPIErrors::ValidationResult(res) => {
                     Ok(SimulateValidationResult::ValidationResult(res))
                 }
@@ -107,13 +112,12 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub async fn simulate_validation_trace<U: Into<UserOperation>>(
         &self,
-        user_operation: U,
+        uo: U,
     ) -> Result<GethTrace, EntryPointErr> {
-        let call = self
-            .entry_point_api
-            .simulate_validation(user_operation.into());
-        let request_result = self
-            .provider
+        let call = self.entry_point_api.simulate_validation(uo.into());
+
+        let res = self
+            .eth_provider
             .debug_trace_call(
                 call.tx,
                 None,
@@ -131,23 +135,22 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             )
             .await
             .map_err(|e| EntryPointErr::from_middleware_err::<M>(e))?;
-        Ok(request_result)
+
+        Ok(res)
     }
 
     pub async fn handle_ops<U: Into<UserOperation>>(
         &self,
-        ops: Vec<U>,
+        uos: Vec<U>,
         beneficiary: Address,
     ) -> Result<(), EntryPointErr> {
         self.entry_point_api
-            .handle_ops(ops.into_iter().map(|u| u.into()).collect(), beneficiary)
+            .handle_ops(uos.into_iter().map(|u| u.into()).collect(), beneficiary)
             .call()
             .await
             .or_else(|e| {
                 Self::deserialize_error_msg(e).and_then(|op| match op {
-                    EntryPointAPIErrors::FailedOp(failed_op) => {
-                        Err(EntryPointErr::FailedOp(failed_op))
-                    }
+                    EntryPointAPIErrors::FailedOp(err) => Err(EntryPointErr::FailedOp(err)),
                     _ => Err(EntryPointErr::UnknownErr(format!(
                         "Handle ops with invalid error: {op:?}"
                     ))),
@@ -155,14 +158,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             })
     }
 
-    pub async fn get_deposit_info(&self, address: &Address) -> Result<DepositInfo, EntryPointErr> {
-        let result = self
-            .stake_manager_api
-            .get_deposit_info(*address)
-            .call()
-            .await;
+    pub async fn get_deposit_info(&self, addr: &Address) -> Result<DepositInfo, EntryPointErr> {
+        let res = self.stake_manager_api.get_deposit_info(*addr).call().await;
 
-        match result {
+        match res {
             Ok(deposit_info) => Ok(deposit_info),
             _ => Err(EntryPointErr::UnknownErr(
                 "Error calling get deposit info".to_string(),
@@ -172,21 +171,21 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub async fn get_sender_address(
         &self,
-        initcode: Bytes,
+        init_code: Bytes,
     ) -> Result<SenderAddressResult, EntryPointErr> {
-        let result = self
+        let res = self
             .entry_point_api
-            .get_sender_address(initcode)
+            .get_sender_address(init_code)
             .call()
             .await;
 
-        match result {
+        match res {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Get sender address should expect revert".to_string(),
             )),
             Err(e) => Self::deserialize_error_msg(e).and_then(|op| match op {
                 EntryPointAPIErrors::SenderAddressResult(res) => Ok(res),
-                EntryPointAPIErrors::FailedOp(failed_op) => Err(EntryPointErr::FailedOp(failed_op)),
+                EntryPointAPIErrors::FailedOp(err) => Err(EntryPointErr::FailedOp(err)),
                 _ => Err(EntryPointErr::UnknownErr(format!(
                     "Simulate validation with invalid error: {op:?}"
                 ))),
@@ -196,21 +195,23 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub async fn simulate_execution<U: Into<UserOperation>>(
         &self,
-        user_operation: U,
+        uo: U,
     ) -> Result<(), EntryPointErr> {
-        let user_operation: UserOperation = user_operation.into();
-        let result = self
-            .provider
+        let uo: UserOperation = uo.into();
+
+        let res = self
+            .eth_provider
             .call(
                 &TransactionRequest::new()
                     .from(self.address)
-                    .to(user_operation.sender)
-                    .data(user_operation.call_data.clone())
+                    .to(uo.sender)
+                    .data(uo.call_data.clone())
                     .into(),
                 None,
             )
             .await;
-        match result {
+
+        match res {
             Ok(_) => Ok(()),
             Err(e) => Err(EntryPointErr::from_middleware_err::<M>(e)),
         }
@@ -218,19 +219,19 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub async fn simulate_handle_op<U: Into<UserOperation>>(
         &self,
-        user_operation: U,
+        uo: U,
     ) -> Result<ExecutionResult, EntryPointErr> {
-        let request_result = self
+        let res = self
             .entry_point_api
-            .simulate_handle_op(user_operation.into(), Address::zero(), Bytes::default())
+            .simulate_handle_op(uo.into(), Address::zero(), Bytes::default())
             .await;
 
-        match request_result {
+        match res {
             Ok(_) => Err(EntryPointErr::UnknownErr(
                 "Simulate handle op should expect revert".to_string(),
             )),
             Err(e) => Self::deserialize_error_msg(e).and_then(|op| match op {
-                EntryPointAPIErrors::FailedOp(failed_op) => Err(EntryPointErr::FailedOp(failed_op)),
+                EntryPointAPIErrors::FailedOp(err) => Err(EntryPointErr::FailedOp(err)),
                 EntryPointAPIErrors::ExecutionResult(res) => Ok(res),
                 _ => Err(EntryPointErr::UnknownErr(format!(
                     "Simulate handle op with invalid error: {op:?}"
@@ -241,7 +242,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
     pub async fn handle_aggregated_ops<U: Into<UserOperation>>(
         &self,
-        _ops_per_aggregator: Vec<U>,
+        _uos_per_aggregator: Vec<U>,
         _beneficiary: Address,
     ) -> Result<(), EntryPointErr> {
         todo!()
@@ -270,97 +271,82 @@ impl From<ProviderError> for EntryPointErr {
 }
 
 impl EntryPointErr {
-    fn from_provider_err(e: &ProviderError) -> Self {
-        match e {
+    fn from_provider_err(err: &ProviderError) -> Self {
+        match err {
             ProviderError::JsonRpcClientError(err) => err
                 .as_error_response()
                 .map(|e| EntryPointErr::JsonRpcError(e.clone()))
                 .unwrap_or(EntryPointErr::UnknownErr(format!(
-                    "Unknown json rpc client error: {err:?}"
+                    "Unknown JSON-RPC client error: {err:?}"
                 ))),
             ProviderError::HTTPError(err) => {
-                EntryPointErr::NetworkErr(format!("Entrypoint HTTP error: {err:?}"))
+                EntryPointErr::NetworkErr(format!("Entry point HTTP error: {err:?}"))
             }
-            _ => EntryPointErr::UnknownErr(format!("Unknown error in provider: {e:?}")),
+            _ => EntryPointErr::UnknownErr(format!("Unknown error in provider: {err:?}")),
         }
     }
 
-    fn from_middleware_err<M: Middleware>(value: M::Error) -> Self {
-        if let Some(json_err) = value.as_error_response() {
-            return EntryPointErr::JsonRpcError(json_err.clone());
+    fn from_middleware_err<M: Middleware>(err: M::Error) -> Self {
+        if let Some(err) = err.as_error_response() {
+            return EntryPointErr::JsonRpcError(err.clone());
         }
 
-        if let Some(provider_err) = value.as_provider_error() {
-            return EntryPointErr::from_provider_err(provider_err);
+        if let Some(err) = err.as_provider_error() {
+            return EntryPointErr::from_provider_err(err);
         }
 
-        EntryPointErr::UnknownErr(format!("Unknown middleware error: {value:?}"))
+        EntryPointErr::UnknownErr(format!("Unknown middleware error: {err:?}"))
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SimulateValidationResult {
-    ValidationResult(ValidationResult),
-    ValidationResultWithAggregation(ValidationResultWithAggregation),
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use aa_bundler_primitives::UserOperation;
     use ethers::{
         providers::{Http, Middleware, Provider},
-        types::{Address, Bytes, GethTrace, U256},
+        types::{Bytes, GethTrace, U256},
     };
-
-    use aa_bundler_primitives::UserOperation;
-
-    use super::*;
-    use std::{str::FromStr, sync::Arc};
+    use std::sync::Arc;
 
     #[tokio::test]
     #[ignore]
     async fn simulate_validation() {
         let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
-        let entry_point = EntryPoint::<Provider<Http>>::new(
+        let ep = EntryPoint::<Provider<Http>>::new(
             eth_provider.clone(),
-            Address::from_str("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789").unwrap(),
+            "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                .parse()
+                .unwrap(),
         );
 
-        let max_priority_fee_per_gas = U256::from(1500000000_u64);
+        let max_priority_fee_per_gas = 1500000000_u64.into();
         let max_fee_per_gas =
             max_priority_fee_per_gas + eth_provider.get_gas_price().await.unwrap();
 
-        let user_operation = UserOperation {
+        let uo = UserOperation {
             sender: "0xBBe6a3230Ef8abC44EF61B3fBf93Cd0394D1d21f".parse().unwrap(),
             nonce: U256::zero(),
-            init_code: Bytes::from_str("0xed886f2d1bbb38b4914e8c545471216a40cce9385fbfb9cf000000000000000000000000ae72a48c1a36bd18af168541c53037965d26e4a80000000000000000000000000000000000000000000000000000018661be6ed7").unwrap(),
-            call_data: Bytes::from_str("0xb61d27f6000000000000000000000000bbe6a3230ef8abc44ef61b3fbf93cd0394d1d21f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004affed0e000000000000000000000000000000000000000000000000000000000").unwrap(),
-            call_gas_limit: U256::from(22016),
-            verification_gas_limit: U256::from(413910),
-            pre_verification_gas: U256::from(48480),
+            init_code: "0xed886f2d1bbb38b4914e8c545471216a40cce9385fbfb9cf000000000000000000000000ae72a48c1a36bd18af168541c53037965d26e4a80000000000000000000000000000000000000000000000000000018661be6ed7".parse().unwrap(),
+            call_data: "0xb61d27f6000000000000000000000000bbe6a3230ef8abc44ef61b3fbf93cd0394d1d21f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004affed0e000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+            call_gas_limit: 22016.into(),
+            verification_gas_limit: 413910.into(),
+            pre_verification_gas: 48480.into(),
             max_fee_per_gas,
             max_priority_fee_per_gas,
             paymaster_and_data: Bytes::default(),
-            signature: Bytes::from_str("0xeb99f2f72c16b3eb5bdeadb243dd38a6e54771f1dd9b3d1d08e99e3e0840717331e6c8c83457c6c33daa3aa30a238197dbf7ea1f17d02aa57c3fa9e9ce3dc1731c").unwrap(),
+            signature: "0xeb99f2f72c16b3eb5bdeadb243dd38a6e54771f1dd9b3d1d08e99e3e0840717331e6c8c83457c6c33daa3aa30a238197dbf7ea1f17d02aa57c3fa9e9ce3dc1731c".parse().unwrap(),
         };
 
-        let simulate_validation = entry_point
-            .simulate_validation(user_operation.clone())
-            .await
-            .unwrap();
+        let res = ep.simulate_validation(uo.clone()).await.unwrap();
 
         assert!(matches!(
-            simulate_validation,
+            res,
             SimulateValidationResult::ValidationResult { .. },
         ));
 
-        let simulate_validation_trace = entry_point
-            .simulate_validation_trace(user_operation)
-            .await
-            .unwrap();
+        let trace = ep.simulate_validation_trace(uo).await.unwrap();
 
-        assert!(matches!(
-            simulate_validation_trace,
-            GethTrace::Unknown { .. },
-        ));
+        assert!(matches!(trace, GethTrace::Unknown { .. },));
     }
 }

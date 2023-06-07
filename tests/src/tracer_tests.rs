@@ -1,6 +1,9 @@
-use std::{ops::Deref, str::FromStr, sync::Arc};
-
-use aa_bundler_contracts::{JsTracerFrame, JS_TRACER};
+use crate::common::{
+    deploy_tracer_test,
+    gen::{ExecSelfResultFilter, TracerTest},
+    setup_geth, ClientType, DeployedContract,
+};
+use aa_bundler_contracts::tracer::{JsTracerFrame, JS_TRACER};
 use ethers::{
     abi::{RawLog, Token},
     contract::EthLogDecode,
@@ -12,12 +15,7 @@ use ethers::{
     },
     utils::GethInstance,
 };
-
-use crate::common::{
-    deploy_tracer_test,
-    gen::{ExecSelfResultFilter, TracerTest},
-    setup_geth, ClientType, DeployedContract,
-};
+use std::{ops::Deref, str::FromStr, sync::Arc};
 
 struct Context<M> {
     _geth: GethInstance,
@@ -38,13 +36,13 @@ async fn setup() -> anyhow::Result<Context<ClientType>> {
 }
 
 async fn trace_call<M: Middleware + 'static>(
-    context: &Context<M>,
-    function_data: Bytes,
+    c: &Context<M>,
+    func_data: Bytes,
 ) -> anyhow::Result<JsTracerFrame> {
     let req = TransactionRequest::new()
-        .to(context.tracer_test.address)
-        .data(function_data);
-    let res = context
+        .to(c.tracer_test.address)
+        .data(func_data);
+    let res = c
         .client
         .clone()
         .debug_trace_call(
@@ -68,33 +66,33 @@ async fn trace_call<M: Middleware + 'static>(
 }
 
 async fn trace_exec_self<M: Middleware + 'static>(
-    context: &Context<M>,
-    function_data: Vec<u8>,
+    c: &Context<M>,
+    func_data: Vec<u8>,
     use_number: bool,
     extra_wrapper: bool,
 ) -> anyhow::Result<JsTracerFrame> {
-    let contract: &BaseContract = context.tracer_test.contract().deref().deref();
-    let function = contract.abi().function("execSelf")?;
+    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
+    let func = contract.abi().function("execSelf")?;
     let exec_test_call_gas =
-        function.encode_input(&[Token::Bytes(function_data), Token::Bool(use_number)])?;
+        func.encode_input(&[Token::Bytes(func_data), Token::Bool(use_number)])?;
     if extra_wrapper {
         let exec_2_test_call_gas =
-            function.encode_input(&[Token::Bytes(exec_test_call_gas), Token::Bool(use_number)])?;
-        trace_call(context, Bytes::from(exec_2_test_call_gas)).await
+            func.encode_input(&[Token::Bytes(exec_test_call_gas), Token::Bool(use_number)])?;
+        trace_call(c, Bytes::from(exec_2_test_call_gas)).await
     } else {
-        trace_call(context, Bytes::from(exec_test_call_gas)).await
+        trace_call(c, Bytes::from(exec_test_call_gas)).await
     }
 }
 
 #[tokio::test]
 async fn count_opcode_depth_bigger_than_1() -> anyhow::Result<()> {
-    let context = setup().await?;
-    let contract: &BaseContract = context.tracer_test.contract().deref().deref();
-    let function_data = contract
+    let c = setup().await?;
+    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
+    let func_data = contract
         .abi()
         .function("callTimeStamp")?
         .encode_input(&[])?;
-    let ret = trace_exec_self(&context, function_data, false, true).await?;
+    let ret = trace_exec_self(&c, func_data, false, true).await?;
     let log: ExecSelfResultFilter = ExecSelfResultFilter::decode_log(&RawLog::from((
         ret.logs[0]
             .topics
@@ -111,13 +109,13 @@ async fn count_opcode_depth_bigger_than_1() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn not_count_opcodes_on_depth_equal_1() -> anyhow::Result<()> {
-    let context = setup().await?;
-    let contract: &BaseContract = context.tracer_test.contract().deref().deref();
-    let function_data = contract
+    let c = setup().await?;
+    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
+    let func_data = contract
         .abi()
         .function("callTimeStamp")?
         .encode_input(&[])?;
-    let ret = trace_call(&context, Bytes::from(function_data)).await?;
+    let ret = trace_call(&c, Bytes::from(func_data)).await?;
     assert_eq!(ret.number_levels[0].opcodes.get("TIMESTAMP"), None);
     let debug_log = ret.debug.join(",");
     assert!(debug_log
@@ -129,8 +127,8 @@ async fn not_count_opcodes_on_depth_equal_1() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn trace_exec_self_should_revert() -> anyhow::Result<()> {
-    let context = setup().await?;
-    let ret = trace_exec_self(&context, Bytes::from_str("0xdead")?.to_vec(), true, true).await?;
+    let c = setup().await?;
+    let ret = trace_exec_self(&c, Bytes::from_str("0xdead")?.to_vec(), true, true).await?;
     assert!(
         ret.debug
             .join(",")
@@ -156,14 +154,14 @@ async fn trace_exec_self_should_revert() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn trace_exec_self_call_itself() -> anyhow::Result<()> {
-    let context = setup().await?;
-    let contract: &BaseContract = context.tracer_test.contract().deref().deref();
+    let c = setup().await?;
+    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let inner_call = contract.abi().function("doNothing")?.encode_input(&[])?;
     let exec_inner = contract
         .abi()
         .function("execSelf")?
         .encode_input(&[Token::Bytes(inner_call.to_vec()), Token::Bool(false)])?;
-    let ret = trace_exec_self(&context, exec_inner, true, true).await?;
+    let ret = trace_exec_self(&c, exec_inner, true, true).await?;
     assert_eq!(ret.logs.len(), 2);
     ret.logs.iter().for_each(|l| {
         let log_params: ExecSelfResultFilter = ExecSelfResultFilter::decode_log(&RawLog::from((
@@ -182,24 +180,24 @@ async fn trace_exec_self_call_itself() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn should_report_direct_use_of_gas_opcode() -> anyhow::Result<()> {
-    let context = setup().await?;
-    let contract: &BaseContract = context.tracer_test.contract().deref().deref();
-    let function_data = contract.abi().function("testCallGas")?.encode_input(&[])?;
-    let ret = trace_exec_self(&context, function_data, false, false).await?;
+    let c = setup().await?;
+    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
+    let func_data = contract.abi().function("testCallGas")?.encode_input(&[])?;
+    let ret = trace_exec_self(&c, func_data, false, false).await?;
     assert_eq!(*ret.number_levels[0].opcodes.get("GAS").unwrap(), 1);
     Ok(())
 }
 
 #[tokio::test]
 async fn should_ignore_gas_used_as_part_of_call() -> anyhow::Result<()> {
-    let context = setup().await?;
-    let contract: &BaseContract = context.tracer_test.contract().deref().deref();
+    let c = setup().await?;
+    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let do_nothing = contract.abi().function("doNothing")?.encode_input(&[])?;
     let call_do_nothing = contract
         .abi()
         .function("execSelf")?
         .encode_input(&[Token::Bytes(do_nothing.to_vec()), Token::Bool(false)])?;
-    let ret = trace_exec_self(&context, call_do_nothing, false, false).await?;
+    let ret = trace_exec_self(&c, call_do_nothing, false, false).await?;
     assert_eq!(ret.number_levels[0].opcodes.get("GAS"), None);
     Ok(())
 }

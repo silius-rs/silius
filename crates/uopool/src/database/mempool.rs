@@ -1,4 +1,6 @@
-use aa_bundler_primitives::{CodeHash, UserOperation, UserOperationHash};
+use super::utils::{WrapAddress, WrapCodeHash, WrapUserOperation, WrapUserOperationHash};
+use crate::mempool::Mempool;
+use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::types::{Address, U256};
 use reth_db::{
     cursor::{DbCursorRO, DbDupCursorRO},
@@ -15,10 +17,6 @@ use reth_db::{
     Error, TableType,
 };
 use std::{fmt::Display, path::PathBuf};
-
-use crate::mempool::Mempool;
-
-use super::utils::{WrapAddress, WrapCodeHash, WrapUserOperation, WrapUserOperationHash};
 
 table!(
     /// UserOperation DB
@@ -106,43 +104,40 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     type Error = DBError;
     fn add(
         &mut self,
-        user_operation: UserOperation,
-        entry_point: &Address,
+        uo: UserOperation,
+        ep: &Address,
         chain_id: &U256,
     ) -> Result<UserOperationHash, DBError> {
-        let hash = user_operation.hash(entry_point, chain_id);
+        let hash = uo.hash(ep, chain_id);
         let tx = self.env.tx_mut()?;
 
-        let wrap_user_operation_hash: WrapUserOperationHash = hash.into();
-        let wrap_user_operation: WrapUserOperation = user_operation.clone().into();
+        let uo_hash_wrap: WrapUserOperationHash = hash.into();
+        let uo_wrap: WrapUserOperation = uo.clone().into();
 
-        tx.put::<UserOperationDB>(wrap_user_operation_hash, wrap_user_operation.clone())?;
-        tx.put::<SenderUserOperationDB>(user_operation.sender.into(), wrap_user_operation)?;
+        tx.put::<UserOperationDB>(uo_hash_wrap, uo_wrap.clone())?;
+        tx.put::<SenderUserOperationDB>(uo.sender.into(), uo_wrap)?;
         tx.commit()?;
         Ok(hash)
     }
 
-    fn get(
-        &self,
-        user_operation_hash: &UserOperationHash,
-    ) -> Result<Option<UserOperation>, DBError> {
-        let wrap_user_operation_hash: WrapUserOperationHash = (*user_operation_hash).into();
+    fn get(&self, uo_hash: &UserOperationHash) -> Result<Option<UserOperation>, DBError> {
+        let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx()?;
-        let res = tx.get::<UserOperationDB>(wrap_user_operation_hash)?;
+        let res = tx.get::<UserOperationDB>(uo_hash_wrap)?;
         tx.commit()?;
 
         Ok(res.map(|uo| uo.into()))
     }
 
     fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations {
-        let wrap_sender: WrapAddress = (*sender).into();
+        let sender_wrap: WrapAddress = (*sender).into();
         self.env
             .tx()
             .and_then(|tx| {
                 let mut cursor = tx.cursor_dup_read::<SenderUserOperationDB>()?;
                 let res: Vec<UserOperation> = cursor
-                    .walk_dup(Some(wrap_sender.clone()), Some(Address::default().into()))?
+                    .walk_dup(Some(sender_wrap.clone()), Some(Address::default().into()))?
                     .map(|a| a.map(|(_, v)| v.into()))
                     .collect::<Result<Vec<_>, _>>()?;
                 tx.commit()?;
@@ -152,13 +147,13 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     }
 
     fn get_number_by_sender(&self, sender: &Address) -> usize {
-        let wrap_sender: WrapAddress = (*sender).into();
+        let sender_wrap: WrapAddress = (*sender).into();
         self.env
             .tx()
             .and_then(|tx| {
                 let mut cursor = tx.cursor_dup_read::<SenderUserOperationDB>()?;
                 let res = cursor
-                    .walk_dup(Some(wrap_sender.clone()), Some(Address::default().into()))?
+                    .walk_dup(Some(sender_wrap.clone()), Some(Address::default().into()))?
                     .count();
                 tx.commit()?;
                 Ok(res)
@@ -166,30 +161,24 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .unwrap_or(0)
     }
 
-    fn has_code_hashes(
-        &self,
-        user_operation_hash: &UserOperationHash,
-    ) -> anyhow::Result<bool, Self::Error> {
-        let wrap_user_operation_hash: WrapUserOperationHash = (*user_operation_hash).into();
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> anyhow::Result<bool, Self::Error> {
+        let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx()?;
-        let res = tx.get::<CodeHashDB>(wrap_user_operation_hash)?;
+        let res = tx.get::<CodeHashDB>(uo_hash_wrap)?;
         tx.commit()?;
         Ok(res.is_some())
     }
 
-    fn get_code_hashes(&self, user_operation_hash: &UserOperationHash) -> Self::CodeHashes {
-        let wrap_user_operation_hash: WrapUserOperationHash = (*user_operation_hash).into();
+    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Self::CodeHashes {
+        let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         self.env
             .tx()
             .and_then(|tx| {
                 let mut cursor = tx.cursor_dup_read::<CodeHashDB>()?;
                 let res: Vec<CodeHash> = cursor
-                    .walk_dup(
-                        Some(wrap_user_operation_hash),
-                        Some(Address::default().into()),
-                    )?
+                    .walk_dup(Some(uo_hash_wrap), Some(Address::default().into()))?
                     .map(|a| a.map(|(_, v)| v.into()))
                     .collect::<Result<Vec<_>, _>>()?;
                 tx.commit()?;
@@ -200,31 +189,31 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
 
     fn set_code_hashes(
         &mut self,
-        user_operation_hash: &UserOperationHash,
-        code_hashes: &Self::CodeHashes,
+        uo_hash: &UserOperationHash,
+        hashes: &Self::CodeHashes,
     ) -> anyhow::Result<(), Self::Error> {
-        let wrap_user_operation_hash: WrapUserOperationHash = (*user_operation_hash).into();
+        let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx_mut()?;
-        let res = tx.get::<CodeHashDB>(wrap_user_operation_hash.clone())?;
+        let res = tx.get::<CodeHashDB>(uo_hash_wrap.clone())?;
         if res.is_some() {
-            tx.delete::<CodeHashDB>(wrap_user_operation_hash.clone(), None)?;
+            tx.delete::<CodeHashDB>(uo_hash_wrap.clone(), None)?;
         }
-        for code_hash in code_hashes {
-            tx.put::<CodeHashDB>(wrap_user_operation_hash.clone(), code_hash.clone().into())?;
+        for hash in hashes {
+            tx.put::<CodeHashDB>(uo_hash_wrap.clone(), hash.clone().into())?;
         }
         tx.commit()?;
         Ok(())
     }
 
-    fn remove(&mut self, user_operation_hash: &UserOperationHash) -> Result<(), DBError> {
-        let wrap_user_operation_hash: WrapUserOperationHash = (*user_operation_hash).into();
+    fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<(), DBError> {
+        let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx_mut()?;
-        if let Some(user_op) = tx.get::<UserOperationDB>(wrap_user_operation_hash.clone())? {
-            tx.delete::<UserOperationDB>(wrap_user_operation_hash.clone(), None)?;
-            tx.delete::<SenderUserOperationDB>(user_op.0.sender.into(), Some(user_op))?;
-            tx.delete::<CodeHashDB>(wrap_user_operation_hash, None)?;
+        if let Some(uo) = tx.get::<UserOperationDB>(uo_hash_wrap.clone())? {
+            tx.delete::<UserOperationDB>(uo_hash_wrap.clone(), None)?;
+            tx.delete::<SenderUserOperationDB>(uo.0.sender.into(), Some(uo))?;
+            tx.delete::<CodeHashDB>(uo_hash_wrap, None)?;
             tx.commit()?;
             Ok(())
         } else {
@@ -237,18 +226,18 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .tx()
             .and_then(|tx| {
                 let mut cursor = tx.cursor_read::<UserOperationDB>()?;
-                let mut user_ops: Vec<UserOperation> = cursor
+                let mut uos: Vec<UserOperation> = cursor
                     .walk(Some(WrapUserOperationHash::default()))?
                     .map(|a| a.map(|(_, uo)| uo.into()))
                     .collect::<Result<Vec<_>, _>>()?;
-                user_ops.sort_by(|a, b| {
+                uos.sort_by(|a, b| {
                     if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
                         b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas)
                     } else {
                         a.nonce.cmp(&b.nonce)
                     }
                 });
-                Ok(user_ops)
+                Ok(uos)
             })
             .map_err(DBError::DBInternalError)
     }

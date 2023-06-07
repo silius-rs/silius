@@ -20,7 +20,6 @@ aa-bundler-uopool = { path = "../uopool" }
 anyhow = "1"
 arrayref = "0.3"
 async-trait = "0.1"
-clap = { version = "4", features = ["derive"] }
 dashmap = "5.4.0"
 ethers = { workspace = true }
 parking_lot = "0.12"
@@ -32,7 +31,7 @@ tonic = { version = "0.8", default-features = false, features = [
     "prost",
     "transport",
 ] }
-tracing = "0.1"
+tracing = { workspace = true }
 
 [build-dependencies]
 prost-build = "0.11"

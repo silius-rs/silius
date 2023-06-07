@@ -1,7 +1,9 @@
 use ethers::types::U256;
 
+/// Currently supported chains
 pub const SUPPORTED_CHAINS: [&str; 2] = ["sepolia", "dev"];
 
+/// Chain information
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Chain {
     Named(ethers::types::Chain),

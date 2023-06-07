@@ -19,9 +19,9 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      - name: Install cargo-sort
+      - name: Install cargo tools
         run: |
-          cargo install cargo-sort
+          cargo install cargo-sort cargo-udeps
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2

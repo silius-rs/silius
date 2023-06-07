@@ -17,4 +17,4 @@ aa-bundler-primitives = { path = "../primitives" }
 
 anyhow = "1"
 ethers = { workspace = true }
-tracing = "0.1"
+tracing = { workspace = true }

@@ -1,95 +1,94 @@
 // Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
 
-    use std::str::FromStr;
-
     use aa_bundler_primitives::UserOperationHash;
     use arrayref::array_ref;
-    use ethers::types::{Address, Bloom, Bytes, U256};
+    use ethers::types::{Address, Bloom, U256};
     use prost::bytes::Buf;
+    use std::str::FromStr;
 
     tonic::include_proto!("types");
 
     impl From<ethers::types::H128> for H128 {
-        fn from(value: ethers::types::H128) -> Self {
+        fn from(val: ethers::types::H128) -> Self {
             Self {
-                hi: u64::from_be_bytes(*array_ref!(value, 0, 8)),
-                lo: u64::from_be_bytes(*array_ref!(value, 8, 8)),
+                hi: u64::from_be_bytes(*array_ref!(val, 0, 8)),
+                lo: u64::from_be_bytes(*array_ref!(val, 8, 8)),
             }
         }
     }
 
     impl From<ethers::types::H160> for H160 {
-        fn from(value: ethers::types::H160) -> Self {
+        fn from(val: ethers::types::H160) -> Self {
             Self {
-                hi: Some(ethers::types::H128::from_slice(&value[..16]).into()),
-                lo: u32::from_be_bytes(*array_ref!(value, 16, 4)),
+                hi: Some(ethers::types::H128::from_slice(&val[..16]).into()),
+                lo: u32::from_be_bytes(*array_ref!(val, 16, 4)),
             }
         }
     }
 
     impl From<ethers::types::H256> for H256 {
-        fn from(value: ethers::types::H256) -> Self {
+        fn from(val: ethers::types::H256) -> Self {
             Self {
-                hi: Some(ethers::types::H128::from_slice(&value[..16]).into()),
-                lo: Some(ethers::types::H128::from_slice(&value[16..]).into()),
+                hi: Some(ethers::types::H128::from_slice(&val[..16]).into()),
+                lo: Some(ethers::types::H128::from_slice(&val[16..]).into()),
             }
         }
     }
 
     impl From<H128> for ethers::types::H128 {
-        fn from(value: H128) -> Self {
+        fn from(val: H128) -> Self {
             let mut v = [0; Self::len_bytes()];
-            v[..8].copy_from_slice(&value.hi.to_be_bytes());
-            v[8..].copy_from_slice(&value.lo.to_be_bytes());
+            v[..8].copy_from_slice(&val.hi.to_be_bytes());
+            v[8..].copy_from_slice(&val.lo.to_be_bytes());
 
             v.into()
         }
     }
 
     impl From<H160> for ethers::types::H160 {
-        fn from(value: H160) -> Self {
+        fn from(val: H160) -> Self {
             type H = ethers::types::H128;
 
             let mut v = [0; Self::len_bytes()];
             v[..H::len_bytes()]
-                .copy_from_slice(H::from(value.hi.unwrap_or_default()).as_fixed_bytes());
-            v[H::len_bytes()..].copy_from_slice(&value.lo.to_be_bytes());
+                .copy_from_slice(H::from(val.hi.unwrap_or_default()).as_fixed_bytes());
+            v[H::len_bytes()..].copy_from_slice(&val.lo.to_be_bytes());
 
             v.into()
         }
     }
 
     impl From<H256> for ethers::types::H256 {
-        fn from(value: H256) -> Self {
+        fn from(val: H256) -> Self {
             type H = ethers::types::H128;
 
             let mut v = [0; Self::len_bytes()];
             v[..H::len_bytes()]
-                .copy_from_slice(H::from(value.hi.unwrap_or_default()).as_fixed_bytes());
+                .copy_from_slice(H::from(val.hi.unwrap_or_default()).as_fixed_bytes());
             v[H::len_bytes()..]
-                .copy_from_slice(H::from(value.lo.unwrap_or_default()).as_fixed_bytes());
+                .copy_from_slice(H::from(val.lo.unwrap_or_default()).as_fixed_bytes());
 
             v.into()
         }
     }
 
     impl From<H256> for UserOperationHash {
-        fn from(value: H256) -> Self {
-            Self::from(ethers::types::H256::from(value))
+        fn from(val: H256) -> Self {
+            Self::from(ethers::types::H256::from(val))
         }
     }
 
     impl From<PbU256> for ethers::types::U256 {
-        fn from(value: PbU256) -> Self {
-            ethers::types::U256::from_big_endian(value.data.chunk())
+        fn from(val: PbU256) -> Self {
+            ethers::types::U256::from_big_endian(val.data.chunk())
         }
     }
 
     impl From<ethers::types::U256> for PbU256 {
-        fn from(value: ethers::types::U256) -> Self {
+        fn from(val: ethers::types::U256) -> Self {
             let mut bytes: [u8; 32] = [0; 32];
-            value.to_big_endian(bytes.as_mut());
+            val.to_big_endian(bytes.as_mut());
             PbU256 {
                 data: prost::bytes::Bytes::copy_from_slice(&bytes),
             }
@@ -133,8 +132,8 @@ pub mod types {
                         U256::zero()
                     }
                 },
-                init_code: Bytes::from(user_operation.init_code),
-                call_data: Bytes::from(user_operation.call_data),
+                init_code: user_operation.init_code.into(),
+                call_data: user_operation.call_data.into(),
                 call_gas_limit: {
                     if let Some(call_gas_limit) = user_operation.call_gas_limit {
                         call_gas_limit.into()
@@ -171,34 +170,36 @@ pub mod types {
                         U256::zero()
                     }
                 },
-                paymaster_and_data: Bytes::from(user_operation.paymaster_and_data),
-                signature: Bytes::from(user_operation.signature),
+                paymaster_and_data: user_operation.paymaster_and_data.into(),
+                signature: user_operation.signature.into(),
             }
         }
     }
 
-    impl From<aa_bundler_primitives::ReputationEntry> for ReputationEntry {
-        fn from(reputation_entry: aa_bundler_primitives::ReputationEntry) -> Self {
+    impl From<aa_bundler_primitives::reputation::ReputationEntry> for ReputationEntry {
+        fn from(reputation_entry: aa_bundler_primitives::reputation::ReputationEntry) -> Self {
             Self {
-                address: Some(reputation_entry.address.into()),
+                addr: Some(reputation_entry.address.into()),
                 uo_seen: reputation_entry.uo_seen,
                 uo_included: reputation_entry.uo_included,
-                status: match reputation_entry.status {
-                    aa_bundler_primitives::ReputationStatus::OK => ReputationStatus::Ok,
-                    aa_bundler_primitives::ReputationStatus::THROTTLED => {
+                stat: match reputation_entry.status {
+                    aa_bundler_primitives::reputation::ReputationStatus::OK => ReputationStatus::Ok,
+                    aa_bundler_primitives::reputation::ReputationStatus::THROTTLED => {
                         ReputationStatus::Throttled
                     }
-                    aa_bundler_primitives::ReputationStatus::BANNED => ReputationStatus::Banned,
+                    aa_bundler_primitives::reputation::ReputationStatus::BANNED => {
+                        ReputationStatus::Banned
+                    }
                 } as i32,
             }
         }
     }
 
-    impl From<ReputationEntry> for aa_bundler_primitives::ReputationEntry {
+    impl From<ReputationEntry> for aa_bundler_primitives::reputation::ReputationEntry {
         fn from(reputation_entry: ReputationEntry) -> Self {
             Self {
                 address: {
-                    if let Some(address) = reputation_entry.address {
+                    if let Some(address) = reputation_entry.addr {
                         address.into()
                     } else {
                         Address::zero()
@@ -206,17 +207,17 @@ pub mod types {
                 },
                 uo_seen: reputation_entry.uo_seen,
                 uo_included: reputation_entry.uo_included,
-                status: match reputation_entry.status {
-                    _ if reputation_entry.status == ReputationStatus::Ok as i32 => {
-                        aa_bundler_primitives::ReputationStatus::OK
+                status: match reputation_entry.stat {
+                    _ if reputation_entry.stat == ReputationStatus::Ok as i32 => {
+                        aa_bundler_primitives::reputation::ReputationStatus::OK
                     }
-                    _ if reputation_entry.status == ReputationStatus::Throttled as i32 => {
-                        aa_bundler_primitives::ReputationStatus::THROTTLED
+                    _ if reputation_entry.stat == ReputationStatus::Throttled as i32 => {
+                        aa_bundler_primitives::reputation::ReputationStatus::THROTTLED
                     }
-                    _ if reputation_entry.status == ReputationStatus::Banned as i32 => {
-                        aa_bundler_primitives::ReputationStatus::BANNED
+                    _ if reputation_entry.stat == ReputationStatus::Banned as i32 => {
+                        aa_bundler_primitives::reputation::ReputationStatus::BANNED
                     }
-                    _ => aa_bundler_primitives::ReputationStatus::OK,
+                    _ => aa_bundler_primitives::reputation::ReputationStatus::OK,
                 },
             }
         }

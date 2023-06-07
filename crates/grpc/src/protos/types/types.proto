@@ -22,7 +22,7 @@ message PbU256 {
 }
 
 message SupportedEntryPoint {
-    types.H160 entry_point = 1;
+    types.H160 ep = 1;
 }
 
 message UserOperation {
@@ -46,10 +46,10 @@ enum ReputationStatus {
 }
 
 message ReputationEntry {
-    types.H160 address = 1;
+    types.H160 addr = 1;
     uint64 uo_seen = 2;
     uint64 uo_included = 3;
-    ReputationStatus status = 4;
+    ReputationStatus stat = 4;
 }
 
 message GetChainIdResponse {
@@ -61,19 +61,19 @@ message GetSupportedEntryPointsResponse {
 }
 
 message TransactionReceipt{
-    H160 to  =1;
-    H160 from =2;
+    H160 to = 1;
+    H160 from = 2;
     H160 contract_address = 3;
     uint64 transaction_index = 4;
     H256 root = 5;
     PbU256 gas_used = 6;
-    string logs_bloom  = 7;
+    string logs_bloom = 7;
     H256 block_hash = 8;
     H256 transaction_hash = 9;
     repeated Log logs = 10;
     uint64 block_number = 11;
-    PbU256 cumulative_gas_used=12;
-    PbU256 effective_gas_price= 13;
+    PbU256 cumulative_gas_used = 12;
+    PbU256 effective_gas_price = 13;
     uint64 status = 14;
 }
 

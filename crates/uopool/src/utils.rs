@@ -1,21 +1,20 @@
-use aa_bundler_primitives::{CodeHash, UserOperation};
+use aa_bundler_primitives::{simulation::CodeHash, UserOperation};
 use ethers::types::{u256_from_f64_saturating, Address, H256, U256};
-use lazy_static::__Deref;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
-pub fn equal_code_hashes(code_hashes: &Vec<CodeHash>, prev_code_hashes: &Vec<CodeHash>) -> bool {
-    if prev_code_hashes.len() != code_hashes.len() {
+pub fn equal_code_hashes(hashes: &Vec<CodeHash>, hashes_prev: &Vec<CodeHash>) -> bool {
+    if hashes_prev.len() != hashes.len() {
         return false;
     }
 
-    let code_hashes_map = code_hashes
+    let hashes_map = hashes
         .iter()
-        .map(|code_hash| (code_hash.address, code_hash.hash))
+        .map(|h: &CodeHash| (h.address, h.hash))
         .collect::<HashMap<Address, H256>>();
 
-    for code_hash in prev_code_hashes {
-        if let Some(hash) = code_hashes_map.get(&code_hash.address) {
-            if hash != &code_hash.hash {
+    for hash_prev in hashes_prev {
+        if let Some(hash) = hashes_map.get(&hash_prev.address) {
+            if hash != &hash_prev.hash {
                 return false;
             }
         } else {
@@ -52,10 +51,10 @@ impl Default for Overhead {
 }
 
 impl Overhead {
-    pub fn calculate_pre_verification_gas(&self, user_operation: &UserOperation) -> U256 {
-        let user_operation_packed = user_operation.pack();
-        let call_data_cost: U256 = U256::from(
-            user_operation_packed
+    pub fn calculate_pre_verification_gas(&self, uo: &UserOperation) -> U256 {
+        let uo_pack = uo.pack();
+        let call_data: U256 = U256::from(
+            uo_pack
                 .deref()
                 .iter()
                 .map(|&x| {
@@ -67,19 +66,19 @@ impl Overhead {
                 })
                 .sum::<u128>(),
         );
-        let length_in_word = ((user_operation_packed.len() + 31) as f64) / 32_f64;
+        let len_in_word = ((uo_pack.len() + 31) as f64) / 32_f64;
         u256_from_f64_saturating(
             (self.fixed.as_u128() as f64) / (self.bundle_size.as_u128() as f64)
-                + ((call_data_cost + self.per_user_op).as_u128() as f64)
-                + (self.per_user_op_word.as_u128() as f64) * length_in_word,
+                + ((call_data + self.per_user_op).as_u128() as f64)
+                + (self.per_user_op_word.as_u128() as f64) * len_in_word,
         )
     }
 }
 
-pub fn calculate_valid_gas(gas_price: U256, gas_increase_perc: U256) -> U256 {
+pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
     let gas_price = gas_price.as_u64() as f64;
-    let gas_increase_perc = gas_increase_perc.as_u64() as f64;
-    U256::from((gas_price * (1.0 + gas_increase_perc / 100.0)).ceil() as u64)
+    let gas_incr_perc = gas_incr_perc.as_u64() as f64;
+    ((gas_price * (1.0 + gas_incr_perc / 100.0)).ceil() as u64).into()
 }
 
 pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
@@ -88,35 +87,30 @@ pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256)
 
 #[cfg(test)]
 pub mod tests {
-    use std::{fmt::Debug, str::FromStr};
-
-    use aa_bundler_primitives::{UserOperation, UserOperationHash};
-    use ethers::types::{Address, Bytes, H256, U256};
-
     use super::*;
     use crate::mempool::Mempool;
+    use aa_bundler_primitives::{UserOperation, UserOperationHash};
+    use ethers::types::{Address, Bytes, H256, U256};
+    use std::fmt::Debug;
 
     #[test]
     fn pre_verification_gas_calculation() {
-        let gas_overhead = Overhead::default();
-        let user_operation = UserOperation {
+        let gas_oh = Overhead::default();
+        let uo = UserOperation {
             sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::zero(),
-            init_code: Bytes::from_str("0xe19e9755942bb0bd0cccce25b1742596b8a8250b3bf2c3e70000000000000000000000001d9a2cb3638c2fc8bf9c01d088b79e75cd188b17000000000000000000000000789d9058feecf1948af429793e7f1eb4a75db2220000000000000000000000000000000000000000000000000000000000000000").unwrap(),
-            call_data: Bytes::from_str("0x80c5c7d0000000000000000000000000ab7e2cbfcfb6a5f33a75ad745c3e5fb48d689b5400000000000000000000000000000000000000000000000002c68af0bb14000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000").unwrap(),
-            call_gas_limit: U256::from(21900),
-            verification_gas_limit: U256::from(1218343),
-            pre_verification_gas: U256::from(50780),
-            max_fee_per_gas: U256::from(10064120791_u64),
-            max_priority_fee_per_gas: U256::from(1620899097),
+            init_code: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b3bf2c3e70000000000000000000000001d9a2cb3638c2fc8bf9c01d088b79e75cd188b17000000000000000000000000789d9058feecf1948af429793e7f1eb4a75db2220000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+            call_data: "0x80c5c7d0000000000000000000000000ab7e2cbfcfb6a5f33a75ad745c3e5fb48d689b5400000000000000000000000000000000000000000000000002c68af0bb14000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+            call_gas_limit: 21900.into(),
+            verification_gas_limit: 1218343.into(),
+            pre_verification_gas: 50780.into(),
+            max_fee_per_gas: 10064120791_u64.into(),
+            max_priority_fee_per_gas: 1620899097.into(),
             paymaster_and_data: Bytes::default(),
-            signature: Bytes::from_str("0x4e69eb5e02d47ba28878655d61c59c20c3e9a2e6905381305626f6a5a2892ec12bd8dd59179f0642731e0e853af54a71ce422a1a234548c9dd1c559bd07df4461c").unwrap(),
+            signature: "0x4e69eb5e02d47ba28878655d61c59c20c3e9a2e6905381305626f6a5a2892ec12bd8dd59179f0642731e0e853af54a71ce422a1a234548c9dd1c559bd07df4461c".parse().unwrap(),
         };
 
-        assert_eq!(
-            gas_overhead.calculate_pre_verification_gas(&user_operation),
-            U256::from(45340)
-        );
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 45340.into());
     }
 
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
@@ -124,58 +118,43 @@ pub mod tests {
         T: Mempool<UserOperations = Vec<UserOperation>> + Debug,
         T::Error: Debug + ToString,
     {
-        let entry_point = Address::random();
+        let ep = Address::random();
         let chain_id = U256::from(5);
         let senders = vec![Address::random(), Address::random(), Address::random()];
 
-        let mut user_operation: UserOperation;
-        let mut user_operation_hash: UserOperationHash = Default::default();
+        let mut uo: UserOperation;
+        let mut uo_hash: UserOperationHash = Default::default();
         for i in 0..2 {
-            user_operation = UserOperation {
+            uo = UserOperation {
                 sender: senders[0],
                 nonce: U256::from(i),
                 ..UserOperation::random()
             };
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
+            uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
 
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
+            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
 
-            user_operation = UserOperation {
+            uo = UserOperation {
                 sender: senders[1],
                 nonce: U256::from(i),
                 ..UserOperation::random()
             };
 
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
+            uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
 
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
+            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
         }
 
         for i in 0..3 {
-            user_operation = UserOperation {
+            uo = UserOperation {
                 sender: senders[2],
                 nonce: U256::from(i),
                 ..UserOperation::random()
             };
 
-            user_operation_hash = mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
+            uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
 
-            assert_eq!(
-                mempool.get(&user_operation_hash).unwrap().unwrap(),
-                user_operation
-            );
+            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
         }
 
         assert_eq!(mempool.get_all().len(), 7);
@@ -183,7 +162,7 @@ pub mod tests {
         assert_eq!(mempool.get_all_by_sender(&senders[1]).len(), 2);
         assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 3);
 
-        assert_eq!(mempool.remove(&user_operation_hash).unwrap(), ());
+        assert_eq!(mempool.remove(&uo_hash).unwrap(), ());
         assert_eq!(
             mempool
                 .remove(&H256::random().into())
@@ -202,16 +181,14 @@ pub mod tests {
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 0);
 
         for i in 0..3 {
-            user_operation = UserOperation {
+            uo = UserOperation {
                 sender: senders[2],
                 nonce: U256::from(i),
                 max_priority_fee_per_gas: U256::from(i + 1),
                 ..UserOperation::random()
             };
 
-            mempool
-                .add(user_operation.clone(), &entry_point, &chain_id)
-                .unwrap();
+            mempool.add(uo.clone(), &ep, &chain_id).unwrap();
         }
 
         let sorted = mempool.get_sorted().unwrap();

@@ -1,9 +1,10 @@
-use aa_bundler_primitives::{BadReputationError, ReputationEntry, ReputationStatus, StakeInfo};
+use crate::reputation::Reputation;
+use aa_bundler_primitives::reputation::{
+    ReputationEntry, ReputationError, ReputationStatus, StakeInfo,
+};
 use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
-
-use crate::reputation::Reputation;
 
 #[derive(Default, Educe)]
 #[educe(Debug)]
@@ -20,16 +21,16 @@ pub struct MemoryReputation {
 }
 
 impl MemoryReputation {
-    fn set(&mut self, address: &Address) {
-        if !self.entities.contains_key(address) {
-            let entity = ReputationEntry {
-                address: *address,
+    fn set(&mut self, addr: &Address) {
+        if !self.entities.contains_key(addr) {
+            let ent = ReputationEntry {
+                address: *addr,
                 uo_seen: 0,
                 uo_included: 0,
                 status: ReputationStatus::OK,
             };
 
-            self.entities.insert(*address, entity);
+            self.entities.insert(*addr, ent);
         }
     }
 }
@@ -52,85 +53,85 @@ impl Reputation for MemoryReputation {
         self.min_unstake_delay = min_unstake_delay;
     }
 
-    fn get(&mut self, address: &Address) -> ReputationEntry {
-        if let Some(entity) = self.entities.get(address) {
-            return *entity;
+    fn get(&mut self, addr: &Address) -> ReputationEntry {
+        if let Some(ent) = self.entities.get(addr) {
+            return *ent;
         }
 
-        let entity = ReputationEntry {
-            address: *address,
+        let ent = ReputationEntry {
+            address: *addr,
             uo_seen: 0,
             uo_included: 0,
             status: ReputationStatus::OK,
         };
 
-        self.entities.insert(*address, entity);
+        self.entities.insert(*addr, ent);
 
-        entity
+        ent
     }
 
-    fn increment_seen(&mut self, address: &Address) {
-        self.set(address);
-        if let Some(entity) = self.entities.get_mut(address) {
-            entity.uo_seen += 1;
+    fn increment_seen(&mut self, addr: &Address) {
+        self.set(addr);
+        if let Some(ent) = self.entities.get_mut(addr) {
+            ent.uo_seen += 1;
         }
     }
 
-    fn increment_included(&mut self, address: &Address) {
-        self.set(address);
-        if let Some(entity) = self.entities.get_mut(address) {
-            entity.uo_included += 1;
+    fn increment_included(&mut self, addr: &Address) {
+        self.set(addr);
+        if let Some(ent) = self.entities.get_mut(addr) {
+            ent.uo_included += 1;
         }
     }
 
     fn update_hourly(&mut self) {
-        for (_, entity) in self.entities.iter_mut() {
-            entity.uo_seen = entity.uo_seen * 23 / 24;
-            entity.uo_included = entity.uo_included * 23 / 24;
+        for (_, ent) in self.entities.iter_mut() {
+            ent.uo_seen = ent.uo_seen * 23 / 24;
+            ent.uo_included = ent.uo_included * 23 / 24;
         }
         self.entities
-            .retain(|_, entity| entity.uo_seen > 0 || entity.uo_included > 0);
+            .retain(|_, ent| ent.uo_seen > 0 || ent.uo_included > 0);
     }
 
-    fn add_whitelist(&mut self, address: &Address) -> bool {
-        self.whitelist.insert(*address)
+    fn add_whitelist(&mut self, addr: &Address) -> bool {
+        self.whitelist.insert(*addr)
     }
 
-    fn remove_whitelist(&mut self, address: &Address) -> bool {
-        self.whitelist.remove(address)
+    fn remove_whitelist(&mut self, addr: &Address) -> bool {
+        self.whitelist.remove(addr)
     }
 
-    fn is_whitelist(&self, address: &Address) -> bool {
-        self.whitelist.contains(address)
+    fn is_whitelist(&self, addr: &Address) -> bool {
+        self.whitelist.contains(addr)
     }
 
-    fn add_blacklist(&mut self, address: &Address) -> bool {
-        self.blacklist.insert(*address)
+    fn add_blacklist(&mut self, addr: &Address) -> bool {
+        self.blacklist.insert(*addr)
     }
 
-    fn remove_blacklist(&mut self, address: &Address) -> bool {
-        self.blacklist.remove(address)
+    fn remove_blacklist(&mut self, addr: &Address) -> bool {
+        self.blacklist.remove(addr)
     }
 
-    fn is_blacklist(&self, address: &Address) -> bool {
-        self.blacklist.contains(address)
+    fn is_blacklist(&self, addr: &Address) -> bool {
+        self.blacklist.contains(addr)
     }
 
-    fn get_status(&self, address: &Address) -> ReputationStatus {
-        if self.is_whitelist(address) {
+    fn get_status(&self, addr: &Address) -> ReputationStatus {
+        if self.is_whitelist(addr) {
             return ReputationStatus::OK;
         }
 
-        if self.is_blacklist(address) {
+        if self.is_blacklist(addr) {
             return ReputationStatus::BANNED;
         }
 
-        match self.entities.get(address) {
-            Some(entity) => {
-                let min_expected_included = entity.uo_seen / self.min_inclusion_denominator;
-                if min_expected_included <= entity.uo_included + self.throttling_slack {
+        match self.entities.get(addr) {
+            Some(ent) => {
+                let min_expected_included = ent.uo_seen / self.min_inclusion_denominator;
+                if min_expected_included <= ent.uo_included + self.throttling_slack {
                     ReputationStatus::OK
-                } else if min_expected_included <= entity.uo_included + self.ban_slack {
+                } else if min_expected_included <= ent.uo_included + self.ban_slack {
                     ReputationStatus::THROTTLED
                 } else {
                     ReputationStatus::BANNED
@@ -140,43 +141,39 @@ impl Reputation for MemoryReputation {
         }
     }
 
-    fn update_handle_ops_reverted(&mut self, address: &Address) {
-        self.set(address);
-        if let Some(entity) = self.entities.get_mut(address) {
-            entity.uo_seen = 100;
-            entity.uo_included = 0;
+    fn update_handle_ops_reverted(&mut self, addr: &Address) {
+        self.set(addr);
+        if let Some(ent) = self.entities.get_mut(addr) {
+            ent.uo_seen = 100;
+            ent.uo_included = 0;
         }
     }
 
-    fn verify_stake(
-        &self,
-        title: &str,
-        stake_info: Option<StakeInfo>,
-    ) -> Result<(), BadReputationError> {
-        if let Some(stake_info) = stake_info {
-            if self.is_whitelist(&stake_info.address) {
+    fn verify_stake(&self, title: &str, info: Option<StakeInfo>) -> Result<(), ReputationError> {
+        if let Some(info) = info {
+            if self.is_whitelist(&info.address) {
                 return Ok(());
             }
 
-            if let Some(entity) = self.entities.get(&stake_info.address) {
-                if entity.status == ReputationStatus::BANNED {
-                    return Err(BadReputationError::EntityBanned {
-                        address: stake_info.address,
+            if let Some(ent) = self.entities.get(&info.address) {
+                if ent.status == ReputationStatus::BANNED {
+                    return Err(ReputationError::EntityBanned {
+                        address: info.address,
                         title: title.to_string(),
                     });
                 }
             }
 
-            let error = if stake_info.stake < self.min_stake {
-                BadReputationError::StakeTooLow {
-                    address: stake_info.address,
+            let err = if info.stake < self.min_stake {
+                ReputationError::StakeTooLow {
+                    address: info.address,
                     title: title.to_string(),
                     min_stake: self.min_stake,
                     min_unstake_delay: self.min_unstake_delay,
                 }
-            } else if stake_info.unstake_delay < self.min_unstake_delay {
-                BadReputationError::UnstakeDelayTooLow {
-                    address: stake_info.address,
+            } else if info.unstake_delay < self.min_unstake_delay {
+                ReputationError::UnstakeDelayTooLow {
+                    address: info.address,
                     title: title.to_string(),
                     min_stake: self.min_stake,
                     min_unstake_delay: self.min_unstake_delay,
@@ -185,15 +182,15 @@ impl Reputation for MemoryReputation {
                 return Ok(());
             };
 
-            return Err(error);
+            return Err(err);
         }
 
         Ok(())
     }
 
-    fn set(&mut self, reputation_entries: Self::ReputationEntries) {
-        for reputation in reputation_entries {
-            self.entities.insert(reputation.address, reputation);
+    fn set(&mut self, entries: Self::ReputationEntries) {
+        for en in entries {
+            self.entities.insert(en.address, en);
         }
     }
 
@@ -208,13 +205,14 @@ impl Reputation for MemoryReputation {
 
 #[cfg(test)]
 mod tests {
-    use aa_bundler_primitives::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK};
-
     use super::*;
+    use aa_bundler_primitives::reputation::{
+        BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+    };
 
     #[tokio::test]
     async fn memory_reputation() {
-        let mut reputation = MemoryReputation::default();
+        let mut reputation: MemoryReputation = MemoryReputation::default();
         reputation.init(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,
@@ -223,70 +221,64 @@ mod tests {
             U256::from(0),
         );
 
-        let mut addresses: Vec<Address> = vec![];
+        let mut addrs: Vec<Address> = vec![];
 
         for _ in 0..5 {
-            let address = Address::random();
+            let addr = Address::random();
             assert_eq!(
-                reputation.get(&address),
+                reputation.get(&addr),
                 ReputationEntry {
-                    address,
+                    address: addr,
                     uo_seen: 0,
                     uo_included: 0,
                     status: ReputationStatus::OK,
                 }
             );
-            addresses.push(address);
+            addrs.push(addr);
         }
 
-        assert_eq!(reputation.add_whitelist(&addresses[2]), true);
-        assert_eq!(reputation.add_blacklist(&addresses[1]), true);
+        assert_eq!(reputation.add_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.add_blacklist(&addrs[1]), true);
 
-        assert_eq!(reputation.is_whitelist(&addresses[2]), true);
-        assert_eq!(reputation.is_whitelist(&addresses[1]), false);
-        assert_eq!(reputation.is_blacklist(&addresses[1]), true);
-        assert_eq!(reputation.is_blacklist(&addresses[2]), false);
+        assert_eq!(reputation.is_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.is_whitelist(&addrs[1]), false);
+        assert_eq!(reputation.is_blacklist(&addrs[1]), true);
+        assert_eq!(reputation.is_blacklist(&addrs[2]), false);
 
-        assert_eq!(reputation.remove_whitelist(&addresses[2]), true);
-        assert_eq!(reputation.remove_whitelist(&addresses[1]), false);
-        assert_eq!(reputation.remove_blacklist(&addresses[1]), true);
-        assert_eq!(reputation.remove_blacklist(&addresses[2]), false);
+        assert_eq!(reputation.remove_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.remove_whitelist(&addrs[1]), false);
+        assert_eq!(reputation.remove_blacklist(&addrs[1]), true);
+        assert_eq!(reputation.remove_blacklist(&addrs[2]), false);
 
-        assert_eq!(reputation.add_whitelist(&addresses[2]), true);
-        assert_eq!(reputation.add_blacklist(&addresses[1]), true);
+        assert_eq!(reputation.add_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.add_blacklist(&addrs[1]), true);
 
-        assert_eq!(reputation.get_status(&addresses[2]), ReputationStatus::OK);
-        assert_eq!(
-            reputation.get_status(&addresses[1]),
-            ReputationStatus::BANNED
-        );
-        assert_eq!(reputation.get_status(&addresses[3]), ReputationStatus::OK);
+        assert_eq!(reputation.get_status(&addrs[2]), ReputationStatus::OK);
+        assert_eq!(reputation.get_status(&addrs[1]), ReputationStatus::BANNED);
+        assert_eq!(reputation.get_status(&addrs[3]), ReputationStatus::OK);
 
-        assert_eq!(reputation.increment_seen(&addresses[2]), ());
-        assert_eq!(reputation.increment_seen(&addresses[2]), ());
-        assert_eq!(reputation.increment_seen(&addresses[3]), ());
-        assert_eq!(reputation.increment_seen(&addresses[3]), ());
+        assert_eq!(reputation.increment_seen(&addrs[2]), ());
+        assert_eq!(reputation.increment_seen(&addrs[2]), ());
+        assert_eq!(reputation.increment_seen(&addrs[3]), ());
+        assert_eq!(reputation.increment_seen(&addrs[3]), ());
 
-        assert_eq!(reputation.increment_included(&addresses[2]), ());
-        assert_eq!(reputation.increment_included(&addresses[2]), ());
-        assert_eq!(reputation.increment_included(&addresses[3]), ());
+        assert_eq!(reputation.increment_included(&addrs[2]), ());
+        assert_eq!(reputation.increment_included(&addrs[2]), ());
+        assert_eq!(reputation.increment_included(&addrs[3]), ());
 
-        assert_eq!(reputation.update_handle_ops_reverted(&addresses[3]), ());
+        assert_eq!(reputation.update_handle_ops_reverted(&addrs[3]), ());
 
         for _ in 0..250 {
-            assert_eq!(reputation.increment_seen(&addresses[3]), ());
+            assert_eq!(reputation.increment_seen(&addrs[3]), ());
         }
         assert_eq!(
-            reputation.get_status(&addresses[3]),
+            reputation.get_status(&addrs[3]),
             ReputationStatus::THROTTLED
         );
 
         for _ in 0..500 {
-            assert_eq!(reputation.increment_seen(&addresses[3]), ());
+            assert_eq!(reputation.increment_seen(&addrs[3]), ());
         }
-        assert_eq!(
-            reputation.get_status(&addresses[3]),
-            ReputationStatus::BANNED
-        );
+        assert_eq!(reputation.get_status(&addrs[3]), ReputationStatus::BANNED);
     }
 }

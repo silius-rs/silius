@@ -1,5 +1,9 @@
-use aa_bundler_grpc::{uopool_service_run, UoPoolServiceOpts};
-use aa_bundler_primitives::{parse_address, parse_u256, Chain, SUPPORTED_CHAINS};
+use aa_bundler::{
+    cli::UoPoolServiceOpts,
+    utils::{parse_address, parse_u256},
+};
+use aa_bundler_grpc::uopool_service_run;
+use aa_bundler_primitives::{chain::SUPPORTED_CHAINS, Chain};
 use anyhow::{format_err, Result};
 use clap::Parser;
 use ethers::{
@@ -61,11 +65,15 @@ async fn main() -> Result<()> {
     info!("Starting uopool gRPC service...");
 
     uopool_service_run(
-        opt.uopool_opts,
+        opt.uopool_opts.uopool_grpc_listen_address,
         opt.entry_points,
         eth_provider,
         chain,
         opt.max_verification_gas,
+        opt.uopool_opts.min_stake,
+        opt.uopool_opts.min_unstake_delay,
+        opt.uopool_opts.min_priority_fee_per_gas,
+        opt.uopool_opts.uo_pool_mode,
     )
     .await?;
 

@@ -3,6 +3,6 @@
 #[cfg(test)]
 mod common;
 #[cfg(test)]
-mod tracer_tests;
+mod simulation_tests;
 #[cfg(test)]
-mod validate_tests;
+mod tracer_tests;

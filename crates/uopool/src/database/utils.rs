@@ -1,4 +1,4 @@
-use aa_bundler_primitives::{CodeHash, UserOperation, UserOperationHash};
+use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::{
     abi::{AbiDecode, AbiEncode},
     prelude::{EthAbiCodec, EthAbiType},
@@ -40,7 +40,7 @@ macro_rules! construct_wrap_hash {
         impl Compress for $name {
             type Compressed = Bytes;
             fn compress(self) -> Self::Compressed {
-                Bytes::from(self.encode())
+                self.encode().into()
             }
         }
 
@@ -71,7 +71,7 @@ macro_rules! construct_wrap_struct {
         impl Compress for $name {
             type Compressed = Bytes;
             fn compress(self) -> Self::Compressed {
-                Bytes::from(self.encode())
+                self.encode().into()
             }
         }
 
