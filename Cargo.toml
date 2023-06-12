@@ -15,6 +15,7 @@ default-members = ["bin/bundler"]
 [workspace.dependencies]
 ethers = { version = "2.0.4" }
 tracing = "0.1"
+tokio = { version = "1.18", features = ["full"] }
 
 [profile.debug-fast]
 inherits = "release"
