@@ -58,6 +58,7 @@ async fn trace_call<M: Middleware + 'static>(
                     tracer_config: None,
                     timeout: None,
                 },
+                state_overrides: None,
             },
         )
         .await?;

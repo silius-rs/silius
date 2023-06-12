@@ -16,7 +16,7 @@ aa-bundler-primitives = { path = "../crates/primitives" }
 
 anyhow = "1"
 ethers = { version = "2.0.4" }
-tokio = { version = "1.18", features = ["full"] }
+tokio = { workspace = true }
 
 [[example]]
 name = "user-operation"

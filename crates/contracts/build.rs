@@ -1,4 +1,4 @@
-use ethers::solc::{Project, ProjectPathsConfig};
+use ethers_solc::{Project, ProjectPathsConfig};
 use std::{env, path::PathBuf};
 
 fn compile_aa_interfaces() -> anyhow::Result<()> {

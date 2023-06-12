@@ -131,6 +131,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         tracer_config: None,
                         timeout: None,
                     },
+                    state_overrides: None,
                 },
             )
             .await
