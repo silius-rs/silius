@@ -218,7 +218,7 @@ async fn validate(
     context: &TestContext<ClientType>,
     user_op: UserOperation,
 ) -> Result<SimulationResult, SimulationError> {
-    context.uopool.simulate_user_operation(&user_op).await
+    context.uopool.simulate_user_operation(&user_op, true).await
 }
 
 async fn test_user_operation(

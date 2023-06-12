@@ -496,11 +496,14 @@ impl<M: Middleware + 'static> UoPool<M> {
     pub async fn simulate_user_operation(
         &self,
         user_operation: &UserOperation,
+        signature_check: bool,
     ) -> Result<SimulationResult, SimulationError> {
         let res = self.simulate_validation(user_operation).await?;
 
         // check signature
-        self.signature(&res)?;
+        if signature_check {
+            self.signature(&res)?;
+        }
 
         // check timestamps
         let valid_after = self.timestamps(&res)?;
