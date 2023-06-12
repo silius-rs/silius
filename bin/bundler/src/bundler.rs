@@ -1,6 +1,6 @@
 use aa_bundler::{
     cli::{BundlerServiceOpts, UoPoolServiceOpts},
-    utils::{parse_address, parse_u256},
+    utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
 use aa_bundler_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
                 .thread_stack_size(128 * 1024 * 1024)
                 .build()?;
 
-            rt.block_on(async move {
+            let task = async move {
                 info!("Starting ERC-4337 AA Bundler");
 
                 let eth_provider =
@@ -205,7 +205,10 @@ fn main() -> Result<()> {
                 }
 
                 pending().await
-            })
+            };
+            rt.block_on(run_until_ctrl_c(task))?;
+            Ok(())
+
         })?
         .join()
         .unwrap_or_else(|e| panic::resume_unwind(e))

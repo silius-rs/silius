@@ -25,6 +25,7 @@ dependencies = [
  "ethers",
  "expanded-pathbuf",
  "jsonrpsee",
+ "pin-utils",
  "tokio",
  "tracing",
  "tracing-subscriber",

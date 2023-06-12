@@ -23,6 +23,7 @@ dirs = "4.0"
 ethers = { workspace = true }
 expanded-pathbuf = "0.1"
 jsonrpsee = { version = "0.16", features = ["server", "macros"] }
+pin-utils = "0.1"
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = "0.3"
