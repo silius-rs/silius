@@ -40,6 +40,15 @@ pub struct BundlerServiceOpts {
     pub bundle_interval: u64,
 }
 
+#[derive(Clone, Debug, Parser, PartialEq)]
+pub struct RpcServiceOpts {
+    #[clap(long, default_value = "127.0.0.1:3000")]
+    pub rpc_listen_address: String,
+
+    #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
+    pub rpc_api: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

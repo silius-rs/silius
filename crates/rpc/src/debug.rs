@@ -1,4 +1,4 @@
-use crate::debug_api::DebugApiServer;
+use crate::{debug_api::DebugApiServer, error::JsonRpcError};
 use aa_bundler_grpc::{
     bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
     GetAllRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest, SetReputationResult,
@@ -6,10 +6,12 @@ use aa_bundler_grpc::{
 use aa_bundler_primitives::{
     bundler::DEFAULT_BUNDLE_INTERVAL, reputation::ReputationEntry, BundlerMode, UserOperation,
 };
-use anyhow::format_err;
 use async_trait::async_trait;
 use ethers::types::{Address, H256};
-use jsonrpsee::core::RpcResult;
+use jsonrpsee::{
+    core::RpcResult,
+    types::{error::INTERNAL_ERROR_CODE, ErrorObjectOwned},
+};
 use tonic::Request;
 
 pub struct DebugApiServerImpl {
@@ -25,7 +27,7 @@ impl DebugApiServer for DebugApiServerImpl {
         uopool_grpc_client
             .clear(Request::new(()))
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         Ok(())
@@ -41,7 +43,7 @@ impl DebugApiServer for DebugApiServerImpl {
         let res = uopool_grpc_client
             .get_all(req)
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         let mut uos: Vec<UserOperation> = res.uos.iter().map(|uo| uo.clone().into()).collect();
@@ -60,15 +62,17 @@ impl DebugApiServer for DebugApiServerImpl {
         let res = uopool_grpc_client
             .set_reputation(req)
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         if res.res == SetReputationResult::SetReputation as i32 {
             return Ok(());
         }
 
-        Err(jsonrpsee::core::Error::Custom(
+        Err(ErrorObjectOwned::owned(
+            INTERNAL_ERROR_CODE,
             "Error setting reputation".to_string(),
+            None::<bool>,
         ))
     }
 
@@ -82,7 +86,7 @@ impl DebugApiServer for DebugApiServerImpl {
         let res = uopool_grpc_client
             .get_all_reputation(request)
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         Ok(res.rep.iter().map(|re| re.clone().into()).collect())
@@ -98,10 +102,7 @@ impl DebugApiServer for DebugApiServerImpl {
 
         match bundler_grpc_client.set_bundler_mode(req).await {
             Ok(_) => Ok(()),
-            Err(s) => Err(jsonrpsee::core::Error::Custom(format!(
-                "GRPC error (bundler): {}",
-                s.message()
-            ))),
+            Err(s) => Err(JsonRpcError::from(s).into()),
         }
     }
 
@@ -116,10 +117,7 @@ impl DebugApiServer for DebugApiServerImpl {
                 .res
                 .expect("Must return send bundle tx data")
                 .into()),
-            Err(s) => Err(jsonrpsee::core::Error::Custom(format!(
-                "GRPC error (bundler): {}",
-                s.message()
-            ))),
+            Err(s) => Err(JsonRpcError::from(s).into()),
         }
     }
 }

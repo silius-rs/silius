@@ -1,5 +1,5 @@
 use aa_bundler::{
-    cli::{BundlerServiceOpts, UoPoolServiceOpts},
+    cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
 use aa_bundler_grpc::{
@@ -10,6 +10,7 @@ use aa_bundler_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
 use aa_bundler_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
+    middleware::ProxyJsonRpcLayer,
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
 };
 use anyhow::{format_err, Result};
@@ -19,8 +20,9 @@ use ethers::{
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
-use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder};
+use jsonrpsee::{server::ServerBuilder, Methods};
 use std::{collections::HashSet, future::pending, panic, sync::Arc};
+use tower::ServiceBuilder;
 use tracing::info;
 
 #[derive(Parser)]
@@ -47,11 +49,8 @@ pub struct Opt {
     #[clap(long)]
     pub no_rpc: bool,
 
-    #[clap(long, default_value = "127.0.0.1:3000")]
-    pub rpc_listen_address: String,
-
-    #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
-    pub rpc_api: Vec<String>,
+    #[clap(flatten)]
+    pub rpc_opts: RpcServiceOpts,
 
     #[clap(long, default_value=None, value_parser = SUPPORTED_CHAINS)]
     pub chain: Option<String>,
@@ -141,7 +140,7 @@ fn main() -> Result<()> {
                     opt.bundler_opts.bundler_grpc_listen_address,
                     wallet,
                     opt.entry_points,
-                    opt.eth_client_address,
+                    opt.eth_client_address.clone(),
                     chain,
                     opt.bundler_opts.beneficiary,
                     opt.bundler_opts.gas_factor,
@@ -158,19 +157,22 @@ fn main() -> Result<()> {
                     info!("Starting bundler JSON-RPC server...");
                     tokio::spawn({
                         async move {
-                            let jsonrpc_server = ServerBuilder::default()
-                                .build(&opt.rpc_listen_address)
-                                .await?;
+                            let service = ServiceBuilder::new()
+                            .layer(ProxyJsonRpcLayer::new(opt.eth_client_address));
+                            let server = ServerBuilder::new()
+                                     .set_middleware(service)
+                                     .build(&opt.rpc_opts.rpc_listen_address)
+                                     .await?;
 
-                            let mut api = Methods::new();
+                            let mut methods = Methods::new();
 
-                            let rpc_api: HashSet<String> =
-                                HashSet::from_iter(opt.rpc_api.iter().cloned());
+                            let api: HashSet<String> =
+                                HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
 
-                            api.merge(Web3ApiServerImpl{}.into_rpc())?;
+                            methods.merge(Web3ApiServerImpl{}.into_rpc())?;
 
-                            if rpc_api.contains("eth") {
-                                api.merge(
+                            if api.contains("eth") {
+                                methods.merge(
                                     EthApiServerImpl {
                                         uopool_grpc_client: uopool_grpc_client.clone(),
                                     }
@@ -178,13 +180,13 @@ fn main() -> Result<()> {
                                 )?;
                             }
 
-                            if rpc_api.contains("debug") {
+                            if api.contains("debug") {
                                 let bundler_grpc_client = BundlerClient::connect(format!(
                                     "http://{}",
                                     opt.bundler_opts.bundler_grpc_listen_address
                                 ))
                                 .await?;
-                                api.merge(
+                                methods.merge(
                                     DebugApiServerImpl {
                                         uopool_grpc_client,
                                         bundler_grpc_client,
@@ -193,10 +195,10 @@ fn main() -> Result<()> {
                                 )?;
                             }
 
-                            let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
+                            let _handle = server.start(methods.clone())?;
                             info!(
                                 "Started bundler JSON-RPC server at {:}",
-                                opt.rpc_listen_address
+                                opt.rpc_opts.rpc_listen_address
                             );
 
                             pending::<Result<()>>().await

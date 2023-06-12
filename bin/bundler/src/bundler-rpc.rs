@@ -1,3 +1,4 @@
+use aa_bundler::cli::RpcServiceOpts;
 use aa_bundler_grpc::{bundler_client::BundlerClient, uo_pool_client::UoPoolClient};
 use aa_bundler_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -6,7 +7,7 @@ use aa_bundler_rpc::{
 };
 use anyhow::Result;
 use clap::Parser;
-use jsonrpsee::{core::server::rpc_module::Methods, server::ServerBuilder};
+use jsonrpsee::{server::ServerBuilder, Methods};
 use std::{collections::HashSet, future::pending};
 use tracing::info;
 
@@ -16,17 +17,14 @@ use tracing::info;
     about = "JSON-RPC server for ERC-4337 Account Abstraction Bundler"
 )]
 pub struct Opt {
-    #[clap(long, default_value = "127.0.0.1:3000")]
-    pub rpc_listen_address: String,
+    #[clap(flatten)]
+    pub rpc_opts: RpcServiceOpts,
 
     #[clap(long, default_value = "127.0.0.1:3001")]
     pub uopool_grpc_listen_address: String,
 
     #[clap(long, default_value = "127.0.0.1:3002")]
     pub bundler_grpc_listen_address: String,
-
-    #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
-    pub rpc_api: Vec<String>,
 }
 
 #[tokio::main]
@@ -37,20 +35,20 @@ async fn main() -> Result<()> {
 
     info!("Starting bundler JSON-RPC server...");
 
-    let jsonrpc_server = ServerBuilder::default()
-        .build(&opt.rpc_listen_address)
+    let server = ServerBuilder::default()
+        .build(&opt.rpc_opts.rpc_listen_address)
         .await?;
 
-    let mut api = Methods::new();
+    let mut methods = Methods::new();
     let uopool_grpc_client =
         UoPoolClient::connect(format!("http://{}", opt.uopool_grpc_listen_address)).await?;
 
-    let rpc_api: HashSet<String> = HashSet::from_iter(opt.rpc_api.iter().cloned());
+    let api: HashSet<String> = HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
 
-    api.merge(Web3ApiServerImpl {}.into_rpc())?;
+    methods.merge(Web3ApiServerImpl {}.into_rpc())?;
 
-    if rpc_api.contains("eth") {
-        api.merge(
+    if api.contains("eth") {
+        methods.merge(
             EthApiServerImpl {
                 uopool_grpc_client: uopool_grpc_client.clone(),
             }
@@ -58,10 +56,10 @@ async fn main() -> Result<()> {
         )?;
     }
 
-    if rpc_api.contains("debug") {
+    if api.contains("debug") {
         let bundler_grpc_client =
             BundlerClient::connect(format!("http://{}", opt.bundler_grpc_listen_address)).await?;
-        api.merge(
+        methods.merge(
             DebugApiServerImpl {
                 uopool_grpc_client,
                 bundler_grpc_client,
@@ -70,10 +68,10 @@ async fn main() -> Result<()> {
         )?;
     }
 
-    let _jsonrpc_server_handle = jsonrpc_server.start(api.clone())?;
+    let _handle = server.start(methods.clone())?;
     info!(
         "Started bundler JSON-RPC server at {:}",
-        opt.rpc_listen_address
+        opt.rpc_opts.rpc_listen_address
     );
 
     pending().await

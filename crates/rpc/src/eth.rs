@@ -8,16 +8,12 @@ use aa_bundler_primitives::{
     uopool::VerificationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
     UserOperationHash, UserOperationPartial, UserOperationReceipt,
 };
-use anyhow::format_err;
 use async_trait::async_trait;
 use ethers::{
     types::{Address, U64},
     utils::to_checksum,
 };
-use jsonrpsee::{
-    core::RpcResult,
-    types::{error::CallError, ErrorObject},
-};
+use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use std::str::FromStr;
 use tonic::Request;
 
@@ -33,7 +29,7 @@ impl EthApiServer for EthApiServerImpl {
         let res = uopool_grpc_client
             .get_chain_id(Request::new(()))
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         return Ok(res.chain_id.into());
@@ -45,7 +41,7 @@ impl EthApiServer for EthApiServerImpl {
         let res = uopool_grpc_client
             .get_supported_entry_points(Request::new(()))
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         return Ok(res
@@ -70,22 +66,19 @@ impl EthApiServer for EthApiServerImpl {
         let res = uopool_grpc_client
             .add(req)
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         if res.res == AddResult::Added as i32 {
-            let uo_hash = serde_json::from_str::<UserOperationHash>(&res.data)
-                .map_err(|err| format_err!("Error parsing user operation hash: {}", err))?;
+            let uo_hash =
+                serde_json::from_str::<UserOperationHash>(&res.data).map_err(JsonRpcError::from)?;
             return Ok(uo_hash);
         }
 
-        Err(jsonrpsee::core::Error::Call(CallError::Custom(
-            JsonRpcError::from(
-                serde_json::from_str::<VerificationError>(&res.data)
-                    .map_err(|err| format_err!("Error parsing error object: {}", err))?,
-            )
-            .0,
-        )))
+        Err(JsonRpcError::from(
+            serde_json::from_str::<VerificationError>(&res.data).map_err(JsonRpcError::from)?,
+        )
+        .0)
     }
 
     async fn estimate_user_operation_gas(
@@ -103,24 +96,19 @@ impl EthApiServer for EthApiServerImpl {
         let res = uopool_grpc_client
             .estimate_user_operation_gas(req)
             .await
-            .map_err(|s| format_err!("GRPC error (uopool): {}", s.message()))?
+            .map_err(JsonRpcError::from)?
             .into_inner();
 
         if res.res == EstimateUserOperationGasResult::Estimated as i32 {
-            let gas_est =
-                serde_json::from_str::<UserOperationGasEstimation>(&res.data).map_err(|err| {
-                    format_err!("Error parsing user operation gas estimation: {}", err)
-                })?;
+            let gas_est = serde_json::from_str::<UserOperationGasEstimation>(&res.data)
+                .map_err(JsonRpcError::from)?;
             return Ok(gas_est);
         }
 
-        Err(jsonrpsee::core::Error::Call(CallError::Custom(
-            JsonRpcError::from(
-                serde_json::from_str::<SimulationError>(&res.data)
-                    .map_err(|err| format_err!("Error parsing error object: {}", err))?,
-            )
-            .0,
-        )))
+        Err(JsonRpcError::from(
+            serde_json::from_str::<SimulationError>(&res.data).map_err(JsonRpcError::from)?,
+        )
+        .0)
     }
 
     async fn get_user_operation_receipt(
@@ -158,25 +146,21 @@ impl EthApiServer for EthApiServerImpl {
                         });
                         Ok(receipt)
                     }
-                    Err(e) => match e.code() {
+                    Err(s) => match s.code() {
                         tonic::Code::NotFound => Ok(None),
-                        _ => Err(jsonrpsee::core::Error::Call(CallError::Custom(
-                            ErrorObject::owned(
-                                USER_OPERATION_HASH,
-                                "Missing/invalid userOpHash".to_string(),
-                                None::<bool>,
-                            ),
-                        ))),
+                        _ => Err(ErrorObjectOwned::owned(
+                            USER_OPERATION_HASH,
+                            "Missing/invalid userOpHash".to_string(),
+                            None::<bool>,
+                        )),
                     },
                 }
             }
-            Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
-                ErrorObject::owned(
-                    USER_OPERATION_HASH,
-                    "Missing/invalid userOpHash".to_string(),
-                    None::<bool>,
-                ),
-            ))),
+            Err(_) => Err(ErrorObjectOwned::owned(
+                USER_OPERATION_HASH,
+                "Missing/invalid userOpHash".to_string(),
+                None::<bool>,
+            )),
         }
     }
 
@@ -213,25 +197,21 @@ impl EthApiServer for EthApiServerImpl {
                         });
                         Ok(uo)
                     }
-                    Err(e) => match e.code() {
+                    Err(s) => match s.code() {
                         tonic::Code::NotFound => Ok(None),
-                        _ => Err(jsonrpsee::core::Error::Call(CallError::Custom(
-                            ErrorObject::owned(
-                                USER_OPERATION_HASH,
-                                "Missing/invalid userOpHash".to_string(),
-                                None::<bool>,
-                            ),
-                        ))),
+                        _ => Err(ErrorObjectOwned::owned(
+                            USER_OPERATION_HASH,
+                            "Missing/invalid userOpHash".to_string(),
+                            None::<bool>,
+                        )),
                     },
                 }
             }
-            Err(_) => Err(jsonrpsee::core::Error::Call(CallError::Custom(
-                ErrorObject::owned(
-                    USER_OPERATION_HASH,
-                    "Missing/invalid userOpHash".to_string(),
-                    None::<bool>,
-                ),
-            ))),
+            Err(_) => Err(ErrorObjectOwned::owned(
+                USER_OPERATION_HASH,
+                "Missing/invalid userOpHash".to_string(),
+                None::<bool>,
+            )),
         }
     }
 }

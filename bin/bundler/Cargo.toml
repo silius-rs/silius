@@ -22,9 +22,10 @@ clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
 ethers = { workspace = true }
 expanded-pathbuf = "0.1"
-jsonrpsee = { version = "0.16", features = ["server", "macros"] }
+jsonrpsee = { version = "0.18.2", features = ["server", "macros"] }
 pin-utils = "0.1"
 tokio = { workspace = true }
+tower = { version = "0.4.13" }
 tracing = { workspace = true }
 tracing-subscriber = "0.3"
 
