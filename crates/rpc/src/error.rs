@@ -9,10 +9,16 @@ use aa_bundler_primitives::{
     uopool::VerificationError,
 };
 use ethers::abi::AbiEncode;
-use jsonrpsee::types::{error::ErrorCode, ErrorObject};
+use jsonrpsee::types::{error::ErrorCode, ErrorObject, ErrorObjectOwned};
 use serde_json::json;
 
-pub struct JsonRpcError(pub ErrorObject<'static>);
+pub struct JsonRpcError(pub ErrorObjectOwned);
+
+impl From<JsonRpcError> for ErrorObjectOwned {
+    fn from(err: JsonRpcError) -> Self {
+        err.0
+    }
+}
 
 impl From<SanityCheckError> for JsonRpcError {
     fn from(err: SanityCheckError) -> Self {
@@ -251,5 +257,25 @@ impl From<VerificationError> for JsonRpcError {
             VerificationError::SanityCheck(err) => err.into(),
             VerificationError::Simulation(err) => err.into(),
         }
+    }
+}
+
+impl From<tonic::Status> for JsonRpcError {
+    fn from(s: tonic::Status) -> Self {
+        JsonRpcError(ErrorObject::owned(
+            ErrorCode::InternalError.code(),
+            format!("gRPC error: {}", s.message()),
+            None::<bool>,
+        ))
+    }
+}
+
+impl From<serde_json::Error> for JsonRpcError {
+    fn from(err: serde_json::Error) -> Self {
+        JsonRpcError(ErrorObject::owned(
+            ErrorCode::ParseError.code(),
+            format!("JSON serializing error: {err}"),
+            None::<bool>,
+        ))
     }
 }

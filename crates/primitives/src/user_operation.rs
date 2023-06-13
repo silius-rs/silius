@@ -263,7 +263,7 @@ impl From<UserOperation> for UserOperationUnsigned {
 }
 
 /// Receipt of the user operation (returned from the RPC endpoint eth_getUserOperationReceipt)
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationReceipt {
     #[serde(rename = "userOpHash")]
@@ -283,7 +283,7 @@ pub struct UserOperationReceipt {
 }
 
 /// Struct that is returned from the RPC endpoint eth_getUserOperationByHash
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationByHash {
     pub user_operation: UserOperation,
@@ -396,7 +396,7 @@ impl From<UserOperationPartial> for UserOperation {
 }
 
 /// Gas estimations for user operation (returned from the RPC endpoint eth_estimateUserOperationGas)
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationGasEstimation {
     pub pre_verification_gas: U256,

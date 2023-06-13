@@ -145,7 +145,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         let sanity_check_result = self.check_user_operation(uo).await?;
 
         // simulation
-        let simulation_result = self.simulate_user_operation(uo).await?;
+        let simulation_result = self.simulate_user_operation(uo, true).await?;
 
         Ok(VerificationResult {
             sanity_check_result,
@@ -207,7 +207,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                 _ => (),
             };
 
-            let sim_res = self.simulate_user_operation(&uo).await;
+            let sim_res = self.simulate_user_operation(&uo, true).await;
 
             match sim_res {
                 Ok(sim_res) => {
@@ -291,7 +291,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         &self,
         uo: &UserOperation,
     ) -> Result<UserOperationGasEstimation, SimulationError> {
-        let sim_res = self.simulate_user_operation(uo).await?;
+        let sim_res = self.simulate_user_operation(uo, false).await?;
 
         match self.entry_point.simulate_execution(uo.clone()).await {
             Ok(_) => {}
