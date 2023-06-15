@@ -1,15 +1,14 @@
 [package]
 name = "aa-bundler-rpc"
 version = "0.1.0"
-authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
-edition = "2021"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Vid201/aa-bundler"
-readme = "README.md"
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 description = """
 AA (ERC-4337) Bundler RPC implementation
 """
-rust-version = "1.69.0"
 
 [dependencies]
 aa-bundler-grpc = { path = "../grpc" }
