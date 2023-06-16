@@ -68,6 +68,10 @@ pub enum SimulationError {
     StorageAccess {
         slot: String,
     },
+    Unstaked {
+        entity: String,
+        message: String,
+    },
     CallStack {
         message: String,
     },

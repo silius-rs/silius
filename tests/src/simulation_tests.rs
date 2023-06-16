@@ -408,7 +408,7 @@ async fn fail_referencing_self_token() -> anyhow::Result<()> {
         c.storage_factory.address,
     )
     .await;
-    assert!(matches!(res, Err(SimulationError::StorageAccess { .. })));
+    assert!(matches!(res, Err(SimulationError::Unstaked { .. })));
 
     Ok(())
 }
@@ -499,7 +499,7 @@ async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> 
     };
 
     let res = validate(&c, uo).await;
-    assert!(matches!(res, Err(SimulationError::CallStack { .. })));
+    assert!(matches!(res, Err(SimulationError::Unstaked { .. })));
 
     Ok(())
 }
