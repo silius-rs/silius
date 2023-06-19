@@ -268,19 +268,17 @@ impl<M: Middleware + 'static> UoPool<M> {
                         continue;
                     }
 
+                    slot_staked.clear();
+
                     for slot in [
                         acc.reads.keys().cloned().collect::<Vec<String>>(),
                         acc.writes.keys().cloned().collect(),
                     ]
                     .concat()
                     {
-                        slot_staked.clear();
-
                         if self.associated_with_slot(&uo.sender, &slot, &slots)? {
-                            if uo.init_code.len() > 0 {
+                            if !uo.init_code.is_empty() {
                                 slot_staked = slot.clone();
-                            } else {
-                                continue;
                             }
                         } else if *addr == stake_info.address
                             || self.associated_with_slot(&stake_info.address, &slot, &slots)?
@@ -289,12 +287,13 @@ impl<M: Middleware + 'static> UoPool<M> {
                         } else {
                             return Err(SimulationError::StorageAccess { slot });
                         }
+                    }
 
-                        if !slot_staked.is_empty() && stake_info.stake.is_zero() {
-                            return Err(SimulationError::StorageAccess {
-                                slot: slot_staked.clone(),
-                            });
-                        }
+                    if !slot_staked.is_empty() && stake_info.stake.is_zero() {
+                        return Err(SimulationError::Unstaked {
+                            entity: LEVEL_TO_ENTITY[i].to_string(),
+                            message: format!("accessed slot {addr} slot {slot_staked}"),
+                        });
                     }
                 }
             }
@@ -407,9 +406,9 @@ impl<M: Middleware + 'static> UoPool<M> {
                                 .verify_stake(PAYMASTER, Some(*stake_info))
                                 .is_err()
                         {
-                            return Err(SimulationError::CallStack {
-                                message: "Paymaster that is not staked should not return context"
-                                    .to_string(),
+                            return Err(SimulationError::Unstaked {
+                                entity: PAYMASTER.to_string(),
+                                message: "must not return context".to_string(),
                             });
                         }
                     }

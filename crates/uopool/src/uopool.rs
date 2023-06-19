@@ -128,7 +128,15 @@ impl<M: Middleware + 'static> UoPool<M> {
 
                 trace!("User operation {uo:?} added to the mempool {}", self.id);
 
-                // TODO: update reputation
+                // update reputation
+                self.reputation.increment_seen(&uo.sender);
+                if let Some(f_addr) = get_address(&uo.init_code) {
+                    self.reputation.increment_seen(&f_addr);
+                }
+                if let Some(p_addr) = get_address(&uo.paymaster_and_data) {
+                    self.reputation.increment_seen(&p_addr);
+                }
+
                 Ok(uo_hash)
             }
             Err(e) => Err(AddError::MempoolError {
@@ -440,23 +448,18 @@ impl<M: Middleware + 'static> UoPool<M> {
             match event {
                 EntryPointAPIEvents::UserOperationEventFilter(uo_event) => {
                     self.remove_user_operation(&uo_event.user_op_hash.into());
-                    self.include_address(uo_event.sender);
-                    self.include_address(uo_event.paymaster);
+                    self.reputation.increment_included(&uo_event.sender);
+                    self.reputation.increment_included(&uo_event.paymaster);
                     // TODO: include event aggregator
                 }
                 EntryPointAPIEvents::AccountDeployedFilter(event) => {
-                    self.include_address(event.factory);
+                    self.reputation.increment_included(&event.factory);
                 }
                 _ => (),
             }
         }
 
         Ok(())
-    }
-
-    pub fn include_address(&mut self, addr: Address) -> Option<()> {
-        self.reputation.increment_included(&addr);
-        Some(())
     }
 
     pub fn remove_user_operation(&mut self, uo_hash: &UserOperationHash) -> Option<()> {

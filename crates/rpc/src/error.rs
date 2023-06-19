@@ -181,6 +181,9 @@ impl From<SimulationError> for JsonRpcError {
                 format!("Storage access validation failed for slot: {slot}"),
                 None::<bool>,
             ),
+            SimulationError::Unstaked { entity, message } => {
+                ErrorObject::owned(OPCODE, format!("unstaked {entity} {message}"), None::<bool>)
+            }
             SimulationError::CallStack { message } => {
                 ErrorObject::owned(OPCODE, message, None::<bool>)
             }
