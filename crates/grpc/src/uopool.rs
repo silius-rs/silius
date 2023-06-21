@@ -309,6 +309,7 @@ pub async fn uopool_service_run(
     min_stake: U256,
     min_unstake_delay: U256,
     min_priority_fee_per_gas: U256,
+    whitelist: Vec<Address>,
     uo_pool_mode: UoPoolMode,
 ) -> Result<()> {
     tokio::spawn(async move {
@@ -327,6 +328,9 @@ pub async fn uopool_service_run(
                 min_stake,
                 min_unstake_delay,
             );
+            for addr in whitelist.iter() {
+                reputation.add_whitelist(addr);
+            }
 
             m_map.insert(
                 id,

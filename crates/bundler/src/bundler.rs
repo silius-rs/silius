@@ -36,12 +36,13 @@ impl Bundler {
     }
 
     pub async fn send_next_bundle(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-        info!("Creating a new bundle with {} user operations", uos.len());
-        trace!("Bundle content: {uos:?}");
-
         if uos.is_empty() {
+            info!("Skipping creating a new bundle, no user operations");
             return Ok(H256::default());
         };
+
+        info!("Creating a new bundle with {} user operations", uos.len());
+        trace!("Bundle content: {uos:?}");
 
         let provider = Provider::<Http>::try_from(self.eth_provider_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(

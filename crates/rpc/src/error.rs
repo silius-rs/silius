@@ -79,11 +79,11 @@ impl From<SanityCheckError> for JsonRpcError {
             ),
             SanityCheckError::LowMaxFeePerGas {
                 max_fee_per_gas,
-                max_fee_per_gas_expected,
+                base_fee,
             } => ErrorObject::owned(
                 SANITY_CHECK,
                 format!(
-                    "Max fee per gas {max_fee_per_gas} is lower than estimated max fee per gas {max_fee_per_gas_expected}",
+                    "Max fee per gas {max_fee_per_gas} is lower than base fee {base_fee}",
                 ),
                 None::<bool>,
             ),
@@ -107,9 +107,9 @@ impl From<SanityCheckError> for JsonRpcError {
                 ),
                 None::<bool>,
             ),
-            SanityCheckError::SenderVerification { sender } => ErrorObject::owned(
+            SanityCheckError::SenderVerification { sender, message } => ErrorObject::owned(
                 SANITY_CHECK,
-                format!("Sender {sender} is invalid (sender check)",),
+                format!("Sender {sender} {message}",),
                 None::<bool>,
             ),
             SanityCheckError::Validation { message } => {

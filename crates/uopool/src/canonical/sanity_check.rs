@@ -10,10 +10,7 @@ use aa_bundler_primitives::{
     sanity_check::SanityCheckError,
     UserOperation, UserOperationHash,
 };
-use ethers::{
-    providers::Middleware,
-    types::{BlockNumber, U256},
-};
+use ethers::{providers::Middleware, types::U256};
 use serde::{Deserialize, Serialize};
 
 const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
@@ -134,34 +131,31 @@ impl<M: Middleware + 'static> UoPool<M> {
             });
         }
 
-        let block = self.eth_provider.get_block(BlockNumber::Latest).await?;
+        let base_fee =
+            self.base_fee_per_gas()
+                .await
+                .map_err(|err| SanityCheckError::UnknownError {
+                    message: err.to_string(),
+                })?;
 
-        if let Some(block) = block {
-            if let Some(base_fee) = block.base_fee_per_gas {
-                if base_fee + uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
-                    return Err(SanityCheckError::LowMaxFeePerGas {
-                        max_fee_per_gas: uo.max_fee_per_gas,
-                        max_fee_per_gas_expected: base_fee + uo.max_priority_fee_per_gas,
-                    });
-                }
-
-                if uo.max_priority_fee_per_gas < self.min_priority_fee_per_gas {
-                    return Err(SanityCheckError::LowMaxPriorityFeePerGas {
-                        max_priority_fee_per_gas: uo.max_priority_fee_per_gas,
-                        min_priority_fee_per_gas: self.min_priority_fee_per_gas,
-                    });
-                }
-
-                return Ok(());
-            }
+        if base_fee > uo.max_fee_per_gas {
+            return Err(SanityCheckError::LowMaxFeePerGas {
+                max_fee_per_gas: uo.max_fee_per_gas,
+                base_fee,
+            });
         }
 
-        Err(SanityCheckError::UnknownError {
-            message: "Cannot verify user operation fees".to_string(),
-        })
+        if uo.max_priority_fee_per_gas < self.min_priority_fee_per_gas {
+            return Err(SanityCheckError::LowMaxPriorityFeePerGas {
+                max_priority_fee_per_gas: uo.max_priority_fee_per_gas,
+                min_priority_fee_per_gas: self.min_priority_fee_per_gas,
+            });
+        }
+
+        Ok(())
     }
 
-    async fn verify_sender(
+    async fn verify_sender_user_operations(
         &self,
         uo: &UserOperation,
     ) -> Result<Option<UserOperationHash>, SanityCheckError> {
@@ -191,7 +185,10 @@ impl<M: Middleware + 'static> UoPool<M> {
                         &self.chain.id().into(),
                     )))
                 } else {
-                    Err(SanityCheckError::SenderVerification { sender: uo.sender })
+                    Err(SanityCheckError::SenderVerification {
+                        sender: uo.sender,
+                        message: "couldn't replace user operation (gas increase too low)".into(),
+                    })
                 }
             }
             None => {
@@ -213,7 +210,10 @@ impl<M: Middleware + 'static> UoPool<M> {
                     ) {
                         Ok(_) => {}
                         Err(_) => {
-                            return Err(SanityCheckError::SenderVerification { sender: uo.sender });
+                            return Err(SanityCheckError::SenderVerification {
+                                sender: uo.sender,
+                                message: "has too many user operations in the mempool".into(),
+                            });
                         }
                     }
                 }
@@ -243,7 +243,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         self.call_gas_limit(uo).await?;
 
         // The sender doesn't have another UserOperation already present in the pool (or it replaces an existing entry with the same sender and nonce, with a higher maxPriorityFeePerGas and an equally increased maxFeePerGas). Only one UserOperation per sender may be included in a single batch. A sender is exempt from this rule and may have multiple UserOperations in the pool and in a batch if it is staked (see reputation, throttling and banning section below), but this exception is of limited use to normal accounts.
-        let user_operation_prev_hash = self.verify_sender(uo).await?;
+        let user_operation_prev_hash = self.verify_sender_user_operations(uo).await?;
 
         Ok(SanityCheckResult {
             user_operation_hash: user_operation_prev_hash,

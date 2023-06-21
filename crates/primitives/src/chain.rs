@@ -1,7 +1,11 @@
 use ethers::types::U256;
 
 /// Currently supported chains
-pub const SUPPORTED_CHAINS: [&str; 2] = ["sepolia", "dev"];
+pub const SUPPORTED_CHAINS: [&str; 3] = [
+    "sepolia", // Ethereum testnet
+    "dev",     // Development chain
+    "mumbai",  // Polygon PoS testnet
+];
 
 /// Chain information
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

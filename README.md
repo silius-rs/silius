@@ -58,9 +58,10 @@ cargo run --release --bin bundler-rpc
 
 Bundler was tested on the following networks:
 
-| Chain      | Mainnet   | Testnet                                       |
-| :--------: | :-------: | :-------:                                     |
-| Ethereum   | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
+| Chain         | Mainnet   | Testnet                                       |
+| :--------:    | :-------: | :-------:                                     |
+| Ethereum      | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
+| Polygon PoS   | :soon:    | :heavy_check_mark: (Mumbai)                   |
 
 ## Examples
 

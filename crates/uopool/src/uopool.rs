@@ -237,14 +237,11 @@ impl<M: Middleware + 'static> UoPool<M> {
                     if let Some(p) = p_opt {
                         let balance = match paymaster_dep.get(&p) {
                             Some(n) => *n,
-                            None => {
-                                self.eth_provider.get_balance(p, None)
-                                .await.map_err(|err| {
-                                    format_err!(
-                                        "Getting balance of paymaster {p:?} failed with error: {err:?}",
-                                    )
-                                })?
-                            }
+                            None => self.entry_point.balance_of(&p).await.map_err(|err| {
+                                format_err!(
+                                    "Getting balance of paymaster {p:?} failed with error: {err:?}",
+                                )
+                            })?,
                         };
 
                         if balance.lt(&sim_res.pre_fund) {

@@ -73,6 +73,7 @@ async fn main() -> Result<()> {
         opt.uopool_opts.min_stake,
         opt.uopool_opts.min_unstake_delay,
         opt.uopool_opts.min_priority_fee_per_gas,
+        opt.uopool_opts.whitelist,
         opt.uopool_opts.uo_pool_mode,
     )
     .await?;
