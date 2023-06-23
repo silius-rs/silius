@@ -4,7 +4,7 @@ use clap::Parser;
 use ethers::types::{Address, U256};
 use std::net::SocketAddr;
 
-#[derive(Clone, Copy, Debug, Parser, PartialEq)]
+#[derive(Clone, Debug, Parser, PartialEq)]
 pub struct UoPoolServiceOpts {
     #[clap(long, default_value = "127.0.0.1:3001")]
     pub uopool_grpc_listen_address: SocketAddr,
@@ -18,11 +18,14 @@ pub struct UoPoolServiceOpts {
     #[clap(long, value_parser=parse_u256, default_value = "0")]
     pub min_priority_fee_per_gas: U256,
 
+    #[clap(long, value_delimiter=',', value_parser = parse_address)]
+    pub whitelist: Vec<Address>,
+
     #[clap(long, default_value = "standard", value_parser=parse_uopool_mode)]
     pub uo_pool_mode: UoPoolMode,
 }
 
-#[derive(Clone, Copy, Debug, Parser, PartialEq)]
+#[derive(Clone, Debug, Parser, PartialEq)]
 pub struct BundlerServiceOpts {
     #[clap(long, value_parser=parse_address)]
     pub beneficiary: Address,

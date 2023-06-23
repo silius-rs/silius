@@ -31,7 +31,7 @@ pub enum SanityCheckError {
     },
     LowMaxFeePerGas {
         max_fee_per_gas: U256,
-        max_fee_per_gas_expected: U256,
+        base_fee: U256,
     },
     HighMaxPriorityFeePerGas {
         max_priority_fee_per_gas: U256,
@@ -43,6 +43,7 @@ pub enum SanityCheckError {
     },
     SenderVerification {
         sender: Address,
+        message: String,
     },
     Validation {
         message: String,

@@ -14,7 +14,7 @@ use ethers::prelude::{ContractError, Event};
 use ethers::providers::{Middleware, ProviderError};
 use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-    GethTrace, TransactionRequest,
+    GethTrace, TransactionRequest, U256,
 };
 use ethers_providers::{JsonRpcError, MiddlewareError};
 use std::fmt::Display;
@@ -166,6 +166,17 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             Ok(deposit_info) => Ok(deposit_info),
             _ => Err(EntryPointErr::UnknownErr(
                 "Error calling get deposit info".to_string(),
+            )),
+        }
+    }
+
+    pub async fn balance_of(&self, addr: &Address) -> Result<U256, EntryPointErr> {
+        let res = self.stake_manager_api.balance_of(*addr).call().await;
+
+        match res {
+            Ok(balance) => Ok(balance),
+            _ => Err(EntryPointErr::UnknownErr(
+                "Error calling balance of".to_string(),
             )),
         }
     }
