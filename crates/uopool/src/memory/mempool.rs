@@ -49,6 +49,13 @@ impl Mempool for MemoryMempool {
         };
     }
 
+    fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation> {
+        self.get_all_by_sender(&uo.sender)
+            .iter()
+            .find(|uo_prev| uo_prev.nonce == uo.nonce)
+            .cloned()
+    }
+
     fn get_number_by_sender(&self, addr: &Address) -> usize {
         return if let Some(uos_by_sender) = self.user_operations_by_sender.get(addr) {
             uos_by_sender.len()

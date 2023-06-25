@@ -123,7 +123,7 @@ pub async fn deploy_test_coin<M: Middleware + 'static>(
     Ok(DeployedContract::new(factory, addr))
 }
 
-pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
+pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType, Provider<Http>)> {
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
     let wallet = MnemonicBuilder::<English>::default()
@@ -144,5 +144,5 @@ pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType)> {
         .from(coinbase);
     provider.send_transaction(tx, None).await?.await?;
 
-    Ok((geth, client))
+    Ok((geth, client, provider))
 }

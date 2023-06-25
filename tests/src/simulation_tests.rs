@@ -11,6 +11,7 @@ use crate::common::{
 };
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
+use ethers::providers::{Http, Provider};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::Address;
 use ethers::utils::{parse_units, GethInstance};
@@ -20,15 +21,35 @@ use ethers::{
 };
 use silius_contracts::EntryPoint;
 use silius_primitives::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
-use silius_primitives::simulation::SimulationError;
-use silius_primitives::{Chain, UoPoolMode, UserOperation};
-use silius_uopool::canonical::simulation::SimulationResult;
+use silius_primitives::simulation::SimulationCheckError;
+use silius_primitives::uopool::ValidationError;
+use silius_primitives::{Chain, UserOperation};
+use silius_uopool::validate::sanity::call_gas::CallGas;
+use silius_uopool::validate::sanity::max_fee::MaxFee;
+use silius_uopool::validate::sanity::paymaster::Paymaster;
+use silius_uopool::validate::sanity::sender::SenderOrInitCode;
+use silius_uopool::validate::sanity::sender_uos::SenderUos;
+use silius_uopool::validate::sanity::verification_gas::VerificationGas;
+use silius_uopool::validate::simulation::signature::Signature;
+use silius_uopool::validate::simulation::timestamp::Timestamp;
+use silius_uopool::validate::simulation_trace::call_stack::CallStack;
+use silius_uopool::validate::simulation_trace::code_hashes::CodeHashes;
+use silius_uopool::validate::simulation_trace::gas::Gas;
+use silius_uopool::validate::simulation_trace::opcodes::Opcodes;
+use silius_uopool::validate::simulation_trace::storage_access::StorageAccess;
+use silius_uopool::validate::validator::StandardUserOperationValidator;
+use silius_uopool::validate::{
+    UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
+};
 use silius_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoPool};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
-struct TestContext<M: Middleware> {
+const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
+const GAS_INCREASE_PERC: u64 = 10;
+
+struct TestContext<M: Middleware + 'static, V: UserOperationValidator + 'static> {
     pub client: Arc<M>,
     pub _geth: GethInstance,
     pub entry_point: DeployedContract<EntryPointContract<M>>,
@@ -37,12 +58,13 @@ struct TestContext<M: Middleware> {
     pub storage_factory: DeployedContract<TestStorageAccountFactory<M>>,
     pub _rules_factory: DeployedContract<TestRulesAccountFactory<M>>,
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
-    pub uopool: UoPool<M>,
+    pub uopool: UoPool<M, V>,
 }
 
-async fn setup() -> anyhow::Result<TestContext<ClientType>> {
+async fn setup(
+) -> anyhow::Result<TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>> {
     let chain_id = 1337u64;
-    let (_geth, _client) = setup_geth().await?;
+    let (_geth, _client, provider) = setup_geth().await?;
     let client = Arc::new(_client);
     let ep = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
@@ -81,31 +103,60 @@ async fn setup() -> anyhow::Result<TestContext<ClientType>> {
     let mempools = Box::new(MemoryMempool::default());
     let mut reputation = Box::new(MemoryReputation::default());
     reputation.init(10, 10, 10, 1u64.into(), 1u64.into());
-    let pool = UoPool::new(
-        EntryPoint::new(client.clone(), ep.address),
+
+    let entry_point = EntryPoint::new(client.clone(), ep.address);
+    let entry_point2 = EntryPoint::new(Arc::new(provider.clone()), ep.address);
+    let c = Chain::from(chain_id);
+
+    let validator =
+        StandardUserOperationValidator::new(Arc::new(provider), entry_point2, c.clone())
+            .with_sanity_check(SenderOrInitCode {})
+            .with_sanity_check(VerificationGas {
+                max_verification_gas: U256::from(1500000000_u64),
+            })
+            .with_sanity_check(Paymaster {})
+            .with_sanity_check(CallGas {})
+            .with_sanity_check(MaxFee {
+                min_priority_fee_per_gas: U256::from(1u64),
+            })
+            .with_sanity_check(SenderUos {
+                max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
+                gas_increase_perc: GAS_INCREASE_PERC.into(),
+            })
+            .with_simulation_check(Signature {})
+            .with_simulation_check(Timestamp {})
+            .with_simulation_trace_check(Gas {})
+            .with_simulation_trace_check(Opcodes {})
+            .with_simulation_trace_check(StorageAccess {})
+            .with_simulation_trace_check(CallStack {})
+            .with_simulation_trace_check(CodeHashes {});
+
+    let pool = UoPool::<ClientType, StandardUserOperationValidator<Provider<Http>>>::new(
+        entry_point,
+        validator,
         mempools,
         reputation,
         client.clone(),
-        U256::from(1500000000_u64),
-        U256::from(1u64),
-        Chain::from(chain_id),
-        UoPoolMode::Standard,
+        1500000000_u64.into(),
+        c,
     );
 
-    Ok(TestContext::<ClientType> {
-        client: client.clone(),
-        _geth,
-        entry_point: ep,
-        paymaster,
-        opcodes_factory,
-        storage_factory,
-        _rules_factory: rules_factory,
-        storage_account: DeployedContract::new(
-            TestRulesAccount::new(storage_account_address, client.clone()),
-            storage_account_address,
-        ),
-        uopool: pool,
-    })
+    Ok(
+        TestContext::<ClientType, StandardUserOperationValidator<Provider<Http>>> {
+            client: client.clone(),
+            _geth,
+            entry_point: ep,
+            paymaster,
+            opcodes_factory,
+            storage_factory,
+            _rules_factory: rules_factory,
+            storage_account: DeployedContract::new(
+                TestRulesAccount::new(storage_account_address, client.clone()),
+                storage_account_address,
+            ),
+            uopool: pool,
+        },
+    )
 }
 
 async fn create_storage_factory_init_code(
@@ -139,7 +190,7 @@ async fn create_opcode_factory_init_code(init_func: String) -> anyhow::Result<(B
 }
 
 async fn create_test_user_operation(
-    context: &TestContext<ClientType>,
+    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
@@ -190,7 +241,7 @@ async fn create_test_user_operation(
 }
 
 fn existing_storage_account_user_operation(
-    context: &TestContext<ClientType>,
+    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
     validate_rule: String,
     pm_rule: String,
 ) -> UserOperation {
@@ -215,20 +266,29 @@ fn existing_storage_account_user_operation(
 }
 
 async fn validate(
-    context: &TestContext<ClientType>,
-    user_op: UserOperation,
-) -> Result<SimulationResult, SimulationError> {
-    context.uopool.simulate_user_operation(&user_op, true).await
+    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
+    uo: UserOperation,
+) -> Result<UserOperationValidationOutcome, ValidationError> {
+    context
+        .uopool
+        .validator
+        .validate_user_operation(
+            &uo,
+            &context.uopool.mempool,
+            &context.uopool.reputation,
+            UserOperationValidatorMode::Simulation | UserOperationValidatorMode::SimulationTrace,
+        )
+        .await
 }
 
 async fn test_user_operation(
-    context: &TestContext<ClientType>,
+    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> Result<SimulationResult, SimulationError> {
+) -> Result<UserOperationValidationOutcome, ValidationError> {
     let uo = create_test_user_operation(
         &context,
         validate_rule,
@@ -245,7 +305,7 @@ async fn test_user_operation(
 async fn test_existing_user_operation(
     validate_rule: String,
     pm_rule: String,
-) -> Result<SimulationResult, SimulationError> {
+) -> Result<UserOperationValidationOutcome, ValidationError> {
     let c = setup().await.expect("Setup context failed");
     let uo = existing_storage_account_user_operation(&c, validate_rule, pm_rule);
     validate(&c, uo).await
@@ -290,7 +350,7 @@ async fn reject_unkown_rule() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(SimulationError::Validation { message }) if message.contains("unknown-rule")
+        Err(ValidationError::Simulation(SimulationCheckError::Validation { message })) if message.contains("unknown-rule")
     ));
 
     Ok(())
@@ -314,7 +374,7 @@ async fn fail_with_bad_opcode_in_ctr() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(SimulationError::ForbiddenOpcode { entity, opcode }) if entity==FACTORY && opcode == "COINBASE"
+        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
     ));
 
     Ok(())
@@ -338,7 +398,7 @@ async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(SimulationError::ForbiddenOpcode { entity, opcode }) if entity==PAYMASTER && opcode == "COINBASE"
+        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
     ));
 
     Ok(())
@@ -362,7 +422,7 @@ async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(SimulationError::ForbiddenOpcode { entity, opcode }) if entity==ACCOUNT && opcode == "BLOCKHASH"
+        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==ACCOUNT && opcode == "BLOCKHASH"
     ));
 
     Ok(())
@@ -386,7 +446,7 @@ async fn fail_if_create_too_many() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(SimulationError::ForbiddenOpcode { entity, opcode }) if entity==ACCOUNT && opcode == "CREATE2"
+        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==ACCOUNT && opcode == "CREATE2"
     ));
 
     Ok(())
@@ -408,7 +468,12 @@ async fn fail_referencing_self_token() -> anyhow::Result<()> {
         c.storage_factory.address,
     )
     .await;
-    assert!(matches!(res, Err(SimulationError::Unstaked { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::Unstaked { .. }
+        ))
+    ));
 
     Ok(())
 }
@@ -422,7 +487,12 @@ async fn account_succeeds_referecing_its_own_balance() {
 #[tokio::test]
 async fn account_fail_to_read_allowance_of_address() {
     let res = test_existing_user_operation("allowance-self-1".to_string(), "".to_string()).await;
-    assert!(matches!(res, Err(SimulationError::StorageAccess { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::StorageAccess { .. }
+        ))
+    ));
 }
 
 #[tokio::test]
@@ -440,7 +510,12 @@ async fn access_self_struct_data() {
 #[tokio::test]
 async fn fail_to_access_other_address_struct_data() {
     let res = test_existing_user_operation("struct-1".to_string(), "".to_string()).await;
-    assert!(matches!(res, Err(SimulationError::StorageAccess { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::StorageAccess { .. }
+        ))
+    ));
 }
 
 #[tokio::test]
@@ -459,7 +534,12 @@ async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
         c.storage_factory.address,
     )
     .await;
-    assert!(matches!(res, Err(SimulationError::StorageAccess { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::StorageAccess { .. }
+        ))
+    ));
 
     Ok(())
 }
@@ -499,7 +579,12 @@ async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> 
     };
 
     let res = validate(&c, uo).await;
-    assert!(matches!(res, Err(SimulationError::Unstaked { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::Unstaked { .. }
+        ))
+    ));
 
     Ok(())
 }
@@ -525,7 +610,12 @@ async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<(
     };
 
     let res = validate(&c, uo).await;
-    assert!(matches!(res, Err(SimulationError::CallStack { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::CallStack { .. }
+        ))
+    ));
 
     Ok(())
 }
@@ -566,7 +656,12 @@ async fn fail_with_inner_oog_revert() -> anyhow::Result<()> {
         c.storage_factory.address,
     )
     .await;
-    assert!(matches!(res, Err(SimulationError::OutOfGas { .. })));
+    assert!(matches!(
+        res,
+        Err(ValidationError::Simulation(
+            SimulationCheckError::OutOfGas { .. }
+        ))
+    ));
 
     Ok(())
 }

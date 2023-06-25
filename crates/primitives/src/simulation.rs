@@ -2,7 +2,7 @@ use crate::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
 use ethers::{
     prelude::{EthAbiCodec, EthAbiType},
     providers::MiddlewareError,
-    types::{Address, H256},
+    types::{Address, H256, U256},
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -48,11 +48,11 @@ lazy_static! {
 
 /// Error object for simulation
 #[derive(Debug, Serialize, Deserialize)]
-pub enum SimulationError {
+pub enum SimulationCheckError {
     Signature {},
     Expiration {
-        valid_after: u64,
-        valid_until: u64,
+        valid_after: U256,
+        valid_until: U256,
         paymaster: Option<Address>,
     },
     Validation {
@@ -87,9 +87,9 @@ pub enum SimulationError {
     },
 }
 
-impl<M: MiddlewareError> From<M> for SimulationError {
+impl<M: MiddlewareError> From<M> for SimulationCheckError {
     fn from(err: M) -> Self {
-        SimulationError::MiddlewareError {
+        SimulationCheckError::MiddlewareError {
             message: err.to_string(),
         }
     }

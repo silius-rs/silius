@@ -4,7 +4,7 @@ pub mod bundler;
 pub mod chain;
 pub mod consts;
 pub mod reputation;
-pub mod sanity_check;
+pub mod sanity;
 pub mod simulation;
 pub mod uopool;
 mod user_operation;

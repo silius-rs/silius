@@ -30,6 +30,7 @@ pub trait Mempool: Debug {
     fn get(&self, uo_hash: &UserOperationHash) -> Result<Option<UserOperation>, Self::Error>;
     fn get_all_by_sender(&self, addr: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, addr: &Address) -> usize;
+    fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation>;
     fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, Self::Error>;
     fn set_code_hashes(
         &mut self,

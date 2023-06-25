@@ -24,7 +24,7 @@ struct Context<M> {
 }
 
 async fn setup() -> anyhow::Result<Context<ClientType>> {
-    let (_geth, _client) = setup_geth().await?;
+    let (_geth, _client, _) = setup_geth().await?;
     let client = Arc::new(_client);
 
     let tracer_test = deploy_tracer_test(client.clone()).await?;

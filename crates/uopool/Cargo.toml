@@ -13,7 +13,9 @@ AA (ERC-4337) bundler uopool implementation
 [dependencies]
 
 anyhow = "1"
+async-trait = "0.1"
 educe = { version = "0.4", features = ["Debug", "Default"] }
+enumset = "1.1.2"
 ethers = { workspace = true }
 page_size = "0.5.0"
 prost = "0.11"

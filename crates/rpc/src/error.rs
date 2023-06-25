@@ -7,9 +7,9 @@ use silius_primitives::{
         VALIDATION,
     },
     reputation::ReputationError,
-    sanity_check::SanityCheckError,
-    simulation::SimulationError,
-    uopool::VerificationError,
+    sanity::SanityCheckError,
+    simulation::SimulationCheckError,
+    uopool::ValidationError,
 };
 
 pub struct JsonRpcError(pub ErrorObjectOwned);
@@ -79,7 +79,7 @@ impl From<SanityCheckError> for JsonRpcError {
             ),
             SanityCheckError::LowMaxFeePerGas {
                 max_fee_per_gas,
-                base_fee,
+                base_fee_per_gas: base_fee,
             } => ErrorObject::owned(
                 SANITY_CHECK,
                 format!(
@@ -138,15 +138,15 @@ impl From<SanityCheckError> for JsonRpcError {
     }
 }
 
-impl From<SimulationError> for JsonRpcError {
-    fn from(err: SimulationError) -> Self {
+impl From<SimulationCheckError> for JsonRpcError {
+    fn from(err: SimulationCheckError) -> Self {
         JsonRpcError(match err {
-            SimulationError::Signature {} => ErrorObject::owned(
+            SimulationCheckError::Signature {} => ErrorObject::owned(
                 SIGNATURE,
                 "Invalid UserOp signature or paymaster signature",
                 None::<bool>,
             ),
-            SimulationError::Expiration {
+            SimulationCheckError::Expiration {
                 valid_after,
                 valid_until,
                 paymaster,
@@ -165,38 +165,38 @@ impl From<SimulationError> for JsonRpcError {
                     }
                 },
             ),
-            SimulationError::Validation { message } => {
+            SimulationCheckError::Validation { message } => {
                 ErrorObject::owned(VALIDATION, message, None::<bool>)
             }
-            SimulationError::ForbiddenOpcode { entity, opcode } => ErrorObject::owned(
+            SimulationCheckError::ForbiddenOpcode { entity, opcode } => ErrorObject::owned(
                 OPCODE,
                 format!("{entity} uses banned opcode: {opcode}"),
                 None::<bool>,
             ),
-            SimulationError::Execution { message } => {
+            SimulationCheckError::Execution { message } => {
                 ErrorObject::owned(EXECUTION, message, None::<bool>)
             }
-            SimulationError::StorageAccess { slot } => ErrorObject::owned(
+            SimulationCheckError::StorageAccess { slot } => ErrorObject::owned(
                 OPCODE,
                 format!("Storage access validation failed for slot: {slot}"),
                 None::<bool>,
             ),
-            SimulationError::Unstaked { entity, message } => {
+            SimulationCheckError::Unstaked { entity, message } => {
                 ErrorObject::owned(OPCODE, format!("unstaked {entity} {message}"), None::<bool>)
             }
-            SimulationError::CallStack { message } => {
+            SimulationCheckError::CallStack { message } => {
                 ErrorObject::owned(OPCODE, message, None::<bool>)
             }
-            SimulationError::CodeHashes { message } => {
+            SimulationCheckError::CodeHashes { message } => {
                 ErrorObject::owned(OPCODE, message, None::<bool>)
             }
-            SimulationError::OutOfGas {} => {
+            SimulationCheckError::OutOfGas {} => {
                 ErrorObject::owned(OPCODE, "User operation out of gas", None::<bool>)
             }
-            SimulationError::MiddlewareError { message } => {
+            SimulationCheckError::MiddlewareError { message } => {
                 ErrorObject::owned(ErrorCode::InternalError.code(), message, None::<bool>)
             }
-            SimulationError::UnknownError { message } => {
+            SimulationCheckError::UnknownError { message } => {
                 ErrorObject::owned(ErrorCode::InternalError.code(), message, None::<bool>)
             }
         })
@@ -254,11 +254,11 @@ impl From<ReputationError> for JsonRpcError {
     }
 }
 
-impl From<VerificationError> for JsonRpcError {
-    fn from(err: VerificationError) -> Self {
+impl From<ValidationError> for JsonRpcError {
+    fn from(err: ValidationError) -> Self {
         match err {
-            VerificationError::SanityCheck(err) => err.into(),
-            VerificationError::Simulation(err) => err.into(),
+            ValidationError::Sanity(err) => err.into(),
+            ValidationError::Simulation(err) => err.into(),
         }
     }
 }

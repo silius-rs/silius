@@ -20,35 +20,53 @@ use silius_primitives::{
     Chain, UoPoolMode,
 };
 use silius_uopool::{
-    mempool_id, MemoryMempool, MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
+    mempool_id,
+    validate::{
+        sanity::{
+            call_gas::CallGas, max_fee::MaxFee, paymaster::Paymaster, sender::SenderOrInitCode,
+            sender_uos::SenderUos, verification_gas::VerificationGas,
+        },
+        simulation::{signature::Signature, timestamp::Timestamp},
+        simulation_trace::{
+            call_stack::CallStack, code_hashes::CodeHashes, gas::Gas, opcodes::Opcodes,
+            storage_access::StorageAccess,
+        },
+        validator::StandardUserOperationValidator,
+        UserOperationValidator,
+    },
+    MemoryMempool, MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
 };
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::info;
 
-pub struct UoPoolService<M: Middleware> {
-    pub uo_pools: Arc<DashMap<MempoolId, UserOperationPool<M>>>,
+const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
+const GAS_INCREASE_PERC: u64 = 10;
+
+pub struct UoPoolService<M: Middleware + 'static, V: UserOperationValidator> {
+    pub uo_pools: Arc<DashMap<MempoolId, UserOperationPool<M, V>>>,
     pub chain: Chain,
 }
 
-impl<M: Middleware + 'static> UoPoolService<M> {
-    pub fn new(uo_pools: Arc<DashMap<MempoolId, UserOperationPool<M>>>, chain: Chain) -> Self {
+impl<M: Middleware + 'static, V: UserOperationValidator> UoPoolService<M, V> {
+    pub fn new(uo_pools: Arc<DashMap<MempoolId, UserOperationPool<M, V>>>, chain: Chain) -> Self {
         Self { uo_pools, chain }
     }
 
-    fn get_uo_pool(&self, ep: &Address) -> Option<Ref<H256, UserOperationPool<M>>> {
+    fn get_uo_pool(&self, ep: &Address) -> Option<Ref<H256, UserOperationPool<M, V>>> {
         let m_id = mempool_id(ep, &U256::from(self.chain.id()));
         self.uo_pools.get(&m_id)
     }
 
-    fn get_uo_pool_mut(&self, ep: &Address) -> Option<RefMut<H256, UserOperationPool<M>>> {
+    fn get_uo_pool_mut(&self, ep: &Address) -> Option<RefMut<H256, UserOperationPool<M, V>>> {
         let m_id = mempool_id(ep, &U256::from(self.chain.id()));
         self.uo_pools.get_mut(&m_id)
     }
 }
 
 #[async_trait]
-impl<M: Middleware + 'static> uo_pool_server::UoPool for UoPoolService<M>
+impl<M: Middleware + 'static, V: UserOperationValidator + 'static> uo_pool_server::UoPool
+    for UoPoolService<M, V>
 where
     EntryPointErr: From<<M as Middleware>::Error>,
 {
@@ -60,7 +78,7 @@ where
 
         let res = {
             let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
-            uo_pool.verify_user_operation(&uo).await
+            uo_pool.validate_user_operation(&uo).await
         };
 
         let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
@@ -315,7 +333,10 @@ pub async fn uopool_service_run(
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
-        let m_map = Arc::new(DashMap::<MempoolId, UserOperationPool<Provider<Http>>>::new());
+        let m_map = Arc::new(DashMap::<
+            MempoolId,
+            UserOperationPool<Provider<Http>, StandardUserOperationValidator<Provider<Http>>>,
+        >::new());
 
         for ep in eps {
             let id = mempool_id(&ep, &U256::from(chain.id()));
@@ -332,17 +353,45 @@ pub async fn uopool_service_run(
                 reputation.add_whitelist(addr);
             }
 
+            let entry_point = EntryPoint::<Provider<Http>>::new(eth_client.clone(), ep);
+
+            let mut validator =
+                StandardUserOperationValidator::new(eth_client.clone(), entry_point.clone(), chain)
+                    .with_sanity_check(SenderOrInitCode {})
+                    .with_sanity_check(VerificationGas {
+                        max_verification_gas,
+                    })
+                    .with_sanity_check(Paymaster {})
+                    .with_sanity_check(CallGas {})
+                    .with_sanity_check(MaxFee {
+                        min_priority_fee_per_gas,
+                    })
+                    .with_sanity_check(SenderUos {
+                        max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
+                        gas_increase_perc: GAS_INCREASE_PERC.into(),
+                    })
+                    .with_simulation_check(Signature {})
+                    .with_simulation_check(Timestamp {});
+
+            if uo_pool_mode != UoPoolMode::Unsafe {
+                validator = validator
+                    .with_simulation_trace_check(Gas {})
+                    .with_simulation_trace_check(Opcodes {})
+                    .with_simulation_trace_check(StorageAccess {})
+                    .with_simulation_trace_check(CallStack {})
+                    .with_simulation_trace_check(CodeHashes {});
+            }
+
             m_map.insert(
                 id,
-                UserOperationPool::<Provider<Http>>::new(
-                    EntryPoint::<Provider<Http>>::new(eth_client.clone(), ep),
+                UserOperationPool::<Provider<Http>, StandardUserOperationValidator<Provider<Http>>>::new(
+                    entry_point,
+                    validator,
                     Box::<MemoryMempool>::default(),
                     reputation,
                     eth_client.clone(),
                     max_verification_gas,
-                    min_priority_fee_per_gas,
                     chain,
-                    uo_pool_mode,
                 ),
             );
         }
