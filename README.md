@@ -91,12 +91,23 @@ Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tes
 
 The best place for the discussion is the dedicated [Telegram group](https://t.me/+sKeRcN4j3MM3NmNk).
 
+## Authors
+
+- Vid Kersic: [GitHub](https://github.com/Vid201), [Twitter](https://twitter.com/vidkersic)
+- WillQ: [GitHub](https://github.com/zsluedem), [Twitter](https://twitter.com/zsluedem06)
+
 ## Licenses
 
 This project is dual-licensed under Apache 2.0 and MIT terms:
 
 - Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+## Donations
+
+aa-bundler is an open-source project and a public good. If you want to help the project, you can send donations of any size via:
+
+- Ethereum address: `0x7cB801446AC4f5EA8f7333EFc58ab787eB611558`
 
 ## Acknowledgements
 
