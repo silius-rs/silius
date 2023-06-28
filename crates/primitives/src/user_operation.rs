@@ -7,7 +7,12 @@ use ethers::{
 };
 use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
-use std::{ops::Deref, str::FromStr};
+use ssz_rs::Sized;
+use std::{
+    ops::{AddAssign, Deref},
+    slice::Windows,
+    str::FromStr,
+};
 
 /// Transaction type for ERC-4337 account abstraction
 #[derive(
@@ -403,6 +408,274 @@ pub struct UserOperationGasEstimation {
     #[serde(rename = "verificationGas")]
     pub verification_gas_limit: U256,
     pub call_gas_limit: U256,
+}
+
+fn ssz_pack_u256(
+    fixed: &mut Vec<Option<Vec<u8>>>,
+    fixed_lengths_sum: &mut usize,
+    variable_lengths: &mut Vec<usize>,
+    value: U256,
+) -> Result<(), ssz_rs::SerializeError> {
+    let mut element_buffer = Vec::with_capacity(32);
+    <[u64; 4] as ssz_rs::Serialize>::serialize(&value.0, &mut element_buffer)?;
+    fixed_lengths_sum.add_assign(32);
+    fixed.push(Some(element_buffer));
+    variable_lengths.push(0);
+    Ok(())
+}
+
+fn ssz_pack_bytes(
+    fixed: &mut Vec<Option<Vec<u8>>>,
+    fixed_lengths_sum: &mut usize,
+    variable: &mut Vec<Vec<u8>>,
+    variable_lengths: &mut Vec<usize>,
+    value: Bytes,
+) {
+    let size = value.len();
+    let mut element: Vec<u8> = Vec::with_capacity(size);
+    element.extend(value.iter());
+    fixed.push(None);
+    fixed_lengths_sum.add_assign(4);
+    variable_lengths.push(size);
+    variable.push(element);
+}
+
+impl ssz_rs::Sized for UserOperation {
+    fn is_variable_size() -> bool {
+        true
+    }
+    fn size_hint() -> usize {
+        0
+    }
+}
+
+impl ssz_rs::Serialize for UserOperation {
+    fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
+        let mut fixed = Vec::new();
+        let mut variable = Vec::new();
+        let mut variable_lengths = Vec::new();
+        let mut fixed_lengths_sum = 0usize;
+
+        // sender
+        let mut element_buffer = Vec::with_capacity(20);
+        <[u8; 20] as ssz_rs::Serialize>::serialize(&self.sender.0, &mut element_buffer)?;
+        fixed_lengths_sum += element_buffer.len();
+        fixed.push(Some(element_buffer));
+        variable_lengths.push(0);
+
+        ssz_pack_u256(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable_lengths,
+            self.nonce,
+        )?;
+        ssz_pack_bytes(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable,
+            &mut variable_lengths,
+            self.init_code.clone(),
+        );
+        ssz_pack_bytes(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable,
+            &mut variable_lengths,
+            self.call_data.clone(),
+        );
+        ssz_pack_u256(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable_lengths,
+            self.call_gas_limit,
+        )?;
+        ssz_pack_u256(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable_lengths,
+            self.verification_gas_limit,
+        )?;
+        ssz_pack_u256(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable_lengths,
+            self.pre_verification_gas,
+        )?;
+        ssz_pack_u256(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable_lengths,
+            self.max_fee_per_gas,
+        )?;
+        ssz_pack_u256(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable_lengths,
+            self.max_priority_fee_per_gas,
+        )?;
+        ssz_pack_bytes(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable,
+            &mut variable_lengths,
+            self.paymaster_and_data.clone(),
+        );
+        ssz_pack_bytes(
+            &mut fixed,
+            &mut fixed_lengths_sum,
+            &mut variable,
+            &mut variable_lengths,
+            self.signature.clone(),
+        );
+
+        ssz_rs::__internal::serialize_composite_from_components(
+            fixed,
+            variable,
+            variable_lengths,
+            fixed_lengths_sum,
+            buffer,
+        )
+    }
+}
+
+fn ssz_unpack_bytes_length(
+    start: usize,
+    encoding: &[u8],
+    offsets: &mut Vec<usize>,
+) -> Result<(), ssz_rs::DeserializeError> {
+    let end = start + 4usize;
+    let next_offset = <u32 as ssz_rs::Deserialize>::deserialize(&encoding[start..end])?;
+    offsets.push(next_offset as usize);
+    Ok(())
+}
+
+fn ssz_unpack_u256(
+    start: usize,
+    encoding: &[u8],
+) -> Result<(U256, usize), ssz_rs::DeserializeError> {
+    let encoded_length = 32usize;
+    let end = start + encoded_length;
+    let result = <[u64; 4] as ssz_rs::Deserialize>::deserialize(&encoding[start..end])?;
+    Ok((U256(result), encoded_length))
+}
+
+fn ssz_unpack_bytes(
+    bytes_zone: &mut Windows<'_, usize>,
+    encoding: &[u8],
+    total_bytes_read: usize,
+) -> Result<(Bytes, usize), ssz_rs::DeserializeError> {
+    let range = bytes_zone
+        .next()
+        .ok_or(ssz_rs::DeserializeError::AdditionalInput {
+            provided: encoding.len(),
+            expected: total_bytes_read,
+        })?;
+    let start = range[0];
+    let end = range[1];
+    let bytes_data = Bytes::from_iter(encoding[start..end].iter());
+    Ok((bytes_data, end - start))
+}
+impl ssz_rs::Deserialize for UserOperation {
+    fn deserialize(encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
+    where
+        Self: Sized,
+    {
+        let mut start = 0;
+        let mut offsets: Vec<usize> = Vec::new();
+        let mut container = Self::default();
+
+        let byte_read = {
+            let encoded_length = <[u8; 20] as ssz_rs::Sized>::size_hint();
+            let end = start + encoded_length;
+            let target =
+                encoding
+                    .get(start..end)
+                    .ok_or(ssz_rs::DeserializeError::ExpectedFurtherInput {
+                        provided: encoding.len() - start,
+                        expected: encoded_length,
+                    })?;
+            let result = <[u8; 20] as ssz_rs::Deserialize>::deserialize(target)?;
+            container.sender = Address::from_slice(&result);
+            encoded_length
+        };
+        start += byte_read;
+
+        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        container.nonce = value;
+        start += byte_read;
+
+        // init code
+        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        start += 4usize;
+
+        // cal data
+        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        start += 4usize;
+
+        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        container.call_gas_limit = value;
+        start += byte_read;
+
+        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        container.verification_gas_limit = value;
+        start += byte_read;
+
+        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        container.pre_verification_gas = value;
+        start += byte_read;
+
+        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        container.max_fee_per_gas = value;
+        start += byte_read;
+
+        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        container.max_priority_fee_per_gas = value;
+        start += byte_read;
+
+        // paymaster and data
+        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        start += 4usize;
+
+        // signature
+        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        start += 4usize;
+
+        let mut total_bytes_read = start;
+        offsets.push(encoding.len());
+        let mut bytes_zone = offsets.windows(2);
+
+        // init code
+        let (init_code, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        total_bytes_read += length;
+        container.init_code = init_code;
+
+        let (call_data, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        total_bytes_read += length;
+        container.call_data = call_data;
+
+        let (paymaster_data, length) =
+            ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        total_bytes_read += length;
+        container.paymaster_and_data = paymaster_data;
+
+        let (signature, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        total_bytes_read += length;
+        container.signature = signature;
+
+        if total_bytes_read > encoding.len() {
+            return Err(ssz_rs::DeserializeError::ExpectedFurtherInput {
+                provided: encoding.len(),
+                expected: total_bytes_read,
+            });
+        }
+        if total_bytes_read < encoding.len() {
+            return Err(ssz_rs::DeserializeError::AdditionalInput {
+                provided: encoding.len(),
+                expected: total_bytes_read,
+            });
+        }
+        Ok(container)
+    }
 }
 
 #[cfg(test)]
