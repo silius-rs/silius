@@ -50,6 +50,9 @@ pub struct RpcServiceOpts {
 
     #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
     pub rpc_api: Vec<String>,
+
+    #[clap(long, value_delimiter = ',', default_value = "*")]
+    pub cors_domain: Vec<String>,
 }
 
 #[cfg(test)]
