@@ -10,8 +10,8 @@ use ethers::{
     providers::{Http, Middleware, Provider},
     types::{Address, U256},
 };
-use jsonrpsee::tracing::info;
 use std::{future::pending, sync::Arc};
+use tracing::info;
 
 #[derive(Parser)]
 #[clap(
