@@ -77,15 +77,15 @@ fn main() -> Result<()> {
             let task = async move {
                 info!("Starting ERC-4337 AA Bundler");
 
-                let eth_provider =
+                let eth_client =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
                 info!(
                     "Connected to the Ethereum execution client at {}: {}",
                     opt.eth_client_address,
-                    eth_provider.client_version().await?
+                    eth_client.client_version().await?
                 );
 
-                let chain_id = eth_provider.get_chainid().await?;
+                let chain_id = eth_client.get_chainid().await?;
                 let chain = Chain::from(chain_id);
 
                 if let Some(chain_opt) = opt.chain {
@@ -102,15 +102,12 @@ fn main() -> Result<()> {
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
                 info!("{:?}", wallet.signer);
 
-                let eth_provider =
-                    Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
-
                 if !opt.no_uopool {
                     info!("Starting uopool gRPC service...");
                     uopool_service_run(
                         opt.uopool_opts.uopool_grpc_listen_address,
                         opt.entry_points.clone(),
-                        eth_provider,
+                        eth_client,
                         chain,
                         opt.max_verification_gas,
                         opt.uopool_opts.min_stake,

@@ -12,7 +12,7 @@ use tracing::{info, trace};
 #[derive(Clone)]
 pub struct Bundler {
     pub wallet: Wallet,
-    pub eth_provider_address: String,
+    pub eth_client_address: String,
     pub beneficiary: Address,
     pub entry_point: Address,
     pub chain: Chain,
@@ -21,14 +21,14 @@ pub struct Bundler {
 impl Bundler {
     pub fn new(
         wallet: Wallet,
-        eth_provider: String,
+        eth_client_address: String,
         beneficiary: Address,
         entry_point: Address,
         chain: Chain,
     ) -> Self {
         Self {
             wallet,
-            eth_provider_address: eth_provider,
+            eth_client_address,
             beneficiary,
             entry_point,
             chain,
@@ -44,9 +44,9 @@ impl Bundler {
         info!("Creating a new bundle with {} user operations", uos.len());
         trace!("Bundle content: {uos:?}");
 
-        let provider = Provider::<Http>::try_from(self.eth_provider_address.clone())?;
+        let eth_client = Provider::<Http>::try_from(self.eth_client_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(
-            provider.clone(),
+            eth_client.clone(),
             self.wallet.signer.clone(),
         ));
         let ep = EntryPointAPI::new(self.entry_point, client.clone());
