@@ -427,10 +427,10 @@ impl<M: Middleware + 'static> UoPool<M> {
         let mut ts: JoinSet<Option<(Address, H256)>> = JoinSet::new();
 
         for addr in addrs {
-            let eth_provider = self.eth_provider.clone();
+            let eth_client = self.eth_client.clone();
 
             ts.spawn(async move {
-                match eth_provider.get_code(addr, None).await {
+                match eth_client.get_code(addr, None).await {
                     Ok(code) => Some((addr, keccak256(&code).into())),
                     Err(_) => None,
                 }

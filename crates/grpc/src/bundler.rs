@@ -194,7 +194,7 @@ pub fn bundler_service_run(
     grpc_listen_address: SocketAddr,
     wallet: Wallet,
     eps: Vec<Address>,
-    eth_provider_address: String,
+    eth_client_address: String,
     chain: Chain,
     beneficiary: Address,
     _gas_factor: U256,
@@ -207,7 +207,7 @@ pub fn bundler_service_run(
         .map(|ep| {
             Bundler::new(
                 wallet.clone(),
-                eth_provider_address.clone(),
+                eth_client_address.clone(),
                 beneficiary,
                 *ep,
                 chain,

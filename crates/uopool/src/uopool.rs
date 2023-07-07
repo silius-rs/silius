@@ -48,7 +48,7 @@ pub struct UoPool<M: Middleware> {
     pub entry_point: EntryPoint<M>,
     pub mempool: MempoolBox<VecUo, VecCh>,
     pub reputation: ReputationBox<Vec<ReputationEntry>>,
-    pub eth_provider: Arc<M>,
+    pub eth_client: Arc<M>,
     pub max_verification_gas: U256,
     pub min_priority_fee_per_gas: U256,
     pub chain: Chain,
@@ -61,7 +61,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         entry_point: EntryPoint<M>,
         mempool: MempoolBox<VecUo, VecCh>,
         reputation: ReputationBox<Vec<ReputationEntry>>,
-        eth_provider: Arc<M>,
+        eth_client: Arc<M>,
         max_verification_gas: U256,
         min_priority_fee_per_gas: U256,
         chain: Chain,
@@ -72,7 +72,7 @@ impl<M: Middleware + 'static> UoPool<M> {
             entry_point,
             mempool,
             reputation,
-            eth_provider,
+            eth_client,
             max_verification_gas,
             min_priority_fee_per_gas,
             chain,
@@ -283,7 +283,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 
     pub async fn base_fee_per_gas(&self) -> anyhow::Result<U256> {
         let block = self
-            .eth_provider
+            .eth_client
             .get_block(BlockNumber::Latest)
             .await?
             .ok_or(format_err!("No block found"))?;
@@ -373,7 +373,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 
         if let Some((event, log_meta)) = event {
             if let Some((uo, ep)) = self
-                .eth_provider
+                .eth_client
                 .get_transaction(log_meta.transaction_hash)
                 .await?
                 .and_then(|tx| {
@@ -405,7 +405,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 
         if let Some((event, log_meta)) = event {
             if let Some(tx_receipt) = self
-                .eth_provider
+                .eth_client
                 .get_transaction_receipt(log_meta.transaction_hash)
                 .await?
             {
@@ -429,7 +429,7 @@ impl<M: Middleware + 'static> UoPool<M> {
     }
 
     pub async fn handle_past_events(&mut self) -> anyhow::Result<()> {
-        let block_num = self.eth_provider.get_block_number().await?;
+        let block_num = self.eth_client.get_block_number().await?;
         let block_st = std::cmp::max(
             1u64,
             block_num

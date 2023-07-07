@@ -28,18 +28,18 @@ pub enum SimulateValidationResult {
 }
 
 pub struct EntryPoint<M: Middleware> {
-    eth_provider: Arc<M>,
+    eth_client: Arc<M>,
     address: Address,
     entry_point_api: EntryPointAPI<M>,
     stake_manager_api: StakeManagerAPI<M>,
 }
 
 impl<M: Middleware + 'static> EntryPoint<M> {
-    pub fn new(eth_provider: Arc<M>, address: Address) -> Self {
-        let entry_point_api = EntryPointAPI::new(address, eth_provider.clone());
-        let stake_manager_api = StakeManagerAPI::new(address, eth_provider.clone());
+    pub fn new(eth_client: Arc<M>, address: Address) -> Self {
+        let entry_point_api = EntryPointAPI::new(address, eth_client.clone());
+        let stake_manager_api = StakeManagerAPI::new(address, eth_client.clone());
         Self {
-            eth_provider,
+            eth_client,
             address,
             entry_point_api,
             stake_manager_api,
@@ -54,8 +54,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         self.entry_point_api.events()
     }
 
-    pub fn provider(&self) -> Arc<M> {
-        self.eth_provider.clone()
+    pub fn eth_client(&self) -> Arc<M> {
+        self.eth_client.clone()
     }
 
     pub fn address(&self) -> Address {
@@ -117,7 +117,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         let call = self.entry_point_api.simulate_validation(uo.into());
 
         let res = self
-            .eth_provider
+            .eth_client
             .debug_trace_call(
                 call.tx,
                 None,
@@ -212,7 +212,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         let uo: UserOperation = uo.into();
 
         let res = self
-            .eth_provider
+            .eth_client
             .call(
                 &TransactionRequest::new()
                     .from(self.address)
@@ -324,17 +324,16 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn simulate_validation() {
-        let eth_provider = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
+        let eth_client = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let ep = EntryPoint::<Provider<Http>>::new(
-            eth_provider.clone(),
+            eth_client.clone(),
             "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
                 .parse()
                 .unwrap(),
         );
 
         let max_priority_fee_per_gas = 1500000000_u64.into();
-        let max_fee_per_gas =
-            max_priority_fee_per_gas + eth_provider.get_gas_price().await.unwrap();
+        let max_fee_per_gas = max_priority_fee_per_gas + eth_client.get_gas_price().await.unwrap();
 
         let uo = UserOperation {
             sender: "0xBBe6a3230Ef8abC44EF61B3fBf93Cd0394D1d21f".parse().unwrap(),

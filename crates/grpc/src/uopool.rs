@@ -303,7 +303,7 @@ where
 pub async fn uopool_service_run(
     grpc_listen_address: SocketAddr,
     eps: Vec<Address>,
-    eth_provider: Arc<Provider<Http>>,
+    eth_client: Arc<Provider<Http>>,
     chain: Chain,
     max_verification_gas: U256,
     min_stake: U256,
@@ -335,10 +335,10 @@ pub async fn uopool_service_run(
             m_map.insert(
                 id,
                 UserOperationPool::<Provider<Http>>::new(
-                    EntryPoint::<Provider<Http>>::new(eth_provider.clone(), ep),
+                    EntryPoint::<Provider<Http>>::new(eth_client.clone(), ep),
                     Box::<MemoryMempool>::default(),
                     reputation,
-                    eth_provider.clone(),
+                    eth_client.clone(),
                     max_verification_gas,
                     min_priority_fee_per_gas,
                     chain,

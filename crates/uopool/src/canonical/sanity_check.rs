@@ -23,7 +23,7 @@ pub struct SanityCheckResult {
 
 impl<M: Middleware + 'static> UoPool<M> {
     async fn sender_or_init_code(&self, uo: &UserOperation) -> Result<(), SanityCheckError> {
-        let code = self.eth_provider.get_code(uo.sender, None).await?;
+        let code = self.eth_client.get_code(uo.sender, None).await?;
         if (code.is_empty() && uo.init_code.is_empty())
             || (!code.is_empty() && !uo.init_code.is_empty())
         {
@@ -57,7 +57,7 @@ impl<M: Middleware + 'static> UoPool<M> {
     async fn verify_paymaster(&self, uo: &UserOperation) -> Result<(), SanityCheckError> {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                let code = self.eth_provider.get_code(addr, None).await?;
+                let code = self.eth_client.get_code(addr, None).await?;
 
                 if !code.is_empty() {
                     let deposit_info =
