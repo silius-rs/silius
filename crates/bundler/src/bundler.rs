@@ -122,7 +122,7 @@ impl Bundler {
         info!("Creating a new bundle with {} user operations", uos.len());
         trace!("Bundle content: {uos:?}");
 
-        let provider = Provider::<Http>::try_from(self.eth_provider_address.clone())?;
+        let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
 
         let _bundle_signer = env::var("FLASHBOTS_IDENTIFIER").expect("FLASHBOTS_IDENTIFIER environment variable is not set");
 
