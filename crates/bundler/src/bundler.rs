@@ -159,6 +159,8 @@ impl Bundler {
 
         trace!("Sending transaction to the execution client: {tx:?}");
 
+        // TODO: add bribe calculation
+
         // Sign the tx
         let typed_tx = TypedTransaction::Eip1559(tx.clone().into());
         let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
