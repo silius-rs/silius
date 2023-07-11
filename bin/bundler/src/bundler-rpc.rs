@@ -4,10 +4,10 @@ use aa_bundler_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
+    JsonRpcServer,
 };
 use anyhow::Result;
 use clap::Parser;
-use jsonrpsee::{server::ServerBuilder, Methods};
 use std::{collections::HashSet, future::pending};
 use tracing::info;
 
@@ -19,6 +19,10 @@ use tracing::info;
 pub struct Opt {
     #[clap(flatten)]
     pub rpc_opts: RpcServiceOpts,
+
+    // execution client rpc endpoint
+    #[clap(long, default_value = "http://127.0.0.1:8545")]
+    pub eth_client_address: String,
 
     #[clap(long, default_value = "127.0.0.1:3001")]
     pub uopool_grpc_listen_address: String,
@@ -35,20 +39,19 @@ async fn main() -> Result<()> {
 
     info!("Starting bundler JSON-RPC server...");
 
-    let server = ServerBuilder::default()
-        .build(&opt.rpc_opts.rpc_listen_address)
-        .await?;
+    let api: HashSet<String> = HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
 
-    let mut methods = Methods::new();
+    let mut server = JsonRpcServer::new(opt.rpc_opts.rpc_listen_address.clone())
+        .with_proxy(opt.eth_client_address)
+        .with_cors(opt.rpc_opts.cors_domain);
+
+    server.add_method(Web3ApiServerImpl {}.into_rpc())?;
+
     let uopool_grpc_client =
         UoPoolClient::connect(format!("http://{}", opt.uopool_grpc_listen_address)).await?;
 
-    let api: HashSet<String> = HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
-
-    methods.merge(Web3ApiServerImpl {}.into_rpc())?;
-
     if api.contains("eth") {
-        methods.merge(
+        server.add_method(
             EthApiServerImpl {
                 uopool_grpc_client: uopool_grpc_client.clone(),
             }
@@ -59,7 +62,7 @@ async fn main() -> Result<()> {
     if api.contains("debug") {
         let bundler_grpc_client =
             BundlerClient::connect(format!("http://{}", opt.bundler_grpc_listen_address)).await?;
-        methods.merge(
+        server.add_method(
             DebugApiServerImpl {
                 uopool_grpc_client,
                 bundler_grpc_client,
@@ -68,11 +71,11 @@ async fn main() -> Result<()> {
         )?;
     }
 
-    let _handle = server.start(methods.clone())?;
+    let _handle = server.start().await?;
     info!(
         "Started bundler JSON-RPC server at {:}",
         opt.rpc_opts.rpc_listen_address
     );
 
-    pending().await
+    pending::<Result<()>>().await
 }
