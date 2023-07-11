@@ -19,6 +19,8 @@ lazy_static = "1.4.0"
 rustc-hex = "^2.0.1"
 serde = "1"
 serde_json = "1"
+ssz_rs = "0.8.0"
+ssz_rs_derive = "0.8.0"
 strum = "0.24"
 strum_macros = "0.24"
 tokio = { workspace = true }

@@ -10,8 +10,8 @@ use aa_bundler_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
 use aa_bundler_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
-    middleware::ProxyJsonRpcLayer,
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
+    JsonRpcServer,
 };
 use anyhow::{format_err, Result};
 use clap::Parser;
@@ -20,9 +20,7 @@ use ethers::{
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
-use jsonrpsee::{server::ServerBuilder, Methods};
 use std::{collections::HashSet, future::pending, panic, sync::Arc};
-use tower::ServiceBuilder;
 use tracing::info;
 
 #[derive(Parser)]
@@ -79,15 +77,15 @@ fn main() -> Result<()> {
             let task = async move {
                 info!("Starting ERC-4337 AA Bundler");
 
-                let eth_provider =
+                let eth_client =
                     Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
                 info!(
                     "Connected to the Ethereum execution client at {}: {}",
                     opt.eth_client_address,
-                    eth_provider.client_version().await?
+                    eth_client.client_version().await?
                 );
 
-                let chain_id = eth_provider.get_chainid().await?;
+                let chain_id = eth_client.get_chainid().await?;
                 let chain = Chain::from(chain_id);
 
                 if let Some(chain_opt) = opt.chain {
@@ -104,15 +102,12 @@ fn main() -> Result<()> {
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
                 info!("{:?}", wallet.signer);
 
-                let eth_provider =
-                    Arc::new(Provider::<Http>::try_from(opt.eth_client_address.clone())?);
-
                 if !opt.no_uopool {
                     info!("Starting uopool gRPC service...");
                     uopool_service_run(
                         opt.uopool_opts.uopool_grpc_listen_address,
                         opt.entry_points.clone(),
-                        eth_provider,
+                        eth_client,
                         chain,
                         opt.max_verification_gas,
                         opt.uopool_opts.min_stake,
@@ -158,22 +153,16 @@ fn main() -> Result<()> {
                     info!("Starting bundler JSON-RPC server...");
                     tokio::spawn({
                         async move {
-                            let service = ServiceBuilder::new()
-                            .layer(ProxyJsonRpcLayer::new(opt.eth_client_address));
-                            let server = ServerBuilder::new()
-                                     .set_middleware(service)
-                                     .build(&opt.rpc_opts.rpc_listen_address)
-                                     .await?;
-
-                            let mut methods = Methods::new();
-
                             let api: HashSet<String> =
                                 HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
 
-                            methods.merge(Web3ApiServerImpl{}.into_rpc())?;
+                            let mut server = JsonRpcServer::new(opt.rpc_opts.rpc_listen_address.clone()).with_proxy(opt.eth_client_address)
+                            .with_cors(opt.rpc_opts.cors_domain);
+
+                            server.add_method(Web3ApiServerImpl{}.into_rpc())?;
 
                             if api.contains("eth") {
-                                methods.merge(
+                                server.add_method(
                                     EthApiServerImpl {
                                         uopool_grpc_client: uopool_grpc_client.clone(),
                                     }
@@ -187,7 +176,7 @@ fn main() -> Result<()> {
                                     opt.bundler_opts.bundler_grpc_listen_address
                                 ))
                                 .await?;
-                                methods.merge(
+                                server.add_method(
                                     DebugApiServerImpl {
                                         uopool_grpc_client,
                                         bundler_grpc_client,
@@ -196,7 +185,7 @@ fn main() -> Result<()> {
                                 )?;
                             }
 
-                            let _handle = server.start(methods.clone())?;
+                            let _handle = server.start().await?;
                             info!(
                                 "Started bundler JSON-RPC server at {:}",
                                 opt.rpc_opts.rpc_listen_address
