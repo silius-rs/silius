@@ -1,6 +1,6 @@
 use crate::UserOperation;
 use ethers::{
-    prelude::{k256::ecdsa::SigningKey, rand},
+    prelude::{k256::ecdsa::SigningKey, LocalWallet, rand},
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
     types::{Address, U256},
 };
@@ -46,6 +46,15 @@ impl Wallet {
         let wallet = MnemonicBuilder::<English>::default()
             .phrase(phrase)
             .build()?;
+
+        Ok(Self {
+            signer: wallet.with_chain_id(chain_id.as_u64()),
+        })
+    }
+
+    /// Create a new wallet from the given private key
+    pub fn from_key(key: &str, chain_id: &U256) -> anyhow::Result<Self> {
+        let wallet = key.parse::<LocalWallet>()?;
 
         Ok(Self {
             signer: wallet.with_chain_id(chain_id.as_u64()),

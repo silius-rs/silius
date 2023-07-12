@@ -19,8 +19,11 @@ aa-bundler-rpc = { path = "../../crates/rpc" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
+dotenv = "0.15.0"
+env_logger = "0.10.0"
 ethers = { workspace = true }
 expanded-pathbuf = "0.1"
+log = "0.4.19"
 pin-utils = "0.1"
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -44,3 +47,7 @@ name = "bundler-rpc"
 [[bin]]
 path = "src/create-wallet.rs"
 name = "create-wallet"
+
+[[bin]]
+path = "src/anvil-bundler.rs"
+name = "anvil-bundler"
