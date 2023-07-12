@@ -21,3 +21,14 @@ tokio = { workspace = true }
 [[example]]
 name = "user-operation"
 path = "user_operation.rs"
+[[example]]
+name = "swap_user_operation"
+path = "swap_user_operation.rs"
+
+
+[dependencies]
+jsonrpsee = {version = "0.18.2", features = ["server", "http-client"]}
+serde_json = { version = "1" }
+tracing = "0.1.34"
+tracing-subscriber = { version = "0.3.3" }
+

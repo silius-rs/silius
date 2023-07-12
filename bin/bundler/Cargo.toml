@@ -49,5 +49,5 @@ path = "src/create-wallet.rs"
 name = "create-wallet"
 
 [[bin]]
-path = "src/anvil-bundler.rs"
-name = "anvil-bundler"
+path = "src/quick-bundler.rs"
+name = "quick-bundler"

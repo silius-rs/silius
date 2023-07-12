@@ -11,7 +11,6 @@ use aa_bundler_rpc::{
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use anyhow::{format_err, Result};
 use ethers::{
-	core::utils::Anvil,
 	providers::{Http, Middleware, Provider},
     types::{Address, U256},
 };
@@ -20,10 +19,13 @@ use log;
 use std::env;
 use tracing::info;
 use dotenv::dotenv;
+use tracing_subscriber::fmt;
 
 fn main() -> Result<()> {
 
-    tracing_subscriber::fmt::init();
+    fmt::Subscriber::builder()
+        .with_max_level(tracing::Level::INFO)
+        .init();
 
     std::thread::Builder::new()
         .stack_size(128 * 1024 * 1024)
@@ -43,35 +45,19 @@ fn main() -> Result<()> {
                         return e.to_string();
                     });
     
-                    let temp_provider = Provider::<Http>::try_from(mainnet_http_url.clone()).unwrap();
-                    let latest_block = temp_provider.get_block_number().await.unwrap();
-                    drop(temp_provider);
     
-                    let port = 8545u16;
-                    let url = format!("http://localhost:{}", port).to_string();
-    
-                    let _anvil = Anvil::new()
-                        .port(port)
-                        .fork(mainnet_http_url.clone())
-                        .fork_block_number(latest_block.as_u64())
-                        .spawn();
-    
-                    println!("Connecting to anvil instance at {}", url);
                     let provider = Arc::new(
-                        Provider::<Http>::try_from(url.clone())
+                        Provider::<Http>::try_from(mainnet_http_url.clone())
                             .ok()
                             .unwrap(),
                     );
-                    let block = provider.get_block_number().await?;
-                    println!("Provider address: {}", block);
-                    log::info!("Connected to anvil instance at {}", url);
+
                     info!("Starting ERC-4337 AA Bundler");
     
                     let eth_client = provider.clone();
     
                     info!(
-                        "Connected to the Ethereum execution client at {}: {}",
-                        "http://localhost:8545",
+                        "Connected to the Ethereum execution client: {}",
                         eth_client.client_version().await?
                     );
     
@@ -114,7 +100,7 @@ fn main() -> Result<()> {
                         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 3001),
                         wallet,
                         vec!["0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse::<Address>().unwrap()],
-                        "http://localhost:8545".to_string(),
+                        mainnet_http_url.clone(),
                         chain,
                         "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 ".parse::<Address>().unwrap(),
                         U256::from(600),
@@ -135,7 +121,7 @@ fn main() -> Result<()> {
                                 HashSet::from_iter(vec!["eth".to_string()]);
     
                             let mut server = JsonRpcServer::new("127.0.0.1:3000".to_string())
-                                .with_proxy("http://localhost:8545".to_string())
+                                .with_proxy(mainnet_http_url.clone())
                                 .with_cors(vec!["*".to_string()]);
     
                             server.add_method(Web3ApiServerImpl{}.into_rpc())?;
@@ -163,7 +149,6 @@ fn main() -> Result<()> {
                             Ok::<(), anyhow::Error>(())
                         }
                     });
-                    drop(_anvil);
                     Ok::<(), anyhow::Error>(())
 
                 };
