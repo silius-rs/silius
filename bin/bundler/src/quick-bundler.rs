@@ -13,6 +13,7 @@ use anyhow::{format_err, Result};
 use ethers::{
 	providers::{Http, Middleware, Provider},
     types::{Address, U256},
+    core::utils::Anvil,
 };
 use std::{collections::HashSet, panic, sync::Arc};
 use log;
@@ -20,10 +21,16 @@ use std::env;
 use tracing::info;
 use dotenv::dotenv;
 use tracing_subscriber::fmt;
+use tracing_subscriber::EnvFilter;
 
+
+/// Setup anvil as testnet
+/// handle past event don't work b/c of anvil don't support eth_getLogs
 fn main() -> Result<()> {
 
+    let filter = EnvFilter::new("info");
     fmt::Subscriber::builder()
+        .with_env_filter(filter)
         .with_max_level(tracing::Level::INFO)
         .init();
 
@@ -44,10 +51,25 @@ fn main() -> Result<()> {
                         log::error!("Error: {}", e);
                         return e.to_string();
                     });
-    
-    
+
+                    // let temp_provider = Provider::<Http>::try_from(mainnet_http_url.clone()).unwrap();
+                    // let latest_block = temp_provider.get_block_number().await.unwrap();
+                    // drop(temp_provider);
+
+                    // let port = 8545u16;
+                    // let url = format!("http://localhost:{}", port).to_string();
+
+                    // // setup anvil instance for testing
+                    // // note: spawn() will panic if spawn is called without anvil being available in the user’s $PATH
+                    // let _anvil = Anvil::new()
+                    //     .port(port)
+                    //     .fork(mainnet_http_url.clone())
+                    //     .fork_block_number(latest_block.as_u64())
+                    //     .spawn();
+
                     let provider = Arc::new(
                         Provider::<Http>::try_from(mainnet_http_url.clone())
+                        // Provider::<Http>::try_from(url.clone())
                             .ok()
                             .unwrap(),
                     );
