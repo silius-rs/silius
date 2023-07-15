@@ -405,7 +405,6 @@ impl From<UserOperationPartial> for UserOperation {
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationGasEstimation {
     pub pre_verification_gas: U256,
-    #[serde(rename = "verificationGas")]
     pub verification_gas_limit: U256,
     pub call_gas_limit: U256,
 }
