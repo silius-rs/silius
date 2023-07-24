@@ -1,36 +1,16 @@
 use aa_bundler_contracts::entry_point::EntryPointAPI;
-use aa_bundler_primitives::{Chain, UserOperation, Wallet};
+use aa_bundler_primitives::{consts::RELAY_ENDPOINTS, Chain, UserOperation, Wallet};
 use ethers::{
-    prelude::{SignerMiddleware, LocalWallet},
+    prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
-    types::{
-        transaction::eip2718::TypedTransaction, 
-        Address, 
-        H256
-    },
+    types::{transaction::eip2718::TypedTransaction, Address, H256},
 };
 use ethers_flashbots::{BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded};
 use std::{sync::Arc, time::Duration};
+use tokio::task::JoinHandle;
 use tracing::{info, trace};
 use url::Url;
-use tokio::task::JoinHandle;
-use std::env;
-
-const RELAY_ENDPOINTS: &[(&str, &str)] = &[
-    ("flashbots", "https://relay.flashbots.net"),
-    ("flashbots_goerli", "https://relay-goerli.flashbots.net"),
-    ("builder0x69", "http://builder0x69.io/"),
-    ("edennetwork", "https://api.edennetwork.io/v1/bundle"),
-    ("beaverbuild", "https://rpc.beaverbuild.org/"),
-    ("lightspeedbuilder", "https://rpc.lightspeedbuilder.info/"),
-    ("eth-builder", "https://eth-builder.com/"),
-    ("ultrasound", "https://relay.ultrasound.money/"),
-    ("agnostic-relay", "https://agnostic-relay.net/"),
-    ("relayoor-wtf", "https://relayooor.wtf/"),
-    ("rsync-builder", "https://rsync-builder.xyz/"),
-];
-
 
 #[derive(Clone)]
 pub struct Bundler {
@@ -103,16 +83,18 @@ impl Bundler {
     }
 
     // TODO: add more relay endpoints support
-    /// Send a bundle as Flashbots bundles
     #[allow(clippy::needless_return)]
     #[allow(clippy::clone_double_ref)]
-    pub async fn send_next_bundle_flashbots(&self, uos: &Vec<UserOperation>, test: Option<bool>) -> anyhow::Result<H256> {
-
+    pub async fn send_next_bundle_flashbots(
+        &self,
+        uos: &Vec<UserOperation>,
+        test: Option<bool>,
+    ) -> anyhow::Result<H256> {
+        // Send a bundle as Flashbots bundles
         let mut relay_endpoint: &str = RELAY_ENDPOINTS[0].1;
         if Some(true) == test {
-            relay_endpoint = RELAY_ENDPOINTS[1].1; 
+            relay_endpoint = RELAY_ENDPOINTS[1].1;
         };
-        
 
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");
@@ -124,23 +106,24 @@ impl Bundler {
 
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
 
-        let _bundle_signer = env::var("FLASHBOTS_IDENTIFIER").expect("FLASHBOTS_IDENTIFIER environment variable is not set");
-
-        let bundle_signer = _bundle_signer.parse::<LocalWallet>()?;
+        let bundle_signer = match self.wallet.fb_signer {
+            Some(ref signer) => signer,
+            None => return Err(anyhow::anyhow!("No Flashbots signer provided")),
+        };
 
         let mut fb_middleware = FlashbotsMiddleware::new(
-                    provider.clone(),
-                    Url::parse(relay_endpoint.clone())?,
-                    bundle_signer.clone(),
-                );
-        fb_middleware.set_simulation_relay(Url::parse(relay_endpoint.clone()).unwrap());
-
-        let client = Arc::new(
-            SignerMiddleware::new(
-                fb_middleware,
-                self.wallet.signer.clone(),
-            )
+            provider.clone(),
+            Url::parse(relay_endpoint.clone())?,
+            bundle_signer.clone(),
         );
+        fb_middleware.set_simulation_relay(
+            Url::parse(relay_endpoint.clone()).expect("Failed to parse simulation relay URL"),
+        );
+
+        let client = Arc::new(SignerMiddleware::new(
+            fb_middleware,
+            self.wallet.signer.clone(),
+        ));
 
         let ep = EntryPointAPI::new(self.entry_point, client.clone());
 
@@ -160,17 +143,11 @@ impl Bundler {
         trace!("Sending transaction to the execution client: {tx:?}");
 
         // TODO: add bribe calculation
-
         // Sign the tx
         let typed_tx = TypedTransaction::Eip1559(tx.clone().into());
         let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
             Ok(tx) => typed_tx.rlp_signed(&tx),
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "Failed to sign transaction: {:?}",
-                    e
-                ))
-            }
+            Err(e) => return Err(anyhow::anyhow!("Failed to sign transaction: {:?}", e)),
         };
 
         // Add tx to Flashbots bundle
@@ -185,60 +162,50 @@ impl Bundler {
             .set_simulation_timestamp(0);
         let simulated_bundle = client.inner().simulate_bundle(&bundle_req).await?;
 
-        // Currently there's only 1 tx per bundle 
+        // Currently there's only 1 tx per bundle
         for tx in simulated_bundle.transactions {
             trace!("Simulate bundle: {:?}", tx);
-            if let Some(err) = &tx.error { 
+            if let Some(err) = &tx.error {
                 return Err(anyhow::anyhow!(
                     "Transaction failed simulation with error: {:?}",
                     err
                 ));
             }
-            if let Some(revert) = &tx.revert { 
+            if let Some(revert) = &tx.revert {
                 return Err(anyhow::anyhow!(
                     "Transaction failed simulation with revert: {:?}",
                     revert
                 ));
             }
-        };
+        }
 
         // Send the Flashbots bundle and check for status
-        let handle: JoinHandle<Result<(bool, H256), anyhow::Error>> = tokio::spawn(
-            async move {
-                let pending_bundle = match client.inner().send_bundle(&bundle_req).await {
-                    Ok(bundle) => bundle,
-                    Err(e) => {
-                        return Err(anyhow::anyhow!(
-                            "Failed to send bundle: {:?}",
-                            e
-                        ))
-                    }
-                };
+        let handle: JoinHandle<Result<(bool, H256), anyhow::Error>> = tokio::spawn(async move {
+            let pending_bundle = match client.inner().send_bundle(&bundle_req).await {
+                Ok(bundle) => bundle,
+                Err(e) => return Err(anyhow::anyhow!("Failed to send bundle: {:?}", e)),
+            };
 
-                let bundle_hash = pending_bundle.bundle_hash;
+            let bundle_hash = pending_bundle.bundle_hash;
 
-                match pending_bundle.await {
-                    Ok(_) => return Ok((true, bundle_hash)),
-                    Err(BundleNotIncluded) => {
-                        return Err(anyhow::anyhow!("Bundle not included in the target block"));
-                    },
-                    Err(e) => {
-                        return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
-                    }
-                };
-            }
-        );
+            match pending_bundle.await {
+                Ok(_) => return Ok((true, bundle_hash)),
+                Err(BundleNotIncluded) => {
+                    return Err(anyhow::anyhow!("Bundle not included in the target block"));
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
+                }
+            };
+        });
 
         match handle.await {
             Ok(Ok((_, bundle_hash))) => {
                 info!("Bundle included");
                 Ok(bundle_hash)
-            },
+            }
             Ok(Err(e)) => Err(e),
-            Err(e) => Err(anyhow::anyhow!(
-                    "Task panicked: {:?}",
-                    e
-                )),
+            Err(e) => Err(anyhow::anyhow!("Task panicked: {:?}", e)),
         }
     }
 }
