@@ -25,3 +25,18 @@ pub mod entities {
     pub const ACCOUNT: &str = "account";
     pub const PAYMASTER: &str = "paymaster";
 }
+
+/// Builder JSON-RPC Endpoints
+pub const RELAY_ENDPOINTS: &[(&str, &str)] = &[
+    ("flashbots", "https://relay.flashbots.net"),
+    ("flashbots_goerli", "https://relay-goerli.flashbots.net"),
+    ("builder0x69", "http://builder0x69.io/"),
+    ("edennetwork", "https://api.edennetwork.io/v1/bundle"),
+    ("beaverbuild", "https://rpc.beaverbuild.org/"),
+    ("lightspeedbuilder", "https://rpc.lightspeedbuilder.info/"),
+    ("eth-builder", "https://eth-builder.com/"),
+    ("ultrasound", "https://relay.ultrasound.money/"),
+    ("agnostic-relay", "https://agnostic-relay.net/"),
+    ("relayoor-wtf", "https://relayooor.wtf/"),
+    ("rsync-builder", "https://rsync-builder.xyz/"),
+];
