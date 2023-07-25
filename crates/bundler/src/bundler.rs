@@ -38,6 +38,32 @@ impl Bundler {
         }
     }
 
+    #[allow(clippy::ptr_arg)]
+    async fn generate_tx<M>(
+        &self,
+        client: Arc<M>,
+        uos: &Vec<UserOperation>,
+    ) -> anyhow::Result<TypedTransaction>
+    where
+        M: Middleware + 'static,
+    {
+        let ep = EntryPointAPI::new(self.entry_point, client.clone());
+
+        let nonce = client
+            .clone()
+            .get_transaction_count(self.wallet.signer.address(), None)
+            .await?;
+        let mut tx: TypedTransaction = ep
+            .handle_ops(
+                uos.clone().into_iter().map(Into::into).collect(),
+                self.beneficiary,
+            )
+            .tx;
+        tx.set_nonce(nonce).set_chain_id(self.chain.id());
+
+        Ok(tx)
+    }
+
     pub async fn send_next_bundle(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");
@@ -52,20 +78,8 @@ impl Bundler {
             eth_client.clone(),
             self.wallet.signer.clone(),
         ));
-        let ep = EntryPointAPI::new(self.entry_point, client.clone());
 
-        let nonce = client
-            .clone()
-            .get_transaction_count(self.wallet.signer.address(), None)
-            .await?;
-        let mut tx: TypedTransaction = ep
-            .handle_ops(
-                uos.clone().into_iter().map(Into::into).collect(),
-                self.beneficiary,
-            )
-            .tx
-            .clone();
-        tx.set_nonce(nonce).set_chain_id(self.chain.id());
+        let tx = self.generate_tx(client.clone(), uos).await?;
 
         trace!("Sending transaction to the execution client: {tx:?}");
 
@@ -88,13 +102,10 @@ impl Bundler {
     pub async fn send_next_bundle_flashbots(
         &self,
         uos: &Vec<UserOperation>,
-        test: Option<bool>,
     ) -> anyhow::Result<H256> {
         // Send a bundle as Flashbots bundles
-        let mut relay_endpoint: &str = RELAY_ENDPOINTS[0].1;
-        if Some(true) == test {
-            relay_endpoint = RELAY_ENDPOINTS[1].1;
-        };
+        // TODO: add more relay endpoints support
+        let relay_endpoint: &str = RELAY_ENDPOINTS[0].1;
 
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");
@@ -125,20 +136,7 @@ impl Bundler {
             self.wallet.signer.clone(),
         ));
 
-        let ep = EntryPointAPI::new(self.entry_point, client.clone());
-
-        let nonce = client
-            .clone()
-            .get_transaction_count(self.wallet.signer.address(), None)
-            .await?;
-        let mut tx: TypedTransaction = ep
-            .handle_ops(
-                uos.clone().into_iter().map(Into::into).collect(),
-                self.beneficiary,
-            )
-            .tx
-            .clone();
-        tx.set_nonce(nonce).set_chain_id(self.chain.id());
+        let tx = self.generate_tx(client.clone(), uos).await?;
 
         trace!("Sending transaction to the execution client: {tx:?}");
 
