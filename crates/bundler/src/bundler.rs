@@ -1,5 +1,5 @@
 use aa_bundler_contracts::entry_point::EntryPointAPI;
-use aa_bundler_primitives::{consts::RELAY_ENDPOINTS, Chain, UserOperation, Wallet};
+use aa_bundler_primitives::{consts::relay_endpoints, Chain, UserOperation, Wallet};
 use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
@@ -137,7 +137,7 @@ impl Bundler {
     ) -> anyhow::Result<H256> {
         // Send a bundle as Flashbots bundles
         // TODO: add more relay endpoints support
-        let relay_endpoint: &str = RELAY_ENDPOINTS[0].1;
+        let relay_endpoint: &str = relay_endpoints::FLASHBOTS;
 
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");

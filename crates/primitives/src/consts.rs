@@ -27,16 +27,16 @@ pub mod entities {
 }
 
 /// Builder JSON-RPC Endpoints
-pub const RELAY_ENDPOINTS: &[(&str, &str)] = &[
-    ("flashbots", "https://relay.flashbots.net"),
-    ("flashbots_goerli", "https://relay-goerli.flashbots.net"),
-    ("builder0x69", "http://builder0x69.io/"),
-    ("edennetwork", "https://api.edennetwork.io/v1/bundle"),
-    ("beaverbuild", "https://rpc.beaverbuild.org/"),
-    ("lightspeedbuilder", "https://rpc.lightspeedbuilder.info/"),
-    ("eth-builder", "https://eth-builder.com/"),
-    ("ultrasound", "https://relay.ultrasound.money/"),
-    ("agnostic-relay", "https://agnostic-relay.net/"),
-    ("relayoor-wtf", "https://relayooor.wtf/"),
-    ("rsync-builder", "https://rsync-builder.xyz/"),
-];
+pub mod relay_endpoints {
+    pub const FLASHBOTS: &str = "https://relay.flashbots.net";
+    pub const FLASHBOTS_GOERLI: &str = "https://relay-goerli.flashbots.net";
+    pub const BUILDER0X69: &str = "http://builder0x69.io/";
+    pub const EDENNETWORK: &str = "https://api.edennetwork.io/v1/bundle";
+    pub const BEAVERBUILD: &str = "https://rpc.beaverbuild.org/";
+    pub const LIGHTSPEEDBUILDER: &str = "https://rpc.lightspeedbuilder.info/";
+    pub const ETH_BUILDER: &str = "https://eth-builder.com/";
+    pub const ULTRASOUND: &str = "https://relay.ultrasound.money/";
+    pub const AGNOSTIC_RELAY: &str = "https://agnostic-relay.net/";
+    pub const RELAYOOR_WTF: &str = "https://relayooor.wtf/";
+    pub const RSYNC_BUILDER: &str = "https://rsync-builder.xyz/";
+}
