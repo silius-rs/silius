@@ -59,6 +59,9 @@ pub struct Opt {
 
     #[clap(flatten)]
     pub bundler_opts: BundlerServiceOpts,
+
+    #[clap(long)]
+    pub fb_mnemonic_file: Option<ExpandedPathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -98,9 +101,22 @@ fn main() -> Result<()> {
                     }
                 }
 
-                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id)
+                let wallet: Wallet;
+                if opt.fb_mnemonic_file.is_some() {
+                    wallet = Wallet::from_file(
+                        opt.mnemonic_file.clone(),
+                        &chain_id,
+                        opt.fb_mnemonic_file.clone(),
+                    )
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
-                info!("{:?}", wallet.signer);
+                    info!("Wallet Signer {:?}", wallet.signer);
+                    info!("Flashbots Signer {:?}", wallet.fb_signer);
+                } else {
+                    wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id, None)
+                        .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
+                    info!("{:?}", wallet.signer);
+                }
+
 
                 if !opt.no_uopool {
                     info!("Starting uopool gRPC service...");

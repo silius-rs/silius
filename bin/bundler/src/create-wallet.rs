@@ -18,6 +18,9 @@ pub struct Opt {
 
     #[clap(long, value_parser=parse_u256, default_value="1")]
     pub chain_id: U256,
+
+    #[clap(long)]
+    pub fb_bundler_path: Option<ExpandedPathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -29,13 +32,29 @@ fn main() -> Result<()> {
         output_path
     } else {
         home_dir()
-            .map(|h| h.join(".aa-bundler"))
+            .map(|h| h.join(".aa-bundler/bundler.json"))
             .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
             .map(ExpandedPathBuf)?
     };
 
-    let wallet = Wallet::build_random(path, &opt.chain_id)?;
-    info!("{:?}", wallet.signer);
+    let fb_path = if let Some(fb_bundler_path) = opt.fb_bundler_path.clone() {
+        fb_bundler_path
+    } else {
+        home_dir()
+            .map(|h| h.join(".aa-bundler/fb-bundler.json"))
+            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
+            .map(ExpandedPathBuf)?
+    };
+
+    if opt.fb_bundler_path.is_some() {
+        let wallet = Wallet::build_random(path.clone(), &opt.chain_id, None)?;
+        info!("Wallet's Signer {:?}", wallet.signer);
+        let fb_wallet = Wallet::build_random(path, &opt.chain_id, Some(fb_path))?;
+        info!("Flashbots' Bundle Signer {:?}", fb_wallet.signer);
+    } else {
+        let wallet = Wallet::build_random(path, &opt.chain_id, None)?;
+        info!("Wallet's Signer {:?}", wallet.signer);
+    }
 
     Ok(())
 }
