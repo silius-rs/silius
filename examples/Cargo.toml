@@ -21,9 +21,6 @@ tokio = { workspace = true }
 [[example]]
 name = "user-operation"
 path = "user_operation.rs"
-[[example]]
-name = "swap_user_operation"
-path = "swap_user_operation.rs"
 
 
 [dependencies]

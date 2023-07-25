@@ -12,16 +12,27 @@ use tokio::task::JoinHandle;
 use tracing::{info, trace};
 use url::Url;
 
+/// The `Bundler` struct is used to represent a bundler with necessary properties
+///
 #[derive(Clone)]
 pub struct Bundler {
+    /// Wallet instance representing the bundler's wallet.
     pub wallet: Wallet,
+    /// URL of an Ethereum client.
     pub eth_client_address: String,
+    /// Beneficiary address where the gas is refunded after execution
     pub beneficiary: Address,
+    /// Entry point contract address
     pub entry_point: Address,
+    /// [Chain](Chain) instance representing the blockchain network to be used
     pub chain: Chain,
 }
 
 impl Bundler {
+    /// Create a new `Bundler` instance
+    ///
+    /// # Returns
+    /// * `Self` - A new `Bundler` instance
     pub fn new(
         wallet: Wallet,
         eth_client_address: String,
@@ -38,6 +49,13 @@ impl Bundler {
         }
     }
 
+    /// Helper function to generate a [TypedTransaction](TypedTransaction) from an array of user operations.
+    ///
+    /// # Arguments
+    /// * `client` - An a provider that implements [Middleware](Middleware) trait
+    ///
+    /// # Returns
+    /// * `TypedTransaction` - A [TypedTransaction](TypedTransaction) instance
     #[allow(clippy::ptr_arg)]
     async fn generate_tx<M>(
         &self,
@@ -64,6 +82,13 @@ impl Bundler {
         Ok(tx)
     }
 
+    /// Send a bundle of user operations to the Ethereum execution client
+    ///
+    /// # Arguments
+    /// * `uos` - An array of [UserOperations](UserOperation)
+    ///
+    /// # Returns
+    /// * `H256` - The transaction hash of the bundle
     pub async fn send_next_bundle(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");
@@ -97,6 +122,13 @@ impl Bundler {
     }
 
     // TODO: add more relay endpoints support
+    /// Sends the bundle as Flashbots bundle.
+    ///
+    /// # Arguments
+    /// * `uos` - An array of [UserOperations](UserOperation)
+    ///
+    /// # Returns
+    /// * `H256` - The transaction hash of the bundle
     #[allow(clippy::needless_return)]
     #[allow(clippy::clone_double_ref)]
     pub async fn send_next_bundle_flashbots(

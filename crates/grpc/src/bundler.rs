@@ -49,6 +49,7 @@ impl BundlerService {
         Ok(uos)
     }
 
+    // TODO: add send bundle to flashbots
     pub async fn send_bundles(&self) -> anyhow::Result<H256> {
         let mut tx_hashes: Vec<H256> = vec![];
 
