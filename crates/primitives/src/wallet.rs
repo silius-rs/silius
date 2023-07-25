@@ -32,9 +32,17 @@ impl Wallet {
 
         if fb_path.is_some() {
             let mut rng = rand::thread_rng();
-            fs::create_dir_all(fb_path.clone().unwrap())?;
+            fs::create_dir_all(
+                fb_path
+                    .clone()
+                    .expect("Failed to open Flashbots' mnemonic file"),
+            )?;
             let fb_wallet = MnemonicBuilder::<English>::default()
-                .write_to(fb_path.unwrap().to_path_buf())
+                .write_to(
+                    fb_path
+                        .expect("Failed to open Flashbots' mnemonic file")
+                        .to_path_buf(),
+                )
                 .build_random(&mut rng)?;
 
             Ok(Self {
@@ -61,7 +69,11 @@ impl Wallet {
 
         if fb_path.is_some() {
             let fb_wallet = MnemonicBuilder::<English>::default()
-                .phrase(fb_path.unwrap().to_path_buf())
+                .phrase(
+                    fb_path
+                        .expect("Failed to open Flashbots' mnemonic file")
+                        .to_path_buf(),
+                )
                 .build()?;
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
@@ -87,7 +99,7 @@ impl Wallet {
 
         if fb_phrase.is_some() {
             let fb_wallet = MnemonicBuilder::<English>::default()
-                .phrase(fb_phrase.unwrap())
+                .phrase(fb_phrase.expect("Failed to read Flashbots' mnemonic file"))
                 .build()?;
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
@@ -106,7 +118,9 @@ impl Wallet {
         let wallet = key.parse::<LocalWallet>()?;
 
         if fb_key.is_some() {
-            let fb_wallet = fb_key.unwrap().parse::<LocalWallet>()?;
+            let fb_wallet = fb_key
+                .expect("Failed to read Flashbot's mnemonic file")
+                .parse::<LocalWallet>()?;
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
                 fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
