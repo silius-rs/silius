@@ -17,6 +17,6 @@ aa-bundler-primitives = { path = "../primitives" }
 anyhow = "1"
 ethers = { workspace = true }
 ethers-flashbots = "0.13.1"
+tokio = { workspace = true }
 tracing = { workspace = true }
 url = "2.4.0"
-tokio = { workspace = true }
