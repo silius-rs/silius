@@ -1,4 +1,10 @@
 use crate::{error::JsonRpcError, eth_api::EthApiServer};
+use async_trait::async_trait;
+use ethers::{
+    types::{Address, U64},
+    utils::to_checksum,
+};
+use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use silius_grpc::{
     uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
     EstimateUserOperationGasResult, UserOperationHashRequest,
@@ -8,12 +14,6 @@ use silius_primitives::{
     uopool::VerificationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
     UserOperationHash, UserOperationPartial, UserOperationReceipt,
 };
-use async_trait::async_trait;
-use ethers::{
-    types::{Address, U64},
-    utils::to_checksum,
-};
-use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
 use std::str::FromStr;
 use tonic::Request;
 

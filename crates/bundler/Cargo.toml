@@ -11,9 +11,9 @@ AA (ERC-4337) bundler bundling implementation
 """
 
 [dependencies]
-silius-contracts = { path = "../contracts" }
-silius-primitives = { path = "../primitives" }
 
 anyhow = "1"
 ethers = { workspace = true }
+silius-contracts = { path = "../contracts" }
+silius-primitives = { path = "../primitives" }
 tracing = { workspace = true }

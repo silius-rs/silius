@@ -1,3 +1,10 @@
+use anyhow::{format_err, Result};
+use clap::Parser;
+use ethers::{
+    providers::{Http, Middleware, Provider},
+    types::{Address, U256},
+};
+use expanded_pathbuf::ExpandedPathBuf;
 use silius::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
@@ -13,21 +20,11 @@ use silius_rpc::{
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
     JsonRpcServer,
 };
-use anyhow::{format_err, Result};
-use clap::Parser;
-use ethers::{
-    providers::{Http, Middleware, Provider},
-    types::{Address, U256},
-};
-use expanded_pathbuf::ExpandedPathBuf;
 use std::{collections::HashSet, future::pending, panic, sync::Arc};
 use tracing::info;
 
 #[derive(Parser)]
-#[clap(
-    name = "silius",
-    about = "Bundler for ERC-4337 Account Abstraction"
-)]
+#[clap(name = "silius", about = "Bundler for ERC-4337 Account Abstraction")]
 pub struct Opt {
     #[clap(long)]
     pub mnemonic_file: ExpandedPathBuf,

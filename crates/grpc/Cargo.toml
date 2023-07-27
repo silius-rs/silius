@@ -11,10 +11,6 @@ AA (ERC-4337) bundler gRPC interfaces
 """
 
 [dependencies]
-silius-bundler = { path = "../bundler" }
-silius-contracts = { path = "../contracts" }
-silius-primitives = { path = "../primitives" }
-silius-uopool = { path = "../uopool" }
 
 anyhow = "1"
 arrayref = "0.3"
@@ -24,6 +20,10 @@ ethers = { workspace = true }
 parking_lot = "0.12"
 prost = "0.11"
 serde_json = "1"
+silius-bundler = { path = "../bundler" }
+silius-contracts = { path = "../contracts" }
+silius-primitives = { path = "../primitives" }
+silius-uopool = { path = "../uopool" }
 tokio = { workspace = true }
 tonic = { version = "0.8", default-features = false, features = [
     "codegen",

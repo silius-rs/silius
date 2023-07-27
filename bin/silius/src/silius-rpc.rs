@@ -1,3 +1,5 @@
+use anyhow::Result;
+use clap::Parser;
 use silius::cli::RpcServiceOpts;
 use silius_grpc::{bundler_client::BundlerClient, uo_pool_client::UoPoolClient};
 use silius_rpc::{
@@ -6,8 +8,6 @@ use silius_rpc::{
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
     JsonRpcServer,
 };
-use anyhow::Result;
-use clap::Parser;
 use std::{collections::HashSet, future::pending};
 use tracing::info;
 

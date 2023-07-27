@@ -1,7 +1,7 @@
 pub use crate::debug::DebugApiServerImpl;
-use silius_primitives::{reputation::ReputationEntry, BundlerMode, UserOperation};
 use ethers::types::{Address, H256};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use silius_primitives::{reputation::ReputationEntry, BundlerMode, UserOperation};
 
 #[rpc(server, namespace = "debug_bundler")]
 pub trait DebugApi {

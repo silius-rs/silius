@@ -1,7 +1,7 @@
 use crate::utils::{parse_address, parse_u256, parse_uopool_mode};
-use silius_primitives::UoPoolMode;
 use clap::Parser;
 use ethers::types::{Address, U256};
+use silius_primitives::UoPoolMode;
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug, Parser, PartialEq)]

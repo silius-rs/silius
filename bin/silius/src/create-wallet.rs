@@ -1,10 +1,10 @@
-use silius::utils::parse_u256;
-use silius_primitives::Wallet;
 use anyhow::Result;
 use clap::Parser;
 use dirs::home_dir;
 use ethers::types::U256;
 use expanded_pathbuf::ExpandedPathBuf;
+use silius::utils::parse_u256;
+use silius_primitives::Wallet;
 use tracing::info;
 
 #[derive(Parser)]

@@ -12,9 +12,6 @@ AA (ERC-4337) bundler - Silius
 default-run = "silius"
 
 [dependencies]
-silius-grpc = { path = "../../crates/grpc" }
-silius-primitives = { path = "../../crates/primitives" }
-silius-rpc = { path = "../../crates/rpc" }
 
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
@@ -22,6 +19,9 @@ dirs = "4.0"
 ethers = { workspace = true }
 expanded-pathbuf = "0.1"
 pin-utils = "0.1"
+silius-grpc = { path = "../../crates/grpc" }
+silius-primitives = { path = "../../crates/primitives" }
+silius-rpc = { path = "../../crates/rpc" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = "0.3"

@@ -1,6 +1,6 @@
-use silius_primitives::UoPoolMode;
 use ethers::types::{Address, U256};
 use pin_utils::pin_mut;
+use silius_primitives::UoPoolMode;
 use std::{future::Future, str::FromStr};
 use tracing::info;
 

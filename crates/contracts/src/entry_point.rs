@@ -314,11 +314,11 @@ impl EntryPointErr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use silius_primitives::UserOperation;
     use ethers::{
         providers::{Http, Middleware, Provider},
         types::{Bytes, GethTrace, U256},
     };
+    use silius_primitives::UserOperation;
     use std::sync::Arc;
 
     #[tokio::test]

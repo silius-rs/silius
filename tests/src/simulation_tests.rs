@@ -9,12 +9,6 @@ use crate::common::{
     },
     setup_geth, ClientType, DeployedContract,
 };
-use silius_contracts::EntryPoint;
-use silius_primitives::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
-use silius_primitives::simulation::SimulationError;
-use silius_primitives::{Chain, UoPoolMode, UserOperation};
-use silius_uopool::canonical::simulation::SimulationResult;
-use silius_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoPool};
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
 use ethers::types::transaction::eip2718::TypedTransaction;
@@ -24,6 +18,12 @@ use ethers::{
     providers::Middleware,
     types::{Bytes, U256},
 };
+use silius_contracts::EntryPoint;
+use silius_primitives::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
+use silius_primitives::simulation::SimulationError;
+use silius_primitives::{Chain, UoPoolMode, UserOperation};
+use silius_uopool::canonical::simulation::SimulationResult;
+use silius_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoPool};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;

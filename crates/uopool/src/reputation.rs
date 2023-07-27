@@ -1,8 +1,8 @@
+use ethers::types::{Address, Bytes, U256};
 use silius_primitives::{
     get_address,
     reputation::{ReputationEntry, ReputationError, ReputationStatus, StakeInfo},
 };
-use ethers::types::{Address, Bytes, U256};
 use std::{fmt::Debug, ops::Deref};
 
 pub type ReputationBox<T> = Box<dyn Reputation<ReputationEntries = T> + Send + Sync>;

@@ -1,6 +1,5 @@
 use super::utils::{WrapAddress, WrapCodeHash, WrapUserOperation, WrapUserOperationHash};
 use crate::mempool::Mempool;
-use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::types::{Address, U256};
 use reth_db::{
     cursor::{DbCursorRO, DbDupCursorRO},
@@ -16,6 +15,7 @@ use reth_db::{
     transaction::{DbTx, DbTxMut},
     Error, TableType,
 };
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use std::{fmt::Display, path::PathBuf};
 
 table!(

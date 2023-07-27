@@ -1,9 +1,9 @@
 use crate::reputation::Reputation;
+use educe::Educe;
+use ethers::types::{Address, U256};
 use silius_primitives::reputation::{
     ReputationEntry, ReputationError, ReputationStatus, StakeInfo,
 };
-use educe::Educe;
-use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Default, Educe)]

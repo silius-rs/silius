@@ -1,11 +1,11 @@
-use silius_contracts::entry_point::EntryPointAPI;
-use silius_primitives::{Chain, UserOperation, Wallet};
 use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
     types::{transaction::eip2718::TypedTransaction, Address, H256},
 };
+use silius_contracts::entry_point::EntryPointAPI;
+use silius_primitives::{Chain, UserOperation, Wallet};
 use std::{sync::Arc, time::Duration};
 use tracing::{info, trace};
 

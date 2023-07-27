@@ -11,7 +11,6 @@ AA (ERC-4337) bundler smart contract interfaces
 """
 
 [dependencies]
-silius-primitives = { path = "../primitives" }
 
 anyhow = "1"
 ethers = { workspace = true }
@@ -19,6 +18,7 @@ ethers-providers = "2.0.1"
 lazy_static = "1.4.0"
 serde = "1"
 serde_json = "1"
+silius-primitives = { path = "../primitives" }
 thiserror = "1"
 
 [dev-dependencies]

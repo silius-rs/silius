@@ -11,8 +11,6 @@ AA (ERC-4337) bundler uopool implementation
 """
 
 [dependencies]
-silius-contracts = { path = "../contracts" }
-silius-primitives = { path = "../primitives" }
 
 anyhow = "1"
 educe = { version = "0.4", features = ["Debug", "Default"] }
@@ -23,6 +21,8 @@ reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610f
 reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
 serde = "1"
 serde_json = "1"
+silius-contracts = { path = "../contracts" }
+silius-primitives = { path = "../primitives" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

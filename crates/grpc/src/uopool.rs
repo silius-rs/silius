@@ -3,15 +3,6 @@ use crate::{
     utils::{parse_addr, parse_hash, parse_uo, parse_uo_pool_mut},
 };
 use crate::{proto::uopool::*, utils::parse_uo_pool};
-use silius_contracts::{entry_point::EntryPointErr, EntryPoint};
-use silius_primitives::{
-    reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
-    uopool::AddError,
-    Chain, UoPoolMode,
-};
-use silius_uopool::{
-    mempool_id, MemoryMempool, MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
-};
 use anyhow::Result;
 use async_trait::async_trait;
 use dashmap::{
@@ -21,6 +12,15 @@ use dashmap::{
 use ethers::{
     providers::{Http, Middleware, Provider},
     types::{Address, H256, U256},
+};
+use silius_contracts::{entry_point::EntryPointErr, EntryPoint};
+use silius_primitives::{
+    reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
+    uopool::AddError,
+    Chain, UoPoolMode,
+};
+use silius_uopool::{
+    mempool_id, MemoryMempool, MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
 };
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};

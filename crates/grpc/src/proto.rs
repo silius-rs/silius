@@ -1,10 +1,10 @@
 // Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
 
-    use silius_primitives::UserOperationHash;
     use arrayref::array_ref;
     use ethers::types::{Address, Bloom, U256};
     use prost::bytes::Buf;
+    use silius_primitives::UserOperationHash;
     use std::str::FromStr;
 
     tonic::include_proto!("types");

@@ -6,6 +6,13 @@ use crate::{
     utils::calculate_call_gas_limit,
     MempoolId, Overhead,
 };
+use anyhow::format_err;
+use ethers::{
+    prelude::LogMeta,
+    providers::Middleware,
+    types::{Address, BlockNumber, U256, U64},
+};
+use serde::{Deserialize, Serialize};
 use silius_contracts::{
     entry_point::{EntryPointAPIEvents, EntryPointErr, UserOperationEventFilter},
     utils::parse_from_input_data,
@@ -19,13 +26,6 @@ use silius_primitives::{
     Chain, UoPoolMode, UserOperation, UserOperationByHash, UserOperationGasEstimation,
     UserOperationHash, UserOperationReceipt,
 };
-use anyhow::format_err;
-use ethers::{
-    prelude::LogMeta,
-    providers::Middleware,
-    types::{Address, BlockNumber, U256, U64},
-};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,

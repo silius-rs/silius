@@ -1,15 +1,15 @@
-use silius::{
-    cli::UoPoolServiceOpts,
-    utils::{parse_address, parse_u256},
-};
-use silius_grpc::uopool_service_run;
-use silius_primitives::{chain::SUPPORTED_CHAINS, Chain};
 use anyhow::{format_err, Result};
 use clap::Parser;
 use ethers::{
     providers::{Http, Middleware, Provider},
     types::{Address, U256},
 };
+use silius::{
+    cli::UoPoolServiceOpts,
+    utils::{parse_address, parse_u256},
+};
+use silius_grpc::uopool_service_run;
+use silius_primitives::{chain::SUPPORTED_CHAINS, Chain};
 use std::{future::pending, sync::Arc};
 use tracing::info;
 
