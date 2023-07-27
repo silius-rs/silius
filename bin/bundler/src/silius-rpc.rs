@@ -1,6 +1,6 @@
-use aa_bundler::cli::RpcServiceOpts;
-use aa_bundler_grpc::{bundler_client::BundlerClient, uo_pool_client::UoPoolClient};
-use aa_bundler_rpc::{
+use silius::cli::RpcServiceOpts;
+use silius_grpc::{bundler_client::BundlerClient, uo_pool_client::UoPoolClient};
+use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
@@ -13,7 +13,7 @@ use tracing::info;
 
 #[derive(Parser)]
 #[clap(
-    name = "aa-bundler-rpc",
+    name = "silius-rpc",
     about = "JSON-RPC server for ERC-4337 Account Abstraction Bundler"
 )]
 pub struct Opt {

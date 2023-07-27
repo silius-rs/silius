@@ -2,8 +2,8 @@ use crate::{
     utils::{calculate_call_gas_limit, calculate_valid_gas, Overhead},
     UoPool,
 };
-use aa_bundler_contracts::entry_point::EntryPointErr;
-use aa_bundler_primitives::{
+use silius_contracts::entry_point::EntryPointErr;
+use silius_primitives::{
     consts::entities::ACCOUNT,
     get_address,
     reputation::{ReputationStatus, StakeInfo},

@@ -1,5 +1,5 @@
 use crate::mempool::Mempool;
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use educe::Educe;
 use ethers::types::{Address, U256};
 use std::collections::{HashMap, HashSet};

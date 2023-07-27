@@ -314,7 +314,7 @@ impl EntryPointErr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aa_bundler_primitives::UserOperation;
+    use silius_primitives::UserOperation;
     use ethers::{
         providers::{Http, Middleware, Provider},
         types::{Bytes, GethTrace, U256},

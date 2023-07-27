@@ -1,5 +1,5 @@
-use aa_bundler_primitives::UserOperation;
-use aa_bundler_uopool::UoPool as UserOperationPool;
+use silius_primitives::UserOperation;
+use silius_uopool::UoPool as UserOperationPool;
 use dashmap::mapref::one::{Ref, RefMut};
 use ethers::{
     providers::Middleware,

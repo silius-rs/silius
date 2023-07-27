@@ -1,4 +1,4 @@
-use aa_bundler_primitives::{UserOperation, Wallet};
+use silius_primitives::{UserOperation, Wallet};
 use ethers::types::Address;
 use std::str::FromStr;
 

@@ -1,5 +1,5 @@
 pub use crate::debug::DebugApiServerImpl;
-use aa_bundler_primitives::{reputation::ReputationEntry, BundlerMode, UserOperation};
+use silius_primitives::{reputation::ReputationEntry, BundlerMode, UserOperation};
 use ethers::types::{Address, H256};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 

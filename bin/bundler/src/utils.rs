@@ -1,4 +1,4 @@
-use aa_bundler_primitives::UoPoolMode;
+use silius_primitives::UoPoolMode;
 use ethers::types::{Address, U256};
 use pin_utils::pin_mut;
 use std::{future::Future, str::FromStr};

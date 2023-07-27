@@ -1,5 +1,5 @@
 [package]
-name = "aa-bundler-uopool"
+name = "silius-uopool"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -7,12 +7,12 @@ license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = """
-AA (ERC-4337) Bundler uopool implementation
+AA (ERC-4337) bundler uopool implementation
 """
 
 [dependencies]
-aa-bundler-contracts = { path = "../contracts" }
-aa-bundler-primitives = { path = "../primitives" }
+silius-contracts = { path = "../contracts" }
+silius-primitives = { path = "../primitives" }
 
 anyhow = "1"
 educe = { version = "0.4", features = ["Debug", "Default"] }
@@ -27,5 +27,5 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-aa-bundler-primitives = { path = "../primitives", features = ["test-utils"] }
+silius-primitives = { path = "../primitives", features = ["test-utils"] }
 tempdir = "0.3.7"

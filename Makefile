@@ -1,23 +1,23 @@
 build:
 	cargo build --release
 
-run-bundler:
-	cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.aa-bundler/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
+run-silius:
+	cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
 
-run-bundler-uopool:
-	cargo run --release --bin bundler-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
+run-silius-uopool:
+	cargo run --release --bin silius-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
 
-run-bundler-rpc:
-	cargo run --release --bin bundler-rpc
+run-silius-rpc:
+	cargo run --release --bin silius-rpc
 
 run-create-wallet:
-	cargo run --release --bin create-wallet -- --output-path ${HOME}/.aa-bundler
+	cargo run --release --bin create-wallet -- --output-path ${HOME}/.silius
 
-run-bundler-debug:
-	cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.aa-bundler/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000 --rpc-api eth,debug
+run-silius-debug:
+	cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000 --rpc-api eth,debug
 
-run-bundler-debug-mode:
-	RUST_LOG=aa_bundler=TRACE cargo run --profile debug-fast -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file /home/vid/.aa-bundler/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000 --rpc-api eth,debug
+run-silius-debug-mode:
+	RUST_LOG=silius=TRACE cargo run --profile debug-fast -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file /home/vid/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000 --rpc-api eth,debug
 
 fetch-thirdparty:
 	git submodule update --init

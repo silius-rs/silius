@@ -3,13 +3,13 @@ use crate::{
     utils::{parse_addr, parse_hash, parse_uo, parse_uo_pool_mut},
 };
 use crate::{proto::uopool::*, utils::parse_uo_pool};
-use aa_bundler_contracts::{entry_point::EntryPointErr, EntryPoint};
-use aa_bundler_primitives::{
+use silius_contracts::{entry_point::EntryPointErr, EntryPoint};
+use silius_primitives::{
     reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
     uopool::AddError,
     Chain, UoPoolMode,
 };
-use aa_bundler_uopool::{
+use silius_uopool::{
     mempool_id, MemoryMempool, MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
 };
 use anyhow::Result;

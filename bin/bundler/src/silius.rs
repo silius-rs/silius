@@ -1,13 +1,13 @@
-use aa_bundler::{
+use silius::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
-use aa_bundler_grpc::{
+use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
-use aa_bundler_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
-use aa_bundler_rpc::{
+use silius_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
+use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
@@ -25,7 +25,7 @@ use tracing::info;
 
 #[derive(Parser)]
 #[clap(
-    name = "aa-bundler",
+    name = "silius",
     about = "Bundler for ERC-4337 Account Abstraction"
 )]
 pub struct Opt {

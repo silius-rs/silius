@@ -1,5 +1,5 @@
 use crate::gen::entry_point_api::{self, EntryPointAPICalls};
-use aa_bundler_primitives::UserOperation;
+use silius_primitives::UserOperation;
 use ethers::{abi::AbiDecode, types::Bytes};
 
 impl From<UserOperation> for entry_point_api::UserOperation {

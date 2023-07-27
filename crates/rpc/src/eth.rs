@@ -1,9 +1,9 @@
 use crate::{error::JsonRpcError, eth_api::EthApiServer};
-use aa_bundler_grpc::{
+use silius_grpc::{
     uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
     EstimateUserOperationGasResult, UserOperationHashRequest,
 };
-use aa_bundler_primitives::{
+use silius_primitives::{
     consts::rpc_error_codes::USER_OPERATION_HASH, simulation::SimulationError,
     uopool::VerificationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
     UserOperationHash, UserOperationPartial, UserOperationReceipt,

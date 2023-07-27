@@ -1,4 +1,4 @@
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::{
     abi::{AbiDecode, AbiEncode},
     prelude::{EthAbiCodec, EthAbiType},

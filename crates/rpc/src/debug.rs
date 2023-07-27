@@ -1,9 +1,9 @@
 use crate::{debug_api::DebugApiServer, error::JsonRpcError};
-use aa_bundler_grpc::{
+use silius_grpc::{
     bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
     GetAllRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest, SetReputationResult,
 };
-use aa_bundler_primitives::{
+use silius_primitives::{
     bundler::DEFAULT_BUNDLE_INTERVAL, reputation::ReputationEntry, BundlerMode, UserOperation,
 };
 use async_trait::async_trait;

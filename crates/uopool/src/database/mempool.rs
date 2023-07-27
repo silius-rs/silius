@@ -1,6 +1,6 @@
 use super::utils::{WrapAddress, WrapCodeHash, WrapUserOperation, WrapUserOperationHash};
 use crate::mempool::Mempool;
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::types::{Address, U256};
 use reth_db::{
     cursor::{DbCursorRO, DbDupCursorRO},

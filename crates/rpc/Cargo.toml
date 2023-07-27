@@ -1,5 +1,5 @@
 [package]
-name = "aa-bundler-rpc"
+name = "silius-rpc"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -7,12 +7,12 @@ license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = """
-AA (ERC-4337) Bundler RPC implementation
+AA (ERC-4337) bundler RPC implementation
 """
 
 [dependencies]
-aa-bundler-grpc = { path = "../grpc" }
-aa-bundler-primitives = { path = "../primitives" }
+silius-grpc = { path = "../grpc" }
+silius-primitives = { path = "../primitives" }
 
 anyhow = "1"
 async-trait = "0.1"

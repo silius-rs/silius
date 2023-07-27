@@ -1,5 +1,5 @@
 use crate::utils::{parse_address, parse_u256, parse_uopool_mode};
-use aa_bundler_primitives::UoPoolMode;
+use silius_primitives::UoPoolMode;
 use clap::Parser;
 use ethers::types::{Address, U256};
 use std::net::SocketAddr;

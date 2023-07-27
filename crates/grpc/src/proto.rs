@@ -1,7 +1,7 @@
 // Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
 
-    use aa_bundler_primitives::UserOperationHash;
+    use silius_primitives::UserOperationHash;
     use arrayref::array_ref;
     use ethers::types::{Address, Bloom, U256};
     use prost::bytes::Buf;
@@ -95,8 +95,8 @@ pub mod types {
         }
     }
 
-    impl From<aa_bundler_primitives::UserOperation> for UserOperation {
-        fn from(user_operation: aa_bundler_primitives::UserOperation) -> Self {
+    impl From<silius_primitives::UserOperation> for UserOperation {
+        fn from(user_operation: silius_primitives::UserOperation) -> Self {
             Self {
                 sender: Some(user_operation.sender.into()),
                 nonce: Some(user_operation.nonce.into()),
@@ -115,7 +115,7 @@ pub mod types {
         }
     }
 
-    impl From<UserOperation> for aa_bundler_primitives::UserOperation {
+    impl From<UserOperation> for silius_primitives::UserOperation {
         fn from(user_operation: UserOperation) -> Self {
             Self {
                 sender: {
@@ -176,18 +176,18 @@ pub mod types {
         }
     }
 
-    impl From<aa_bundler_primitives::reputation::ReputationEntry> for ReputationEntry {
-        fn from(reputation_entry: aa_bundler_primitives::reputation::ReputationEntry) -> Self {
+    impl From<silius_primitives::reputation::ReputationEntry> for ReputationEntry {
+        fn from(reputation_entry: silius_primitives::reputation::ReputationEntry) -> Self {
             Self {
                 addr: Some(reputation_entry.address.into()),
                 uo_seen: reputation_entry.uo_seen,
                 uo_included: reputation_entry.uo_included,
                 stat: match reputation_entry.status {
-                    aa_bundler_primitives::reputation::ReputationStatus::OK => ReputationStatus::Ok,
-                    aa_bundler_primitives::reputation::ReputationStatus::THROTTLED => {
+                    silius_primitives::reputation::ReputationStatus::OK => ReputationStatus::Ok,
+                    silius_primitives::reputation::ReputationStatus::THROTTLED => {
                         ReputationStatus::Throttled
                     }
-                    aa_bundler_primitives::reputation::ReputationStatus::BANNED => {
+                    silius_primitives::reputation::ReputationStatus::BANNED => {
                         ReputationStatus::Banned
                     }
                 } as i32,
@@ -195,7 +195,7 @@ pub mod types {
         }
     }
 
-    impl From<ReputationEntry> for aa_bundler_primitives::reputation::ReputationEntry {
+    impl From<ReputationEntry> for silius_primitives::reputation::ReputationEntry {
         fn from(reputation_entry: ReputationEntry) -> Self {
             Self {
                 address: {
@@ -209,15 +209,15 @@ pub mod types {
                 uo_included: reputation_entry.uo_included,
                 status: match reputation_entry.stat {
                     _ if reputation_entry.stat == ReputationStatus::Ok as i32 => {
-                        aa_bundler_primitives::reputation::ReputationStatus::OK
+                        silius_primitives::reputation::ReputationStatus::OK
                     }
                     _ if reputation_entry.stat == ReputationStatus::Throttled as i32 => {
-                        aa_bundler_primitives::reputation::ReputationStatus::THROTTLED
+                        silius_primitives::reputation::ReputationStatus::THROTTLED
                     }
                     _ if reputation_entry.stat == ReputationStatus::Banned as i32 => {
-                        aa_bundler_primitives::reputation::ReputationStatus::BANNED
+                        silius_primitives::reputation::ReputationStatus::BANNED
                     }
-                    _ => aa_bundler_primitives::reputation::ReputationStatus::OK,
+                    _ => silius_primitives::reputation::ReputationStatus::OK,
                 },
             }
         }
@@ -326,7 +326,7 @@ pub mod uopool {
 }
 
 pub mod bundler {
-    use aa_bundler_primitives::BundlerMode as GrpcMode;
+    use silius_primitives::BundlerMode as GrpcMode;
 
     tonic::include_proto!("bundler");
 

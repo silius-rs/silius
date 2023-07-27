@@ -1,11 +1,11 @@
 use crate::{utils::equal_code_hashes, UoPool};
-use aa_bundler_contracts::{
+use silius_contracts::{
     entry_point::{
         EntryPointErr, SimulateValidationResult, ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
     },
     tracer::{Call, CallEntry, JsTracerFrame},
 };
-use aa_bundler_primitives::{
+use silius_primitives::{
     consts::entities::{FACTORY, PAYMASTER},
     get_address,
     reputation::StakeInfo,

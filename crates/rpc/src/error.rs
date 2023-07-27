@@ -1,4 +1,4 @@
-use aa_bundler_primitives::{
+use silius_primitives::{
     consts::rpc_error_codes::{
         ENTITY_BANNED, EXECUTION, EXPIRATION, OPCODE, SANITY_CHECK, SIGNATURE, STAKE_TOO_LOW,
         VALIDATION,

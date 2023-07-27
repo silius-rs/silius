@@ -1,5 +1,5 @@
-use aa_bundler_contracts::entry_point::EntryPointAPI;
-use aa_bundler_primitives::{Chain, UserOperation, Wallet};
+use silius_contracts::entry_point::EntryPointAPI;
+use silius_primitives::{Chain, UserOperation, Wallet};
 use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},

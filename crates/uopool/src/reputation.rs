@@ -1,4 +1,4 @@
-use aa_bundler_primitives::{
+use silius_primitives::{
     get_address,
     reputation::{ReputationEntry, ReputationError, ReputationStatus, StakeInfo},
 };

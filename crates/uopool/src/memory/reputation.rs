@@ -1,5 +1,5 @@
 use crate::reputation::Reputation;
-use aa_bundler_primitives::reputation::{
+use silius_primitives::reputation::{
     ReputationEntry, ReputationError, ReputationStatus, StakeInfo,
 };
 use educe::Educe;
@@ -206,7 +206,7 @@ impl Reputation for MemoryReputation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aa_bundler_primitives::reputation::{
+    use silius_primitives::reputation::{
         BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
     };
 

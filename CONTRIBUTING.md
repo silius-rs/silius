@@ -1,8 +1,8 @@
-# Contributing to aa-bundler
+# Contributing to Silius
 
 Thanks for your help in improving the project! We are so happy to have you!
 
-aa-bundler is an open-source ERC-4337 bundler implementation in Rust. It doesn't matter how experienced you are with Rust or account abstraction (ERC-4337); there is definitely something to help us.
+Silius is an open-source ERC-4337 bundler implementation in Rust. It doesn't matter how experienced you are with Rust or account abstraction (ERC-4337); there is definitely something to help us.
 
 **No contribution is too small!**
 
@@ -22,7 +22,7 @@ This project operates like any other open-source project on GitHub.
 
 ## Finding something to work on
 
-1. The best way to start is to find an issue to work on; if you need more information, leave a comment or join the [Telegram channel](https://t.me/aabundler). If you think of something for which the issue doesn't exist, create a new one.
+1. The best way to start is to find an issue to work on; if you need more information, leave a comment or join the [Telegram group](https://t.me/+sKeRcN4j3MM3NmNk). If you think of something for which the issue doesn't exist, create a new one.
 2. Work on the issue in your personal fork.
 3. Once you finish your work, open a pull request and reference the issue you worked on. Make sure your PR successfully passes the GitHub CI.
 4. All pull requests will be reviewed, and sometimes you will have to make some changes based on the received comments.
