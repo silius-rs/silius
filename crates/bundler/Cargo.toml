@@ -1,5 +1,5 @@
 [package]
-name = "aa-bundler-bundler"
+name = "silius-bundler"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -7,13 +7,13 @@ license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = """
-AA (ERC-4337) Bundler bundling implementation
+AA (ERC-4337) bundler bundling implementation
 """
 
 [dependencies]
-aa-bundler-contracts = { path = "../contracts" }
-aa-bundler-primitives = { path = "../primitives" }
 
 anyhow = "1"
 ethers = { workspace = true }
+silius-contracts = { path = "../contracts" }
+silius-primitives = { path = "../primitives" }
 tracing = { workspace = true }

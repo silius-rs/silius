@@ -15,7 +15,7 @@ WORKDIR /rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:$PATH"
 
-WORKDIR /aa-bundler
+WORKDIR /silius
 COPY . .
 
 RUN make fetch-thirdparty
@@ -25,10 +25,10 @@ RUN make build
 # run
 FROM frolvlad/alpine-glibc
 
-COPY --from=builder /aa-bundler/target/release/bundler /usr/local/bin/bundler
+COPY --from=builder /silius/target/release/silius /usr/local/bin/silius
 
 EXPOSE 3000
 
-ENTRYPOINT ["usr/local/bin/bundler"]
+ENTRYPOINT ["usr/local/bin/silius"]
 
-LABEL org.opencontainers.image.source=https://github.com/Vid201/aa-bundler
+LABEL org.opencontainers.image.source=https://github.com/Vid201/silius

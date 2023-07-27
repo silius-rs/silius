@@ -1,5 +1,5 @@
 [package]
-name = "aa-bundler-tests"
+name = "silius-tests"
 version = "0.1.0"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -7,15 +7,15 @@ license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 description = """
-AA (ERC-4337) Bundler integration tests
+AA (ERC-4337) bundler integration tests
 """
 
 [dev-dependencies]
-aa-bundler-contracts = { path = "../crates/contracts" }
-aa-bundler-primitives = { path = "../crates/primitives" }
-aa-bundler-uopool = { path = "../crates/uopool" }
 
 anyhow = "1"
 ethers = { workspace = true }
+silius-contracts = { path = "../crates/contracts" }
+silius-primitives = { path = "../crates/primitives" }
+silius-uopool = { path = "../crates/uopool" }
 tempdir = "0.3.7"
 tokio = { workspace = true }

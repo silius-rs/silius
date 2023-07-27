@@ -1,4 +1,7 @@
-use aa_bundler_primitives::{
+use ethers::abi::AbiEncode;
+use jsonrpsee::types::{error::ErrorCode, ErrorObject, ErrorObjectOwned};
+use serde_json::json;
+use silius_primitives::{
     consts::rpc_error_codes::{
         ENTITY_BANNED, EXECUTION, EXPIRATION, OPCODE, SANITY_CHECK, SIGNATURE, STAKE_TOO_LOW,
         VALIDATION,
@@ -8,9 +11,6 @@ use aa_bundler_primitives::{
     simulation::SimulationError,
     uopool::VerificationError,
 };
-use ethers::abi::AbiEncode;
-use jsonrpsee::types::{error::ErrorCode, ErrorObject, ErrorObjectOwned};
-use serde_json::json;
 
 pub struct JsonRpcError(pub ErrorObjectOwned);
 

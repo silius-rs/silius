@@ -1,5 +1,5 @@
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation};
 use ethers::types::{u256_from_f64_saturating, Address, H256, U256};
+use silius_primitives::{simulation::CodeHash, UserOperation};
 use std::{collections::HashMap, ops::Deref};
 
 pub fn equal_code_hashes(hashes: &Vec<CodeHash>, hashes_prev: &Vec<CodeHash>) -> bool {
@@ -89,8 +89,8 @@ pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256)
 pub mod tests {
     use super::*;
     use crate::mempool::Mempool;
-    use aa_bundler_primitives::{UserOperation, UserOperationHash};
     use ethers::types::{Address, Bytes, H256, U256};
+    use silius_primitives::{UserOperation, UserOperationHash};
     use std::fmt::Debug;
 
     #[test]

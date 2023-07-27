@@ -1,19 +1,19 @@
 use crate::{error::JsonRpcError, eth_api::EthApiServer};
-use aa_bundler_grpc::{
-    uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
-    EstimateUserOperationGasResult, UserOperationHashRequest,
-};
-use aa_bundler_primitives::{
-    consts::rpc_error_codes::USER_OPERATION_HASH, simulation::SimulationError,
-    uopool::VerificationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
-    UserOperationHash, UserOperationPartial, UserOperationReceipt,
-};
 use async_trait::async_trait;
 use ethers::{
     types::{Address, U64},
     utils::to_checksum,
 };
 use jsonrpsee::{core::RpcResult, types::ErrorObjectOwned};
+use silius_grpc::{
+    uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
+    EstimateUserOperationGasResult, UserOperationHashRequest,
+};
+use silius_primitives::{
+    consts::rpc_error_codes::USER_OPERATION_HASH, simulation::SimulationError,
+    uopool::VerificationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
+    UserOperationHash, UserOperationPartial, UserOperationReceipt,
+};
 use std::str::FromStr;
 use tonic::Request;
 

@@ -1,6 +1,6 @@
-# <h1 align="center"> AA - Bundler </h1>
+# <h1 align="center"> Silius </h1>
 
-<p align="center">Rust Bundler - <a href="https://eips.ethereum.org/EIPS/eip-4337">ERC-4337 (Account Abstraction)</a>.</p>
+<p align="center">Silius - <a href="https://eips.ethereum.org/EIPS/eip-4337">ERC-4337 (Account Abstraction)</a> bundler implementation in Rust.</p>
 
 <p align="center">
     <img src="./docs/images/logo.jpeg" width="300" height="300">
@@ -33,25 +33,25 @@ make setup-thirdparty
 Create wallet for bundler:
 
 ```bash
-cargo run --release --bin create-wallet -- --output-path ${HOME}/.aa-bundler --chain-id 5
+cargo run --release --bin create-wallet -- --output-path ${HOME}/.silius --chain-id 5
 ```
 
 Run bundler (with user operation pool and JSON-RPC API): 
 
 ```bash
-cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.aa-bundler/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
+cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --gas-factor 600 --min-balance 1 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
 ```
 
 Run only user operation pool:
 
 ```bash
-cargo run --release --bin bundler-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
+cargo run --release --bin silius-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --min-stake 1 --min-unstake-delay 0 --min-priority-fee-per-gas 0 --max-verification-gas 1500000
 ```
 
 Run only JSON-RPC API: 
 
 ```bash
-cargo run --release --bin bundler-rpc
+cargo run --release --bin silius-rpc
 ```
 
 ## Supported networks
@@ -112,7 +112,7 @@ This project is dual-licensed under Apache 2.0 and MIT terms:
 
 ## Donations
 
-aa-bundler is an open-source project and a public good. If you want to help the project, you can send donations of any size via:
+Silius is an open-source project and a public good. If you want to help the project, you can send donations of any size via:
 
 - Ethereum address: `0x7cB801446AC4f5EA8f7333EFc58ab787eB611558`
 

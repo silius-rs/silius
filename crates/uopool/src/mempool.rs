@@ -1,9 +1,9 @@
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::{
     abi::AbiEncode,
     types::{Address, H256, U256},
     utils::{keccak256, to_checksum},
 };
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use std::fmt::Debug;
 
 pub type MempoolId = H256;

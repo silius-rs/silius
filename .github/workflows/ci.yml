@@ -8,7 +8,7 @@ name: ci
 
 jobs:
   build_and_test:
-    name: Account Abstraction Bundler in Rust
+    name: Silius - ERC-4337 bundler in Rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -63,8 +63,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: bundler
-          path: target/release/bundler
+          name: silius
+          path: target/release/silius
 
       - name: Lint
         run: |
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path:
-            aa-bundler
+            silius
       - run: curl -sSL https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py | python3 -
 
       - run: pip install jq yq
@@ -95,11 +95,11 @@ jobs:
   
       - uses: actions/download-artifact@v3
         with:
-          name: bundler
-          path: bundler-artifact
-      - run: mv bundler-artifact/bundler /usr/local/bin/
-      - run: chmod a+x /usr/local/bin/bundler
-      - run: chmod a+x aa-bundler/bundler-spec-test/launcher.sh
+          name: silius
+          path: silius-artifact
+      - run: mv silius-artifact/silius /usr/local/bin/
+      - run: chmod a+x /usr/local/bin/silius
+      - run: chmod a+x silius/bundler-spec-test/launcher.sh
       
       - uses: actions/setup-node@v3
         with:
@@ -107,6 +107,6 @@ jobs:
       - run: npm install -g yarn
 
       - name: Run tests
-        run: pdm run test --launcher-script aa-bundler/bundler-spec-test/launcher.sh --url http://localhost:3000
+        run: pdm run test --launcher-script silius/bundler-spec-test/launcher.sh --url http://localhost:3000
 
       

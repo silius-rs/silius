@@ -1,16 +1,16 @@
 use crate::{debug_api::DebugApiServer, error::JsonRpcError};
-use aa_bundler_grpc::{
-    bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
-    GetAllRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest, SetReputationResult,
-};
-use aa_bundler_primitives::{
-    bundler::DEFAULT_BUNDLE_INTERVAL, reputation::ReputationEntry, BundlerMode, UserOperation,
-};
 use async_trait::async_trait;
 use ethers::types::{Address, H256};
 use jsonrpsee::{
     core::RpcResult,
     types::{error::INTERNAL_ERROR_CODE, ErrorObjectOwned},
+};
+use silius_grpc::{
+    bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
+    GetAllRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest, SetReputationResult,
+};
+use silius_primitives::{
+    bundler::DEFAULT_BUNDLE_INTERVAL, reputation::ReputationEntry, BundlerMode, UserOperation,
 };
 use tonic::Request;
 

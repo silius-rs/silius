@@ -1,4 +1,3 @@
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use ethers::{
     abi::{AbiDecode, AbiEncode},
     prelude::{EthAbiCodec, EthAbiType},
@@ -6,6 +5,7 @@ use ethers::{
 };
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use serde::{Deserialize, Serialize};
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 
 macro_rules! construct_wrap_hash {
     ($type:ty, $name:ident, $n_bytes:expr ) => {

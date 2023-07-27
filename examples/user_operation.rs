@@ -1,5 +1,5 @@
-use aa_bundler_primitives::{UserOperation, Wallet};
 use ethers::types::Address;
+use silius_primitives::{UserOperation, Wallet};
 use std::str::FromStr;
 
 pub const MNEMONIC_PHRASE: &str = "test test test test test test test test test test test junk";

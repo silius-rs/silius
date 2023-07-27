@@ -1,15 +1,15 @@
-use aa_bundler::utils::parse_u256;
-use aa_bundler_primitives::Wallet;
 use anyhow::Result;
 use clap::Parser;
 use dirs::home_dir;
 use ethers::types::U256;
 use expanded_pathbuf::ExpandedPathBuf;
+use silius::utils::parse_u256;
+use silius_primitives::Wallet;
 use tracing::info;
 
 #[derive(Parser)]
 #[clap(
-    name = "aa-bundler-create-wallet",
+    name = "silius-create-wallet",
     about = "Bundler's wallet creation for ERC-4337 Account Abstraction"
 )]
 pub struct Opt {
@@ -29,7 +29,7 @@ fn main() -> Result<()> {
         output_path
     } else {
         home_dir()
-            .map(|h| h.join(".aa-bundler"))
+            .map(|h| h.join(".silius"))
             .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
             .map(ExpandedPathBuf)?
     };

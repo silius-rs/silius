@@ -1,10 +1,10 @@
 pub use crate::eth::EthApiServerImpl;
-use aa_bundler_primitives::{
+use ethers::types::{Address, U64};
+use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use silius_primitives::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationPartial, UserOperationReceipt,
 };
-use ethers::types::{Address, U64};
-use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 
 #[rpc(server, namespace = "eth")]
 pub trait EthApi {

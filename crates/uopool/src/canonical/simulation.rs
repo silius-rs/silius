@@ -1,11 +1,18 @@
 use crate::{utils::equal_code_hashes, UoPool};
-use aa_bundler_contracts::{
+use ethers::{
+    abi::AbiDecode,
+    providers::Middleware,
+    types::{Address, Bytes, GethTrace, H256, U256},
+    utils::keccak256,
+};
+use serde::{Deserialize, Serialize};
+use silius_contracts::{
     entry_point::{
         EntryPointErr, SimulateValidationResult, ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
     },
     tracer::{Call, CallEntry, JsTracerFrame},
 };
-use aa_bundler_primitives::{
+use silius_primitives::{
     consts::entities::{FACTORY, PAYMASTER},
     get_address,
     reputation::StakeInfo,
@@ -16,13 +23,6 @@ use aa_bundler_primitives::{
     },
     UoPoolMode, UserOperation,
 };
-use ethers::{
-    abi::AbiDecode,
-    providers::Middleware,
-    types::{Address, Bytes, GethTrace, H256, U256},
-    utils::keccak256,
-};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     time::{SystemTime, UNIX_EPOCH},

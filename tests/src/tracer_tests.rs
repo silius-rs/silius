@@ -3,7 +3,6 @@ use crate::common::{
     gen::{ExecSelfResultFilter, TracerTest},
     setup_geth, ClientType, DeployedContract,
 };
-use aa_bundler_contracts::tracer::{JsTracerFrame, JS_TRACER};
 use ethers::{
     abi::{RawLog, Token},
     contract::EthLogDecode,
@@ -15,6 +14,7 @@ use ethers::{
     },
     utils::GethInstance,
 };
+use silius_contracts::tracer::{JsTracerFrame, JS_TRACER};
 use std::{ops::Deref, str::FromStr, sync::Arc};
 
 struct Context<M> {

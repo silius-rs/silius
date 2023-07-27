@@ -1,7 +1,7 @@
 use crate::mempool::Mempool;
-use aa_bundler_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use educe::Educe;
 use ethers::types::{Address, U256};
+use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Default, Educe)]
