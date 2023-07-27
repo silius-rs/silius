@@ -13,157 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aa-bundler"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-grpc",
- "aa-bundler-primitives",
- "aa-bundler-rpc",
- "anyhow",
- "clap",
- "dirs 4.0.0",
- "ethers",
- "expanded-pathbuf",
- "pin-utils",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "aa-bundler-bundler"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-contracts",
- "aa-bundler-primitives",
- "anyhow",
- "ethers",
- "tracing",
-]
-
-[[package]]
-name = "aa-bundler-contracts"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-primitives",
- "anyhow",
- "ethers",
- "ethers-providers",
- "ethers-solc",
- "lazy_static",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "aa-bundler-examples"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-primitives",
- "anyhow",
- "ethers",
- "tokio",
-]
-
-[[package]]
-name = "aa-bundler-grpc"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-bundler",
- "aa-bundler-contracts",
- "aa-bundler-primitives",
- "aa-bundler-uopool",
- "anyhow",
- "arrayref",
- "async-trait",
- "dashmap",
- "ethers",
- "parking_lot",
- "prost",
- "prost-build",
- "protobuf-src",
- "serde_json",
- "tokio",
- "tonic",
- "tonic-build",
- "tracing",
-]
-
-[[package]]
-name = "aa-bundler-primitives"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "educe",
- "ethers",
- "expanded-pathbuf",
- "lazy_static",
- "rustc-hex",
- "serde",
- "serde_json",
- "ssz_rs",
- "ssz_rs_derive",
- "strum",
- "strum_macros",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "aa-bundler-rpc"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-grpc",
- "aa-bundler-primitives",
- "anyhow",
- "async-trait",
- "ethers",
- "git-version",
- "hyper",
- "jsonrpsee",
- "serde",
- "serde_json",
- "tonic",
- "tower",
- "tower-http",
-]
-
-[[package]]
-name = "aa-bundler-tests"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-contracts",
- "aa-bundler-primitives",
- "aa-bundler-uopool",
- "anyhow",
- "ethers",
- "tempdir",
- "tokio",
-]
-
-[[package]]
-name = "aa-bundler-uopool"
-version = "0.1.0"
-dependencies = [
- "aa-bundler-contracts",
- "aa-bundler-primitives",
- "anyhow",
- "educe",
- "ethers",
- "page_size 0.5.0",
- "prost",
- "reth-db",
- "reth-libmdbx",
- "serde",
- "serde_json",
- "tempdir",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4362,6 +4211,157 @@ checksum = "5e1788eed21689f9cf370582dfc467ef36ed9c707f073528ddafa8d83e3b8500"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "silius"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dirs 4.0.0",
+ "ethers",
+ "expanded-pathbuf",
+ "pin-utils",
+ "silius-grpc",
+ "silius-primitives",
+ "silius-rpc",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "silius-bundler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "silius-contracts",
+ "silius-primitives",
+ "tracing",
+]
+
+[[package]]
+name = "silius-contracts"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "ethers-providers",
+ "ethers-solc",
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "silius-primitives",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "silius-examples"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "silius-primitives",
+ "tokio",
+]
+
+[[package]]
+name = "silius-grpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrayref",
+ "async-trait",
+ "dashmap",
+ "ethers",
+ "parking_lot",
+ "prost",
+ "prost-build",
+ "protobuf-src",
+ "serde_json",
+ "silius-bundler",
+ "silius-contracts",
+ "silius-primitives",
+ "silius-uopool",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "tracing",
+]
+
+[[package]]
+name = "silius-primitives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "educe",
+ "ethers",
+ "expanded-pathbuf",
+ "lazy_static",
+ "rustc-hex",
+ "serde",
+ "serde_json",
+ "ssz_rs",
+ "ssz_rs_derive",
+ "strum",
+ "strum_macros",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "silius-rpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "ethers",
+ "git-version",
+ "hyper",
+ "jsonrpsee",
+ "serde",
+ "serde_json",
+ "silius-grpc",
+ "silius-primitives",
+ "tonic",
+ "tower",
+ "tower-http",
+]
+
+[[package]]
+name = "silius-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "silius-contracts",
+ "silius-primitives",
+ "silius-uopool",
+ "tempdir",
+ "tokio",
+]
+
+[[package]]
+name = "silius-uopool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "educe",
+ "ethers",
+ "page_size 0.5.0",
+ "prost",
+ "reth-db",
+ "reth-libmdbx",
+ "serde",
+ "serde_json",
+ "silius-contracts",
+ "silius-primitives",
+ "tempdir",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
