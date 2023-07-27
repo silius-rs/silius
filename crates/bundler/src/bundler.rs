@@ -1,5 +1,5 @@
 use aa_bundler_contracts::entry_point::EntryPointAPI;
-use aa_bundler_primitives::{consts::relay_endpoints, Chain, UserOperation, Wallet};
+use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, UserOperation, Wallet};
 use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
@@ -130,14 +130,14 @@ impl Bundler {
     /// # Returns
     /// * `H256` - The transaction hash of the bundle
     #[allow(clippy::needless_return)]
-    #[allow(clippy::clone_double_ref)]
+    #[allow(clippy::suspicious_double_ref_op)]
     pub async fn send_next_bundle_flashbots(
         &self,
         uos: &Vec<UserOperation>,
     ) -> anyhow::Result<H256> {
         // Send a bundle as Flashbots bundles
         // TODO: add more relay endpoints support
-        let relay_endpoint: &str = relay_endpoints::FLASHBOTS;
+        let relay_endpoint: &str = flashbots_relay_endpoints::FLASHBOTS;
 
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");

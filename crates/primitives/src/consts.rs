@@ -27,7 +27,7 @@ pub mod entities {
 }
 
 /// Builder JSON-RPC Endpoints
-pub mod relay_endpoints {
+pub mod flashbots_relay_endpoints {
     pub const FLASHBOTS: &str = "https://relay.flashbots.net";
     pub const FLASHBOTS_GOERLI: &str = "https://relay-goerli.flashbots.net";
     pub const BUILDER0X69: &str = "http://builder0x69.io/";

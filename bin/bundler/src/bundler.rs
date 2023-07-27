@@ -61,7 +61,7 @@ pub struct Opt {
     pub bundler_opts: BundlerServiceOpts,
 
     #[clap(long)]
-    pub fb_mnemonic_file: Option<ExpandedPathBuf>,
+    pub build_fb_signer: Option<bool>,
 }
 
 fn main() -> Result<()> {
@@ -102,17 +102,17 @@ fn main() -> Result<()> {
                 }
 
                 let wallet: Wallet;
-                if opt.fb_mnemonic_file.is_some() {
+                if opt.build_fb_signer == Some(true) {
                     wallet = Wallet::from_file(
                         opt.mnemonic_file.clone(),
                         &chain_id,
-                        opt.fb_mnemonic_file.clone(),
+                        true,
                     )
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
                     info!("Wallet Signer {:?}", wallet.signer);
                     info!("Flashbots Signer {:?}", wallet.fb_signer);
                 } else {
-                    wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id, None)
+                    wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id, false)
                         .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
                     info!("{:?}", wallet.signer);
                 }

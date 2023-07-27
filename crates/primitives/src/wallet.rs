@@ -12,38 +12,47 @@ use std::fs;
 pub struct Wallet {
     /// Signing key of the wallet
     pub signer: ethers::signers::Wallet<SigningKey>,
+    /// Flashbots signing key of the wallet
     pub fb_signer: Option<ethers::signers::Wallet<SigningKey>>,
 }
 
 impl Wallet {
-    /// Create a new wallet and outputs the mnemonic to the given path
+    /// Builds a `Wallet` and construct using a randomly generated number
+    /// if `build_fb_wallet` is true, then a Flashbots wallet is also built, otherwise it is set to None
+    ///
+    /// # Arguments
+    /// * `path` - The path to the file where the mnemonic phrase will be written
+    /// * `chain_id` - The chain id of the blockchain network to be used
+    /// * `build_fb_wallet` - Whether to build a Flashbots wallet
+    ///
+    /// # Returns
+    /// * `Self` - A new `Wallet` instance
     pub fn build_random(
         path: ExpandedPathBuf,
         chain_id: &U256,
-        fb_path: Option<ExpandedPathBuf>,
+        build_fb_wallet: bool,
     ) -> anyhow::Result<Self> {
         let mut rng = rand::thread_rng();
 
         fs::create_dir_all(&path)?;
 
-        let wallet = MnemonicBuilder::<English>::default()
-            .write_to(path.to_path_buf())
+        let wallet_builder = MnemonicBuilder::<English>::default().write_to(path.to_path_buf());
+
+        let wallet = wallet_builder
+            .clone()
+            .derivation_path("m/44'/60'/0'/0/0")
+            .expect("Failed to write mnemonic file")
             .build_random(&mut rng)?;
 
-        if fb_path.is_some() {
-            let mut rng = rand::thread_rng();
-            fs::create_dir_all(
-                fb_path
-                    .clone()
-                    .expect("Failed to open Flashbots' mnemonic file"),
-            )?;
+        if build_fb_wallet {
+            let mut entries = fs::read_dir(&path)?;
+            let entry = entries.next().expect("No file found")?;
+
             let fb_wallet = MnemonicBuilder::<English>::default()
-                .write_to(
-                    fb_path
-                        .expect("Failed to open Flashbots' mnemonic file")
-                        .to_path_buf(),
-                )
-                .build_random(&mut rng)?;
+                .phrase(entry.path().to_path_buf())
+                .derivation_path("m/44'/60'/0'/0/1")
+                .expect("Failed to write mnemonic file")
+                .build()?;
 
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
@@ -58,23 +67,35 @@ impl Wallet {
     }
 
     /// Create a new wallet from the given file containing the mnemonic phrase
+    /// if `build_fb_wallet` is true, then a Flashbots wallet is also built, otherwise it is set to None
+    ///
+    /// # Arguments
+    /// * `path` - The path to the file where the mnemonic phrase is stored
+    /// * `chain_id` - The chain id of the blockchain network to be used
+    /// * `build_fb_wallet` - Whether to build a Flashbots wallet
+    ///
+    /// # Returns
+    /// * `Self` - A new `Wallet` instance
     pub fn from_file(
         path: ExpandedPathBuf,
         chain_id: &U256,
-        fb_path: Option<ExpandedPathBuf>,
+        build_fb_wallet: bool,
     ) -> anyhow::Result<Self> {
-        let wallet = MnemonicBuilder::<English>::default()
-            .phrase(path.to_path_buf())
+        let wallet_builder = MnemonicBuilder::<English>::default().phrase(path.to_path_buf());
+
+        let wallet = wallet_builder
+            .clone()
+            .derivation_path("m/44'/60'/0'/0/0")
+            .expect("Failed to read mnemonic file")
             .build()?;
 
-        if fb_path.is_some() {
-            let fb_wallet = MnemonicBuilder::<English>::default()
-                .phrase(
-                    fb_path
-                        .expect("Failed to open Flashbots' mnemonic file")
-                        .to_path_buf(),
-                )
+        if build_fb_wallet {
+            let fb_wallet = wallet_builder
+                .clone()
+                .derivation_path("m/44'/60'/0'/0/1")
+                .expect("Failed to read Flashbots' mnemonic file")
                 .build()?;
+
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
                 fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
@@ -88,19 +109,35 @@ impl Wallet {
     }
 
     /// Create a new wallet from the given mnemonic phrase
+    /// if `build_fb_wallet` is true, then a Flashbots wallet is also built, otherwise it is set to None
+    ///
+    /// # Arguments
+    /// * `phrase` - The mnemonic phrase
+    /// * `chain_id` - The chain id of the blockchain network to be used
+    /// * `build_fb_wallet` - Whether to build a Flashbots wallet
+    ///
+    /// # Returns
+    /// * `Self` - A new `Wallet` instance
     pub fn from_phrase(
         phrase: &str,
         chain_id: &U256,
-        fb_phrase: Option<&str>,
+        build_fb_wallet: bool,
     ) -> anyhow::Result<Self> {
-        let wallet = MnemonicBuilder::<English>::default()
-            .phrase(phrase)
+        let wallet_builder = MnemonicBuilder::<English>::default().phrase(phrase);
+
+        let wallet = wallet_builder
+            .clone()
+            .derivation_path("m/44'/60'/0'/0/0")
+            .expect("Failed to read mnemonic file")
             .build()?;
 
-        if fb_phrase.is_some() {
-            let fb_wallet = MnemonicBuilder::<English>::default()
-                .phrase(fb_phrase.expect("Failed to read Flashbots' mnemonic file"))
+        if build_fb_wallet {
+            let fb_wallet = wallet_builder
+                .clone()
+                .derivation_path("m/44'/60'/0'/0/1")
+                .expect("Failed to read Flashbots' mnemonic file")
                 .build()?;
+
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
                 fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
@@ -114,6 +151,15 @@ impl Wallet {
     }
 
     /// Create a new wallet from the given private key
+    /// if `fb_key` is provided, then a Flashbots wallet is also built, otherwise it is set to None
+    ///
+    /// # Arguments
+    /// * `key` - The private key
+    /// * `chain_id` - The chain id of the blockchain network to be used
+    /// * `fb_key` - The private key of the Flashbots wallet
+    ///
+    /// # Returns
+    /// * `Self` - A new `Wallet` instance
     pub fn from_key(key: &str, chain_id: &U256, fb_key: Option<&str>) -> anyhow::Result<Self> {
         let wallet = key.parse::<LocalWallet>()?;
 
@@ -134,6 +180,14 @@ impl Wallet {
     }
 
     /// Signs the user operation
+    ///
+    /// # Arguments
+    /// * `uo` - The [UserOperation](UserOperation) to be signed
+    /// * `ep` - The entry point contract address
+    /// * `chain_id` - The chain id of the blockchain network to be used
+    ///
+    /// # Returns
+    /// * `UserOperation` - The signed [UserOperation](UserOperation)
     pub async fn sign_uo(
         &self,
         uo: &UserOperation,

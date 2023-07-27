@@ -1,5 +1,3 @@
-use std::fs::create_dir_all;
-
 use aa_bundler::utils::parse_u256;
 use aa_bundler_primitives::Wallet;
 use anyhow::Result;
@@ -22,7 +20,7 @@ pub struct Opt {
     pub chain_id: U256,
 
     #[clap(long)]
-    pub fb_bundler_path: Option<ExpandedPathBuf>,
+    pub build_fb_wallet: Option<bool>,
 }
 
 fn main() -> Result<()> {
@@ -33,30 +31,19 @@ fn main() -> Result<()> {
     let path = if let Some(output_path) = opt.output_path {
         output_path
     } else {
-        let default_path = home_dir()
-            .map(|h| h.join(".aa-bundler/bundler"))
-            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))?;
-        create_dir_all(&default_path)?;
-        ExpandedPathBuf::from(default_path)
+        home_dir()
+            .map(|h| h.join(".aa-bundler"))
+            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
+            .map(ExpandedPathBuf)?
     };
 
-    let fb_path = if let Some(fb_bundler_path) = opt.fb_bundler_path.clone() {
-        fb_bundler_path
-    } else {
-        let default_path = home_dir()
-            .map(|h| h.join(".aa-bundler/fb-bundler"))
-            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))?;
-        create_dir_all(&default_path)?;
-        ExpandedPathBuf::from(default_path)
-    };
-
-    if opt.fb_bundler_path.is_some() {
-        let wallet = Wallet::build_random(path, &opt.chain_id, None)?;
+    if opt.build_fb_wallet == Some(true) {
+        let wallet = Wallet::build_random(path, &opt.chain_id, true)?;
         info!("Wallet Signer {:?}", wallet.signer);
+        info!("Flashbots Signer {:?}", wallet.fb_signer);
     } else {
-        let fb_wallet = Wallet::build_random(path, &opt.chain_id, Some(fb_path))?;
-        info!("Wallet Signer {:?}", fb_wallet.signer);
-        info!("Flashbots Signer {:?}", fb_wallet.fb_signer);
+        let wallet = Wallet::build_random(path, &opt.chain_id, false)?;
+        info!("Wallet Signer {:?}", wallet.signer);
     }
 
     Ok(())
