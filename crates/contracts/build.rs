@@ -2,7 +2,7 @@ use ethers_solc::{Project, ProjectPathsConfig};
 use std::{env, path::PathBuf};
 
 fn compile_aa_interfaces() -> anyhow::Result<()> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("account-abstraction");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("thirdparty/account-abstraction");
     let target_path = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
     let build_path_config = ProjectPathsConfig::builder()
         // only interfaces are needed

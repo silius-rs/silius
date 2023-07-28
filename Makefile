@@ -23,8 +23,8 @@ fetch-thirdparty:
 	git submodule update --init
 
 setup-thirdparty:
-	cd crates/contracts/account-abstraction && yarn install --frozen-lockfile --immutable && yarn compile && cd ../..
-	cd tests/bundler && yarn install --frozen-lockfile --immutable && yarn preprocess && cd ../..
+	cd crates/contracts/thirdparty/account-abstraction && yarn install --frozen-lockfile --immutable && yarn compile && cd ../../../..
+	cd tests/thirdparty/bundler && yarn install --frozen-lockfile --immutable && yarn preprocess && cd ../../..
 
 test:
 	cargo test --workspace
