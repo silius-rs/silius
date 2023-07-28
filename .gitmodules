@@ -1,6 +1,6 @@
-[submodule "thirdparty/account-abstraction"]
-	path = thirdparty/account-abstraction
-	url = https://github.com/eth-infinitism/account-abstraction.git
-[submodule "thirdparty/bundler"]
-	path = thirdparty/bundler
+[submodule "tests/bundler"]
+	path = tests/bundler
 	url = https://github.com/eth-infinitism/bundler.git
+[submodule "crates/contracts/account-abstraction"]
+	path = crates/contracts/account-abstraction
+	url = https://github.com/eth-infinitism/account-abstraction.git
