@@ -2,6 +2,7 @@ use aa_bundler::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
+use aa_bundler_bundler::SendBundleMode;
 use aa_bundler_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
@@ -62,6 +63,9 @@ pub struct Opt {
 
     #[clap(long)]
     pub build_fb_signer: Option<bool>,
+
+    #[clap(long, default_value = "eth-client")]
+    pub send_bundle_mode: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -159,6 +163,14 @@ fn main() -> Result<()> {
                     opt.bundler_opts.min_balance,
                     opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),
+                    match opt.send_bundle_mode {
+                        Some(mode) => match mode.as_str() {
+                            "eth-client" => SendBundleMode::EthClient,
+                            "flashbots" => SendBundleMode::Flashbots,
+                            _ => SendBundleMode::EthClient,
+                        },
+                        None => SendBundleMode::EthClient,
+                    },
                 );
                 info!(
                     "Started bundler gRPC service at {:}",

@@ -3,4 +3,4 @@
 
 mod bundler;
 
-pub use bundler::Bundler;
+pub use bundler::{Bundler, SendBundleMode};

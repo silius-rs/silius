@@ -1,6 +1,6 @@
 use crate::UserOperation;
 use ethers::{
-    prelude::{k256::ecdsa::SigningKey, rand, LocalWallet},
+    prelude::{k256::ecdsa::SigningKey, rand},
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
     types::{Address, U256},
 };
@@ -39,9 +39,8 @@ impl Wallet {
         let wallet_builder = MnemonicBuilder::<English>::default().write_to(path.to_path_buf());
 
         let wallet = wallet_builder
-            .clone()
             .derivation_path("m/44'/60'/0'/0/0")
-            .expect("Failed to write mnemonic file")
+            .expect("Failed to derive wallet")
             .build_random(&mut rng)?;
 
         if build_fb_wallet {
@@ -49,9 +48,9 @@ impl Wallet {
             let entry = entries.next().expect("No file found")?;
 
             let fb_wallet = MnemonicBuilder::<English>::default()
-                .phrase(entry.path().to_path_buf())
+                .phrase(entry.path())
                 .derivation_path("m/44'/60'/0'/0/1")
-                .expect("Failed to write mnemonic file")
+                .expect("Failed to derive wallet")
                 .build()?;
 
             Ok(Self {
@@ -86,14 +85,13 @@ impl Wallet {
         let wallet = wallet_builder
             .clone()
             .derivation_path("m/44'/60'/0'/0/0")
-            .expect("Failed to read mnemonic file")
+            .expect("Failed to derive wallet")
             .build()?;
 
         if build_fb_wallet {
             let fb_wallet = wallet_builder
-                .clone()
                 .derivation_path("m/44'/60'/0'/0/1")
-                .expect("Failed to read Flashbots' mnemonic file")
+                .expect("Failed to derive wallet")
                 .build()?;
 
             Ok(Self {
@@ -128,45 +126,14 @@ impl Wallet {
         let wallet = wallet_builder
             .clone()
             .derivation_path("m/44'/60'/0'/0/0")
-            .expect("Failed to read mnemonic file")
+            .expect("Failed to derive wallet")
             .build()?;
 
         if build_fb_wallet {
             let fb_wallet = wallet_builder
-                .clone()
                 .derivation_path("m/44'/60'/0'/0/1")
-                .expect("Failed to read Flashbots' mnemonic file")
+                .expect("Failed to derive wallet")
                 .build()?;
-
-            Ok(Self {
-                signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
-            })
-        } else {
-            Ok(Self {
-                signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: None,
-            })
-        }
-    }
-
-    /// Create a new wallet from the given private key
-    /// if `fb_key` is provided, then a Flashbots wallet is also built, otherwise it is set to None
-    ///
-    /// # Arguments
-    /// * `key` - The private key
-    /// * `chain_id` - The chain id of the blockchain network to be used
-    /// * `fb_key` - The private key of the Flashbots wallet
-    ///
-    /// # Returns
-    /// * `Self` - A new `Wallet` instance
-    pub fn from_key(key: &str, chain_id: &U256, fb_key: Option<&str>) -> anyhow::Result<Self> {
-        let wallet = key.parse::<LocalWallet>()?;
-
-        if fb_key.is_some() {
-            let fb_wallet = fb_key
-                .expect("Failed to read Flashbot's mnemonic file")
-                .parse::<LocalWallet>()?;
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
                 fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),

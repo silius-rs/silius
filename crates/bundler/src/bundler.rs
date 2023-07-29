@@ -12,8 +12,16 @@ use tokio::task::JoinHandle;
 use tracing::{info, trace};
 use url::Url;
 
+/// Send bundle mode determines whether to send the bundle to a regular Eth execution client or to Flashbots
+#[derive(Clone)]
+pub enum SendBundleMode {
+    /// Send the bundle to a regular Eth execution client
+    EthClient,
+    /// Send the bundle to Flashbots relay
+    Flashbots,
+}
+
 /// The `Bundler` struct is used to represent a bundler with necessary properties
-///
 #[derive(Clone)]
 pub struct Bundler {
     /// Wallet instance representing the bundler's wallet.
@@ -26,6 +34,8 @@ pub struct Bundler {
     pub entry_point: Address,
     /// [Chain](Chain) instance representing the blockchain network to be used
     pub chain: Chain,
+    /// Send bundle mode determines whether to send the bundle to a regular Eth execution client or to Flashbots
+    pub send_bundle_mode: SendBundleMode,
 }
 
 impl Bundler {
@@ -39,6 +49,7 @@ impl Bundler {
         beneficiary: Address,
         entry_point: Address,
         chain: Chain,
+        send_bundle_mode: SendBundleMode,
     ) -> Self {
         Self {
             wallet,
@@ -46,6 +57,29 @@ impl Bundler {
             beneficiary,
             entry_point,
             chain,
+            send_bundle_mode,
+        }
+    }
+
+    /// Send a bundle of user operations to the Eth execution client or Flashbots' relay, depending on the [SendBundleMode](SendBundleMode)
+    ///
+    /// # Arguments
+    /// * `uos` - An array of [UserOperations](UserOperation)
+    ///
+    /// # Returns
+    /// * `H256` - The transaction hash of the bundle or transaction
+    pub async fn send_next_bundle(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
+        if uos.is_empty() {
+            info!("Skipping creating a new bundle, no user operations");
+            return Ok(H256::default());
+        };
+
+        info!("Creating a new bundle with {} user operations", uos.len());
+        trace!("Bundle content: {uos:?}");
+
+        match self.send_bundle_mode {
+            SendBundleMode::EthClient => self.send_next_bundle_eth(uos).await,
+            SendBundleMode::Flashbots => self.send_next_bundle_flashbots(uos).await,
         }
     }
 
@@ -89,15 +123,7 @@ impl Bundler {
     ///
     /// # Returns
     /// * `H256` - The transaction hash of the bundle
-    pub async fn send_next_bundle(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-        if uos.is_empty() {
-            info!("Skipping creating a new bundle, no user operations");
-            return Ok(H256::default());
-        };
-
-        info!("Creating a new bundle with {} user operations", uos.len());
-        trace!("Bundle content: {uos:?}");
-
+    async fn send_next_bundle_eth(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
         let eth_client = Provider::<Http>::try_from(self.eth_client_address.clone())?;
         let client = Arc::new(SignerMiddleware::new(
             eth_client.clone(),
@@ -122,7 +148,7 @@ impl Bundler {
     }
 
     // TODO: add more relay endpoints support
-    /// Sends the bundle as Flashbots bundle.
+    /// Sends the bundle as Flashbots relay.
     ///
     /// # Arguments
     /// * `uos` - An array of [UserOperations](UserOperation)
@@ -130,22 +156,8 @@ impl Bundler {
     /// # Returns
     /// * `H256` - The transaction hash of the bundle
     #[allow(clippy::needless_return)]
-    #[allow(clippy::suspicious_double_ref_op)]
-    pub async fn send_next_bundle_flashbots(
-        &self,
-        uos: &Vec<UserOperation>,
-    ) -> anyhow::Result<H256> {
-        // Send a bundle as Flashbots bundles
-        // TODO: add more relay endpoints support
+    async fn send_next_bundle_flashbots(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
         let relay_endpoint: &str = flashbots_relay_endpoints::FLASHBOTS;
-
-        if uos.is_empty() {
-            info!("Skipping creating a new bundle, no user operations");
-            return Ok(H256::default());
-        };
-
-        info!("Creating a new bundle with {} user operations", uos.len());
-        trace!("Bundle content: {uos:?}");
 
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
 

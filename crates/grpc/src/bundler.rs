@@ -1,7 +1,7 @@
 use crate::proto::bundler::*;
 use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
 use crate::uo_pool_client::UoPoolClient;
-use aa_bundler_bundler::Bundler;
+use aa_bundler_bundler::{Bundler, SendBundleMode};
 use aa_bundler_primitives::{Chain, UserOperation, Wallet};
 use async_trait::async_trait;
 use ethers::types::{Address, H256, U256};
@@ -49,7 +49,6 @@ impl BundlerService {
         Ok(uos)
     }
 
-    // TODO: add send bundle to flashbots
     pub async fn send_bundles(&self) -> anyhow::Result<H256> {
         let mut tx_hashes: Vec<H256> = vec![];
 
@@ -202,6 +201,7 @@ pub fn bundler_service_run(
     _min_balance: U256,
     bundle_interval: u64,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
+    send_bundle_mode: SendBundleMode,
 ) {
     let bundlers: Vec<Bundler> = eps
         .iter()
@@ -212,6 +212,7 @@ pub fn bundler_service_run(
                 beneficiary,
                 *ep,
                 chain,
+                send_bundle_mode.clone(),
             )
         })
         .collect();

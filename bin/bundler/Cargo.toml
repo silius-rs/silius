@@ -12,6 +12,7 @@ AA (ERC-4337) Bundler
 default-run = "bundler"
 
 [dependencies]
+aa-bundler-bundler = { path = "../../crates/bundler" }
 aa-bundler-grpc = { path = "../../crates/grpc" }
 aa-bundler-primitives = { path = "../../crates/primitives" }
 aa-bundler-rpc = { path = "../../crates/rpc" }

@@ -16,6 +16,7 @@ dependencies = [
 name = "aa-bundler"
 version = "0.1.0"
 dependencies = [
+ "aa-bundler-bundler",
  "aa-bundler-grpc",
  "aa-bundler-primitives",
  "aa-bundler-rpc",
