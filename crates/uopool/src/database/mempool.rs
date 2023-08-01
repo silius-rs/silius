@@ -146,13 +146,6 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
             .unwrap_or_else(|_| vec![])
     }
 
-    fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation> {
-        self.get_all_by_sender(&uo.sender)
-            .iter()
-            .find(|uo_prev| uo_prev.nonce == uo.nonce)
-            .cloned()
-    }
-
     fn get_number_by_sender(&self, sender: &Address) -> usize {
         let sender_wrap: WrapAddress = (*sender).into();
         self.env

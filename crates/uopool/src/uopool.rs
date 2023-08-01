@@ -113,12 +113,9 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     pub async fn add_user_operation(
         &mut self,
         uo: UserOperation,
-        res: Option<Result<UserOperationValidationOutcome, ValidationError>>,
+        res: Option<UserOperationValidationOutcome>,
     ) -> Result<UserOperationHash, AddError> {
-        let res = match res {
-            Some(res) => res?,
-            None => self.validate_user_operation(&uo).await?,
-        };
+        let res = res.unwrap_or(self.validate_user_operation(&uo).await?);
 
         if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);

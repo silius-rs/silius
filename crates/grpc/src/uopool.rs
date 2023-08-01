@@ -78,7 +78,17 @@ where
 
         let res = {
             let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
-            uo_pool.validate_user_operation(&uo).await
+            match uo_pool.validate_user_operation(&uo).await {
+                Ok(res) => res,
+                Err(err) => {
+                    return Ok(Response::new(AddResponse {
+                        res: AddResult::NotAdded as i32,
+                        data: serde_json::to_string(&err).map_err(|err| {
+                            Status::internal(format!("Failed to serialize error: {err}"))
+                        })?,
+                    }))
+                }
+            }
         };
 
         let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
@@ -357,12 +367,12 @@ pub async fn uopool_service_run(
 
             let mut validator =
                 StandardUserOperationValidator::new(eth_client.clone(), entry_point.clone(), chain)
-                    .with_sanity_check(SenderOrInitCode {})
+                    .with_sanity_check(SenderOrInitCode)
                     .with_sanity_check(VerificationGas {
                         max_verification_gas,
                     })
-                    .with_sanity_check(Paymaster {})
-                    .with_sanity_check(CallGas {})
+                    .with_sanity_check(Paymaster)
+                    .with_sanity_check(CallGas)
                     .with_sanity_check(MaxFee {
                         min_priority_fee_per_gas,
                     })
@@ -370,16 +380,16 @@ pub async fn uopool_service_run(
                         max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
                         gas_increase_perc: GAS_INCREASE_PERC.into(),
                     })
-                    .with_simulation_check(Signature {})
-                    .with_simulation_check(Timestamp {});
+                    .with_simulation_check(Signature)
+                    .with_simulation_check(Timestamp);
 
             if uo_pool_mode != UoPoolMode::Unsafe {
                 validator = validator
-                    .with_simulation_trace_check(Gas {})
-                    .with_simulation_trace_check(Opcodes {})
-                    .with_simulation_trace_check(StorageAccess {})
-                    .with_simulation_trace_check(CallStack {})
-                    .with_simulation_trace_check(CodeHashes {});
+                    .with_simulation_trace_check(Gas)
+                    .with_simulation_trace_check(Opcodes)
+                    .with_simulation_trace_check(StorageAccess)
+                    .with_simulation_trace_check(CallStack)
+                    .with_simulation_trace_check(CodeHashes);
             }
 
             m_map.insert(
