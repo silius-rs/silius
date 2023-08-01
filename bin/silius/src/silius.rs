@@ -156,7 +156,9 @@ fn main() -> Result<()> {
                             let mut server = JsonRpcServer::new(opt.rpc_opts.rpc_listen_address.clone()).with_proxy(opt.eth_client_address)
                             .with_cors(opt.rpc_opts.cors_domain);
 
-                            server.add_method(Web3ApiServerImpl{}.into_rpc())?;
+                            if api.contains("web3") {
+                                server.add_method(Web3ApiServerImpl{}.into_rpc())?;
+                            }
 
                             if api.contains("eth") {
                                 server.add_method(

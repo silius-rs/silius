@@ -21,7 +21,7 @@ case $1 in
         --min-stake 1 \
         --min-unstake-delay 0 \
         --min-priority-fee-per-gas 0 \
-        --rpc-api eth,debug \
+        --rpc-api eth,debug,web3 \
         --max-verification-gas 1500000 & echo $! > bundler.pid
     popd
 	cd @account-abstraction && yarn deploy --network localhost
