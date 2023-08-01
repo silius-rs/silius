@@ -4,25 +4,38 @@ use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
-    types::{transaction::eip2718::TypedTransaction, Address, H256},
+    types::{
+        transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest,
+        Eip2930TransactionRequest, H256, U64, U256,
+        transaction::eip2930::{AccessList, AccessListItem},
+    },
 };
 use ethers_flashbots::{BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded};
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 use tracing::{info, trace};
+use std::collections::BTreeSet;
 use url::Url;
+use foundry_evm::executor::fork::{inspector::AccessListTracer, BlockchainDb, BlockchainDbMeta, SharedBackend};
+use foundry_evm::revm::{
+    db::CacheDB,
+    primitives::{Address as rAddress, U256 as rU256},
+    EVM,
+};
+use anvil::eth::util::get_precompiles_for;
 
-/// Send bundle mode determines whether to send the bundle to a regular Eth execution client or to Flashbots
-#[derive(Clone)]
+
+/// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
+#[derive(Clone, Debug, PartialEq)]
 pub enum SendBundleMode {
-    /// Send the bundle to a regular Eth execution client
+    /// Send the bundle to a Ethereum execution client
     EthClient,
     /// Send the bundle to Flashbots relay
     Flashbots,
 }
 
 /// The `Bundler` struct is used to represent a bundler with necessary properties
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Bundler {
     /// Wallet instance representing the bundler's wallet.
     pub wallet: Wallet,
@@ -36,10 +49,13 @@ pub struct Bundler {
     pub chain: Chain,
     /// Send bundle mode determines whether to send the bundle to a regular Eth execution client or to Flashbots
     pub send_bundle_mode: SendBundleMode,
+    /// Block Builder relay endpoints
+    pub relay_endpoints: Option<Vec<String>>,
 }
 
 impl Bundler {
     /// Create a new `Bundler` instance
+    /// if `send_bundle_mode` is `SendBundleMode::Flashbots` and `relay_endpoints` is `None`, the default Flashbots relay endpoint will be used
     ///
     /// # Returns
     /// * `Self` - A new `Bundler` instance
@@ -50,18 +66,52 @@ impl Bundler {
         entry_point: Address,
         chain: Chain,
         send_bundle_mode: SendBundleMode,
+        relay_endpoints: Option<Vec<String>>,
     ) -> Self {
-        Self {
-            wallet,
-            eth_client_address,
-            beneficiary,
-            entry_point,
-            chain,
-            send_bundle_mode,
+        if !(chain.id() == 1 || chain.id() == 5 || chain.id() == 11155111)
+            && send_bundle_mode == SendBundleMode::Flashbots
+        {
+            panic!("Flashbots is only supported on mainnet, goerli and Sepolia");
+        };
+
+        match send_bundle_mode {
+            SendBundleMode::EthClient => Self {
+                wallet,
+                eth_client_address,
+                beneficiary,
+                entry_point,
+                chain,
+                send_bundle_mode,
+                relay_endpoints: None,
+            },
+            SendBundleMode::Flashbots => match relay_endpoints {
+                None => {
+                    let mut relay_endpoints = Vec::new();
+                    relay_endpoints.push(flashbots_relay_endpoints::FLASHBOTS.to_string());
+                    Self {
+                        wallet,
+                        eth_client_address,
+                        beneficiary,
+                        entry_point,
+                        chain,
+                        send_bundle_mode,
+                        relay_endpoints: Some(relay_endpoints),
+                    }
+                }
+                Some(relay_endpoints) => Self {
+                    wallet,
+                    eth_client_address,
+                    beneficiary,
+                    entry_point,
+                    chain,
+                    send_bundle_mode,
+                    relay_endpoints: Some(relay_endpoints),
+                },
+            },
         }
     }
 
-    /// Send a bundle of user operations to the Eth execution client or Flashbots' relay, depending on the [SendBundleMode](SendBundleMode)
+    /// Send a bundle of [UserOperations](UserOperation) to the Ethereum execution client or Flashbots' relay, depending on the [SendBundleMode](SendBundleMode)
     ///
     /// # Arguments
     /// * `uos` - An array of [UserOperations](UserOperation)
@@ -81,6 +131,51 @@ impl Bundler {
             SendBundleMode::EthClient => self.send_next_bundle_eth(uos).await,
             SendBundleMode::Flashbots => self.send_next_bundle_flashbots(uos).await,
         }
+    }
+
+    async fn create_access_list<M: Middleware + 'static>(&self, client: Arc<M>) -> anyhow::Result<AccessList> {
+        let block_number = client.get_block_number().await?;
+        let current_block = match client.get_block(block_number).await {
+            Ok(block) => match block {
+                Some(block) => block,
+                None => return Err(anyhow::anyhow!("Failed to get block")),
+            },
+            Err(e) => return Err(anyhow::anyhow!("Failed to get block: {:?}", e)),
+        };
+
+        let shared_backend = SharedBackend::spawn_backend_thread(
+            client.clone(),
+            BlockchainDb::new(
+                BlockchainDbMeta {
+                    cfg_env: Default::default(),
+                    block_env: Default::default(),
+                    hosts: BTreeSet::from(["".to_string()]),
+                },
+                None,
+            ), 
+            Some((current_block.clone().number - 1).into()),
+        );
+
+        let next_block = client.get_block(current_block.number + 1).await?;
+
+        let mut fork_db = CacheDB::new(shared_backend);
+        let mut evm = EVM::new();
+        evm.database(fork_db);
+        evm.env.block.number = rU256::from(next_block.number.as_u64());
+        evm.env.block.timestamp = next_block.timestamp.into();
+        evm.env.block.basefee = next_block.base_fee_per_gas.into();
+
+        let mut access_list_inspector = AccessListTracer::new(
+            Default::default(),
+            searcher,
+            sando_address,
+            get_precompiles_for(evm.env.cfg.spec_id),
+        );
+        evm.inspect_ref(&mut access_list_inspector)
+            .map_err(|e| anyhow::anyhow!("[EVM ERROR] frontrun: {:?}", (e)))?;
+        let access_list = access_list_inspector.access_list();
+
+        Ok(AccessListInspector::new().inspect(&mut evm, &uos))
     }
 
     /// Helper function to generate a [TypedTransaction](TypedTransaction) from an array of user operations.
@@ -111,12 +206,48 @@ impl Bundler {
                 self.beneficiary,
             )
             .tx;
-        tx.set_nonce(nonce).set_chain_id(self.chain.id());
 
-        Ok(tx)
+        let accesslist = client
+            .clone()
+            .create_access_list(&tx, None)
+            .await?;
+
+        match self.chain.id() {
+            // Mumbai
+            80001u64 => {
+                tx = TypedTransaction::Eip2930(Eip2930TransactionRequest {
+                    tx: tx.into(),
+                    access_list: accesslist.access_list,
+                });
+            }
+            _ => {
+
+                let estimated_gas = client.clone().estimate_gas(&tx, None).await?;
+
+                let (max_fee_per_gas, max_priority_fee) =
+                    client.clone().estimate_eip1559_fees(None).await?;
+
+                tx = TypedTransaction::Eip1559(Eip1559TransactionRequest {
+                    to: tx.to().cloned(),
+                    from: Some(self.wallet.signer.address()),
+                    data: tx.data().cloned(),
+                    chain_id: Some(U64::from(self.chain.id())),
+                    max_priority_fee_per_gas: Some(max_priority_fee),
+                    max_fee_per_gas: Some(max_fee_per_gas),
+                    gas: Some(estimated_gas),
+                    nonce: Some(nonce),
+                    value: None,
+                    access_list: accesslist.access_list,
+                });
+            }
+        };
+
+        println!("tx: {:?}", tx);
+
+        Ok(tx.into())
     }
 
-    /// Send a bundle of user operations to the Ethereum execution client
+    /// Send a bundle of [UserOperations](UserOperation) to the Ethereum execution client
     ///
     /// # Arguments
     /// * `uos` - An array of [UserOperations](UserOperation)
@@ -148,7 +279,7 @@ impl Bundler {
     }
 
     // TODO: add more relay endpoints support
-    /// Sends the bundle as Flashbots relay.
+    /// Send a bundle of [UserOperations](UserOperation) to the Flashbots relay.
     ///
     /// # Arguments
     /// * `uos` - An array of [UserOperations](UserOperation)
@@ -157,7 +288,8 @@ impl Bundler {
     /// * `H256` - The transaction hash of the bundle
     #[allow(clippy::needless_return)]
     async fn send_next_bundle_flashbots(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-        let relay_endpoint: &str = flashbots_relay_endpoints::FLASHBOTS;
+        // TODO: add support for multiple relay endpoints
+        let relay_endpoint: &str = self.relay_endpoints.as_ref().unwrap().first().unwrap();
 
         let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
 
@@ -173,6 +305,7 @@ impl Bundler {
         );
         fb_middleware.set_simulation_relay(
             Url::parse(relay_endpoint.clone()).expect("Failed to parse simulation relay URL"),
+            bundle_signer.clone(),
         );
 
         let client = Arc::new(SignerMiddleware::new(
@@ -184,7 +317,6 @@ impl Bundler {
 
         trace!("Sending transaction to the execution client: {tx:?}");
 
-        // TODO: add bribe calculation
         // Sign the tx
         let typed_tx = TypedTransaction::Eip1559(tx.clone().into());
         let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
@@ -250,4 +382,99 @@ impl Bundler {
             Err(e) => Err(anyhow::anyhow!("Task panicked: {:?}", e)),
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{Bundler, SendBundleMode};
+    use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, UserOperation, Wallet};
+    use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
+    use alloy_sol_types::{sol, SolCall};
+    use ethers::{
+        signers::Signer,
+        types::{Address, U256},
+    };
+    use std::env;
+
+    sol! {
+        #[derive(Debug)]
+        function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts);
+    }
+
+    // Testing key
+    const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
+    // Deplolyed SimpleAccount address on Goerli
+    const SIMPLE_ACCOUNT: &str = "0xf850679aFA7A1675D24D21092b584AbA709d35F8";
+    // UO signing key
+    const SIGNING_KEY: &str = "0xdf1f39dd322a0cb54da8724bf1baf639f0d34916d529adbe2942a28b47dbed4a";
+
+    struct TestContext {
+        pub bundler: Bundler,
+        pub entry_point: Address,
+    }
+
+    async fn setup() -> anyhow::Result<TestContext> {
+        std::env::set_var("RUST_LOG", "info");
+        tracing_subscriber::fmt::init();
+
+        dotenv::dotenv().ok();
+        let eth_client_address = env::var("HTTP_RPC").expect("HTTP_RPC env var not set");
+        let ep_address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse::<Address>()?;
+
+        let wallet = Wallet::from_phrase(KEY_PHRASE, &U256::from(5), true)?;
+
+        let bundler = Bundler::new(
+            wallet.clone(),
+            eth_client_address.clone(),
+            wallet.signer.address(),
+            ep_address,
+            Chain::from(5),
+            SendBundleMode::Flashbots,
+            Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.to_string()]),
+        );
+
+        Ok(TestContext {
+            bundler,
+            entry_point: ep_address,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_send_bundle_flashbots() -> anyhow::Result<()> {
+        let ctx = setup().await?;
+
+        let path = vec![
+            // WETH address
+            alloy_Address::parse_checksummed("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", None)
+                .unwrap(),
+            // USDt address
+            alloy_Address::parse_checksummed("0xdAC17F958D2ee523a2206206994597C13D831ec7", None)
+                .unwrap(),
+        ];
+
+        let swap_eth = swapExactETHForTokensCall {
+            amountOutMin: alloy_U256::from(0),
+            path: path.clone(),
+            to: SIMPLE_ACCOUNT.parse::<alloy_Address>().unwrap(),
+            deadline: alloy_U256::from(0),
+        };
+        let call_data = swap_eth.encode();
+
+        let uo = UserOperation::default()
+            .call_data(call_data.into())
+            .sender(SIMPLE_ACCOUNT.parse::<Address>().unwrap())
+            // .verification_gas_limit(100_000.into())
+            // .pre_verification_gas(21_000.into())
+            // .max_priority_fee_per_gas(1_000_000_000.into())
+            // .call_gas_limit(200_000.into())
+            // .max_fee_per_gas(3_000_000_000_u64.into())
+            // .max_priority_fee_per_gas(1_000_000_000.into())
+            .signature(SIGNING_KEY.parse().unwrap());
+
+        let bundle_hash = ctx.bundler.send_next_bundle(&vec![uo]).await?;
+        println!("Bundle hash: {}", bundle_hash);
+
+        Ok(())
+    }
+
 }

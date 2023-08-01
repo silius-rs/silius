@@ -11,6 +11,7 @@ AA (ERC-4337) Bundler integration tests
 """
 
 [dev-dependencies]
+aa-bundler-bundler = { path = "../crates/bundler" }
 aa-bundler-contracts = { path = "../crates/contracts" }
 aa-bundler-primitives = { path = "../crates/primitives" }
 aa-bundler-uopool = { path = "../crates/uopool" }

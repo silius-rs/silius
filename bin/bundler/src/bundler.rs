@@ -7,7 +7,9 @@ use aa_bundler_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
-use aa_bundler_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
+use aa_bundler_primitives::{
+    chain::SUPPORTED_CHAINS, consts::flashbots_relay_endpoints, Chain, Wallet,
+};
 use aa_bundler_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
@@ -71,6 +73,7 @@ pub struct Opt {
 fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
 
+    std::env::set_var("RUST_LOG", "info");
     tracing_subscriber::fmt::init();
 
     std::thread::Builder::new()
@@ -163,13 +166,23 @@ fn main() -> Result<()> {
                     opt.bundler_opts.min_balance,
                     opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),
-                    match opt.send_bundle_mode {
-                        Some(mode) => match mode.as_str() {
+                    match opt.send_bundle_mode.as_deref() {
+                        Some(mode) => match mode {
                             "eth-client" => SendBundleMode::EthClient,
                             "flashbots" => SendBundleMode::Flashbots,
                             _ => SendBundleMode::EthClient,
                         },
                         None => SendBundleMode::EthClient,
+                    },
+                    match opt.send_bundle_mode {
+                        Some(mode) => match mode.as_str() {
+                            "eth-client" => None,
+                            "flashbots" => Some(vec![
+                                flashbots_relay_endpoints::FLASHBOTS.to_string(),
+                            ]),
+                            _ => None,
+                        },
+                        None => None,
                     },
                 );
                 info!(

@@ -8,7 +8,7 @@ use expanded_pathbuf::ExpandedPathBuf;
 use std::fs;
 
 /// Wrapper around ethers wallet
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Wallet {
     /// Signing key of the wallet
     pub signer: ethers::signers::Wallet<SigningKey>,

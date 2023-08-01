@@ -32,7 +32,7 @@ fn main() -> Result<()> {
         output_path
     } else {
         home_dir()
-            .map(|h| h.join(".aa-bundler"))
+            .map(|h| h.join(".silius"))
             .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
             .map(ExpandedPathBuf)?
     };
