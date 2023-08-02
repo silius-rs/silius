@@ -1,41 +1,23 @@
 use aa_bundler_contracts::entry_point::EntryPointAPI;
 use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, UserOperation, Wallet};
-use anvil::eth::util::get_precompiles_for;
-use bytes::Bytes;
 use ethers::{
-    prelude::SignerMiddleware,
+    prelude::{LocalWallet, SignerMiddleware},
     providers::{Http, Middleware, Provider},
     signers::Signer,
     types::{
-        transaction::eip2718::TypedTransaction,
-        transaction::eip2930::AccessList,
-        Address, Eip1559TransactionRequest, Eip2930TransactionRequest, H256, U256, U64,
+        transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest, H256, U64,
     },
-    
 };
 use ethers_flashbots::{BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded};
-use foundry_evm::revm::{
-    db::CacheDB,
-    primitives::{Address as rAddress, U256 as rU256},
-    EVM,
-};
-use foundry_evm::{
-    executor::{
-        fork::{BlockchainDb, BlockchainDbMeta, SharedBackend},
-        inspector::AccessListTracer,
-        TxEnv,
-    },
-    utils::{eval_to_instruction_result, halt_to_instruction_result},
-};
-use revm::{
-    interpreter::InstructionResult,
-    primitives::{ExecutionResult, Output, TransactTo},
-};
-use std::collections::BTreeSet;
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 use tracing::{info, trace};
 use url::Url;
+
+type FlashbotsClientType<M> =
+    Arc<SignerMiddleware<FlashbotsMiddleware<M, LocalWallet>, LocalWallet>>;
+
+type EthClientType<M> = Arc<SignerMiddleware<M, LocalWallet>>;
 
 /// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
 #[derive(Clone, Debug, PartialEq)]
@@ -63,7 +45,10 @@ pub struct Bundler {
     pub send_bundle_mode: SendBundleMode,
     /// Block Builder relay endpoints
     pub relay_endpoints: Option<Vec<String>>,
+    pub eth_client: Option<EthClientType<Provider<Http>>>,
+    pub fb_client: Option<FlashbotsClientType<Provider<Http>>>,
 }
+
 
 impl Bundler {
     /// Create a new `Bundler` instance
@@ -79,7 +64,7 @@ impl Bundler {
         chain: Chain,
         send_bundle_mode: SendBundleMode,
         relay_endpoints: Option<Vec<String>>,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         if !(chain.id() == 1 || chain.id() == 5 || chain.id() == 11155111)
             && send_bundle_mode == SendBundleMode::Flashbots
         {
@@ -87,19 +72,16 @@ impl Bundler {
         };
 
         match send_bundle_mode {
-            SendBundleMode::EthClient => Self {
-                wallet,
-                eth_client_address,
-                beneficiary,
-                entry_point,
-                chain,
-                send_bundle_mode,
-                relay_endpoints: None,
-            },
-            SendBundleMode::Flashbots => match relay_endpoints {
-                None => {
-                    let mut relay_endpoints = Vec::new();
-                    relay_endpoints.push(flashbots_relay_endpoints::FLASHBOTS.to_string());
+
+            SendBundleMode::EthClient => {
+
+                let eth_client = Provider::<Http>::try_from(eth_client_address.clone())?;
+                let client = Arc::new(SignerMiddleware::new(
+                    eth_client.clone(),
+                    wallet.signer.clone(),
+                ));
+
+                Ok(
                     Self {
                         wallet,
                         eth_client_address,
@@ -107,17 +89,58 @@ impl Bundler {
                         entry_point,
                         chain,
                         send_bundle_mode,
-                        relay_endpoints: Some(relay_endpoints),
+                        relay_endpoints: None,
+                        eth_client: Some(client),
+                        fb_client: None,
                     }
+                )
+            },
+            SendBundleMode::Flashbots => match relay_endpoints {
+                None => {
+                    let mut relay_endpoints = Vec::new();
+                    relay_endpoints.push(flashbots_relay_endpoints::FLASHBOTS.to_string());
+                    let fb_client = generate_fb_middleware(
+                        eth_client_address.clone(),
+                        Some(relay_endpoints.clone()),
+                        wallet.clone(),
+                    )?;
+
+                    Ok(
+                        Self {
+                            wallet,
+                            eth_client_address,
+                            beneficiary,
+                            entry_point,
+                            chain,
+                            send_bundle_mode,
+                            relay_endpoints: Some(relay_endpoints),
+                            eth_client: None,
+                            fb_client: Some(fb_client),
+                        }
+                    )
                 }
-                Some(relay_endpoints) => Self {
-                    wallet,
-                    eth_client_address,
-                    beneficiary,
-                    entry_point,
-                    chain,
-                    send_bundle_mode,
-                    relay_endpoints: Some(relay_endpoints),
+                Some(relay_endpoints) => {
+
+                    let fb_client = generate_fb_middleware(
+                        eth_client_address.clone(),
+                        Some(relay_endpoints.clone()),
+                        wallet.clone(),
+                    )?;
+
+                    Ok(
+
+                        Self {
+                            wallet,
+                            eth_client_address,
+                            beneficiary,
+                            entry_point,
+                            chain,
+                            send_bundle_mode,
+                            relay_endpoints: Some(relay_endpoints),
+                            eth_client: None,
+                            fb_client: Some(fb_client),
+                        }
+                    )
                 },
             },
         }
@@ -145,110 +168,13 @@ impl Bundler {
         }
     }
 
-    /// Based on Reth [`create_access_list_at`](https://github.com/paradigmxyz/reth/blob/b46101afb5e549d40b7b2537fff9b67e05ad4448/crates/rpc/rpc/src/eth/api/call.rs#L237) method
-    async fn create_access_list<M: Middleware + 'static>(
-        &self,
-        client: Arc<M>,
-        call_data: Bytes,
-    ) -> anyhow::Result<(InstructionResult, Option<Output>, u64, AccessList)> 
-    {
-        let block_number = client.get_block_number().await?;
-        let current_block = match client.get_block(block_number.clone()).await {
-            Ok(block) => match block {
-                Some(block) => block,
-                None => return Err(anyhow::anyhow!("Failed to get block")),
-            },
-            Err(e) => return Err(anyhow::anyhow!("Failed to get block: {:?}", e)),
-        };
-
-        let shared_backend = SharedBackend::spawn_backend_thread(
-            client.clone(),
-            BlockchainDb::new(
-                BlockchainDbMeta {
-                    cfg_env: Default::default(),
-                    block_env: Default::default(),
-                    hosts: BTreeSet::from(["".to_string()]),
-                },
-                None,
-            ),
-            Some(block_number.clone().into()),
-        );
-
-        let fork_db = CacheDB::new(shared_backend);
-        let mut evm = EVM::new();
-        evm.database(fork_db);
-
-        // Set up the EVM block environment
-        evm.env.block.number = rU256::from(block_number.as_u64());
-        evm.env.block.timestamp = current_block.timestamp.into();
-        evm.env.block.basefee = current_block
-            .base_fee_per_gas
-            .unwrap_or(U256::from(21000))
-            .into();
-        // Using builder0x69's address as a mock
-        evm.env.block.coinbase = "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990"
-            .parse::<rAddress>()
-            .expect("Failed to parse address");
-
-        // Set up the EVM transaction environment
-        let tx = TxEnv {
-            caller: self.wallet.signer.address().into(),
-            gas_limit: u64::MAX,
-            gas_price: current_block
-                .base_fee_per_gas
-                .unwrap_or(U256::from(21000))
-                .into(),
-            gas_priority_fee: None,
-            transact_to: TransactTo::Call(self.entry_point.into()),
-            value: Default::default(),
-            data: call_data,
-            chain_id: self.chain.id().into(),
-            nonce: None,
-            access_list: Default::default(),
-        };
-        evm.env.tx = tx;
-
-        let mut access_list_inspector = AccessListTracer::new(
-            Default::default(),
-            self.wallet.signer.address().into(),
-            self.entry_point.into(),
-            get_precompiles_for(evm.env.cfg.spec_id),
-        );
-
-        let res_and_state = match evm.inspect_ref(&mut access_list_inspector) {
-            Ok(res_and_state) => res_and_state,
-            Err(e) => return Err(anyhow::anyhow!("Failed to inspect transaction: {:?}", e)),
-        };
-
-        let (exit_reason, gas_used, out) = match res_and_state.result {
-            ExecutionResult::Success {
-                reason,
-                gas_used,
-                output,
-                ..
-            } => (eval_to_instruction_result(reason), gas_used, Some(output)),
-            ExecutionResult::Revert { gas_used, output } => (
-                InstructionResult::Revert,
-                gas_used,
-                Some(Output::Call(output)),
-            ),
-            ExecutionResult::Halt { reason, gas_used } => {
-                (halt_to_instruction_result(reason), gas_used, None)
-            }
-        };
-
-        let access_list = access_list_inspector.access_list();
-
-        Ok((exit_reason, out, gas_used, access_list))
-    }
-
     /// Helper function to generate a [TypedTransaction](TypedTransaction) from an array of user operations.
     ///
     /// # Arguments
-    /// * `client` - An a provider that implements [Middleware](Middleware) trait
+    /// * `client` - A provider that implements [Middleware](Middleware) trait
     ///
     /// # Returns
-    /// * `TypedTransaction` - A [TypedTransaction](TypedTransaction) instance
+    /// * `TypedTransaction` - A [TypedTransaction](TypedTransaction) 
     #[allow(clippy::ptr_arg)]
     async fn generate_tx<M>(
         &self,
@@ -271,7 +197,6 @@ impl Bundler {
             )
             .tx;
 
-
         match self.chain.id() {
             // Mumbai
             80001u64 => {
@@ -279,9 +204,12 @@ impl Bundler {
             }
             _ => {
 
-                
-                let accesslist = client.clone().create_access_list(&tx, None).await?.access_list;
-                tx.set_access_list(accesslist);
+                let accesslist = client
+                    .clone()
+                    .create_access_list(&tx, None)
+                    .await?
+                    .access_list;
+                tx.set_access_list(accesslist.clone());
                 let estimated_gas = client.clone().estimate_gas(&tx, None).await?;
 
                 let (max_fee_per_gas, max_priority_fee) =
@@ -297,12 +225,10 @@ impl Bundler {
                     gas: Some(estimated_gas),
                     nonce: Some(nonce),
                     value: None,
-                    access_list: accesslist.access_list,
+                    access_list: accesslist,
                 });
             }
         };
-
-        println!("tx: {:?}", tx);
 
         Ok(tx.into())
     }
@@ -313,13 +239,13 @@ impl Bundler {
     /// * `uos` - An array of [UserOperations](UserOperation)
     ///
     /// # Returns
-    /// * `H256` - The transaction hash of the bundle
+    /// * `H256` - The transaction hash 
     async fn send_next_bundle_eth(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-        let eth_client = Provider::<Http>::try_from(self.eth_client_address.clone())?;
-        let client = Arc::new(SignerMiddleware::new(
-            eth_client.clone(),
-            self.wallet.signer.clone(),
-        ));
+
+        let client = match self.eth_client.clone() {
+            Some(client) => client,
+            None => return Err(anyhow::anyhow!("No Ethereum client provided")),
+        };
 
         let tx = self.generate_tx(client.clone(), uos).await?;
 
@@ -348,100 +274,171 @@ impl Bundler {
     /// * `H256` - The transaction hash of the bundle
     #[allow(clippy::needless_return)]
     async fn send_next_bundle_flashbots(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-        // TODO: add support for multiple relay endpoints
-        let relay_endpoint: &str = self.relay_endpoints.as_ref().unwrap().first().unwrap();
 
-        let provider = Provider::<Http>::try_from(self.eth_client_address.clone())?;
-
-        let bundle_signer = match self.wallet.fb_signer {
-            Some(ref signer) => signer,
-            None => return Err(anyhow::anyhow!("No Flashbots signer provided")),
+        let client = match self.fb_client.clone() {
+            Some(client) => client,
+            None => return Err(anyhow::anyhow!("No Flashbots client provided")),
         };
-
-        let mut fb_middleware = FlashbotsMiddleware::new(
-            provider.clone(),
-            Url::parse(relay_endpoint.clone())?,
-            bundle_signer.clone(),
-        );
-        fb_middleware.set_simulation_relay(
-            Url::parse(relay_endpoint.clone()).expect("Failed to parse simulation relay URL"),
-            bundle_signer.clone(),
-        );
-
-        let client = Arc::new(SignerMiddleware::new(
-            fb_middleware,
-            self.wallet.signer.clone(),
-        ));
 
         let tx = self.generate_tx(client.clone(), uos).await?;
 
-        trace!("Sending transaction to the execution client: {tx:?}");
+        let bundle_req = generate_bundle_req(client.clone(), tx).await?;
 
-        // Sign the tx
-        let typed_tx = TypedTransaction::Eip1559(tx.clone().into());
-        let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
-            Ok(tx) => typed_tx.rlp_signed(&tx),
-            Err(e) => return Err(anyhow::anyhow!("Failed to sign transaction: {:?}", e)),
+        simulate_fb_bundle(client.clone(), &bundle_req).await?;
+
+        let bundle_hash = send_fb_bundle(client.clone(), bundle_req.clone()).await?;
+
+        Ok(bundle_hash)
+    }
+}
+
+
+/// Send a Flashbots bundle and check for status
+/// 
+/// # Arguments
+/// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware) 
+/// * `bundle` - A [BundleRequest](BundleRequest) sent to Flashbots relay
+/// 
+/// # Returns
+/// * `H256` - The transaction hash of the bundle
+async fn send_fb_bundle<M: Middleware + 'static>(
+    client: FlashbotsClientType<M>,
+    bundle: BundleRequest,
+) -> anyhow::Result<H256> {
+
+    // Send the Flashbots bundle and check for status
+    let handle: JoinHandle<Result<(bool, H256), anyhow::Error>> = tokio::spawn(async move {
+        let pending_bundle = match client.inner().send_bundle(&bundle).await {
+            Ok(bundle) => bundle,
+            Err(e) => return Err(anyhow::anyhow!("Failed to send bundle: {:?}", e)),
         };
 
-        // Add tx to Flashbots bundle
-        let mut bundle_req = BundleRequest::new();
-        bundle_req = bundle_req.push_transaction(raw_signed_tx);
+        let bundle_hash = pending_bundle.bundle_hash;
 
-        // Simulate the Flashbots bundle
-        let block_num = client.get_block_number().await?;
-        bundle_req = bundle_req
-            .set_block(block_num + 1)
-            .set_simulation_block(block_num)
-            .set_simulation_timestamp(0);
-        let simulated_bundle = client.inner().simulate_bundle(&bundle_req).await?;
+        match pending_bundle.await {
+            Ok(_) => return Ok((true, bundle_hash)),
+            Err(BundleNotIncluded) => {
+                return Err(anyhow::anyhow!("Bundle not included in the target block"));
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
+            }
+        };
+    });
 
-        // Currently there's only 1 tx per bundle
-        for tx in simulated_bundle.transactions {
-            trace!("Simulate bundle: {:?}", tx);
-            if let Some(err) = &tx.error {
-                return Err(anyhow::anyhow!(
-                    "Transaction failed simulation with error: {:?}",
-                    err
-                ));
-            }
-            if let Some(revert) = &tx.revert {
-                return Err(anyhow::anyhow!(
-                    "Transaction failed simulation with revert: {:?}",
-                    revert
-                ));
-            }
+    match handle.await {
+        Ok(Ok((_, bundle_hash))) => {
+            info!("Bundle included");
+            Ok(bundle_hash)
         }
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(anyhow::anyhow!("Task panicked: {:?}", e)),
+    }
+}
 
-        // Send the Flashbots bundle and check for status
-        let handle: JoinHandle<Result<(bool, H256), anyhow::Error>> = tokio::spawn(async move {
-            let pending_bundle = match client.inner().send_bundle(&bundle_req).await {
-                Ok(bundle) => bundle,
-                Err(e) => return Err(anyhow::anyhow!("Failed to send bundle: {:?}", e)),
-            };
+/// Simulate a Flashbots bundle
+/// 
+/// # Arguments
+/// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
+/// * `bundle` - A [BundleRequest](BundleRequest) sent to Flashbots relay
+async fn simulate_fb_bundle<M: Middleware + 'static>(
+    client: FlashbotsClientType<M>,
+    bundle: &BundleRequest,
+) -> anyhow::Result<()> {
+    let simulated_bundle = client.inner().simulate_bundle(&bundle).await?;
 
-            let bundle_hash = pending_bundle.bundle_hash;
-
-            match pending_bundle.await {
-                Ok(_) => return Ok((true, bundle_hash)),
-                Err(BundleNotIncluded) => {
-                    return Err(anyhow::anyhow!("Bundle not included in the target block"));
-                }
-                Err(e) => {
-                    return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
-                }
-            };
-        });
-
-        match handle.await {
-            Ok(Ok((_, bundle_hash))) => {
-                info!("Bundle included");
-                Ok(bundle_hash)
-            }
-            Ok(Err(e)) => Err(e),
-            Err(e) => Err(anyhow::anyhow!("Task panicked: {:?}", e)),
+    // Currently there's only 1 tx per bundle
+    for tx in simulated_bundle.transactions {
+        trace!("Simulate bundle: {:?}", tx);
+        if let Some(err) = &tx.error {
+            return Err(anyhow::anyhow!(
+                "Transaction failed simulation with error: {:?}",
+                err
+            ));
+        }
+        if let Some(revert) = &tx.revert {
+            return Err(anyhow::anyhow!(
+                "Transaction failed simulation with revert: {:?}",
+                revert
+            ));
         }
     }
+
+    Ok(())
+}
+
+/// Generate a Flashbots bundle request
+/// 
+/// # Arguments
+/// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
+/// * `tx` - A [EIP-1559 TypedTransaction](TypedTransaction) 
+/// 
+/// # Returns
+/// * `BundleRequest` - A [BundleRequest](BundleRequest) 
+async fn generate_bundle_req<M: Middleware + 'static>(
+    client: FlashbotsClientType<M>,
+    tx: TypedTransaction,
+) -> anyhow::Result<BundleRequest> {
+    let typed_tx = TypedTransaction::Eip1559(tx.into());
+    let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
+        Ok(tx) => typed_tx.rlp_signed(&tx),
+        Err(e) => return Err(anyhow::anyhow!("Failed to sign transaction: {:?}", e)),
+    };
+    let mut bundle_req = BundleRequest::new();
+    bundle_req = bundle_req.push_transaction(raw_signed_tx);
+
+    // Simulate the Flashbots bundle
+    let block_num = client.get_block_number().await?;
+    bundle_req = bundle_req
+        .set_block(block_num + 1)
+        .set_simulation_block(block_num)
+        .set_simulation_timestamp(0);
+
+    Ok(bundle_req)
+}
+
+/// Create a Flashbots middleware
+/// 
+/// # Arguments
+/// * `eth_client_address` - The URL of an Ethereum execution client
+/// * `relay_endpoints` - An array of Flashbots relay endpoints
+/// * `wallet` - A [Wallet](Wallet) 
+/// 
+/// # Returns
+/// * `FlashbotsClientType` - A [Flashbots Signer Middleware](FlashbotsClientType)
+fn generate_fb_middleware(
+    eth_client_address: String,
+    relay_endpoints: Option<Vec<String>>,
+    wallet: Wallet,
+) -> anyhow::Result<FlashbotsClientType<Provider<Http>>> {
+
+    // Only support one relay endpoint for now
+    let relay_endpoint: &str = relay_endpoints.as_ref().unwrap().first().unwrap();
+
+    let provider = Provider::<Http>::try_from(eth_client_address.clone())?;
+
+    let bundle_signer = match wallet.fb_signer {
+        Some(ref signer) => signer,
+        None => return Err(anyhow::anyhow!("No Flashbots signer provided")),
+    };
+
+    let mut fb_middleware = FlashbotsMiddleware::new(
+        provider.clone(),
+        Url::parse(relay_endpoint.clone())?,
+        bundle_signer.clone(),
+    );
+    fb_middleware.set_simulation_relay(
+        Url::parse(relay_endpoint.clone()).expect("Failed to parse simulation relay URL"),
+        bundle_signer.clone(),
+    );
+
+    let client = Arc::new(SignerMiddleware::new(
+        fb_middleware,
+        wallet.signer.clone(),
+    ));
+
+    Ok(client)
+
 }
 
 #[cfg(test)]

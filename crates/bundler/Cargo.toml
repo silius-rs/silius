@@ -22,9 +22,6 @@ bytes = "1.4.0"
 dotenv = "0.15.0"
 ethers = { workspace = true }
 ethers-flashbots = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", branch = "master" }
-foundry-evm = { git = "https://github.com/qi-protocol/foundry.git", branch = "stable-ethers" }
-hashbrown = "0.14.0"
-revm = "3.3.0"
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
