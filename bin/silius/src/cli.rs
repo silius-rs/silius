@@ -48,7 +48,7 @@ pub struct RpcServiceOpts {
     #[clap(long, default_value = "127.0.0.1:3000")]
     pub rpc_listen_address: String,
 
-    #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug"])]
+    #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug", "web3"])]
     pub rpc_api: Vec<String>,
 
     #[clap(long, value_delimiter = ',', default_value = "*")]

@@ -45,7 +45,9 @@ async fn main() -> Result<()> {
         .with_proxy(opt.eth_client_address)
         .with_cors(opt.rpc_opts.cors_domain);
 
-    server.add_method(Web3ApiServerImpl {}.into_rpc())?;
+    if api.contains("web3") {
+        server.add_method(Web3ApiServerImpl {}.into_rpc())?;
+    }
 
     let uopool_grpc_client =
         UoPoolClient::connect(format!("http://{}", opt.uopool_grpc_listen_address)).await?;
