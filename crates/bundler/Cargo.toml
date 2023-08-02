@@ -13,20 +13,21 @@ AA (ERC-4337) Bundler bundling implementation
 [dependencies]
 aa-bundler-contracts = { path = "../contracts" }
 aa-bundler-primitives = { path = "../primitives" }
-
-anyhow = "1"
 alloy-primitives = "0.3.0"
 alloy-sol-types = "0.3.0"
+anvil = { git = "https://github.com/qi-protocol/foundry.git", branch = "stable-ethers" }
+
+anyhow = "1"
+bytes = "1.4.0"
 dotenv = "0.15.0"
 ethers = { workspace = true }
 ethers-flashbots = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", branch = "master" }
 foundry-evm = { git = "https://github.com/qi-protocol/foundry.git", branch = "stable-ethers" }
-anvil = { git = "https://github.com/qi-protocol/foundry.git", branch = "stable-ethers" }
+hashbrown = "0.14.0"
+revm = "3.3.0"
 tokio = { workspace = true }
 tracing = { workspace = true }
-url = "2.4.0"
-revm = "3.3.0"
-hashbrown = "0.14.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.4.0"
 
 

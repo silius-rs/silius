@@ -1,29 +1,41 @@
 use aa_bundler_contracts::entry_point::EntryPointAPI;
 use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, UserOperation, Wallet};
+use anvil::eth::util::get_precompiles_for;
+use bytes::Bytes;
 use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
     types::{
-        transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest,
-        Eip2930TransactionRequest, H256, U64, U256,
-        transaction::eip2930::{AccessList, AccessListItem},
+        transaction::eip2718::TypedTransaction,
+        transaction::eip2930::AccessList,
+        Address, Eip1559TransactionRequest, Eip2930TransactionRequest, H256, U256, U64,
     },
+    
 };
 use ethers_flashbots::{BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded};
-use std::{sync::Arc, time::Duration};
-use tokio::task::JoinHandle;
-use tracing::{info, trace};
-use std::collections::BTreeSet;
-use url::Url;
-use foundry_evm::executor::fork::{inspector::AccessListTracer, BlockchainDb, BlockchainDbMeta, SharedBackend};
 use foundry_evm::revm::{
     db::CacheDB,
     primitives::{Address as rAddress, U256 as rU256},
     EVM,
 };
-use anvil::eth::util::get_precompiles_for;
-
+use foundry_evm::{
+    executor::{
+        fork::{BlockchainDb, BlockchainDbMeta, SharedBackend},
+        inspector::AccessListTracer,
+        TxEnv,
+    },
+    utils::{eval_to_instruction_result, halt_to_instruction_result},
+};
+use revm::{
+    interpreter::InstructionResult,
+    primitives::{ExecutionResult, Output, TransactTo},
+};
+use std::collections::BTreeSet;
+use std::{sync::Arc, time::Duration};
+use tokio::task::JoinHandle;
+use tracing::{info, trace};
+use url::Url;
 
 /// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
 #[derive(Clone, Debug, PartialEq)]
@@ -133,9 +145,15 @@ impl Bundler {
         }
     }
 
-    async fn create_access_list<M: Middleware + 'static>(&self, client: Arc<M>) -> anyhow::Result<AccessList> {
+    /// Based on Reth [`create_access_list_at`](https://github.com/paradigmxyz/reth/blob/b46101afb5e549d40b7b2537fff9b67e05ad4448/crates/rpc/rpc/src/eth/api/call.rs#L237) method
+    async fn create_access_list<M: Middleware + 'static>(
+        &self,
+        client: Arc<M>,
+        call_data: Bytes,
+    ) -> anyhow::Result<(InstructionResult, Option<Output>, u64, AccessList)> 
+    {
         let block_number = client.get_block_number().await?;
-        let current_block = match client.get_block(block_number).await {
+        let current_block = match client.get_block(block_number.clone()).await {
             Ok(block) => match block {
                 Some(block) => block,
                 None => return Err(anyhow::anyhow!("Failed to get block")),
@@ -152,30 +170,76 @@ impl Bundler {
                     hosts: BTreeSet::from(["".to_string()]),
                 },
                 None,
-            ), 
-            Some((current_block.clone().number - 1).into()),
+            ),
+            Some(block_number.clone().into()),
         );
 
-        let next_block = client.get_block(current_block.number + 1).await?;
-
-        let mut fork_db = CacheDB::new(shared_backend);
+        let fork_db = CacheDB::new(shared_backend);
         let mut evm = EVM::new();
         evm.database(fork_db);
-        evm.env.block.number = rU256::from(next_block.number.as_u64());
-        evm.env.block.timestamp = next_block.timestamp.into();
-        evm.env.block.basefee = next_block.base_fee_per_gas.into();
+
+        // Set up the EVM block environment
+        evm.env.block.number = rU256::from(block_number.as_u64());
+        evm.env.block.timestamp = current_block.timestamp.into();
+        evm.env.block.basefee = current_block
+            .base_fee_per_gas
+            .unwrap_or(U256::from(21000))
+            .into();
+        // Using builder0x69's address as a mock
+        evm.env.block.coinbase = "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990"
+            .parse::<rAddress>()
+            .expect("Failed to parse address");
+
+        // Set up the EVM transaction environment
+        let tx = TxEnv {
+            caller: self.wallet.signer.address().into(),
+            gas_limit: u64::MAX,
+            gas_price: current_block
+                .base_fee_per_gas
+                .unwrap_or(U256::from(21000))
+                .into(),
+            gas_priority_fee: None,
+            transact_to: TransactTo::Call(self.entry_point.into()),
+            value: Default::default(),
+            data: call_data,
+            chain_id: self.chain.id().into(),
+            nonce: None,
+            access_list: Default::default(),
+        };
+        evm.env.tx = tx;
 
         let mut access_list_inspector = AccessListTracer::new(
             Default::default(),
-            searcher,
-            sando_address,
+            self.wallet.signer.address().into(),
+            self.entry_point.into(),
             get_precompiles_for(evm.env.cfg.spec_id),
         );
-        evm.inspect_ref(&mut access_list_inspector)
-            .map_err(|e| anyhow::anyhow!("[EVM ERROR] frontrun: {:?}", (e)))?;
+
+        let res_and_state = match evm.inspect_ref(&mut access_list_inspector) {
+            Ok(res_and_state) => res_and_state,
+            Err(e) => return Err(anyhow::anyhow!("Failed to inspect transaction: {:?}", e)),
+        };
+
+        let (exit_reason, gas_used, out) = match res_and_state.result {
+            ExecutionResult::Success {
+                reason,
+                gas_used,
+                output,
+                ..
+            } => (eval_to_instruction_result(reason), gas_used, Some(output)),
+            ExecutionResult::Revert { gas_used, output } => (
+                InstructionResult::Revert,
+                gas_used,
+                Some(Output::Call(output)),
+            ),
+            ExecutionResult::Halt { reason, gas_used } => {
+                (halt_to_instruction_result(reason), gas_used, None)
+            }
+        };
+
         let access_list = access_list_inspector.access_list();
 
-        Ok(AccessListInspector::new().inspect(&mut evm, &uos))
+        Ok((exit_reason, out, gas_used, access_list))
     }
 
     /// Helper function to generate a [TypedTransaction](TypedTransaction) from an array of user operations.
@@ -207,21 +271,17 @@ impl Bundler {
             )
             .tx;
 
-        let accesslist = client
-            .clone()
-            .create_access_list(&tx, None)
-            .await?;
 
         match self.chain.id() {
             // Mumbai
             80001u64 => {
-                tx = TypedTransaction::Eip2930(Eip2930TransactionRequest {
-                    tx: tx.into(),
-                    access_list: accesslist.access_list,
-                });
+                tx.set_nonce(nonce).set_chain_id(self.chain.id());
             }
             _ => {
 
+                
+                let accesslist = client.clone().create_access_list(&tx, None).await?.access_list;
+                tx.set_access_list(accesslist);
                 let estimated_gas = client.clone().estimate_gas(&tx, None).await?;
 
                 let (max_fee_per_gas, max_priority_fee) =
@@ -476,5 +536,4 @@ mod test {
 
         Ok(())
     }
-
 }

@@ -42,6 +42,7 @@ dependencies = [
  "alloy-sol-types",
  "anvil",
  "anyhow",
+ "bytes",
  "dotenv",
  "ethers",
  "ethers-flashbots",
