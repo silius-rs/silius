@@ -27,7 +27,8 @@ pub enum SimulateValidationResult {
     ValidationResultWithAggregation(ValidationResultWithAggregation),
 }
 
-pub struct EntryPoint<M: Middleware> {
+#[derive(Clone)]
+pub struct EntryPoint<M: Middleware + 'static> {
     eth_client: Arc<M>,
     address: Address,
     entry_point_api: EntryPointAPI<M>,

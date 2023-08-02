@@ -31,7 +31,7 @@ pub enum SanityCheckError {
     },
     LowMaxFeePerGas {
         max_fee_per_gas: U256,
-        base_fee: U256,
+        base_fee_per_gas: U256,
     },
     HighMaxPriorityFeePerGas {
         max_priority_fee_per_gas: U256,

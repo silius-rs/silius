@@ -10,8 +10,8 @@ use silius_grpc::{
     EstimateUserOperationGasResult, UserOperationHashRequest,
 };
 use silius_primitives::{
-    consts::rpc_error_codes::USER_OPERATION_HASH, simulation::SimulationError,
-    uopool::VerificationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
+    consts::rpc_error_codes::USER_OPERATION_HASH, simulation::SimulationCheckError,
+    uopool::ValidationError, UserOperation, UserOperationByHash, UserOperationGasEstimation,
     UserOperationHash, UserOperationPartial, UserOperationReceipt,
 };
 use std::str::FromStr;
@@ -76,7 +76,7 @@ impl EthApiServer for EthApiServerImpl {
         }
 
         Err(JsonRpcError::from(
-            serde_json::from_str::<VerificationError>(&res.data).map_err(JsonRpcError::from)?,
+            serde_json::from_str::<ValidationError>(&res.data).map_err(JsonRpcError::from)?,
         )
         .0)
     }
@@ -106,7 +106,7 @@ impl EthApiServer for EthApiServerImpl {
         }
 
         Err(JsonRpcError::from(
-            serde_json::from_str::<SimulationError>(&res.data).map_err(JsonRpcError::from)?,
+            serde_json::from_str::<SimulationCheckError>(&res.data).map_err(JsonRpcError::from)?,
         )
         .0)
     }

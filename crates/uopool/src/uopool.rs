@@ -1,9 +1,11 @@
 use crate::{
-    canonical::{sanity_check::SanityCheckResult, simulation::SimulationResult},
     mempool::MempoolBox,
     mempool_id,
     reputation::ReputationBox,
     utils::calculate_call_gas_limit,
+    validate::{
+        UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
+    },
     MempoolId, Overhead,
 };
 use anyhow::format_err;
@@ -12,7 +14,6 @@ use ethers::{
     providers::Middleware,
     types::{Address, BlockNumber, U256, U64},
 };
-use serde::{Deserialize, Serialize};
 use silius_contracts::{
     entry_point::{EntryPointAPIEvents, EntryPointErr, UserOperationEventFilter},
     utils::parse_from_input_data,
@@ -21,10 +22,10 @@ use silius_contracts::{
 use silius_primitives::{
     get_address,
     reputation::{ReputationEntry, ReputationStatus, THROTTLED_MAX_INCLUDE},
-    simulation::{CodeHash, SimulationError},
-    uopool::{AddError, VerificationError},
-    Chain, UoPoolMode, UserOperation, UserOperationByHash, UserOperationGasEstimation,
-    UserOperationHash, UserOperationReceipt,
+    simulation::{CodeHash, SimulationCheckError},
+    uopool::{AddError, ValidationError},
+    Chain, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+    UserOperationReceipt,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -32,51 +33,42 @@ use std::{
 };
 use tracing::trace;
 
-type VecUo = Vec<UserOperation>;
-type VecCh = Vec<CodeHash>;
+pub type VecUo = Vec<UserOperation>;
+pub type VecCh = Vec<CodeHash>;
 
 const LATEST_SCAN_DEPTH: u64 = 1000;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct VerificationResult {
-    pub sanity_check_result: SanityCheckResult,
-    pub simulation_result: SimulationResult,
-}
-
-pub struct UoPool<M: Middleware> {
+pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     pub id: MempoolId,
     pub entry_point: EntryPoint<M>,
+    pub validator: V,
     pub mempool: MempoolBox<VecUo, VecCh>,
     pub reputation: ReputationBox<Vec<ReputationEntry>>,
     pub eth_client: Arc<M>,
     pub max_verification_gas: U256,
-    pub min_priority_fee_per_gas: U256,
     pub chain: Chain,
-    pub mode: UoPoolMode,
 }
 
-impl<M: Middleware + 'static> UoPool<M> {
+impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         entry_point: EntryPoint<M>,
+        validator: V,
         mempool: MempoolBox<VecUo, VecCh>,
         reputation: ReputationBox<Vec<ReputationEntry>>,
         eth_client: Arc<M>,
         max_verification_gas: U256,
-        min_priority_fee_per_gas: U256,
         chain: Chain,
-        mode: UoPoolMode,
     ) -> Self {
         Self {
             id: mempool_id(&entry_point.address(), &chain.id().into()),
             entry_point,
+            validator,
             mempool,
             reputation,
             eth_client,
             max_verification_gas,
-            min_priority_fee_per_gas,
             chain,
-            mode,
         }
     }
 
@@ -101,17 +93,31 @@ impl<M: Middleware + 'static> UoPool<M> {
         self.reputation.clear();
     }
 
+    pub async fn validate_user_operation(
+        &self,
+        uo: &UserOperation,
+    ) -> Result<UserOperationValidationOutcome, ValidationError> {
+        self.validator
+            .validate_user_operation(
+                uo,
+                &self.mempool,
+                &self.reputation,
+                UserOperationValidatorMode::Sanity
+                    | UserOperationValidatorMode::Simulation
+                    | UserOperationValidatorMode::SimulationTrace,
+            )
+            .await
+    }
+
+    /// Adds a single validated user operation into the pool
     pub async fn add_user_operation(
         &mut self,
         uo: UserOperation,
-        res: Option<Result<VerificationResult, VerificationError>>,
+        res: Option<UserOperationValidationOutcome>,
     ) -> Result<UserOperationHash, AddError> {
-        let res = match res {
-            Some(res) => res?,
-            None => self.verify_user_operation(&uo).await?,
-        };
+        let res = res.unwrap_or(self.validate_user_operation(&uo).await?);
 
-        if let Some(uo_hash) = res.sanity_check_result.user_operation_hash {
+        if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);
         }
 
@@ -122,9 +128,9 @@ impl<M: Middleware + 'static> UoPool<M> {
         ) {
             Ok(uo_hash) => {
                 // TODO: find better way to do it atomically
-                let _ = self
-                    .mempool
-                    .set_code_hashes(&uo_hash, &res.simulation_result.code_hashes);
+                if let Some(code_hashes) = res.code_hashes {
+                    let _ = self.mempool.set_code_hashes(&uo_hash, &code_hashes);
+                }
 
                 trace!("User operation {uo:?} added to the mempool {}", self.id);
 
@@ -143,22 +149,6 @@ impl<M: Middleware + 'static> UoPool<M> {
                 message: e.to_string(),
             }),
         }
-    }
-
-    pub async fn verify_user_operation(
-        &self,
-        uo: &UserOperation,
-    ) -> Result<VerificationResult, VerificationError> {
-        // sanity check
-        let sanity_check_result = self.check_user_operation(uo).await?;
-
-        // simulation
-        let simulation_result = self.simulate_user_operation(uo, true).await?;
-
-        Ok(VerificationResult {
-            sanity_check_result,
-            simulation_result,
-        })
     }
 
     pub fn get_sorted_user_operations(&self) -> anyhow::Result<Vec<UserOperation>> {
@@ -215,18 +205,27 @@ impl<M: Middleware + 'static> UoPool<M> {
                 _ => (),
             };
 
-            let sim_res = self.simulate_user_operation(&uo, true).await;
+            let val_out = self
+                .validator
+                .validate_user_operation(
+                    &uo,
+                    &self.mempool,
+                    &self.reputation,
+                    UserOperationValidatorMode::Simulation
+                        | UserOperationValidatorMode::SimulationTrace,
+                )
+                .await;
 
-            match sim_res {
-                Ok(sim_res) => {
-                    if sim_res.valid_after.is_some() {
+            match val_out {
+                Ok(val_out) => {
+                    if val_out.valid_after.is_some() {
                         continue;
                     }
 
                     // TODO
                     // it would be better to use estimate_gas instead of call_gas_limit
                     // The result of call_gas_limit is usesally higher and less user op would be included
-                    let gas_cost = sim_res
+                    let gas_cost = val_out
                         .verification_gas_limit
                         .saturating_add(uo.call_gas_limit);
                     let gas_total_new = gas_total.saturating_add(gas_cost);
@@ -244,7 +243,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                             })?,
                         };
 
-                        if balance.lt(&sim_res.pre_fund) {
+                        if balance.lt(&val_out.pre_fund) {
                             continue;
                         }
 
@@ -252,7 +251,7 @@ impl<M: Middleware + 'static> UoPool<M> {
                             .entry(p)
                             .and_modify(|c| *c += 1)
                             .or_insert(1);
-                        paymaster_dep.insert(p, balance.saturating_sub(sim_res.pre_fund));
+                        paymaster_dep.insert(p, balance.saturating_sub(val_out.pre_fund));
                     }
 
                     if let Some(f) = f_opt {
@@ -295,17 +294,31 @@ impl<M: Middleware + 'static> UoPool<M> {
     pub async fn estimate_user_operation_gas(
         &self,
         uo: &UserOperation,
-    ) -> Result<UserOperationGasEstimation, SimulationError> {
-        let sim_res = self.simulate_user_operation(uo, false).await?;
+    ) -> Result<UserOperationGasEstimation, SimulationCheckError> {
+        let val_out = self
+            .validator
+            .validate_user_operation(
+                uo,
+                &self.mempool,
+                &self.reputation,
+                UserOperationValidatorMode::SimulationTrace.into(),
+            )
+            .await
+            .map_err(|err| match err {
+                ValidationError::Sanity(_) => SimulationCheckError::UnknownError {
+                    message: "Unknown error".to_string(),
+                },
+                ValidationError::Simulation(err) => err,
+            })?;
 
         match self.entry_point.simulate_execution(uo.clone()).await {
             Ok(_) => {}
             Err(err) => {
                 return Err(match err {
-                    EntryPointErr::JsonRpcError(err) => SimulationError::Execution {
+                    EntryPointErr::JsonRpcError(err) => SimulationCheckError::Execution {
                         message: err.message,
                     },
-                    _ => SimulationError::UnknownError {
+                    _ => SimulationCheckError::UnknownError {
                         message: format!("{err:?}"),
                     },
                 })
@@ -316,10 +329,10 @@ impl<M: Middleware + 'static> UoPool<M> {
             Ok(res) => res,
             Err(err) => {
                 return Err(match err {
-                    EntryPointErr::JsonRpcError(err) => SimulationError::Execution {
+                    EntryPointErr::JsonRpcError(err) => SimulationCheckError::Execution {
                         message: err.message,
                     },
-                    _ => SimulationError::UnknownError {
+                    _ => SimulationCheckError::UnknownError {
                         message: format!("{err:?}"),
                     },
                 })
@@ -329,7 +342,7 @@ impl<M: Middleware + 'static> UoPool<M> {
         let base_fee_per_gas =
             self.base_fee_per_gas()
                 .await
-                .map_err(|err| SimulationError::UnknownError {
+                .map_err(|err| SimulationCheckError::UnknownError {
                     message: err.to_string(),
                 })?;
         let call_gas_limit = calculate_call_gas_limit(
@@ -341,7 +354,7 @@ impl<M: Middleware + 'static> UoPool<M> {
 
         Ok(UserOperationGasEstimation {
             pre_verification_gas: Overhead::default().calculate_pre_verification_gas(uo),
-            verification_gas_limit: sim_res.verification_gas_limit,
+            verification_gas_limit: val_out.verification_gas_limit,
             call_gas_limit,
         })
     }

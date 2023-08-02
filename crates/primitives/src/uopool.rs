@@ -1,4 +1,4 @@
-use crate::{sanity_check::SanityCheckError, simulation::SimulationError};
+use crate::{sanity::SanityCheckError, simulation::SimulationCheckError};
 use serde::{Deserialize, Serialize};
 use strum_macros::{EnumString, EnumVariantNames};
 
@@ -11,31 +11,31 @@ pub enum Mode {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum VerificationError {
-    SanityCheck(SanityCheckError),
-    Simulation(SimulationError),
+pub enum ValidationError {
+    Sanity(SanityCheckError),
+    Simulation(SimulationCheckError),
 }
 
-impl From<SanityCheckError> for VerificationError {
+impl From<SanityCheckError> for ValidationError {
     fn from(err: SanityCheckError) -> Self {
-        Self::SanityCheck(err)
+        Self::Sanity(err)
     }
 }
 
-impl From<SimulationError> for VerificationError {
-    fn from(err: SimulationError) -> Self {
+impl From<SimulationCheckError> for ValidationError {
+    fn from(err: SimulationCheckError) -> Self {
         Self::Simulation(err)
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AddError {
-    Verification(VerificationError),
+    Verification(ValidationError),
     MempoolError { message: String },
 }
 
-impl From<VerificationError> for AddError {
-    fn from(err: VerificationError) -> Self {
+impl From<ValidationError> for AddError {
+    fn from(err: ValidationError) -> Self {
         Self::Verification(err)
     }
 }
