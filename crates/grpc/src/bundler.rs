@@ -216,6 +216,7 @@ pub fn bundler_service_run(
                 send_bundle_mode.clone(),
                 relay_endpoints.clone(),
             )
+            .expect("Failed to create bundler")
         })
         .collect();
 

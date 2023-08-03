@@ -45,10 +45,11 @@ pub struct Bundler {
     pub send_bundle_mode: SendBundleMode,
     /// Block Builder relay endpoints
     pub relay_endpoints: Option<Vec<String>>,
+    /// Ethereum signer middleware
     pub eth_client: Option<EthClientType<Provider<Http>>>,
+    /// Flashbots signer middleware
     pub fb_client: Option<FlashbotsClientType<Provider<Http>>>,
 }
-
 
 impl Bundler {
     /// Create a new `Bundler` instance
@@ -68,33 +69,29 @@ impl Bundler {
         if !(chain.id() == 1 || chain.id() == 5 || chain.id() == 11155111)
             && send_bundle_mode == SendBundleMode::Flashbots
         {
-            panic!("Flashbots is only supported on mainnet, goerli and Sepolia");
+            panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia");
         };
 
         match send_bundle_mode {
-
             SendBundleMode::EthClient => {
-
                 let eth_client = Provider::<Http>::try_from(eth_client_address.clone())?;
                 let client = Arc::new(SignerMiddleware::new(
                     eth_client.clone(),
                     wallet.signer.clone(),
                 ));
 
-                Ok(
-                    Self {
-                        wallet,
-                        eth_client_address,
-                        beneficiary,
-                        entry_point,
-                        chain,
-                        send_bundle_mode,
-                        relay_endpoints: None,
-                        eth_client: Some(client),
-                        fb_client: None,
-                    }
-                )
-            },
+                Ok(Self {
+                    wallet,
+                    eth_client_address,
+                    beneficiary,
+                    entry_point,
+                    chain,
+                    send_bundle_mode,
+                    relay_endpoints: None,
+                    eth_client: Some(client),
+                    fb_client: None,
+                })
+            }
             SendBundleMode::Flashbots => match relay_endpoints {
                 None => {
                     let mut relay_endpoints = Vec::new();
@@ -105,43 +102,37 @@ impl Bundler {
                         wallet.clone(),
                     )?;
 
-                    Ok(
-                        Self {
-                            wallet,
-                            eth_client_address,
-                            beneficiary,
-                            entry_point,
-                            chain,
-                            send_bundle_mode,
-                            relay_endpoints: Some(relay_endpoints),
-                            eth_client: None,
-                            fb_client: Some(fb_client),
-                        }
-                    )
+                    Ok(Self {
+                        wallet,
+                        eth_client_address,
+                        beneficiary,
+                        entry_point,
+                        chain,
+                        send_bundle_mode,
+                        relay_endpoints: Some(relay_endpoints),
+                        eth_client: None,
+                        fb_client: Some(fb_client),
+                    })
                 }
                 Some(relay_endpoints) => {
-
                     let fb_client = generate_fb_middleware(
                         eth_client_address.clone(),
                         Some(relay_endpoints.clone()),
                         wallet.clone(),
                     )?;
 
-                    Ok(
-
-                        Self {
-                            wallet,
-                            eth_client_address,
-                            beneficiary,
-                            entry_point,
-                            chain,
-                            send_bundle_mode,
-                            relay_endpoints: Some(relay_endpoints),
-                            eth_client: None,
-                            fb_client: Some(fb_client),
-                        }
-                    )
-                },
+                    Ok(Self {
+                        wallet,
+                        eth_client_address,
+                        beneficiary,
+                        entry_point,
+                        chain,
+                        send_bundle_mode,
+                        relay_endpoints: Some(relay_endpoints),
+                        eth_client: None,
+                        fb_client: Some(fb_client),
+                    })
+                }
             },
         }
     }
@@ -174,7 +165,7 @@ impl Bundler {
     /// * `client` - A provider that implements [Middleware](Middleware) trait
     ///
     /// # Returns
-    /// * `TypedTransaction` - A [TypedTransaction](TypedTransaction) 
+    /// * `TypedTransaction` - A [TypedTransaction](TypedTransaction)
     #[allow(clippy::ptr_arg)]
     async fn generate_tx<M>(
         &self,
@@ -203,7 +194,6 @@ impl Bundler {
                 tx.set_nonce(nonce).set_chain_id(self.chain.id());
             }
             _ => {
-
                 let accesslist = client
                     .clone()
                     .create_access_list(&tx, None)
@@ -239,9 +229,8 @@ impl Bundler {
     /// * `uos` - An array of [UserOperations](UserOperation)
     ///
     /// # Returns
-    /// * `H256` - The transaction hash 
+    /// * `H256` - The transaction hash
     async fn send_next_bundle_eth(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-
         let client = match self.eth_client.clone() {
             Some(client) => client,
             None => return Err(anyhow::anyhow!("No Ethereum client provided")),
@@ -274,7 +263,6 @@ impl Bundler {
     /// * `H256` - The transaction hash of the bundle
     #[allow(clippy::needless_return)]
     async fn send_next_bundle_flashbots(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
-
         let client = match self.fb_client.clone() {
             Some(client) => client,
             None => return Err(anyhow::anyhow!("No Flashbots client provided")),
@@ -284,7 +272,10 @@ impl Bundler {
 
         let bundle_req = generate_bundle_req(client.clone(), tx).await?;
 
-        simulate_fb_bundle(client.clone(), &bundle_req).await?;
+        match simulate_fb_bundle(client.clone(), &bundle_req).await {
+            Ok(_) => {}
+            Err(e) => return Err(anyhow::anyhow!("Bundle simulation failed: {:?}", e)),
+        };
 
         let bundle_hash = send_fb_bundle(client.clone(), bundle_req.clone()).await?;
 
@@ -292,20 +283,18 @@ impl Bundler {
     }
 }
 
-
 /// Send a Flashbots bundle and check for status
-/// 
+///
 /// # Arguments
-/// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware) 
+/// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
 /// * `bundle` - A [BundleRequest](BundleRequest) sent to Flashbots relay
-/// 
+///
 /// # Returns
 /// * `H256` - The transaction hash of the bundle
 async fn send_fb_bundle<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
     bundle: BundleRequest,
 ) -> anyhow::Result<H256> {
-
     // Send the Flashbots bundle and check for status
     let handle: JoinHandle<Result<(bool, H256), anyhow::Error>> = tokio::spawn(async move {
         let pending_bundle = match client.inner().send_bundle(&bundle).await {
@@ -337,7 +326,7 @@ async fn send_fb_bundle<M: Middleware + 'static>(
 }
 
 /// Simulate a Flashbots bundle
-/// 
+///
 /// # Arguments
 /// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
 /// * `bundle` - A [BundleRequest](BundleRequest) sent to Flashbots relay
@@ -368,13 +357,13 @@ async fn simulate_fb_bundle<M: Middleware + 'static>(
 }
 
 /// Generate a Flashbots bundle request
-/// 
+///
 /// # Arguments
 /// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
-/// * `tx` - A [EIP-1559 TypedTransaction](TypedTransaction) 
-/// 
+/// * `tx` - A [EIP-1559 TypedTransaction](TypedTransaction)
+///
 /// # Returns
-/// * `BundleRequest` - A [BundleRequest](BundleRequest) 
+/// * `BundleRequest` - A [BundleRequest](BundleRequest)
 async fn generate_bundle_req<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
     tx: TypedTransaction,
@@ -398,20 +387,19 @@ async fn generate_bundle_req<M: Middleware + 'static>(
 }
 
 /// Create a Flashbots middleware
-/// 
+///
 /// # Arguments
 /// * `eth_client_address` - The URL of an Ethereum execution client
 /// * `relay_endpoints` - An array of Flashbots relay endpoints
-/// * `wallet` - A [Wallet](Wallet) 
-/// 
+/// * `wallet` - A [Wallet](Wallet)
+///
 /// # Returns
 /// * `FlashbotsClientType` - A [Flashbots Signer Middleware](FlashbotsClientType)
-fn generate_fb_middleware(
+pub(crate) fn generate_fb_middleware(
     eth_client_address: String,
     relay_endpoints: Option<Vec<String>>,
     wallet: Wallet,
 ) -> anyhow::Result<FlashbotsClientType<Provider<Http>>> {
-
     // Only support one relay endpoint for now
     let relay_endpoint: &str = relay_endpoints.as_ref().unwrap().first().unwrap();
 
@@ -432,31 +420,47 @@ fn generate_fb_middleware(
         bundle_signer.clone(),
     );
 
-    let client = Arc::new(SignerMiddleware::new(
-        fb_middleware,
-        wallet.signer.clone(),
-    ));
+    let client = Arc::new(SignerMiddleware::new(fb_middleware, wallet.signer.clone()));
 
     Ok(client)
-
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{Bundler, SendBundleMode};
-    use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, UserOperation, Wallet};
+    use crate::test_helper::MockFlashbotsRelayServer;
+    use crate::{
+        bundler::generate_fb_middleware,
+        test_helper::{MockFlashbotsBlockBuilderRelay, INIT_BLOCK},
+        Bundler, SendBundleMode,
+    };
+    use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, Wallet};
     use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
     use alloy_sol_types::{sol, SolCall};
     use ethers::{
+        contract::abigen,
+        providers::Middleware,
         signers::Signer,
-        types::{Address, U256},
+        types::{
+            transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest,
+            NameOrAddress, H160, U256, U64,
+        },
+        utils::{parse_units, Anvil, AnvilInstance},
     };
+    use jsonrpsee::core::client::ClientT;
+    use jsonrpsee::http_client::HttpClientBuilder;
+    use jsonrpsee::rpc_params;
+    use jsonrpsee::server::{ServerBuilder, ServerHandle};
     use std::env;
 
     sol! {
         #[derive(Debug)]
         function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts);
     }
+
+    abigen!(
+        WETH,
+        "https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+    );
 
     // Testing key
     const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
@@ -468,6 +472,7 @@ mod test {
     struct TestContext {
         pub bundler: Bundler,
         pub entry_point: Address,
+        pub anvil: AnvilInstance,
     }
 
     async fn setup() -> anyhow::Result<TestContext> {
@@ -477,28 +482,99 @@ mod test {
         dotenv::dotenv().ok();
         let eth_client_address = env::var("HTTP_RPC").expect("HTTP_RPC env var not set");
         let ep_address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse::<Address>()?;
+        let wallet = Wallet::from_phrase(KEY_PHRASE, &U256::from(1), true)?;
 
-        let wallet = Wallet::from_phrase(KEY_PHRASE, &U256::from(5), true)?;
+        // Start Anvil and expose the port at 8545
+        let port = 8545u16;
+        let anvil = Anvil::new()
+            .port(port)
+            .fork(eth_client_address.clone())
+            .fork_block_number(INIT_BLOCK.clone())
+            .spawn();
 
+        // Create a bundler and connect to the Anvil
         let bundler = Bundler::new(
             wallet.clone(),
-            eth_client_address.clone(),
+            "http://localhost:8545".to_string(),
             wallet.signer.address(),
             ep_address,
-            Chain::from(5),
+            Chain::from(1),
             SendBundleMode::Flashbots,
             Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.to_string()]),
-        );
+        )
+        .expect("Failed to create bundler");
 
         Ok(TestContext {
             bundler,
             entry_point: ep_address,
+            anvil,
         })
+    }
+
+    async fn start_mock_server() -> anyhow::Result<(ServerHandle, MockFlashbotsBlockBuilderRelay)> {
+        // Start a mock server connecting to the Anvil, exposing the port at 3001
+        let mock_relay = MockFlashbotsBlockBuilderRelay::new(8545u64).await.unwrap();
+        let server = ServerBuilder::new()
+            .build("127.0.0.1:3001".to_string())
+            .await?;
+        let handle = server
+            .start(mock_relay.clone().into_rpc())
+            .expect("Failed to start mock server");
+
+        Ok((handle, mock_relay))
     }
 
     #[tokio::test]
     async fn test_send_bundle_flashbots() -> anyhow::Result<()> {
         let ctx = setup().await?;
+        let (_handle, mock_relay) = start_mock_server().await?;
+
+        let bundler = ctx.bundler;
+        let depositor = mock_relay.mock_eth_client.clone();
+        let address = bundler.wallet.signer.address();
+
+        // Create a Flashbots signer middleware
+        let client = generate_fb_middleware(
+            "http://localhost:8545".to_string(),
+            Some(vec!["http://127.0.0.1:3001".to_string()]),
+            bundler.wallet.clone(),
+        )?;
+
+        let depositor_weth_instance = WETH::new(
+            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse::<H160>()?,
+            depositor.clone(),
+        );
+        let bundler_weth_instance = WETH::new(
+            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse::<H160>()?,
+            client.clone(),
+        );
+
+        // Deposit 500 ETH to get WETH and transfer to the bundler
+        let value = U256::from(parse_units("500.0", "ether").unwrap());
+        let _ = depositor_weth_instance
+            .deposit()
+            .value(value)
+            .send()
+            .await?
+            .await?;
+        let _ = depositor_weth_instance
+            .transfer(address.clone(), value)
+            .send()
+            .await?
+            .await?;
+
+        // Approve the UniswapV2 Router from the Bundler
+        let _ = bundler_weth_instance
+            .approve(
+                "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a".parse::<H160>()?,
+                U256::MAX,
+            )
+            .send()
+            .await?
+            .await?;
+
+        let balance = bundler_weth_instance.balance_of(address).call().await?;
+        println!("Balance: {:?}", balance);
 
         let path = vec![
             // WETH address
@@ -515,21 +591,32 @@ mod test {
             to: SIMPLE_ACCOUNT.parse::<alloy_Address>().unwrap(),
             deadline: alloy_U256::from(0),
         };
+
         let call_data = swap_eth.encode();
+        let nonce = client.clone().get_transaction_count(address, None).await?;
 
-        let uo = UserOperation::default()
-            .call_data(call_data.into())
-            .sender(SIMPLE_ACCOUNT.parse::<Address>().unwrap())
-            // .verification_gas_limit(100_000.into())
-            // .pre_verification_gas(21_000.into())
-            // .max_priority_fee_per_gas(1_000_000_000.into())
-            // .call_gas_limit(200_000.into())
-            // .max_fee_per_gas(3_000_000_000_u64.into())
-            // .max_priority_fee_per_gas(1_000_000_000.into())
-            .signature(SIGNING_KEY.parse().unwrap());
+        let tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
+            to: Some(NameOrAddress::Address(
+                "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a".parse::<H160>()?,
+            )),
+            from: Some(address),
+            data: Some(call_data.into()),
+            chain_id: Some(U64::from(1)),
+            max_fee_per_gas: Some(U256::from(1000000000000u64)),
+            max_priority_fee_per_gas: Some(U256::from(1000000000000u64)),
+            gas: Some(U256::from(1000000u64)),
+            nonce: Some(nonce),
+            value: None,
+            access_list: Default::default(),
+        });
 
-        let bundle_hash = ctx.bundler.send_next_bundle(&vec![uo]).await?;
-        println!("Bundle hash: {}", bundle_hash);
+        println!("{:?}", tx_req);
+
+        // let url = "http://127.0.0.1:3001";
+        // let client = HttpClientBuilder::default().build(url)?;
+        // let params = rpc_params![tx];
+        // let response: Result<String, _> = client.request("eth_callBundle", params).await;
+        // println!("{:?}", response);
 
         Ok(())
     }
