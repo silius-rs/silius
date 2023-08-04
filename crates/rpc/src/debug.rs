@@ -78,7 +78,7 @@ impl DebugApiServer for DebugApiServerImpl {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
         let req = Request::new(SetReputationRequest {
-            rep: entries.iter().map(|re| (*re).into()).collect(),
+            rep: entries.iter().map(|re| re.clone().into()).collect(),
             ep: Some(ep.into()),
         });
 

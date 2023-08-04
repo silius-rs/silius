@@ -4,7 +4,7 @@ pub mod types {
     use arrayref::array_ref;
     use ethers::types::{Address, Bloom, U256};
     use prost::bytes::Buf;
-    use silius_primitives::UserOperationHash;
+    use silius_primitives::{reputation::Status, UserOperationHash};
     use std::str::FromStr;
 
     tonic::include_proto!("types");
@@ -182,14 +182,10 @@ pub mod types {
                 addr: Some(reputation_entry.address.into()),
                 uo_seen: reputation_entry.uo_seen,
                 uo_included: reputation_entry.uo_included,
-                stat: match reputation_entry.status {
-                    silius_primitives::reputation::ReputationStatus::OK => ReputationStatus::Ok,
-                    silius_primitives::reputation::ReputationStatus::THROTTLED => {
-                        ReputationStatus::Throttled
-                    }
-                    silius_primitives::reputation::ReputationStatus::BANNED => {
-                        ReputationStatus::Banned
-                    }
+                stat: match Status::from(reputation_entry.status) {
+                    silius_primitives::reputation::Status::OK => ReputationStatus::Ok,
+                    silius_primitives::reputation::Status::THROTTLED => ReputationStatus::Throttled,
+                    silius_primitives::reputation::Status::BANNED => ReputationStatus::Banned,
                 } as i32,
             }
         }
@@ -209,15 +205,15 @@ pub mod types {
                 uo_included: reputation_entry.uo_included,
                 status: match reputation_entry.stat {
                     _ if reputation_entry.stat == ReputationStatus::Ok as i32 => {
-                        silius_primitives::reputation::ReputationStatus::OK
+                        silius_primitives::reputation::Status::OK.into()
                     }
                     _ if reputation_entry.stat == ReputationStatus::Throttled as i32 => {
-                        silius_primitives::reputation::ReputationStatus::THROTTLED
+                        silius_primitives::reputation::Status::THROTTLED.into()
                     }
                     _ if reputation_entry.stat == ReputationStatus::Banned as i32 => {
-                        silius_primitives::reputation::ReputationStatus::BANNED
+                        silius_primitives::reputation::Status::BANNED.into()
                     }
-                    _ => silius_primitives::reputation::ReputationStatus::OK,
+                    _ => silius_primitives::reputation::Status::OK.into(),
                 },
             }
         }

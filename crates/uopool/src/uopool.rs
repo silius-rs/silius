@@ -21,7 +21,7 @@ use silius_contracts::{
 };
 use silius_primitives::{
     get_address,
-    reputation::{ReputationEntry, ReputationStatus, THROTTLED_MAX_INCLUDE},
+    reputation::{ReputationEntry, Status, THROTTLED_MAX_INCLUDE},
     simulation::{CodeHash, SimulationCheckError},
     uopool::{AddError, ValidationError},
     Chain, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
@@ -84,8 +84,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         self.reputation.get_all()
     }
 
-    pub fn set_reputation(&mut self, reputation: Vec<ReputationEntry>) {
-        self.reputation.set(reputation);
+    pub fn set_reputation(&mut self, reputation: Vec<ReputationEntry>) -> anyhow::Result<()> {
+        self.reputation.set_entities(reputation)
     }
 
     pub fn clear(&mut self) {
@@ -135,12 +135,24 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 trace!("User operation {uo:?} added to the mempool {}", self.id);
 
                 // update reputation
-                self.reputation.increment_seen(&uo.sender);
+                self.reputation
+                    .increment_seen(&uo.sender)
+                    .map_err(|e| AddError::MempoolError {
+                        message: e.to_string(),
+                    })?;
                 if let Some(f_addr) = get_address(&uo.init_code) {
-                    self.reputation.increment_seen(&f_addr);
+                    self.reputation.increment_seen(&f_addr).map_err(|e| {
+                        AddError::MempoolError {
+                            message: e.to_string(),
+                        }
+                    })?;
                 }
                 if let Some(p_addr) = get_address(&uo.paymaster_and_data) {
-                    self.reputation.increment_seen(&p_addr);
+                    self.reputation.increment_seen(&p_addr).map_err(|e| {
+                        AddError::MempoolError {
+                            message: e.to_string(),
+                        }
+                    })?;
                 }
 
                 Ok(uo_hash)
@@ -177,10 +189,20 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             let p_opt = get_address(&uo.paymaster_and_data.0);
             let f_opt = get_address(&uo.init_code.0);
 
-            let p_st = self
-                .reputation
-                .get_status_from_bytes(&uo.paymaster_and_data);
-            let f_st = self.reputation.get_status_from_bytes(&uo.init_code);
+            let p_st = Status::from(
+                self.reputation
+                    .get_status_from_bytes(&uo.paymaster_and_data)
+                    .map_err(|err| {
+                        format_err!("Error getting reputation status with error: {err:?}")
+                    })?,
+            );
+            let f_st = Status::from(
+                self.reputation
+                    .get_status_from_bytes(&uo.init_code)
+                    .map_err(|err| {
+                        format_err!("Error getting reputation status with error: {err:?}")
+                    })?,
+            );
 
             let p_c = p_opt
                 .map(|p| staked_entity_c.get(&p).cloned().unwrap_or(0))
@@ -190,7 +212,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 .unwrap_or(0);
 
             match (p_st, f_st) {
-                (ReputationStatus::BANNED, _) | (_, ReputationStatus::BANNED) => {
+                (Status::BANNED, _) | (_, Status::BANNED) => {
                     self.mempool.remove(&uo_hash).map_err(|err| {
                         format_err!(
                             "Removing a banned user operation {uo_hash:?} failed with error: {err:?}",
@@ -198,10 +220,10 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                     })?;
                     continue;
                 }
-                (ReputationStatus::THROTTLED, _) if p_c > THROTTLED_MAX_INCLUDE => {
+                (Status::THROTTLED, _) if p_c > THROTTLED_MAX_INCLUDE => {
                     continue;
                 }
-                (_, ReputationStatus::THROTTLED) if f_c > THROTTLED_MAX_INCLUDE => {
+                (_, Status::THROTTLED) if f_c > THROTTLED_MAX_INCLUDE => {
                     continue;
                 }
                 _ => (),
@@ -468,12 +490,12 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             match event {
                 EntryPointAPIEvents::UserOperationEventFilter(uo_event) => {
                     self.remove_user_operation(&uo_event.user_op_hash.into());
-                    self.reputation.increment_included(&uo_event.sender);
-                    self.reputation.increment_included(&uo_event.paymaster);
+                    self.reputation.increment_included(&uo_event.sender)?;
+                    self.reputation.increment_included(&uo_event.paymaster)?;
                     // TODO: include event aggregator
                 }
                 EntryPointAPIEvents::AccountDeployedFilter(event) => {
-                    self.reputation.increment_included(&event.factory);
+                    self.reputation.increment_included(&event.factory)?;
                 }
                 _ => (),
             }
