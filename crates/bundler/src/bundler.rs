@@ -9,11 +9,9 @@ use ethers::{
     },
 };
 use ethers_flashbots::{
-    BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded,
-    SimulatedBundle
+    BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded, SimulatedBundle,
 };
 use std::{sync::Arc, time::Duration};
-use tokio::task::JoinHandle;
 use tracing::{info, trace};
 use url::Url;
 
@@ -97,8 +95,7 @@ impl Bundler {
             }
             SendBundleMode::Flashbots => match relay_endpoints {
                 None => {
-                    let mut relay_endpoints = Vec::new();
-                    relay_endpoints.push(flashbots_relay_endpoints::FLASHBOTS.to_string());
+                    let relay_endpoints = vec![flashbots_relay_endpoints::FLASHBOTS.to_string()];
                     let fb_client = generate_fb_middleware(
                         eth_client_address.clone(),
                         Some(relay_endpoints.clone()),
@@ -223,7 +220,7 @@ impl Bundler {
             }
         };
 
-        Ok(tx.into())
+        Ok(tx)
     }
 
     /// Send a bundle of [UserOperations](UserOperation) to the Ethereum execution client
@@ -294,11 +291,11 @@ impl Bundler {
 ///
 /// # Returns
 /// * `H256` - The transaction hash of the bundle
+#[allow(clippy::needless_return)]
 async fn send_fb_bundle<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
     bundle: BundleRequest,
 ) -> anyhow::Result<H256> {
-    
     // Send the Flashbots bundle and check for status
     let pending_bundle = match client.inner().send_bundle(&bundle).await {
         Ok(bundle) => bundle,
@@ -315,7 +312,6 @@ async fn send_fb_bundle<M: Middleware + 'static>(
             return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
         }
     };
-
 }
 
 /// Simulate a Flashbots bundle
@@ -327,7 +323,7 @@ async fn simulate_fb_bundle<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
     bundle: &BundleRequest,
 ) -> anyhow::Result<SimulatedBundle> {
-    let simulated_bundle = client.inner().simulate_bundle(&bundle).await?;
+    let simulated_bundle = client.inner().simulate_bundle(bundle).await?;
 
     // Currently there's only 1 tx per bundle
     for tx in &simulated_bundle.transactions {
@@ -403,7 +399,11 @@ pub(crate) fn generate_fb_middleware(
     wallet: Wallet,
 ) -> anyhow::Result<FlashbotsClientType<Provider<Http>>> {
     // Only support one relay endpoint for now
-    let relay_endpoint: &str = relay_endpoints.as_ref().unwrap().first().unwrap();
+    let relay_endpoint: &str = relay_endpoints
+        .as_ref()
+        .expect("No Flashbots relay endpoint provided")
+        .first()
+        .expect("No Flashbots relay endpoint provided");
 
     let provider = Provider::<Http>::try_from(eth_client_address.clone())?;
 
@@ -431,9 +431,11 @@ pub(crate) fn generate_fb_middleware(
 mod test {
     use crate::test_helper::MockFlashbotsRelayServer;
     use crate::{
-        bundler::{generate_bundle_req, generate_fb_middleware, simulate_fb_bundle, send_fb_bundle},
+        bundler::{
+            generate_bundle_req, generate_fb_middleware, send_fb_bundle, simulate_fb_bundle,
+        },
         test_helper::{MockFlashbotsBlockBuilderRelay, INIT_BLOCK},
-        Bundler, SendBundleMode, 
+        Bundler, SendBundleMode,
     };
     use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, Wallet};
     use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
@@ -444,13 +446,12 @@ mod test {
         signers::Signer,
         types::{
             transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest,
-            NameOrAddress, TransactionRequest, H160, U256, U64,
+            NameOrAddress, H160, U256, U64,
         },
         utils::{parse_units, Anvil, AnvilInstance},
     };
     use jsonrpsee::server::{ServerBuilder, ServerHandle};
     use std::env;
-
 
     sol! {
         #[derive(Debug)]
@@ -566,7 +567,6 @@ mod test {
             .await?
             .await?;
 
-
         let _ = depositor_weth_instance
             .transfer(address.clone(), value.clone())
             .send()
@@ -611,7 +611,6 @@ mod test {
             .get_transaction_count(address, None)
             .await?;
 
-
         // Craft a bundle with approve() and swapExactETHForTokens()
         let approve_tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
             to: Some(NameOrAddress::Address(
@@ -646,7 +645,7 @@ mod test {
         // Simulate the bundle
         let sim_bundle_req = generate_bundle_req(
             fb_client.clone(),
-            vec![approve_tx_req.clone(),swap_tx_req.clone()],
+            vec![approve_tx_req.clone(), swap_tx_req.clone()],
             true,
         )
         .await?;
@@ -665,11 +664,11 @@ mod test {
         // Send the bundle
         let bundle_req = generate_bundle_req(
             fb_client.clone(),
-            vec![approve_tx_req.clone(),swap_tx_req.clone()],
+            vec![approve_tx_req.clone(), swap_tx_req.clone()],
             true,
         )
         .await?;
-        
+
         let result = send_fb_bundle(fb_client.clone(), bundle_req.clone()).await;
         assert!(matches!(
             result,
