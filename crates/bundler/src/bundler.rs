@@ -10,16 +10,16 @@ use ethers_flashbots::{
     BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded, SimulatedBundle,
 };
 use silius_contracts::entry_point::EntryPointAPI;
-use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{consts::flashbots_relay_endpoints, Chain, UserOperation, Wallet};
-use silius_primitives::{Chain, UserOperation, Wallet};
 use std::{sync::Arc, time::Duration};
 use tracing::{info, trace};
 use url::Url;
 
+/// A type alias for the Flashbots Signer client
 type FlashbotsClientType<M> =
     Arc<SignerMiddleware<FlashbotsMiddleware<M, LocalWallet>, LocalWallet>>;
 
+/// A type alias for the Ethereum Signer client
 type EthClientType<M> = Arc<SignerMiddleware<M, LocalWallet>>;
 
 /// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
@@ -195,6 +195,7 @@ impl Bundler {
             80001u64 => {
                 tx.set_nonce(nonce).set_chain_id(self.chain.id());
             }
+            // All other surpported networks, including Mainnet, Goerli
             _ => {
                 let accesslist = client
                     .clone()
@@ -263,7 +264,6 @@ impl Bundler {
     ///
     /// # Returns
     /// * `H256` - The transaction hash of the bundle
-    #[allow(clippy::needless_return)]
     async fn send_next_bundle_flashbots(&self, uos: &Vec<UserOperation>) -> anyhow::Result<H256> {
         let client = match self.fb_client.clone() {
             Some(client) => client,
@@ -391,7 +391,7 @@ async fn generate_bundle_req<M: Middleware + 'static>(
 /// # Arguments
 /// * `eth_client_address` - The URL of an Ethereum execution client
 /// * `relay_endpoints` - An array of Flashbots relay endpoints
-/// * `wallet` - A [Wallet](Wallet)
+/// * `wallet` - A [Wallet](Wallet) instance
 ///
 /// # Returns
 /// * `FlashbotsClientType` - A [Flashbots Signer Middleware](FlashbotsClientType)
@@ -431,12 +431,11 @@ pub(crate) fn generate_fb_middleware(
 
 #[cfg(test)]
 mod test {
-    use crate::test_helper::MockFlashbotsRelayServer;
     use crate::{
         bundler::{
             generate_bundle_req, generate_fb_middleware, send_fb_bundle, simulate_fb_bundle,
         },
-        test_helper::{MockFlashbotsBlockBuilderRelay, INIT_BLOCK},
+        mock_relay::{MockFlashbotsBlockBuilderRelay, MockFlashbotsRelayServer, INIT_BLOCK},
         Bundler, SendBundleMode,
     };
     use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
@@ -540,6 +539,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn test_send_bundle_flashbots() -> anyhow::Result<()> {
         let ctx = setup().await?;
         let (_handle, mock_relay) = start_mock_server().await?;

@@ -1689,7 +1689,7 @@ dependencies = [
 [[package]]
 name = "ethers-flashbots"
 version = "0.13.1"
-source = "git+https://github.com/qi-protocol/ethers-flashbots.git?branch=master#97e232dd473596da4098c932f37872d204d5dbb9"
+source = "git+https://github.com/qi-protocol/ethers-flashbots.git?branch=master#0449d1a6b89112344eac6594019c70c0175f52d3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4789,6 +4789,7 @@ dependencies = [
  "expanded-pathbuf",
  "log",
  "pin-utils",
+ "silius-bundler",
  "silius-grpc",
  "silius-primitives",
  "silius-rpc",

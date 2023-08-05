@@ -20,6 +20,7 @@ ethers = { workspace = true }
 expanded-pathbuf = "0.1"
 log = "0.4.19"
 pin-utils = "0.1"
+silius-bundler = { path = "../../crates/bundler" }
 silius-grpc = { path = "../../crates/grpc" }
 silius-primitives = { path = "../../crates/primitives" }
 silius-rpc = { path = "../../crates/rpc" }

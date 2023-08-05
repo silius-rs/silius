@@ -3,6 +3,6 @@
 
 mod bundler;
 #[cfg(test)]
-mod test_helper;
+mod mock_relay;
 
 pub use bundler::{Bundler, SendBundleMode};

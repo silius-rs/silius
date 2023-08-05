@@ -9,11 +9,14 @@ use silius::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
+use silius_bundler::SendBundleMode;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
-use silius_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
+use silius_primitives::{
+    chain::SUPPORTED_CHAINS, consts::flashbots_relay_endpoints, Chain, Wallet,
+};
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
