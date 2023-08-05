@@ -4844,12 +4844,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ethers",
- "jsonrpsee",
- "serde_json",
  "silius-primitives",
  "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
