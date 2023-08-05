@@ -5,6 +5,8 @@ use async_trait::async_trait;
 use ethers::types::{Address, H256, U256};
 use parking_lot::Mutex;
 use silius_bundler::Bundler;
+use silius_bundler::{Bundler, SendBundleMode};
+use silius_primitives::{Chain, UserOperation, Wallet};
 use silius_primitives::{Chain, UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
@@ -201,6 +203,8 @@ pub fn bundler_service_run(
     _min_balance: U256,
     bundle_interval: u64,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
+    send_bundle_mode: SendBundleMode,
+    relay_endpoints: Option<Vec<String>>,
 ) {
     let bundlers: Vec<Bundler> = eps
         .iter()
@@ -211,7 +215,10 @@ pub fn bundler_service_run(
                 beneficiary,
                 *ep,
                 chain,
+                send_bundle_mode.clone(),
+                relay_endpoints.clone(),
             )
+            .expect("Failed to create bundler")
         })
         .collect();
 

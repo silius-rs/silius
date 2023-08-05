@@ -56,11 +56,18 @@ pub struct Opt {
 
     #[clap(flatten)]
     pub bundler_opts: BundlerServiceOpts,
+
+    #[clap(long)]
+    pub build_fb_signer: Option<bool>,
+
+    #[clap(long, default_value = "eth-client")]
+    pub send_bundle_mode: Option<String>,
 }
 
 fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
 
+    std::env::set_var("RUST_LOG", "info");
     tracing_subscriber::fmt::init();
 
     std::thread::Builder::new()
@@ -95,9 +102,22 @@ fn main() -> Result<()> {
                     }
                 }
 
-                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id)
+                let wallet: Wallet;
+                if opt.build_fb_signer == Some(true) {
+                    wallet = Wallet::from_file(
+                        opt.mnemonic_file.clone(),
+                        &chain_id,
+                        true,
+                    )
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
-                info!("{:?}", wallet.signer);
+                    info!("Wallet Signer {:?}", wallet.signer);
+                    info!("Flashbots Signer {:?}", wallet.fb_signer);
+                } else {
+                    wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id, false)
+                        .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
+                    info!("{:?}", wallet.signer);
+                }
+
 
                 if !opt.no_uopool {
                     info!("Starting uopool gRPC service...");
@@ -140,6 +160,24 @@ fn main() -> Result<()> {
                     opt.bundler_opts.min_balance,
                     opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),
+                    match opt.send_bundle_mode.as_deref() {
+                        Some(mode) => match mode {
+                            "eth-client" => SendBundleMode::EthClient,
+                            "flashbots" => SendBundleMode::Flashbots,
+                            _ => SendBundleMode::EthClient,
+                        },
+                        None => SendBundleMode::EthClient,
+                    },
+                    match opt.send_bundle_mode {
+                        Some(mode) => match mode.as_str() {
+                            "eth-client" => None,
+                            "flashbots" => Some(vec![
+                                flashbots_relay_endpoints::FLASHBOTS.to_string(),
+                            ]),
+                            _ => None,
+                        },
+                        None => None,
+                    },
                 );
                 info!(
                     "Started bundler gRPC service at {:}",

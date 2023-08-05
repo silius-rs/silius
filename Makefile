@@ -31,6 +31,7 @@ test:
 
 format:
 	cargo fmt --all
+	cargo sort --workspace
 
 lint:
 	cargo fmt --all -- --check

@@ -25,3 +25,18 @@ pub mod entities {
     pub const ACCOUNT: &str = "account";
     pub const PAYMASTER: &str = "paymaster";
 }
+
+/// Builder JSON-RPC Endpoints
+pub mod flashbots_relay_endpoints {
+    pub const FLASHBOTS: &str = "https://relay.flashbots.net";
+    pub const FLASHBOTS_GOERLI: &str = "https://relay-goerli.flashbots.net";
+    pub const BUILDER0X69: &str = "http://builder0x69.io/";
+    pub const EDENNETWORK: &str = "https://api.edennetwork.io/v1/bundle";
+    pub const BEAVERBUILD: &str = "https://rpc.beaverbuild.org/";
+    pub const LIGHTSPEEDBUILDER: &str = "https://rpc.lightspeedbuilder.info/";
+    pub const ETH_BUILDER: &str = "https://eth-builder.com/";
+    pub const ULTRASOUND: &str = "https://relay.ultrasound.money/";
+    pub const AGNOSTIC_RELAY: &str = "https://agnostic-relay.net/";
+    pub const RELAYOOR_WTF: &str = "https://relayooor.wtf/";
+    pub const RSYNC_BUILDER: &str = "https://rsync-builder.xyz/";
+}
