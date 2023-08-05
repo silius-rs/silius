@@ -46,6 +46,7 @@ dependencies = [
  "dotenv",
  "ethers",
  "ethers-flashbots",
+ "ethers-flashbots-test",
  "jsonrpsee",
  "serde",
  "serde_json",
@@ -1837,7 +1838,25 @@ dependencies = [
 [[package]]
 name = "ethers-flashbots"
 version = "0.13.1"
-source = "git+https://github.com/da-bao-jian/ethers-flashbots.git?branch=master#7c29e0bb93a9d3e77b49cc82bcbadce5155cbccf"
+source = "git+https://github.com/qi-protocol/ethers-flashbots.git?branch=master#97e232dd473596da4098c932f37872d204d5dbb9"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "ethers",
+ "futures-core",
+ "futures-util",
+ "pin-project",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url",
+]
+
+[[package]]
+name = "ethers-flashbots-test"
+version = "0.13.1"
+source = "git+https://github.com/da-bao-jian/ethers-flashbots.git?branch=master#1eda9b7bb84e82f43f35b98c34d9066f9596b41d"
 dependencies = [
  "async-trait",
  "chrono",

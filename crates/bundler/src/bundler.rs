@@ -8,7 +8,10 @@ use ethers::{
         transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest, H256, U64,
     },
 };
-use ethers_flashbots::{BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded};
+use ethers_flashbots::{
+    BundleRequest, FlashbotsMiddleware, PendingBundleError::BundleNotIncluded,
+    SimulatedBundle
+};
 use std::{sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 use tracing::{info, trace};
@@ -270,7 +273,7 @@ impl Bundler {
 
         let tx = self.generate_tx(client.clone(), uos).await?;
 
-        let bundle_req = generate_bundle_req(client.clone(), tx).await?;
+        let bundle_req = generate_bundle_req(client.clone(), vec![tx], false).await?;
 
         match simulate_fb_bundle(client.clone(), &bundle_req).await {
             Ok(_) => {}
@@ -295,34 +298,24 @@ async fn send_fb_bundle<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
     bundle: BundleRequest,
 ) -> anyhow::Result<H256> {
+    
     // Send the Flashbots bundle and check for status
-    let handle: JoinHandle<Result<(bool, H256), anyhow::Error>> = tokio::spawn(async move {
-        let pending_bundle = match client.inner().send_bundle(&bundle).await {
-            Ok(bundle) => bundle,
-            Err(e) => return Err(anyhow::anyhow!("Failed to send bundle: {:?}", e)),
-        };
+    let pending_bundle = match client.inner().send_bundle(&bundle).await {
+        Ok(bundle) => bundle,
+        Err(e) => return Err(anyhow::anyhow!("Failed to send bundle: {:?}", e)),
+    };
+    info!("Bundle Received at block: {:?}", pending_bundle.block);
 
-        let bundle_hash = pending_bundle.bundle_hash;
-
-        match pending_bundle.await {
-            Ok(_) => return Ok((true, bundle_hash)),
-            Err(BundleNotIncluded) => {
-                return Err(anyhow::anyhow!("Bundle not included in the target block"));
-            }
-            Err(e) => {
-                return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
-            }
-        };
-    });
-
-    match handle.await {
-        Ok(Ok((_, bundle_hash))) => {
-            info!("Bundle included");
-            Ok(bundle_hash)
+    match pending_bundle.await {
+        Ok(bundle_hash) => return Ok(bundle_hash),
+        Err(BundleNotIncluded) => {
+            return Err(anyhow::anyhow!("Bundle not included in the target block"));
         }
-        Ok(Err(e)) => Err(e),
-        Err(e) => Err(anyhow::anyhow!("Task panicked: {:?}", e)),
-    }
+        Err(e) => {
+            return Err(anyhow::anyhow!("Bundle rejected: {:?}", e));
+        }
+    };
+
 }
 
 /// Simulate a Flashbots bundle
@@ -333,11 +326,11 @@ async fn send_fb_bundle<M: Middleware + 'static>(
 async fn simulate_fb_bundle<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
     bundle: &BundleRequest,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<SimulatedBundle> {
     let simulated_bundle = client.inner().simulate_bundle(&bundle).await?;
 
     // Currently there's only 1 tx per bundle
-    for tx in simulated_bundle.transactions {
+    for tx in &simulated_bundle.transactions {
         trace!("Simulate bundle: {:?}", tx);
         if let Some(err) = &tx.error {
             return Err(anyhow::anyhow!(
@@ -353,7 +346,7 @@ async fn simulate_fb_bundle<M: Middleware + 'static>(
         }
     }
 
-    Ok(())
+    Ok(simulated_bundle)
 }
 
 /// Generate a Flashbots bundle request
@@ -361,20 +354,29 @@ async fn simulate_fb_bundle<M: Middleware + 'static>(
 /// # Arguments
 /// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
 /// * `tx` - A [EIP-1559 TypedTransaction](TypedTransaction)
+/// * `revertible` - If true the bundle is revertible, otherwise any transactions in the bundle revert will revert the whole bundle
 ///
 /// # Returns
 /// * `BundleRequest` - A [BundleRequest](BundleRequest)
 async fn generate_bundle_req<M: Middleware + 'static>(
     client: FlashbotsClientType<M>,
-    tx: TypedTransaction,
+    txs: Vec<TypedTransaction>,
+    revertible: bool,
 ) -> anyhow::Result<BundleRequest> {
-    let typed_tx = TypedTransaction::Eip1559(tx.into());
-    let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
-        Ok(tx) => typed_tx.rlp_signed(&tx),
-        Err(e) => return Err(anyhow::anyhow!("Failed to sign transaction: {:?}", e)),
-    };
     let mut bundle_req = BundleRequest::new();
-    bundle_req = bundle_req.push_transaction(raw_signed_tx);
+    for tx in txs {
+        let typed_tx = TypedTransaction::Eip1559(tx.into());
+        let raw_signed_tx = match client.signer().sign_transaction(&typed_tx).await {
+            Ok(tx) => typed_tx.rlp_signed(&tx),
+            Err(e) => return Err(anyhow::anyhow!("Failed to sign transaction: {:?}", e)),
+        };
+
+        if revertible {
+            bundle_req = bundle_req.push_revertible_transaction(raw_signed_tx);
+        } else {
+            bundle_req = bundle_req.push_transaction(raw_signed_tx);
+        };
+    }
 
     // Simulate the Flashbots bundle
     let block_num = client.get_block_number().await?;
@@ -429,9 +431,9 @@ pub(crate) fn generate_fb_middleware(
 mod test {
     use crate::test_helper::MockFlashbotsRelayServer;
     use crate::{
-        bundler::generate_fb_middleware,
+        bundler::{generate_bundle_req, generate_fb_middleware, simulate_fb_bundle, send_fb_bundle},
         test_helper::{MockFlashbotsBlockBuilderRelay, INIT_BLOCK},
-        Bundler, SendBundleMode,
+        Bundler, SendBundleMode, 
     };
     use aa_bundler_primitives::{consts::flashbots_relay_endpoints, Chain, Wallet};
     use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
@@ -442,19 +444,28 @@ mod test {
         signers::Signer,
         types::{
             transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest,
-            NameOrAddress, H160, U256, U64,
+            NameOrAddress, TransactionRequest, H160, U256, U64,
         },
         utils::{parse_units, Anvil, AnvilInstance},
     };
-    use jsonrpsee::core::client::ClientT;
-    use jsonrpsee::http_client::HttpClientBuilder;
-    use jsonrpsee::rpc_params;
     use jsonrpsee::server::{ServerBuilder, ServerHandle};
     use std::env;
 
+
     sol! {
         #[derive(Debug)]
-        function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts);
+        function swapExactTokensForTokens(
+            uint amountIn,
+            uint amountOutMin,
+            address[] calldata path,
+            address to,
+            uint deadline
+        ) external returns (uint[] memory amounts);
+    }
+
+    sol! {
+        #[derive(Debug)]
+        function approve(address guy, uint wad) public returns (bool);
     }
 
     abigen!(
@@ -490,6 +501,7 @@ mod test {
             .port(port)
             .fork(eth_client_address.clone())
             .fork_block_number(INIT_BLOCK.clone())
+            .block_time(1u64)
             .spawn();
 
         // Create a bundler and connect to the Anvil
@@ -500,7 +512,7 @@ mod test {
             ep_address,
             Chain::from(1),
             SendBundleMode::Flashbots,
-            Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.to_string()]),
+            Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()]),
         )
         .expect("Failed to create bundler");
 
@@ -524,7 +536,7 @@ mod test {
         Ok((handle, mock_relay))
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_send_bundle_flashbots() -> anyhow::Result<()> {
         let ctx = setup().await?;
         let (_handle, mock_relay) = start_mock_server().await?;
@@ -534,7 +546,7 @@ mod test {
         let address = bundler.wallet.signer.address();
 
         // Create a Flashbots signer middleware
-        let client = generate_fb_middleware(
+        let fb_client = generate_fb_middleware(
             "http://localhost:8545".to_string(),
             Some(vec!["http://127.0.0.1:3001".to_string()]),
             bundler.wallet.clone(),
@@ -543,10 +555,6 @@ mod test {
         let depositor_weth_instance = WETH::new(
             "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse::<H160>()?,
             depositor.clone(),
-        );
-        let bundler_weth_instance = WETH::new(
-            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse::<H160>()?,
-            client.clone(),
         );
 
         // Deposit 500 ETH to get WETH and transfer to the bundler
@@ -557,24 +565,27 @@ mod test {
             .send()
             .await?
             .await?;
+
+
         let _ = depositor_weth_instance
-            .transfer(address.clone(), value)
+            .transfer(address.clone(), value.clone())
             .send()
             .await?
             .await?;
 
-        // Approve the UniswapV2 Router from the Bundler
-        let _ = bundler_weth_instance
-            .approve(
-                "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a".parse::<H160>()?,
-                U256::MAX,
+        let balance_before = fb_client.clone().get_balance(address, None).await?;
+
+        // Create approve calldata
+        let approve = approveCall {
+            // UniswapV2Router address
+            guy: alloy_Address::parse_checksummed(
+                "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+                None,
             )
-            .send()
-            .await?
-            .await?;
-
-        let balance = bundler_weth_instance.balance_of(address).call().await?;
-        println!("Balance: {:?}", balance);
+            .unwrap(),
+            wad: alloy_U256::MAX,
+        };
+        let approve_call_data = approve.encode();
 
         let path = vec![
             // WETH address
@@ -585,38 +596,85 @@ mod test {
                 .unwrap(),
         ];
 
-        let swap_eth = swapExactETHForTokensCall {
+        // Create swap calldata
+        let swap_eth = swapExactTokensForTokensCall {
+            amountIn: alloy_U256::from(10),
             amountOutMin: alloy_U256::from(0),
             path: path.clone(),
-            to: SIMPLE_ACCOUNT.parse::<alloy_Address>().unwrap(),
-            deadline: alloy_U256::from(0),
+            to: alloy_Address::from_slice(address.clone().as_bytes()),
+            deadline: alloy_U256::MAX,
         };
+        let swap_call_data = swap_eth.encode();
 
-        let call_data = swap_eth.encode();
-        let nonce = client.clone().get_transaction_count(address, None).await?;
+        let nonce = fb_client
+            .clone()
+            .get_transaction_count(address, None)
+            .await?;
 
-        let tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
+
+        // Craft a bundle with approve() and swapExactETHForTokens()
+        let approve_tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
             to: Some(NameOrAddress::Address(
-                "0xf164fC0Ec4E93095b804a4795bBe1e041497b92a".parse::<H160>()?,
+                "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse::<H160>()?,
             )),
             from: Some(address),
-            data: Some(call_data.into()),
+            data: Some(approve_call_data.into()),
             chain_id: Some(U64::from(1)),
             max_fee_per_gas: Some(U256::from(1000000000000u64)),
             max_priority_fee_per_gas: Some(U256::from(1000000000000u64)),
             gas: Some(U256::from(1000000u64)),
-            nonce: Some(nonce),
+            nonce: Some(nonce.clone()),
             value: None,
             access_list: Default::default(),
         });
 
-        println!("{:?}", tx_req);
+        let swap_tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
+            to: Some(NameOrAddress::Address(
+                "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D".parse::<H160>()?,
+            )),
+            from: Some(address),
+            data: Some(swap_call_data.into()),
+            chain_id: Some(U64::from(1)),
+            max_fee_per_gas: Some(U256::from(1000000000000u64)),
+            max_priority_fee_per_gas: Some(U256::from(1000000000000u64)),
+            gas: Some(U256::from(9000000u64)),
+            nonce: Some(nonce.clone() + 1),
+            value: None,
+            access_list: Default::default(),
+        });
 
-        // let url = "http://127.0.0.1:3001";
-        // let client = HttpClientBuilder::default().build(url)?;
-        // let params = rpc_params![tx];
-        // let response: Result<String, _> = client.request("eth_callBundle", params).await;
-        // println!("{:?}", response);
+        // Simulate the bundle
+        let sim_bundle_req = generate_bundle_req(
+            fb_client.clone(),
+            vec![approve_tx_req.clone(),swap_tx_req.clone()],
+            true,
+        )
+        .await?;
+        sim_bundle_req
+            .clone()
+            .set_simulation_block(U64::from(INIT_BLOCK.clone()));
+        // Swap on Anvil as mock to simulation. In reality, no real state change should happen
+        let simultation_res = simulate_fb_bundle(fb_client.clone(), &sim_bundle_req).await?;
+
+        assert_eq!(simultation_res.transactions.len(), 2);
+        assert_eq!(simultation_res.transactions[0].from, address);
+
+        let balance_after = fb_client.clone().get_balance(address, None).await?;
+        assert_ne!(balance_before, balance_after);
+
+        // Send the bundle
+        let bundle_req = generate_bundle_req(
+            fb_client.clone(),
+            vec![approve_tx_req.clone(),swap_tx_req.clone()],
+            true,
+        )
+        .await?;
+        
+        let result = send_fb_bundle(fb_client.clone(), bundle_req.clone()).await;
+        assert!(matches!(
+            result,
+            Err(ref e) if e.to_string() == "Bundle not included in the target block"
+        ));
 
         Ok(())
     }

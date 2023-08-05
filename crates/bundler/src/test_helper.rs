@@ -3,41 +3,25 @@ use async_trait::async_trait;
 use ethers::{
     middleware::SignerMiddleware,
     prelude::LocalWallet,
-    providers::{Http, Middleware, Provider},
-    types::{transaction::eip2718::TypedTransaction, Address, H256, U256},
+    providers::{JsonRpcClient, Http, Middleware, Provider},
+    types::{Address, U64, TxHash, Bytes, H256, U256},
 };
+use ethers_flashbots_test::{BundleRequest, relay::SendBundleResponse, PendingBundle, BundleTransaction, SimulatedBundle, SimulatedTransaction};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 
-pub const INIT_BLOCK: u64 = 17832041;
+pub const INIT_BLOCK: u64 = 17832062;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct CallBundleArgs {
-    pub txs: Vec<TypedTransaction>,
-    pub coinbase: Option<Address>,
-    pub gas_limit: Option<u64>,
-    pub base_fee: Option<U256>,
-}
 
-impl CallBundleArgs {
-    pub fn new(txs: Vec<TypedTransaction>) -> Self {
-        Self {
-            txs,
-            coinbase: None,
-            gas_limit: None,
-            base_fee: None,
-        }
-    }
-}
 
 #[rpc(server, namespace = "eth")]
 pub trait MockFlashbotsRelay {
     #[method(name = "sendBundle")]
-    async fn send_bundle(&self) -> RpcResult<MockPayload>;
+    async fn send_bundle(&self, bundle_req: BundleRequest) -> RpcResult<SendBundleResponse>;
 
     #[method(name = "callBundle")]
-    async fn call_bundle(&self, call_bundle_args: CallBundleArgs) -> RpcResult<Vec<MockPayload>>;
+    async fn call_bundle(&self, bundle_req: BundleRequest) -> RpcResult<SimulatedBundle>;
 }
 
 #[derive(Debug, Clone)]
@@ -45,36 +29,14 @@ pub struct MockFlashbotsBlockBuilderRelay {
     pub mock_eth_client: Arc<SignerMiddleware<Provider<Http>, LocalWallet>>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MockPayload {
-    // pub bundle_gas_price: U256,
-    pub bundle_hash: H256,
-    pub coinbase_diff: U256,
-    // pub eth_sent_to_coinbase: U256,
-    // pub gas_fees: U256,
-    // pub results: Vec<MockJsonResult>,
-    // pub state_block_number: U64,
-    // pub total_gas_used: U256,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct MockJsonResult {
-    pub coinbase_diff: U256,
-    pub eth_sent_to_coinbase: U256,
-    pub from_address: Address,
-    pub to_address: Address,
-    pub gas_used: U256,
-    pub tx_hash: H256,
-}
 
 impl MockFlashbotsBlockBuilderRelay {
     pub async fn new(port: u64) -> anyhow::Result<Self> {
-        // Connect to the Anvil
         let url = format!("http://localhost:{}", port).to_string();
         let mock_eth_client = Provider::<Http>::try_from(&url)?;
 
-        // Create a wallet and SignerMiddleware to deposit ETH into the Bundler
-        let wallet = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        // Create a wallet and SignerMiddleware 
+        let wallet = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
             .parse::<LocalWallet>()?;
         let client = Arc::new(SignerMiddleware::new(mock_eth_client.clone(), wallet));
 
@@ -82,68 +44,90 @@ impl MockFlashbotsBlockBuilderRelay {
             mock_eth_client: client,
         })
     }
+
+    fn create_pending_bundle<'a, P: JsonRpcClient>(
+        provider: &'a Provider<P>,
+        bundle_req: &BundleRequest,
+    ) -> PendingBundle<'a, P> {
+
+        let bundle_hash = H256::from_low_u64_be(0);
+        let block = bundle_req.block().unwrap_or(U64::from(INIT_BLOCK));
+        let transactions: Vec<TxHash> = bundle_req
+            .transactions()
+            .iter()
+            .map(|tx_hash| 
+                match tx_hash {
+                    BundleTransaction::Raw(_) => TxHash::zero(),
+                    _ => panic!("Not a raw transaction"),
+                }
+            )
+            .collect();
+
+        // Create the PendingBundle
+        PendingBundle::new(bundle_hash, block, transactions, &provider)
+    }
 }
 
 #[async_trait]
 impl MockFlashbotsRelayServer for MockFlashbotsBlockBuilderRelay {
-    async fn send_bundle(&self) -> RpcResult<MockPayload> {
-        let port = 8545;
-        let url = format!("http://localhost:{}", port).to_string();
-        let provider = Provider::<Http>::try_from(&url).unwrap();
+    async fn send_bundle(&self, bundle_req: BundleRequest) -> RpcResult<SendBundleResponse> {
 
-        Ok(MockPayload::default())
+    let provider = self.mock_eth_client.inner().clone();
+
+    tokio::spawn(async move {
+        
+        tokio::time::sleep(Duration::from_secs(12)).await;
+        let _ = MockFlashbotsBlockBuilderRelay::create_pending_bundle(&provider, &bundle_req);
+
+    });
+
+        Ok(SendBundleResponse::default())
     }
 
-    async fn call_bundle(&self, call_bundle_args: CallBundleArgs) -> RpcResult<Vec<MockPayload>> {
-        let txs = call_bundle_args.txs;
-        let block_number = INIT_BLOCK;
-        let coinbase = call_bundle_args.coinbase.unwrap_or(
-            "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990"
-                .parse::<Address>()
-                .expect("Failed to parse address"),
-        );
-        let _gas_limit = call_bundle_args.gas_limit.unwrap_or(700000);
-        let _base_fee = call_bundle_args.base_fee.unwrap_or(
-            self.mock_eth_client
-                .get_block(block_number)
-                .await
-                .expect("Failed to get block")
-                .unwrap()
-                .base_fee_per_gas
-                .unwrap(),
-        );
 
-        let mut res = Vec::new();
+
+    async fn call_bundle(&self, bundle_req: BundleRequest) -> RpcResult<SimulatedBundle> {
+
+        let txs: Vec<Bytes> = bundle_req
+            .transactions()
+            .iter()
+            .map(|tx| match tx {
+                BundleTransaction::Raw(inner) => (*inner).clone(),
+                _ => panic!("Not a raw transaction"),
+            })
+            .collect();
+
+        let mut simulated_bundle = SimulatedBundle::default();
+        simulated_bundle.simulation_block = INIT_BLOCK.into();
+        let mut gas_used = U256::from(0);
+        let mut gas_price = U256::from(0);
         for tx in txs {
-            let mut mock_payload = MockPayload::default();
-            let coinbase_before = self
-                .mock_eth_client
-                .get_balance(coinbase, None)
-                .await
-                .expect("Failed to get balance");
 
-            let tx_hash = self
-                .mock_eth_client
-                .send_transaction(tx.clone(), None)
+            let mut simulated_transaction = SimulatedTransaction::default();
+            let result = self.mock_eth_client
+                .send_raw_transaction(tx)
                 .await
                 .unwrap()
                 .await
                 .unwrap()
                 .unwrap();
-            mock_payload.bundle_hash = tx_hash.transaction_hash;
 
-            let coinbase_after = self
-                .mock_eth_client
-                .get_balance(coinbase, None)
-                .await
-                .expect("Failed to get balance");
+            simulated_transaction.hash = result.transaction_hash;
+            simulated_transaction.gas_used = result.gas_used.unwrap();
+            simulated_transaction.gas_price = result.effective_gas_price.unwrap();
+            simulated_transaction.from = result.from;
+            simulated_transaction.to = result.to;
 
-            let coinbase_diff = coinbase_after - coinbase_before;
-            mock_payload.coinbase_diff = coinbase_diff;
+            gas_used += result.gas_used.unwrap();
+            gas_price += result.effective_gas_price.unwrap();
 
-            res.push(mock_payload);
+            simulated_bundle.transactions.push(simulated_transaction);
         }
+        simulated_bundle.gas_used = gas_used;
+        simulated_bundle.gas_price = gas_price;
 
-        return Ok(res);
+        Ok(
+            simulated_bundle
+        )
     }
 }

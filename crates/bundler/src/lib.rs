@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 mod bundler;
+#[cfg(test)]
 mod test_helper;
 
 pub use bundler::{Bundler, SendBundleMode};

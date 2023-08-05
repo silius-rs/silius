@@ -21,13 +21,17 @@ async-trait = "0.1"
 bytes = "1.4.0"
 dotenv = "0.15.0"
 ethers = { workspace = true, features = ["abigen-online"] }
-ethers-flashbots = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", branch = "master" }
 jsonrpsee = { version = "0.18.2", features = ["server", "macros", "client"] }
-serde = "1"
-serde_json = "1"
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.4.0"
+
+ethers-flashbots = { git = "https://github.com/qi-protocol/ethers-flashbots.git", branch = "master" }
+serde_json = "1"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+ethers-flashbots-test = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", branch = "master" }
 
 
