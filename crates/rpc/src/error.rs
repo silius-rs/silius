@@ -12,15 +12,18 @@ use silius_primitives::{
     uopool::ValidationError,
 };
 
+/// A wrapper for the [ErrorObjectOwned](ErrorObjectOwned) type.
 pub struct JsonRpcError(pub ErrorObjectOwned);
 
 impl From<JsonRpcError> for ErrorObjectOwned {
+    /// Convert a [JsonRpcError](JsonRpcError) to a [ErrorObjectOwned](ErrorObjectOwned).
     fn from(err: JsonRpcError) -> Self {
         err.0
     }
 }
 
 impl From<SanityCheckError> for JsonRpcError {
+    /// Convert a [SanityCheckError](SanityCheckError) to a [JsonRpcError](JsonRpcError).
     fn from(err: SanityCheckError) -> Self {
         JsonRpcError(
         match err {
@@ -139,6 +142,7 @@ impl From<SanityCheckError> for JsonRpcError {
 }
 
 impl From<SimulationCheckError> for JsonRpcError {
+    /// Convert a [SimulationCheckError](SimulationCheckError) to a [JsonRpcError](JsonRpcError).
     fn from(err: SimulationCheckError) -> Self {
         JsonRpcError(match err {
             SimulationCheckError::Signature {} => ErrorObject::owned(
@@ -204,6 +208,7 @@ impl From<SimulationCheckError> for JsonRpcError {
 }
 
 impl From<ReputationError> for JsonRpcError {
+    /// Convert a [ReputationError](ReputationError) to a [JsonRpcError](JsonRpcError).
     fn from(err: ReputationError) -> Self {
         JsonRpcError(
         match err {
@@ -255,6 +260,7 @@ impl From<ReputationError> for JsonRpcError {
 }
 
 impl From<ValidationError> for JsonRpcError {
+    /// Convert a [ValidationError](ValidationError) to a [JsonRpcError](JsonRpcError).
     fn from(err: ValidationError) -> Self {
         match err {
             ValidationError::Sanity(err) => err.into(),
@@ -264,6 +270,7 @@ impl From<ValidationError> for JsonRpcError {
 }
 
 impl From<tonic::Status> for JsonRpcError {
+    /// Convert a tonic status to a [JsonRpcError](JsonRpcError).
     fn from(s: tonic::Status) -> Self {
         JsonRpcError(ErrorObject::owned(
             ErrorCode::InternalError.code(),
@@ -274,6 +281,7 @@ impl From<tonic::Status> for JsonRpcError {
 }
 
 impl From<serde_json::Error> for JsonRpcError {
+    /// Convert a [serde_json error](serde_json::Error) to a [JsonRpcError](JsonRpcError).
     fn from(err: serde_json::Error) -> Self {
         JsonRpcError(ErrorObject::owned(
             ErrorCode::ParseError.code(),

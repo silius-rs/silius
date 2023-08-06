@@ -17,12 +17,18 @@ use silius_primitives::{
 use std::str::FromStr;
 use tonic::Request;
 
+/// EthApiServer implements the ERC-4337 `eth` namespace RPC methods trait [EthApiServer](EthApiServer).
 pub struct EthApiServerImpl {
+    /// The [UoPool gRPC client](UoPoolClient).
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 }
 
 #[async_trait]
 impl EthApiServer for EthApiServerImpl {
+    /// Retrieve the current [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
+    ///
+    /// # Returns
+    /// * `RpcResult<U64>` - The chain ID as a U64.
     async fn chain_id(&self) -> RpcResult<U64> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
@@ -35,6 +41,10 @@ impl EthApiServer for EthApiServerImpl {
         return Ok(res.chain_id.into());
     }
 
+    /// Get the supported entry points for [UserOperations](UserOperation).
+    ///
+    /// # Returns
+    /// * `RpcResult<Vec<String>>` - A array of the entry point addresses as strings.
     async fn supported_entry_points(&self) -> RpcResult<Vec<String>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
@@ -51,6 +61,14 @@ impl EthApiServer for EthApiServerImpl {
             .collect());
     }
 
+    /// Send a user operation via the [AddRequest](AddRequest).
+    ///
+    /// # Arguments
+    /// * `user_operation: UserOperation` - The user operation to be sent.
+    /// * `entry_point: Address` - The address of the entry point.
+    ///
+    /// # Returns
+    /// * `RpcResult<UserOperationHash>` - The hash of the sent user operation.
     async fn send_user_operation(
         &self,
         uo: UserOperation,
@@ -81,6 +99,16 @@ impl EthApiServer for EthApiServerImpl {
         .0)
     }
 
+    /// Estimate the gas required for a [UserOperation](UserOperation) via the [EstimateUserOperationGasRequest](EstimateUserOperationGasRequest).
+    /// This allows you to gauge the computational cost of the operation.
+    /// See [How ERC-4337 Gas Estimation Works](https://www.alchemy.com/blog/erc-4337-gas-estimation).
+    ///
+    /// # Arguments
+    /// * `user_operation: [UserOperationPartial](UserOperationPartial)` - The partial user operation for which to estimate the gas.
+    /// * `entry_point: Address` - The address of the entry point.
+    ///
+    /// # Returns
+    /// * `RpcResult<UserOperationGasEstimation>` - The [UserOperationGasEstimation](UserOperationGasEstimation) for the user operation.
     async fn estimate_user_operation_gas(
         &self,
         uo: UserOperationPartial,
@@ -111,6 +139,13 @@ impl EthApiServer for EthApiServerImpl {
         .0)
     }
 
+    /// Retrieve the receipt of a [UserOperation](UserOperation).
+    ///
+    /// # Arguments
+    /// * `user_operation_hash: String` - The hash of the user operation.
+    ///
+    /// # Returns
+    /// * `RpcResult<Option<UserOperationReceipt>>` - The [UserOperationReceipt] of the user operation.    
     async fn get_user_operation_receipt(
         &self,
         uo_hash: String,
@@ -164,6 +199,14 @@ impl EthApiServer for EthApiServerImpl {
         }
     }
 
+    /// Retrieve a [UserOperation](UserOperation) by its hash via [UserOperationHashRequest](UserOperationHashRequest).
+    /// The hash serves as a unique identifier for the [UserOperation](UserOperation).
+    ///
+    /// # Arguments
+    /// * `user_operation_hash: String` - The hash of a [UserOperation](UserOperation).
+    ///
+    /// # Returns
+    /// * `RpcResult<Option<UserOperationByHash>>` - The [UserOperation](UserOperation) associated with the hash, or None if it does not exist.
     async fn get_user_operation_by_hash(
         &self,
         uo_hash: String,

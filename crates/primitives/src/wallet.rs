@@ -1,3 +1,4 @@
+//! A `Wallet` is a wrapper around an ethers wallet with an optional field for Flashbots bundle identifier
 use crate::UserOperation;
 use ethers::{
     prelude::{k256::ecdsa::SigningKey, rand},

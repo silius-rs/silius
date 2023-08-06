@@ -9,12 +9,21 @@ use std::task::Poll;
 use std::{error::Error, task::Context};
 use tower::{Layer, Service};
 
+/// The proxy layer for the [json rpc server](JsonRpcServer)
 #[derive(Clone, Debug)]
 pub struct ProxyJsonRpcLayer {
+    /// The address of the Ethereum execution client
     pub address: String,
 }
 
 impl ProxyJsonRpcLayer {
+    /// Create a new proxy layer
+    ///
+    /// # Arguments
+    /// * `address: impl Into<String>` - The address of the Ethereum execution client
+    ///
+    /// # Returns
+    /// * `Self` - A ProxyJsonRpcLayer instance
     pub fn new(address: impl Into<String>) -> Self {
         Self {
             address: address.into(),
@@ -31,13 +40,24 @@ impl<S> Layer<S> for ProxyJsonRpcLayer {
     }
 }
 
+/// The RPC request to send to the Ethereum execution client.
 #[derive(Debug, Clone)]
 pub struct ProxyJsonRpcRequest<S> {
+    /// The inner service
     inner: S,
+    /// The address of the Ethereum execution client
     address: Arc<str>,
 }
 
 impl<S> ProxyJsonRpcRequest<S> {
+    /// Create a new proxy request
+    ///
+    /// # Arguments
+    /// * `inner: S` - The inner service
+    /// * `address: &str` - The address of the Ethereum execution client
+    ///
+    /// # Returns
+    /// * `Result<Self, JsonRpcError>` - A ProxyJsonRpcRequest instance
     pub fn new(inner: S, address: &str) -> Result<Self, JsonRpcError> {
         Ok(Self {
             inner,
