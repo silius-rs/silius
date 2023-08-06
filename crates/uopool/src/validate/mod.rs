@@ -7,9 +7,10 @@ use enumset::{EnumSet, EnumSetType};
 use ethers::{providers::Middleware, types::U256};
 use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame, EntryPoint};
 use silius_primitives::{
+    consts::entities::NUMBER_LEVELS,
     reputation::{ReputationEntry, StakeInfo},
     sanity::SanityCheckError,
-    simulation::{CodeHash, SimulationCheckError, NUMBER_LEVELS},
+    simulation::{CodeHash, SimulationCheckError, StorageMap},
     uopool::ValidationError,
     Chain, UserOperation, UserOperationHash,
 };
@@ -30,6 +31,7 @@ pub struct UserOperationValidationOutcome {
     pub valid_after: Option<U256>,
     // Simulation trace
     pub code_hashes: Option<Vec<CodeHash>>,
+    pub storage_map: Option<StorageMap>,
 }
 
 #[derive(EnumSetType, Debug)]

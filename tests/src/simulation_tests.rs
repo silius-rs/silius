@@ -112,7 +112,7 @@ async fn setup(
         StandardUserOperationValidator::new(Arc::new(provider), entry_point2, c.clone())
             .with_sanity_check(SenderOrInitCode {})
             .with_sanity_check(VerificationGas {
-                max_verification_gas: U256::from(1500000000_u64),
+                max_verification_gas: U256::from(3000000_u64),
             })
             .with_sanity_check(Paymaster {})
             .with_sanity_check(CallGas {})
@@ -137,7 +137,7 @@ async fn setup(
         mempools,
         reputation,
         client.clone(),
-        1500000000_u64.into(),
+        3000000_u64.into(),
         c,
     );
 

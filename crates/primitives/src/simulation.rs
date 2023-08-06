@@ -1,4 +1,3 @@
-use crate::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
 use ethers::{
     prelude::{EthAbiCodec, EthAbiType},
     providers::MiddlewareError,
@@ -6,14 +5,7 @@ use ethers::{
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-
-/// Markers used in entry point smart contracts to differentiate between parts of user operation
-// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/core/EntryPoint.sol#L514
-// 0 - factory, 1 - sender/account, 2 - paymaster
-// opcode NUMBER is marker between levels
-pub const NUMBER_LEVELS: usize = 3;
-pub const LEVEL_TO_ENTITY: [&str; NUMBER_LEVELS] = [FACTORY, ACCOUNT, PAYMASTER];
+use std::collections::{HashMap, HashSet};
 
 /// Time ineterval before user operation expires (in seconds)
 pub const EXPIRATION_TIMESTAMP_DIFF: u64 = 30;
@@ -112,3 +104,5 @@ pub struct CodeHash {
     pub address: Address,
     pub hash: H256,
 }
+
+pub type StorageMap = HashMap<Address, HashMap<String, u64>>;

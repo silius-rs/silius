@@ -5,10 +5,10 @@ use silius_contracts::{
     tracer::{Call, CallEntry, JsTracerFrame},
 };
 use silius_primitives::{
-    consts::entities::PAYMASTER,
+    consts::entities::{LEVEL_TO_ENTITY, PAYMASTER},
     simulation::{
-        SimulationCheckError, CREATE_OPCODE, LEVEL_TO_ENTITY, PAYMASTER_VALIDATION_FUNCTION,
-        RETURN_OPCODE, REVERT_OPCODE,
+        SimulationCheckError, CREATE_OPCODE, PAYMASTER_VALIDATION_FUNCTION, RETURN_OPCODE,
+        REVERT_OPCODE,
     },
     UserOperation,
 };

@@ -37,6 +37,12 @@ pub struct StakeInfo {
     pub unstake_delay: U256, // seconds
 }
 
+impl StakeInfo {
+    pub fn is_staked(&self) -> bool {
+        self.stake > U256::zero() && self.unstake_delay > U256::zero()
+    }
+}
+
 /// Error object for reputation
 pub enum ReputationError {
     EntityBanned {
