@@ -1,5 +1,5 @@
 use super::{
-    utils::{extract_pre_fund, extract_verification_gas_limit},
+    utils::{extract_pre_fund, extract_storage_map, extract_verification_gas_limit},
     SanityCheck, SanityHelper, SimulationCheck, SimulationHelper, SimulationTraceCheck,
     SimulationTraceHelper, UserOperationValidationOutcome, UserOperationValidator,
     UserOperationValidatorMode,
@@ -183,6 +183,7 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
             }
 
             out.code_hashes = sim_helper.code_hashes;
+            out.storage_map = Some(extract_storage_map(&js_trace));
         }
 
         Ok(out)

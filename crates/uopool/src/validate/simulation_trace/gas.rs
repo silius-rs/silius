@@ -1,8 +1,7 @@
 use crate::validate::{SimulationTraceCheck, SimulationTraceHelper};
 use ethers::providers::Middleware;
 use silius_primitives::{
-    simulation::{SimulationCheckError, LEVEL_TO_ENTITY},
-    UserOperation,
+    consts::entities::LEVEL_TO_ENTITY, simulation::SimulationCheckError, UserOperation,
 };
 
 pub struct Gas;

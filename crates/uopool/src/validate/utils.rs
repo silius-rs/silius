@@ -1,7 +1,8 @@
 use ethers::types::{Address, U256};
-use silius_contracts::entry_point::SimulateValidationResult;
+use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame};
 use silius_primitives::{
-    get_address, reputation::StakeInfo, simulation::NUMBER_LEVELS, UserOperation,
+    consts::entities::NUMBER_LEVELS, get_address, reputation::StakeInfo, simulation::StorageMap,
+    UserOperation,
 };
 
 pub fn extract_verification_gas_limit(sim_res: &SimulateValidationResult) -> U256 {
@@ -62,4 +63,16 @@ pub fn extract_stake_info(
             unstake_delay: p_info.1,
         },
     ]
+}
+
+pub fn extract_storage_map(js_trace: &JsTracerFrame) -> StorageMap {
+    let mut storage_map = StorageMap::default();
+
+    for l in js_trace.number_levels.iter() {
+        for (addr, acc) in l.access.iter() {
+            storage_map.insert(*addr, acc.reads.clone());
+        }
+    }
+
+    storage_map
 }

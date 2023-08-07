@@ -1,8 +1,8 @@
 use crate::validate::{SimulationTraceCheck, SimulationTraceHelper};
 use ethers::providers::Middleware;
 use silius_primitives::{
-    consts::entities::FACTORY,
-    simulation::{SimulationCheckError, CREATE2_OPCODE, FORBIDDEN_OPCODES, LEVEL_TO_ENTITY},
+    consts::entities::{FACTORY, LEVEL_TO_ENTITY},
+    simulation::{SimulationCheckError, CREATE2_OPCODE, FORBIDDEN_OPCODES},
     UserOperation,
 };
 

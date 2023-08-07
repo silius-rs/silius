@@ -30,10 +30,10 @@ pub struct BundlerServiceOpts {
     #[clap(long, value_parser=parse_address)]
     pub beneficiary: Address,
 
-    #[clap(long, default_value = "1", value_parser=parse_u256)]
+    #[clap(long, default_value = "600", value_parser=parse_u256)]
     pub gas_factor: U256,
 
-    #[clap(long, value_parser=parse_u256)]
+    #[clap(long, default_value = "1", value_parser=parse_u256)]
     pub min_balance: U256,
 
     #[clap(long, default_value = "127.0.0.1:3002")]

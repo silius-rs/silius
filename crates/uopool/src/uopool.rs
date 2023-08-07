@@ -165,7 +165,9 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         let mut paymaster_dep = HashMap::new();
         let mut staked_entity_c = HashMap::new();
 
-        for uo in uos {
+        let senders_all = uos.iter().map(|uo| uo.sender).collect::<HashSet<_>>();
+
+        'uos: for uo in uos {
             if senders.contains(&uo.sender) {
                 continue;
             }
@@ -220,6 +222,14 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 Ok(val_out) => {
                     if val_out.valid_after.is_some() {
                         continue;
+                    }
+
+                    if let Some(storage_map) = val_out.storage_map {
+                        for addr in storage_map.keys() {
+                            if *addr != uo.sender && senders_all.contains(addr) {
+                                continue 'uos;
+                            }
+                        }
                     }
 
                     // TODO

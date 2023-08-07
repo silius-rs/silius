@@ -5,8 +5,9 @@ use ethers::{
     utils::keccak256,
 };
 use silius_primitives::{
+    consts::entities::{FACTORY_INDEX, LEVEL_TO_ENTITY, NUMBER_LEVELS},
     reputation::StakeInfo,
-    simulation::{SimulationCheckError, LEVEL_TO_ENTITY, NUMBER_LEVELS},
+    simulation::SimulationCheckError,
     UserOperation,
 };
 use std::collections::{HashMap, HashSet};
@@ -90,8 +91,9 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
         );
 
         let mut slot_staked = String::new();
+        let stake_info = helper.stake_info.unwrap_or_default();
 
-        for (i, stake_info) in helper.stake_info.unwrap_or_default().iter().enumerate() {
+        for (i, stake_info_i) in stake_info.iter().enumerate() {
             if let Some(l) = helper.js_trace.number_levels.get(i) {
                 for (addr, acc) in &l.access {
                     if *addr == uo.sender || *addr == helper.entry_point.address() {
@@ -107,11 +109,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                     .concat()
                     {
                         if self.associated_with_slot(&uo.sender, &slot, &slots)? {
-                            if !uo.init_code.is_empty() {
+                            if !(uo.init_code.is_empty()
+                                || uo.sender == stake_info_i.address
+                                    && stake_info[FACTORY_INDEX].is_staked())
+                            {
                                 slot_staked = slot.clone();
                             }
-                        } else if *addr == stake_info.address
-                            || self.associated_with_slot(&stake_info.address, &slot, &slots)?
+                        } else if *addr == stake_info_i.address
+                            || self.associated_with_slot(&stake_info_i.address, &slot, &slots)?
                         {
                             slot_staked = slot.clone();
                         } else {
@@ -119,7 +124,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                         }
                     }
 
-                    if !slot_staked.is_empty() && stake_info.stake.is_zero() {
+                    if !slot_staked.is_empty() && !stake_info_i.is_staked() {
                         return Err(SimulationCheckError::Unstaked {
                             entity: LEVEL_TO_ENTITY[i].to_string(),
                             message: format!("accessed slot {addr} slot {slot_staked}"),

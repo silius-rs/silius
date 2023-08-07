@@ -38,7 +38,7 @@ pub struct Opt {
     #[clap(flatten)]
     pub uopool_opts: UoPoolServiceOpts,
 
-    #[clap(long, value_parser=parse_u256)]
+    #[clap(long, default_value="3000000", value_parser=parse_u256)]
     pub max_verification_gas: U256,
 
     #[clap(long)]
