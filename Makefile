@@ -31,6 +31,7 @@ test:
 
 format:
 	cargo fmt --all
+	cargo sort --workspace
 
 lint:
 	cargo fmt --all -- --check
@@ -39,6 +40,6 @@ lint:
 	cargo udeps --workspace
 
 clean:
-	cd thirdparty/account-abstraction && yarn clean && cd ../..
-	cd thirdparty/bundler && yarn clear && cd ../..
+	cd crates/contracts/thirdparty/account-abstraction && yarn clean && cd ../..
+	cd crates/contracts/thirdparty/bundler && yarn clear && cd ../..
 	cargo clean
