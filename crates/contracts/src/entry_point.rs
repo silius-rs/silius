@@ -75,11 +75,30 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             ))),
             ContractError::MiddlewareError { e } => Err(EntryPointErr::from_middleware_err::<M>(e)),
             ContractError::ProviderError { e } => Err(e.into()),
-            ContractError::Revert(data) => AbiDecode::decode(data).map_err(|e| {
-                EntryPointErr::DecodeErr(format!(
-                    "{e:?} data field could not be deserialize to EntryPointAPIErrors",
-                ))
-            }),
+            ContractError::Revert(data) => {
+                let decoded = EntryPointAPIErrors::decode(data.as_ref());
+                match decoded {
+                    Ok(res) => Ok(res),
+                    Err(e) => {
+                        // ethers-rs could not handle `require (true, "reason")` well in this case
+                        // revert with `require` error would ends up with error event signature `0x08c379a0`
+                        // we need to handle it manually
+                        let (error_sig, reason) = data.split_at(4);
+                        if error_sig == [0x08, 0xc3, 0x79, 0xa0] {
+                            return <String as AbiDecode>::decode(reason)
+                                .map(EntryPointAPIErrors::RevertString)
+                                .map_err(|e| {
+                                    EntryPointErr::DecodeErr(format!(
+                                        "{e:?} data field could not be deserialize to revert error",
+                                    ))
+                                });
+                        }
+                        Err(EntryPointErr::DecodeErr(format!(
+                            "{e:?} data field could not be deserialize to EntryPointAPIErrors",
+                        )))
+                    }
+                }
+            }
             _ => Err(EntryPointErr::UnknownErr(format!(
                 "Unkown error: {err_msg:?}",
             ))),
@@ -320,7 +339,7 @@ mod tests {
         types::{Bytes, GethTrace, U256},
     };
     use silius_primitives::UserOperation;
-    use std::sync::Arc;
+    use std::{str::FromStr, sync::Arc};
 
     #[tokio::test]
     #[ignore]
@@ -360,5 +379,26 @@ mod tests {
         let trace = ep.simulate_validation_trace(uo).await.unwrap();
 
         assert!(matches!(trace, GethTrace::Unknown { .. },));
+    }
+
+    #[test]
+    fn deserialize_error_msg() -> anyhow::Result<()> {
+        let err_msg = Bytes::from_str("0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001841413934206761732076616c756573206f766572666c6f770000000000000000")?;
+        let res = EntryPointAPIErrors::decode(err_msg)?;
+        println!("res: {:?}", res);
+        match res {
+            EntryPointAPIErrors::RevertString(s) => {
+                assert_eq!(s, "AA94 gas values overflow")
+            }
+            _ => panic!("Invalid error message"),
+        }
+
+        let err_msg = Bytes::from_str("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001841413934206761732076616c756573206f766572666c6f770000000000000000")?;
+        let res = EntryPointAPIErrors::decode(err_msg);
+        assert!(
+            matches!(res, Err(_)),
+            "ethers-rs derivatives could not handle revert error correctly"
+        );
+        Ok(())
     }
 }
