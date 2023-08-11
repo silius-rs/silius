@@ -54,7 +54,9 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
                     Err(SimulationCheckError::Validation { message: f.reason })
                 }
                 _ => Err(SimulationCheckError::UnknownError {
-                    message: "Error when simulating validation on entry point".to_string(),
+                    message: format!(
+                        "Unknown error when simulating validation on entry point. Error message: {err:?}"
+                    ),
                 }),
             },
         }
@@ -71,7 +73,9 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
                     Err(SimulationCheckError::Validation { message: f.reason })
                 }
                 _ => Err(SimulationCheckError::UnknownError {
-                    message: "Error when simulating validation on entry point".to_string(),
+                    message: format!(
+                        "Unknown error when simulating validation on entry point. Error message: {err:?}"
+                    ),
                 }),
             },
         }
