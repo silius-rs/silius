@@ -1,3 +1,4 @@
+//! User operation validator module provides all the necessary traits and types for validations.
 use crate::{
     mempool::MempoolBox,
     reputation::ReputationBox,
@@ -22,6 +23,7 @@ pub mod simulation_trace;
 mod utils;
 pub mod validator;
 
+/// The outcome of a user operation validation.
 #[derive(Debug, Clone, Default)]
 pub struct UserOperationValidationOutcome {
     pub prev_hash: Option<UserOperationHash>,
@@ -34,6 +36,8 @@ pub struct UserOperationValidationOutcome {
     pub storage_map: Option<StorageMap>,
 }
 
+/// The mode in which the user operation validator is running.
+/// The validator has three modes: sanity, simulation, and simulation trace.
 #[derive(EnumSetType, Debug)]
 pub enum UserOperationValidatorMode {
     Sanity,
@@ -41,6 +45,8 @@ pub enum UserOperationValidatorMode {
     SimulationTrace,
 }
 
+/// The [UserOperation](UserOperation) validator trait.
+/// The [UserOperationValidator](UserOperationValidator) is a composable trait that allows bundler to choose validation rules(sanity, simultation, simulation trace) to apply.
 #[async_trait::async_trait]
 pub trait UserOperationValidator: Send + Sync {
     async fn validate_user_operation(
@@ -52,6 +58,7 @@ pub trait UserOperationValidator: Send + Sync {
     ) -> Result<UserOperationValidationOutcome, ValidationError>;
 }
 
+/// The [UserOperation](UserOperation) sanity check helper trait.
 pub struct SanityHelper<'a, M: Middleware + 'static> {
     mempool: &'a MempoolBox<VecUo, VecCh>,
     reputation: &'a ReputationBox<Vec<ReputationEntry>>,
@@ -69,6 +76,7 @@ pub trait SanityCheck<M: Middleware>: Send + Sync {
     ) -> Result<(), SanityCheckError>;
 }
 
+/// The [UserOperation](UserOperation) simulation check helper trait.
 pub struct SimulationHelper<'a, M: Middleware + 'static> {
     mempool: &'a MempoolBox<VecUo, VecCh>,
     reputation: &'a ReputationBox<Vec<ReputationEntry>>,
@@ -88,6 +96,7 @@ pub trait SimulationCheck<M: Middleware>: Send + Sync {
     ) -> Result<(), SimulationCheckError>;
 }
 
+/// The [UserOperation](UserOperation) simulation trace check helper trait.
 pub struct SimulationTraceHelper<'a, M: Middleware + 'static> {
     mempool: &'a MempoolBox<VecUo, VecCh>,
     reputation: &'a ReputationBox<Vec<ReputationEntry>>,

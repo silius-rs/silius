@@ -6,6 +6,14 @@ pub struct Paymaster;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for Paymaster {
+    /// The [check_user_operation] method implementation that performs the sanity check on the paymaster.
+    ///
+    /// # Arguments
+    /// `uo` - The user operation to be checked.
+    /// `helper` - The [sanity check helper](SanityHelper) that contains the necessary data to perform the sanity check.
+    ///
+    /// # Returns
+    /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
     async fn check_user_operation(
         &self,
         uo: &UserOperation,

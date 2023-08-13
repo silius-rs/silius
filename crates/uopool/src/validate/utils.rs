@@ -5,6 +5,13 @@ use silius_primitives::{
     UserOperation,
 };
 
+/// Helper function to extract the gas limit for verification from the simulation result
+///
+/// # Arguments
+/// `sim_res` - The [simulation result](SimulateValidationResult) from the simulation
+///
+/// # Returns
+/// The gas limit for verification
 pub fn extract_verification_gas_limit(sim_res: &SimulateValidationResult) -> U256 {
     match sim_res {
         SimulateValidationResult::ValidationResult(res) => res.return_info.0,
@@ -12,6 +19,13 @@ pub fn extract_verification_gas_limit(sim_res: &SimulateValidationResult) -> U25
     }
 }
 
+/// Helper function to extract the pre-fund for verification from the simulation result
+///
+/// # Arguments
+/// `sim_res` - The [simulation result](SimulateValidationResult) from the simulation
+///
+/// # Returns
+/// The pre-fund for verification
 pub fn extract_pre_fund(sim_res: &SimulateValidationResult) -> U256 {
     match sim_res {
         SimulateValidationResult::ValidationResult(res) => res.return_info.1,
@@ -19,6 +33,13 @@ pub fn extract_pre_fund(sim_res: &SimulateValidationResult) -> U256 {
     }
 }
 
+/// Helper function to extract the post-fund for verification from the simulation result
+///
+/// # Arguments
+/// `sim_res` - The [simulation result](SimulateValidationResult) from the simulation
+///
+/// # Returns
+/// The post-fund for verification
 pub fn extract_timestamps(sim_res: &SimulateValidationResult) -> (U256, U256) {
     match sim_res {
         SimulateValidationResult::ValidationResult(res) => {
@@ -30,6 +51,14 @@ pub fn extract_timestamps(sim_res: &SimulateValidationResult) -> (U256, U256) {
     }
 }
 
+/// Helper function to extract the stake info from the simulation result
+///
+/// # Arguments
+/// `uo` - The [user operation](UserOperation) to extract the stake info from
+/// `sim_res` - The [simulation result](SimulateValidationResult) from the simulation
+///
+/// # Returns
+/// The stake info for the factory, account and paymaster
 pub fn extract_stake_info(
     uo: &UserOperation,
     sim_res: &SimulateValidationResult,
@@ -65,6 +94,13 @@ pub fn extract_stake_info(
     ]
 }
 
+/// Helper function to extract the storage map from the simulation result
+///
+/// # Arguments
+/// `js_trace` - The [js tracer frame](JsTracerFrame) to extract the storage map from
+///
+/// # Returns
+/// The [storage map](StorageMap)
 pub fn extract_storage_map(js_trace: &JsTracerFrame) -> StorageMap {
     let mut storage_map = StorageMap::default();
 

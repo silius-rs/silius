@@ -1,3 +1,4 @@
+//! The UserOperation alternative mempool implementation according to the [ERC-4337 specifications](https://eips.ethereum.org/EIPS/eip-4337#Alternative%20Mempools).
 #![allow(dead_code)]
 
 mod database;

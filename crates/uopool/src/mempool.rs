@@ -17,6 +17,8 @@ pub fn mempool_id(ep: &Address, chain_id: &U256) -> MempoolId {
     )
 }
 
+/// Mempool trait that's implemented by [DatabaseMempool](DatabaseMempool) and [MemoryMempool](MemoryMempool)
+/// See [DatabaseMempool](DatabaseMempool) and [MemoryMempool](MemoryMempool) for implementation details
 pub trait Mempool: Debug {
     type UserOperations: IntoIterator<Item = UserOperation>;
     type CodeHashes: IntoIterator<Item = CodeHash>;

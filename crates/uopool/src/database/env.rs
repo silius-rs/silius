@@ -72,6 +72,7 @@ fn default_page_size() -> usize {
 }
 
 impl<E: EnvironmentKind> Env<E> {
+    /// Sets up the database environment
     pub fn open(path: PathBuf) -> anyhow::Result<Self> {
         let env = Environment::new()
             .set_max_dbs(TABLES.len())

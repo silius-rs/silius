@@ -8,6 +8,9 @@ use std::{fmt::Debug, ops::Deref};
 pub type ReputationBox<T> =
     Box<dyn Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync>;
 
+/// Reputation trait is imeplemented by [DatabaseMempool](DatabaseMempool) and [MemoryMempool](MemoryMempool) according to [Reputation scoring and throttling/banning for global entities](https://eips.ethereum.org/EIPS/eip-4337#reputation-scoring-and-throttlingbanning-for-global-entities) requirements.
+/// [UserOperation’s](UserOperation) storage access rules prevent them from interfere with each other. But “global” entities - paymasters, factories and aggregators are accessed by multiple UserOperations, and thus might invalidate multiple previously-valid UserOperations.
+/// To prevent abuse, we need to throttle down (or completely ban for a period of time) an entity that causes invalidation of large number of UserOperations in the mempool. To prevent such entities from “sybil-attack”, we require them to stake with the system, and thus make such DoS attack very expensive.
 pub trait Reputation: Debug {
     type ReputationEntries: IntoIterator<Item = ReputationEntry>;
     type Error;

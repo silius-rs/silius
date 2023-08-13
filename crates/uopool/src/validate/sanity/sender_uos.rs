@@ -14,6 +14,14 @@ pub struct SenderUos {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for SenderUos {
+    /// The [check_user_operation] method implementation that performs the sanity check on the [UserOperation](UserOperation) sender.
+    ///
+    /// # Arguments
+    /// `uo` - The [UserOperation](UserOperation) to be checked.
+    /// `helper` - The [sanity check helper](SanityHelper) that contains the necessary data to perform the sanity check.
+    ///
+    /// # Returns
+    /// Nothing if the sanity check is successful, otherwise a [SanityCheckError](SanityCheckError) is returned.
     async fn check_user_operation(
         &self,
         uo: &UserOperation,

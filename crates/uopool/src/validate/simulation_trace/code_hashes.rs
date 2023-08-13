@@ -17,6 +17,15 @@ use tokio::task::JoinSet;
 pub struct CodeHashes;
 
 impl CodeHashes {
+    /// The helper function to retrieve code hashes given a list of addresses
+    ///
+    /// # Arguments
+    /// `addrs` - The list of addresses
+    /// `hashes` - The list of code hashes
+    /// `eth_client` - The Ethereum client
+    ///
+    /// # Returns
+    /// None if code hash is available, otherwise [SimulationCheckError](SimulationCheckError).
     async fn get_code_hashes<M: Middleware + 'static>(
         &self,
         addrs: Vec<Address>,
@@ -56,6 +65,14 @@ impl CodeHashes {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
+    /// The [check_user_operation] method implementation that checks the code hashes
+    ///
+    /// # Arguments
+    /// `uo` - The user operation to check
+    /// `helper` - The [SimulationTraceHelper](SimulationTraceHelper)
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     async fn check_user_operation(
         &self,
         uo: &UserOperation,

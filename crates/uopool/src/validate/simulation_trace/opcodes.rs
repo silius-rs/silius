@@ -10,6 +10,14 @@ pub struct Opcodes;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
+    /// The [check_user_operation] method implementation that checks the use of forbidden opcodes
+    ///
+    /// # Arguments
+    /// `_uo` - Not used
+    /// `helper` - The [SimulationTraceHelper]
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     async fn check_user_operation(
         &self,
         _uo: &UserOperation,

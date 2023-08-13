@@ -10,6 +10,14 @@ pub struct CallGas;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for CallGas {
+    /// The `check_user_operation` method implementation for the `CallGas` sanity check.
+    ///
+    /// # Arguments
+    /// `uo` - The user operation to check.
+    /// `helper` - The helper struct that contains the entry point and the Ethereum client.
+    ///
+    /// # Returns
+    /// None if the sanity check passes, otherwise [SanityCheckError].
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
