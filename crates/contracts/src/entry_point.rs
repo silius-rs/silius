@@ -200,6 +200,13 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         }
     }
 
+    pub async fn get_nonce(&self, address: &Address, key: U256) -> Result<U256, EntryPointErr> {
+        self.entry_point_api
+            .get_nonce(*address, key)
+            .await
+            .map_err(|e| EntryPointErr::UnknownErr(format!("Error getting nonce: {e:?}")))
+    }
+
     pub async fn get_sender_address(
         &self,
         init_code: Bytes,

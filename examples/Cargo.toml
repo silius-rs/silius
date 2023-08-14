@@ -11,15 +11,33 @@ description = """
 AA (ERC-4337) bundler examples
 """
 
-[dev-dependencies]
-
+[dependencies]
+alloy-primitives = "0.3"
+alloy-sol-types = "0.3"
 anyhow = "1"
 ethers = { workspace = true }
+reqwest = { version = "0.11.4", features = ["json"] }
+serde = "1"
+serde_json = "1"
+silius-contracts = { path = "../crates/contracts" }
 silius-primitives = { path = "../crates/primitives" }
+silius-tests = { path = "../tests" }
 tokio = { workspace = true }
 
 [[example]]
 name = "user-operation"
 path = "user_operation.rs"
+
+[[example]]
+name = "create_with_factory"
+path = "simple_account/create_with_factory.rs"
+
+[[example]]
+name = "deposit"
+path = "simple_account/deposit.rs"
+
+[[example]]
+name = "transfer"
+path = "simple_account/transfer.rs"
 
 

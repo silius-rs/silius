@@ -41,7 +41,7 @@ pub async fn deploy_entry_point<M: Middleware + 'static>(
     let (ep, receipt) = EntryPointContract::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(ep, addr))
 }
 
@@ -51,7 +51,7 @@ pub async fn deploy_test_opcode_account<M: Middleware + 'static>(
     let (acc, receipt) = TestOpcodesAccount::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(acc, addr))
 }
 
@@ -61,7 +61,7 @@ pub async fn deploy_test_opcode_account_factory<M: Middleware + 'static>(
     let (factory, receipt) = TestOpcodesAccountFactory::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
 
@@ -72,7 +72,7 @@ pub async fn deploy_test_storage_account_factory<M: Middleware + 'static>(
     let (factory, receipt) = TestStorageAccountFactory::deploy(client, test_coin_addr)?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
 
@@ -82,7 +82,7 @@ pub async fn deploy_test_storage_account<M: Middleware + 'static>(
     let (acc, receipt) = TestStorageAccount::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(acc, addr))
 }
 
@@ -93,7 +93,7 @@ pub async fn deploy_test_recursion_account<M: Middleware + 'static>(
     let (acc, receipt) = TestRecursionAccount::deploy(client, ep)?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(acc, addr))
 }
 
@@ -103,7 +103,7 @@ pub async fn deploy_test_rules_account_factory<M: Middleware + 'static>(
     let (factory, receipt) = TestRulesAccountFactory::deploy(client, ())?
         .send_with_receipt()
         .await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
 
@@ -111,7 +111,7 @@ pub async fn deploy_tracer_test<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TracerTest<M>>> {
     let (factory, receipt) = TracerTest::deploy(client, ())?.send_with_receipt().await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
 
@@ -119,7 +119,7 @@ pub async fn deploy_test_coin<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> anyhow::Result<DeployedContract<TestCoin<M>>> {
     let (factory, receipt) = TestCoin::deploy(client, ())?.send_with_receipt().await?;
-    let addr = receipt.contract_address.unwrap();
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
 

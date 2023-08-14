@@ -10,8 +10,7 @@ description = """
 AA (ERC-4337) bundler integration tests
 """
 
-[dev-dependencies]
-
+[dependencies]
 anyhow = "1"
 ethers = { workspace = true }
 silius-contracts = { path = "../crates/contracts" }
