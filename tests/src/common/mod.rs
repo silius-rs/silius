@@ -15,7 +15,7 @@ use tempdir::TempDir;
 
 pub mod gen;
 
-pub const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
+pub const SEED_PHRASE: &str = "test test test test test test test test test test test junk";
 pub type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
 
 pub struct DeployedContract<C> {
@@ -127,7 +127,7 @@ pub async fn setup_geth() -> anyhow::Result<(GethInstance, ClientType, Provider<
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
     let wallet = MnemonicBuilder::<English>::default()
-        .phrase(KEY_PHRASE)
+        .phrase(SEED_PHRASE)
         .build()?;
 
     let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();

@@ -24,6 +24,9 @@ silius-primitives = { path = "../crates/primitives" }
 silius-tests = { path = "../tests" }
 tokio = { workspace = true }
 
+[package.metadata.cargo-udeps.ignore]
+normal = ["anyhow", "silius-contracts", "silius-primitives", "silius-tests"]
+
 [[example]]
 name = "user-operation"
 path = "user_operation.rs"

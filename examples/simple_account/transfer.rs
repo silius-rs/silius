@@ -9,6 +9,7 @@ use ethers::{
 use reqwest;
 use silius_contracts::EntryPoint;
 use silius_examples::{simple_account::SimpleAccountExecute, EstimateResult, Request, Response};
+use silius_primitives::consts::entry_point::ADDRESS;
 use silius_primitives::UserOperation;
 use silius_primitives::Wallet as UoWallet;
 use silius_tests::common::gen::SimpleAccountFactory;
@@ -16,15 +17,14 @@ use silius_tests::common::gen::SimpleAccountFactory;
 // stackup simple account factory
 const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";
 // 0.6.0 entrypoint address
-const ENTRYPOINT_ADDRESS: &str = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
 const CREATE_INDEX: u64 = 1;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let key_phrase = env::var("KEY_PHRASE").unwrap();
+    let seed_phrase = env::var("SEED_PHRASE").unwrap();
     let bundler_url = env::var("BUNDLER_URL").unwrap();
     let wallet = MnemonicBuilder::<English>::default()
-        .phrase(key_phrase.as_str())
+        .phrase(seed_phrase.as_str())
         .build()?;
     let provider =
         Provider::<Http>::try_from(bundler_url.as_str())?.interval(Duration::from_millis(10u64));
@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     println!("Smart account addresss: {:?}", address);
 
-    let nonce = EntryPoint::new(provider.clone(), ENTRYPOINT_ADDRESS.parse::<Address>()?)
+    let nonce = EntryPoint::new(provider.clone(), ADDRESS.parse::<Address>()?)
         .get_nonce(&address, U256::zero())
         .await?;
     println!("nonce: {:?}", nonce);
@@ -74,11 +74,11 @@ async fn main() -> anyhow::Result<()> {
         paymaster_and_data: Bytes::new(),
         signature: Bytes::default(),
     };
-    let uo_wallet = UoWallet::from_phrase(key_phrase.as_str(), &U256::from(5))?;
+    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &U256::from(5))?;
     let user_op = uo_wallet
         .sign_uo(
             &user_op,
-            &ENTRYPOINT_ADDRESS.to_string().parse::<Address>()?,
+            &ADDRESS.to_string().parse::<Address>()?,
             &U256::from(5),
         )
         .await?;
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
         jsonrpc: "2.0".to_string(),
         id: 1,
         method: "eth_estimateUserOperationGas".to_string(),
-        params: vec![value, ENTRYPOINT_ADDRESS.to_string().into()],
+        params: vec![value, ADDRESS.to_string().into()],
     };
     println!("req_body: {:?}", serde_json::to_string(&req_body)?);
     let post = reqwest::Client::builder()
@@ -118,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
     let user_op = uo_wallet
         .sign_uo(
             &user_op,
-            &ENTRYPOINT_ADDRESS.to_string().parse::<Address>()?,
+            &ADDRESS.to_string().parse::<Address>()?,
             &U256::from(5),
         )
         .await?;
@@ -129,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
         method: "eth_sendUserOperation".to_string(),
         params: vec![
             serde_json::to_value(&user_op).unwrap(),
-            ENTRYPOINT_ADDRESS.to_string().into(),
+            ADDRESS.to_string().into(),
         ],
     };
     let post = reqwest::Client::builder()
