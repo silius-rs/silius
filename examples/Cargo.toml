@@ -32,8 +32,8 @@ name = "user-operation"
 path = "user_operation.rs"
 
 [[example]]
-name = "create_with_factory"
-path = "simple_account/create_with_factory.rs"
+name = "simple_account_create"
+path = "simple_account/simple_account_create.rs"
 
 [[example]]
 name = "deposit"

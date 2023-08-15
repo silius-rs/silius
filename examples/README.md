@@ -8,7 +8,7 @@ cargo run --example user-operation
 
 
 ```bash
-SEED_PHRASE="test test test test test test test test test test test junk" BUNDLER_URL="http://127.0.0.1:3000" cargo run --example create_with_factory
+SEED_PHRASE="test test test test test test test test test test test junk" BUNDLER_URL="http://127.0.0.1:3000" cargo run --example simple_account_create
 ```
 
 ### Deposit funds to entrypoint
