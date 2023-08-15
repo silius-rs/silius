@@ -4347,6 +4347,7 @@ dependencies = [
  "serde_json",
  "silius-grpc",
  "silius-primitives",
+ "tokio",
  "tonic",
  "tower",
  "tower-http",
