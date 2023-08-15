@@ -130,4 +130,31 @@ mod tests {
             RpcServiceOpts::try_parse_from(args).unwrap()
         );
     }
+
+    #[test]
+    fn rpc_service_opts_when_no_http_and_ws_flag() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: true,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
 }
