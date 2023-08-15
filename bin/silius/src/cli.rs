@@ -51,10 +51,20 @@ pub struct RpcServiceOpts {
     #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug", "web3"])]
     pub rpc_api: Vec<String>,
 
-    #[clap(long, action = Set, default_value = "true")]
+    /// Enables or disables the HTTP RPC.
+    ///
+    /// By default, this option is set to true.
+    /// - To enable: `--http`, `--http true`, or no `http` flag.
+    /// - To disable: `--http false`.
+    #[clap(long, action = Set, num_args=0..=1, default_value = "true", default_missing_value = "true")]
     pub http: bool,
 
-    #[clap(long, action = Set, default_value = "true")]
+    /// Enables or disables the WebSocket RPC.
+    ///
+    /// By default, this option is set to true.
+    /// - To enable: `--ws`, `--ws true`, or no `ws` flag.
+    /// - To disable: `--ws false`.
+    #[clap(long, action = Set, num_args=0..=1, default_value = "true", default_missing_value = "true")]
     pub ws: bool,
 
     #[clap(long, value_delimiter = ',', default_value = "*")]
@@ -101,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn rpc_service_opts() {
+    fn rpc_service_opts_when_http_is_true_ws_is_false() {
         let args = vec![
             "rpcserviceopts",
             "--rpc-listen-address",
@@ -139,6 +149,35 @@ mod tests {
             "127.0.0.1:1234",
             "--rpc-api",
             "eth,debug,web3",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: true,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts_when_http_and_ws_flag() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--http",
+            "--ws",
             "--cors-domain",
             "127.0.0.1:4321",
         ];
