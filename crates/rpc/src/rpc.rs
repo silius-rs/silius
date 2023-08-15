@@ -16,8 +16,21 @@ pub struct JsonRpcServer {
     cors_layer: Option<CorsLayer>,
     /// The [proxy layer](ProxyJsonRpcLayer) to forward requests.
     proxy_layer: Option<ProxyJsonRpcLayer>,
+    /// Whether to start an HTTP server.
+    http: bool,
+    /// Whether to start a WS server.
+    ws: bool,
     /// The RPC methods to be exposed.
     methods: Methods,
+}
+
+enum JsonRpcProtocolType {
+    /// Both HTTP and WS.
+    Both,
+    /// Only HTTP.
+    OnlyHttp,
+    /// Only WS.
+    OnlyWs,
 }
 
 impl JsonRpcServer {
@@ -28,11 +41,13 @@ impl JsonRpcServer {
     ///
     /// # Returns
     /// * `Self` - A new [JsonRpcServer](JsonRpcServer) instance.
-    pub fn new(listen_address: String) -> Self {
+    pub fn new(listen_address: String, http: bool, ws: bool) -> Self {
         Self {
             listen_address,
             cors_layer: None,
             proxy_layer: None,
+            http,
+            ws,
             methods: Methods::new(),
         }
     }
@@ -101,11 +116,38 @@ impl JsonRpcServer {
             .option_layer(self.cors_layer.clone())
             .option_layer(self.proxy_layer.clone());
 
-        let server = ServerBuilder::new()
+        let server = self
+            .server_builder()?
             .set_middleware(service)
             .build(&self.listen_address)
             .await?;
 
         Ok(server.start(self.methods.clone())?)
+    }
+
+    /// Create a [ServerBuilder](ServerBuilder) based on the server type.
+    ///
+    /// # Returns
+    /// * `Result<ServerBuilder, Error>` - The [ServerBuilder](ServerBuilder) instance.
+    fn server_builder(&self) -> anyhow::Result<ServerBuilder> {
+        let protocol_type = self.protocol_type()?;
+        match protocol_type {
+            JsonRpcProtocolType::Both => Ok(ServerBuilder::new()),
+            JsonRpcProtocolType::OnlyHttp => Ok(ServerBuilder::new().http_only()),
+            JsonRpcProtocolType::OnlyWs => Ok(ServerBuilder::new().ws_only()),
+        }
+    }
+
+    /// Get the protocol type based on the server configuration.
+    ///
+    /// # Returns
+    /// * `Result<JsonRpcProtocolType, Error>` - The [JsonRpcProtocolType](JsonRpcProtocolType) instance.
+    fn protocol_type(&self) -> anyhow::Result<JsonRpcProtocolType> {
+        match (self.http, self.ws) {
+            (true, true) => Ok(JsonRpcProtocolType::Both),
+            (true, false) => Ok(JsonRpcProtocolType::OnlyHttp),
+            (false, true) => Ok(JsonRpcProtocolType::OnlyWs),
+            (false, false) => Err(anyhow::anyhow!("No protocol type selected")),
+        }
     }
 }
