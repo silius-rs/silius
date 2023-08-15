@@ -1,12 +1,12 @@
 mod common;
 
+use common::{
+    build_http_client, build_ws_client, test_address, DummyEthApiClient, DummyEthApiServer,
+    DummyEthApiServerImpl,
+};
 use ethers::types::U64;
 use silius_rpc::JsonRpcServer;
 use tokio;
-use common::{
-    build_http_client, build_ws_client, test_address, DummyApiClient, DummyApiServer,
-    DummyApiServerImpl,
-};
 
 #[tokio::test]
 async fn test_only_http_rpc_server() {
@@ -17,7 +17,7 @@ async fn test_only_http_rpc_server() {
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_method(DummyApiServerImpl { chain_id }.into_rpc())
+        .add_method(DummyEthApiServerImpl { chain_id }.into_rpc())
         .unwrap();
 
     let handle = server.start().await.unwrap();
@@ -25,7 +25,7 @@ async fn test_only_http_rpc_server() {
 
     // http client return success response
     let http_client = build_http_client(address.clone()).unwrap();
-    let http_response = DummyApiClient::chain_id(&http_client).await.unwrap();
+    let http_response = DummyEthApiClient::chain_id(&http_client).await.unwrap();
     assert_eq!(http_response, chain_id);
 
     // ws client cannot connect to http server
@@ -41,7 +41,7 @@ async fn test_only_ws_rpc_server() {
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_method(DummyApiServerImpl { chain_id }.into_rpc())
+        .add_method(DummyEthApiServerImpl { chain_id }.into_rpc())
         .unwrap();
 
     let handle = server.start().await.unwrap();
@@ -49,12 +49,12 @@ async fn test_only_ws_rpc_server() {
 
     // http client return error response
     let http_client = build_http_client(address.clone()).unwrap();
-    let http_response = DummyApiClient::chain_id(&http_client).await;
+    let http_response = DummyEthApiClient::chain_id(&http_client).await;
     assert!(http_response.is_err());
 
     // ws client return success response
     let ws_client = build_ws_client(address.clone()).await.unwrap();
-    let ws_response = DummyApiClient::chain_id(&ws_client).await.unwrap();
+    let ws_response = DummyEthApiClient::chain_id(&ws_client).await.unwrap();
     assert_eq!(ws_response, chain_id);
 }
 
@@ -67,7 +67,7 @@ async fn test_http_and_ws_rpc_server() {
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_method(DummyApiServerImpl { chain_id }.into_rpc())
+        .add_method(DummyEthApiServerImpl { chain_id }.into_rpc())
         .unwrap();
 
     let handle = server.start().await.unwrap();
@@ -75,11 +75,11 @@ async fn test_http_and_ws_rpc_server() {
 
     // http client return success response
     let http_client = build_http_client(address.clone()).unwrap();
-    let http_response = DummyApiClient::chain_id(&http_client).await.unwrap();
+    let http_response = DummyEthApiClient::chain_id(&http_client).await.unwrap();
     assert_eq!(http_response, chain_id);
 
     // ws client return success response
     let ws_client = build_ws_client(address.clone()).await.unwrap();
-    let ws_response = DummyApiClient::chain_id(&ws_client).await.unwrap();
+    let ws_response = DummyEthApiClient::chain_id(&ws_client).await.unwrap();
     assert_eq!(ws_response, chain_id);
 }
