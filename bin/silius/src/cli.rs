@@ -1,5 +1,5 @@
 use crate::utils::{parse_address, parse_u256, parse_uopool_mode};
-use clap::Parser;
+use clap::{ArgAction::Set, Parser};
 use ethers::types::{Address, U256};
 use silius_primitives::UoPoolMode;
 use std::net::SocketAddr;
@@ -51,6 +51,12 @@ pub struct RpcServiceOpts {
     #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug", "web3"])]
     pub rpc_api: Vec<String>,
 
+    #[clap(long, action = Set, default_value = "true")]
+    pub http: bool,
+
+    #[clap(long, action = Set, default_value = "true")]
+    pub ws: bool,
+
     #[clap(long, value_delimiter = ',', default_value = "*")]
     pub cors_domain: Vec<String>,
 }
@@ -91,6 +97,37 @@ mod tests {
                 bundle_interval: 10,
             },
             BundlerServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--http",
+            "true",
+            "--ws",
+            "false",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: false,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
         );
     }
 }
