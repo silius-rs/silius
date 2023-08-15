@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build_and_test
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
         with:
           repository: eth-infinitism/bundler-spec-tests
           ref: 'f7c993031d4bb5f0940c5282298c911ec15a5fb7'
