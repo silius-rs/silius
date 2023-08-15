@@ -14,7 +14,7 @@ AA (ERC-4337) bundler examples
 [dev-dependencies]
 
 anyhow = "1"
-ethers = { version = "2.0.4" }
+ethers = { workspace = true }
 silius-primitives = { path = "../crates/primitives" }
 tokio = { workspace = true }
 

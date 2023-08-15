@@ -175,6 +175,7 @@ async fn create_storage_factory_init_code(
 
     Ok((init_code.into(), init_func.into()))
 }
+
 async fn create_opcode_factory_init_code(init_func: String) -> anyhow::Result<(Bytes, Bytes)> {
     let c = setup().await?;
     let contract: &BaseContract = c.opcodes_factory.contract().deref().deref();
