@@ -36,11 +36,11 @@ name = "simple_account_create"
 path = "simple_account/simple_account_create.rs"
 
 [[example]]
-name = "deposit"
+name = "simple_account_deposit"
 path = "simple_account/deposit.rs"
 
 [[example]]
-name = "transfer"
+name = "simple_account_transfer"
 path = "simple_account/transfer.rs"
 
 
