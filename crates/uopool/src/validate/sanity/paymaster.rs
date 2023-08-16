@@ -4,6 +4,7 @@ use silius_primitives::{
     get_address, reputation::ReputationStatus, sanity::SanityCheckError, UserOperation,
 };
 
+#[derive(Debug)]
 pub struct Paymaster;
 
 #[async_trait::async_trait]

@@ -6,6 +6,7 @@ use silius_primitives::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Debug)]
 pub struct Timestamp;
 
 #[async_trait::async_trait]

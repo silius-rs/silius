@@ -5,6 +5,7 @@ use ethers::{
 };
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Debug)]
 pub struct MaxFee {
     pub min_priority_fee_per_gas: U256,
 }

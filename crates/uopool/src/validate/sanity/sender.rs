@@ -2,6 +2,7 @@ use crate::validate::{SanityCheck, SanityHelper};
 use ethers::providers::Middleware;
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Debug)]
 pub struct SenderOrInitCode;
 
 #[async_trait::async_trait]

@@ -3,6 +3,7 @@ use ethers::providers::Middleware;
 use silius_contracts::entry_point::SimulateValidationResult;
 use silius_primitives::{simulation::SimulationCheckError, UserOperation};
 
+#[derive(Debug)]
 pub struct Signature;
 
 #[async_trait::async_trait]

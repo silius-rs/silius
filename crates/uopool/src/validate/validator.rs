@@ -21,6 +21,7 @@ use silius_primitives::{
     UserOperation,
 };
 use std::sync::Arc;
+use tracing::info;
 
 pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static> {
     eth_client: Arc<M>,
@@ -125,6 +126,7 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
             };
 
             for sanity_check in self.sanity_checks.iter() {
+                info!("Sanity check {sanity_check:?}");
                 sanity_check
                     .check_user_operation(uo, &mut sanity_helper)
                     .await?;
@@ -132,11 +134,12 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
         }
 
         if let Some(uo) = mempool.get_prev_by_sender(uo) {
+            info!("Previous sender");
             out.prev_hash = Some(uo.hash(&self.entry_point.address(), &self.chain.id().into()));
         }
-
+        info!("Simulating validation");
         let sim_res = self.simulate_validation(uo).await?;
-
+        info!("Simulating validation res : {sim_res:?}");
         if !self.simulation_checks.is_empty()
             && mode.contains(UserOperationValidatorMode::Simulation)
         {
@@ -151,6 +154,7 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
             };
 
             for sim_check in self.simulation_checks.iter() {
+                info!("sim check {sim_check:?}");
                 sim_check.check_user_operation(uo, &mut sim_helper).await?;
             }
 

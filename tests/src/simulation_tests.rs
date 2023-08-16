@@ -45,6 +45,7 @@ use silius_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoP
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
+use tracing::info;
 
 const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 const GAS_INCREASE_PERC: u64 = 10;
@@ -289,6 +290,7 @@ async fn test_user_operation(
     init_func: Bytes,
     factory_address: Address,
 ) -> Result<UserOperationValidationOutcome, ValidationError> {
+    info!("Create test user operation");
     let uo = create_test_user_operation(
         &context,
         validate_rule,
@@ -299,6 +301,7 @@ async fn test_user_operation(
     )
     .await
     .expect("Create test user operation failed.");
+    info!("Create test user operation successfully : {uo:?}");
     validate(&context, uo).await
 }
 

@@ -61,7 +61,7 @@ pub struct SanityHelper<'a, M: Middleware + 'static> {
 }
 
 #[async_trait::async_trait]
-pub trait SanityCheck<M: Middleware>: Send + Sync {
+pub trait SanityCheck<M: Middleware>: Send + Sync + core::fmt::Debug {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
@@ -80,7 +80,7 @@ pub struct SimulationHelper<'a, M: Middleware + 'static> {
 }
 
 #[async_trait::async_trait]
-pub trait SimulationCheck<M: Middleware>: Send + Sync {
+pub trait SimulationCheck<M: Middleware>: Send + Sync + core::fmt::Debug {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,

@@ -7,6 +7,7 @@ use silius_primitives::{
     consts::entities::ACCOUNT, reputation::StakeInfo, sanity::SanityCheckError, UserOperation,
 };
 
+#[derive(Debug)]
 pub struct SenderUos {
     pub max_uos_per_unstaked_sender: usize,
     pub gas_increase_perc: U256,

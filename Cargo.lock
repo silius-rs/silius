@@ -4363,6 +4363,7 @@ dependencies = [
  "silius-uopool",
  "tempdir",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

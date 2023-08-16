@@ -5,6 +5,7 @@ use crate::{
 use ethers::{providers::Middleware, types::U256};
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Debug)]
 pub struct VerificationGas {
     pub max_verification_gas: U256,
 }

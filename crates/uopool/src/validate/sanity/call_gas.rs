@@ -6,6 +6,7 @@ use ethers::{providers::Middleware, types::BlockNumber};
 use silius_contracts::entry_point::EntryPointErr;
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Debug)]
 pub struct CallGas;
 
 #[async_trait::async_trait]
