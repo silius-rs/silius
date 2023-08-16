@@ -11,12 +11,11 @@ use super::tracer::JS_TRACER;
 use crate::gen::ExecutionResult;
 use ethers::abi::AbiDecode;
 use ethers::prelude::{ContractError, Event};
-use ethers::providers::{Middleware, ProviderError};
+use ethers::providers::{JsonRpcError, Middleware, MiddlewareError, ProviderError};
 use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
     GethTrace, TransactionRequest, U256,
 };
-use ethers_providers::{JsonRpcError, MiddlewareError};
 use std::fmt::Display;
 use std::sync::Arc;
 use thiserror::Error;

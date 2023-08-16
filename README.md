@@ -14,10 +14,10 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 ## Prerequisites
 
-Rust version: 1.70
+Rust version: 1.71.1
 
 1. libclang, `libclang-dev` on Debian/Ubuntu.
-2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode; so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
+2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.11.6](https://github.com/ethereum/go-ethereum/releases/tag/v1.11.6)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
 3. [`solc`](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
 4. [`cargo-sort`](https://crates.io/crates/cargo-sort) and [`cargo-udeps`](https://crates.io/crates/cargo-udeps).
 
@@ -92,7 +92,7 @@ make lint
 make test
 ```
 
-Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline. You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [f7c993031d4bb5f0940c5282298c911ec15a5fb7](https://github.com/eth-infinitism/bundler-spec-tests/tree/f7c993031d4bb5f0940c5282298c911ec15a5fb7)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
 
 ## Contact
 

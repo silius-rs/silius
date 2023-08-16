@@ -17,10 +17,10 @@ authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Vid201/silius"
-rust-version = "1.70"
+rust-version = "1.71.1"
 
 [workspace.dependencies]
-ethers = { version = "2.0.4" }
+ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc" }
 tracing = "0.1"
 tokio = { version = "1.18", features = ["full"] }
 
