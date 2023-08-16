@@ -79,10 +79,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build_and_test
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           repository: eth-infinitism/bundler-spec-tests
-          ref: 'f7c993031d4bb5f0940c5282298c911ec15a5fb7'
+          ref: '94a0634ebd6e6da657e863c134d20bc46724ed0f'
           submodules: true
       - uses: actions/checkout@v3
         with:
@@ -92,7 +92,7 @@ jobs:
 
       - run: pip install jq yq
 
-      - run: pdm install && pdm run update-deps
+      - run: pdm install && git submodule update --init --recursive && cd @account-abstraction && yarn && yarn compile &&  cd ../spec && yarn && yarn build
   
       - uses: actions/download-artifact@v3
         with:
