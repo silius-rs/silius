@@ -38,7 +38,7 @@ use silius_uopool::{
 };
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
-use tracing::info;
+use tracing::{info, warn};
 
 const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 const GAS_INCREASE_PERC: u64 = 10;
@@ -319,11 +319,15 @@ where
         let ep = parse_addr(req.ep)?;
         let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
 
-        uo_pool.set_reputation(req.rep.iter().map(|re| re.clone().into()).collect());
+        let res = Response::new(SetReputationResponse {
+            res: match uo_pool.set_reputation(req.rep.iter().map(|re| re.clone().into()).collect())
+            {
+                Ok(_) => SetReputationResult::SetReputation as i32,
+                Err(_) => SetReputationResult::NotSetReputation as i32,
+            },
+        });
 
-        Ok(Response::new(SetReputationResponse {
-            res: SetReputationResult::SetReputation as i32,
-        }))
+        Ok(res)
     }
 }
 
@@ -410,9 +414,13 @@ pub async fn uopool_service_run(
 
         tokio::spawn(async move {
             loop {
-                m_map
-                    .iter_mut()
-                    .for_each(|mut m| m.value_mut().reputation.update_hourly());
+                m_map.iter_mut().for_each(|mut m| {
+                    let _ = m
+                        .value_mut()
+                        .reputation
+                        .update_hourly()
+                        .map_err(|e| warn!("Failed to update hourly reputation: {:?}", e));
+                });
                 tokio::time::sleep(Duration::from_secs(60 * 60)).await;
             }
         });

@@ -88,9 +88,14 @@ pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256)
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::mempool::Mempool;
+    use crate::{mempool::Mempool, Reputation};
     use ethers::types::{Address, Bytes, H256, U256};
-    use silius_primitives::{UserOperation, UserOperationHash};
+    use silius_primitives::{
+        reputation::{
+            ReputationEntry, Status, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+        },
+        UserOperation, UserOperationHash,
+    };
     use std::fmt::Debug;
 
     #[test]
@@ -196,5 +201,94 @@ pub mod tests {
         assert_eq!(sorted[1].max_priority_fee_per_gas, U256::from(2));
         assert_eq!(sorted[2].max_priority_fee_per_gas, U256::from(1));
         assert_eq!(sorted.len(), 3);
+    }
+
+    pub fn reputation_test_case<T>(mut reputation: T)
+    where
+        T: Reputation<ReputationEntries = Vec<ReputationEntry>> + Debug,
+        T::Error: Debug + ToString,
+    {
+        reputation.init(
+            MIN_INCLUSION_RATE_DENOMINATOR,
+            THROTTLING_SLACK,
+            BAN_SLACK,
+            U256::from(1),
+            U256::from(0),
+        );
+
+        let mut addrs: Vec<Address> = vec![];
+
+        for _ in 0..5 {
+            let addr = Address::random();
+            assert_eq!(
+                reputation.get(&addr).unwrap(),
+                ReputationEntry {
+                    address: addr,
+                    uo_seen: 0,
+                    uo_included: 0,
+                    status: Status::OK.into(),
+                }
+            );
+            addrs.push(addr);
+        }
+
+        assert_eq!(reputation.add_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.add_blacklist(&addrs[1]), true);
+
+        assert_eq!(reputation.is_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.is_whitelist(&addrs[1]), false);
+        assert_eq!(reputation.is_blacklist(&addrs[1]), true);
+        assert_eq!(reputation.is_blacklist(&addrs[2]), false);
+
+        assert_eq!(reputation.remove_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.remove_whitelist(&addrs[1]), false);
+        assert_eq!(reputation.remove_blacklist(&addrs[1]), true);
+        assert_eq!(reputation.remove_blacklist(&addrs[2]), false);
+
+        assert_eq!(reputation.add_whitelist(&addrs[2]), true);
+        assert_eq!(reputation.add_blacklist(&addrs[1]), true);
+
+        assert_eq!(
+            Status::from(reputation.get_status(&addrs[2]).unwrap()),
+            Status::OK
+        );
+        assert_eq!(
+            Status::from(reputation.get_status(&addrs[1]).unwrap()),
+            Status::BANNED
+        );
+        assert_eq!(
+            Status::from(reputation.get_status(&addrs[3]).unwrap()),
+            Status::OK
+        );
+
+        assert_eq!(reputation.increment_seen(&addrs[2]).unwrap(), ());
+        assert_eq!(reputation.increment_seen(&addrs[2]).unwrap(), ());
+        assert_eq!(reputation.increment_seen(&addrs[3]).unwrap(), ());
+        assert_eq!(reputation.increment_seen(&addrs[3]).unwrap(), ());
+
+        assert_eq!(reputation.increment_included(&addrs[2]).unwrap(), ());
+        assert_eq!(reputation.increment_included(&addrs[2]).unwrap(), ());
+        assert_eq!(reputation.increment_included(&addrs[3]).unwrap(), ());
+
+        assert_eq!(
+            reputation.update_handle_ops_reverted(&addrs[3]).unwrap(),
+            ()
+        );
+
+        for _ in 0..250 {
+            assert_eq!(reputation.increment_seen(&addrs[3]).unwrap(), ());
+        }
+        assert_eq!(
+            Status::from(reputation.get_status(&addrs[3]).unwrap()),
+            Status::THROTTLED
+        );
+
+        for _ in 0..500 {
+            assert_eq!(reputation.increment_seen(&addrs[3]).unwrap(), ());
+        }
+        assert_eq!(
+            Status::from(reputation.get_status(&addrs[3]).unwrap()),
+            Status::BANNED
+        );
     }
 }

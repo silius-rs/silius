@@ -21,6 +21,7 @@ pub trait Mempool: Debug {
     type UserOperations: IntoIterator<Item = UserOperation>;
     type CodeHashes: IntoIterator<Item = CodeHash>;
     type Error;
+
     fn add(
         &mut self,
         uo: UserOperation,

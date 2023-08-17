@@ -1,8 +1,6 @@
 use crate::validate::{SanityCheck, SanityHelper};
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{
-    get_address, reputation::ReputationStatus, sanity::SanityCheckError, UserOperation,
-};
+use silius_primitives::{get_address, reputation::Status, sanity::SanityCheckError, UserOperation};
 
 pub struct Paymaster;
 
@@ -24,12 +22,16 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
                             .get_deposit_info(&addr)
                             .await
                             .map_err(|_| SanityCheckError::UnknownError {
-                                message: "Couldn't retrieve deposit info from entry point"
-                                    .to_string(),
+                                message: "Couldn't retrieve deposit info from entry point".into(),
                             })?;
 
                     if U256::from(deposit_info.deposit) >= uo.max_fee_per_gas
-                        && helper.reputation.get_status(&addr) != ReputationStatus::BANNED
+                        && Status::from(helper.reputation.get_status(&addr).map_err(|_| {
+                            SanityCheckError::UnknownError {
+                                message: "Failed to retrieve reputation status for paymaster"
+                                    .into(),
+                            }
+                        })?) != Status::BANNED
                     {
                         return Ok(());
                     }

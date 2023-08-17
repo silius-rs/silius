@@ -5,7 +5,9 @@ use ethers::{
 };
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use serde::{Deserialize, Serialize};
-use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
+use silius_primitives::{
+    reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
+};
 
 macro_rules! construct_wrap_hash {
     ($type:ty, $name:ident, $n_bytes:expr ) => {
@@ -100,3 +102,4 @@ construct_wrap_hash!(UserOperationHash, WrapUserOperationHash, 32);
 
 construct_wrap_struct!(CodeHash, WrapCodeHash);
 construct_wrap_struct!(UserOperation, WrapUserOperation);
+construct_wrap_struct!(ReputationEntry, WrapReputationEntry);

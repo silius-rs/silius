@@ -1,6 +1,11 @@
 use educe::Educe;
-use ethers::types::{Address, U256};
+use ethers::{
+    prelude::{EthAbiCodec, EthAbiType},
+    types::{Address, U256},
+};
 use serde::{Deserialize, Serialize};
+
+pub type ReputationStatus = u8;
 
 pub const MIN_INCLUSION_RATE_DENOMINATOR: u64 = 10;
 pub const THROTTLING_SLACK: u64 = 10;
@@ -10,16 +15,50 @@ pub const BAN_SLACK: u64 = 50;
 pub const THROTTLED_MAX_INCLUDE: u64 = 1;
 
 /// All possible reputation statuses
-#[derive(Clone, Copy, Educe, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, Educe, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 #[educe(Debug)]
-pub enum ReputationStatus {
+pub enum Status {
+    #[default]
     OK,
     THROTTLED,
     BANNED,
 }
 
+impl From<Status> for ReputationStatus {
+    fn from(status: Status) -> Self {
+        match status {
+            Status::OK => 0,
+            Status::THROTTLED => 1,
+            Status::BANNED => 2,
+        }
+    }
+}
+
+impl From<ReputationStatus> for Status {
+    fn from(status: ReputationStatus) -> Self {
+        match status {
+            0 => Status::OK,
+            1 => Status::THROTTLED,
+            2 => Status::BANNED,
+            _ => Status::OK,
+        }
+    }
+}
+
 /// Reputation entry for entities
-#[derive(Clone, Copy, Educe, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Default,
+    Clone,
+    Educe,
+    Eq,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    EthAbiCodec,
+    EthAbiType,
+)]
 #[educe(Debug)]
 pub struct ReputationEntry {
     pub address: Address,
