@@ -123,13 +123,13 @@ async fn setup(
                 max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
                 gas_increase_perc: GAS_INCREASE_PERC.into(),
             })
-            .with_simulation_check(Signature {})
-            .with_simulation_check(Timestamp {})
-            .with_simulation_trace_check(Gas {})
-            .with_simulation_trace_check(Opcodes {})
-            .with_simulation_trace_check(StorageAccess {})
-            .with_simulation_trace_check(CallStack {})
-            .with_simulation_trace_check(CodeHashes {});
+            .with_simulation_check(Signature)
+            .with_simulation_check(Timestamp)
+            .with_simulation_trace_check(Gas)
+            .with_simulation_trace_check(Opcodes)
+            .with_simulation_trace_check(StorageAccess)
+            .with_simulation_trace_check(CallStack)
+            .with_simulation_trace_check(CodeHashes);
 
     let pool = UoPool::<ClientType, StandardUserOperationValidator<Provider<Http>>>::new(
         entry_point,
@@ -375,7 +375,7 @@ async fn fail_with_bad_opcode_in_ctr() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
+        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
     ));
 
     Ok(())
@@ -399,7 +399,7 @@ async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
+        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
     ));
 
     Ok(())
@@ -423,7 +423,7 @@ async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==ACCOUNT && opcode == "BLOCKHASH"
+        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==ACCOUNT && opcode == "BLOCKHASH"
     ));
 
     Ok(())
@@ -447,7 +447,7 @@ async fn fail_if_create_too_many() -> anyhow::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(ValidationError::Simulation(SimulationCheckError::ForbiddenOpcode { entity, opcode })) if entity==ACCOUNT && opcode == "CREATE2"
+        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==ACCOUNT && opcode == "CREATE2"
     ));
 
     Ok(())
