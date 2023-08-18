@@ -28,8 +28,8 @@ use silius_uopool::{
         },
         simulation::{signature::Signature, timestamp::Timestamp},
         simulation_trace::{
-            call_stack::CallStack, code_hashes::CodeHashes, gas::Gas, opcodes::Opcodes,
-            storage_access::StorageAccess,
+            call_stack::CallStack, code_hashes::CodeHashes, external_contracts::ExternalContracts,
+            gas::Gas, opcodes::Opcodes, storage_access::StorageAccess,
         },
         validator::StandardUserOperationValidator,
         UserOperationValidator,
@@ -391,6 +391,7 @@ pub async fn uopool_service_run(
                 validator = validator
                     .with_simulation_trace_check(Gas)
                     .with_simulation_trace_check(Opcodes)
+                    .with_simulation_trace_check(ExternalContracts)
                     .with_simulation_trace_check(StorageAccess)
                     .with_simulation_trace_check(CallStack)
                     .with_simulation_trace_check(CodeHashes);

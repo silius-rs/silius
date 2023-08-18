@@ -65,7 +65,7 @@ impl CallStack {
                                 method: m,
                                 ret: call.data.clone(),
                                 rev: None,
-                                value: None,
+                                value: top.value,
                             });
                         }
                     }
@@ -93,26 +93,31 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
         let mut calls: Vec<CallEntry> = vec![];
         self.parse_call_stack(helper.js_trace, &mut calls)?;
 
-        let call = calls.iter().find(|call| {
-            call.to.unwrap_or_default() == helper.entry_point.address()
+        for call in calls.iter() {
+            if call.to.unwrap_or_default() == helper.entry_point.address()
                 && call.from.unwrap_or_default() != helper.entry_point.address()
                 && (call.method.is_some()
                     && call.method.clone().unwrap_or_default() != *"depositTo")
-        });
-        if call.is_some() {
-            return Err(SimulationCheckError::CallStack {
-                message: format!("Illegal call into entry point during validation {call:?}"),
-            });
-        }
-
-        for (i, stake_info) in helper.stake_info.unwrap_or_default().iter().enumerate() {
-            if LEVEL_TO_ENTITY[i] == PAYMASTER {
-                let call = calls.iter().find(|call| {
-                    call.method == Some(PAYMASTER_VALIDATION_FUNCTION.clone())
-                        && call.to == Some(stake_info.address)
+            {
+                return Err(SimulationCheckError::CallStack {
+                    message: format!("Illegal call into entry point during validation {call:?}"),
                 });
+            }
 
-                if let Some(call) = call {
+            if call.to.unwrap_or_default() != helper.entry_point.address()
+                && !call.value.unwrap_or_default().is_zero()
+            {
+                return Err(SimulationCheckError::CallStack {
+                    message: format!("Illegal call {call:?}"),
+                });
+            }
+
+            // paymaster
+            for (i, stake_info) in helper.stake_info.unwrap_or_default().iter().enumerate() {
+                if LEVEL_TO_ENTITY[i] == PAYMASTER
+                    && call.method == Some(PAYMASTER_VALIDATION_FUNCTION.clone())
+                    && call.to == Some(stake_info.address)
+                {
                     if let Some(ret) = call.ret.as_ref() {
                         let validate_paymaster_return: ValidatePaymasterUserOpReturn =
                             AbiDecode::decode(ret).map_err(|_| {

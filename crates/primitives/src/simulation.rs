@@ -11,6 +11,11 @@ use std::collections::{HashMap, HashSet};
 pub const EXPIRATION_TIMESTAMP_DIFF: u64 = 30;
 
 lazy_static! {
+    pub static ref CREATE2_OPCODE: String = "CREATE2".to_string();
+    pub static ref RETURN_OPCODE: String = "RETURN".to_string();
+    pub static ref REVERT_OPCODE: String = "REVERT".to_string();
+    pub static ref CREATE_OPCODE: String = "CREATE".to_string();
+    pub static ref PAYMASTER_VALIDATION_FUNCTION: String = "validatePaymasterUserOp".to_string();
     pub static ref FORBIDDEN_OPCODES: HashSet<String> = {
         let mut set = HashSet::new();
         set.insert("GASPRICE".to_string());
@@ -31,11 +36,6 @@ lazy_static! {
         set.insert("PREVRANDAO".to_string());
         set
     };
-    pub static ref CREATE2_OPCODE: String = "CREATE2".to_string();
-    pub static ref RETURN_OPCODE: String = "RETURN".to_string();
-    pub static ref REVERT_OPCODE: String = "REVERT".to_string();
-    pub static ref CREATE_OPCODE: String = "CREATE".to_string();
-    pub static ref PAYMASTER_VALIDATION_FUNCTION: String = "validatePaymasterUserOp".to_string();
 }
 
 /// Error object for simulation
@@ -50,7 +50,7 @@ pub enum SimulationCheckError {
     Validation {
         message: String,
     },
-    ForbiddenOpcode {
+    Opcode {
         entity: String,
         opcode: String,
     },

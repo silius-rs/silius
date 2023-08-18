@@ -19,7 +19,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
             if let Some(l) = helper.js_trace.number_levels.get(i) {
                 for op in l.opcodes.keys() {
                     if FORBIDDEN_OPCODES.contains(op) {
-                        return Err(SimulationCheckError::ForbiddenOpcode {
+                        return Err(SimulationCheckError::Opcode {
                             entity: LEVEL_TO_ENTITY[i].to_string(),
                             opcode: op.clone(),
                         });
@@ -32,7 +32,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
                     if LEVEL_TO_ENTITY[i] == FACTORY && *c == 1 {
                         continue;
                     }
-                    return Err(SimulationCheckError::ForbiddenOpcode {
+                    return Err(SimulationCheckError::Opcode {
                         entity: LEVEL_TO_ENTITY[i].to_string(),
                         opcode: CREATE2_OPCODE.to_string(),
                     });

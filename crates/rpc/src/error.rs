@@ -172,7 +172,7 @@ impl From<SimulationCheckError> for JsonRpcError {
             SimulationCheckError::Validation { message } => {
                 ErrorObject::owned(VALIDATION, message, None::<bool>)
             }
-            SimulationCheckError::ForbiddenOpcode { entity, opcode } => ErrorObject::owned(
+            SimulationCheckError::Opcode { entity, opcode } => ErrorObject::owned(
                 OPCODE,
                 format!("{entity} uses banned opcode: {opcode}"),
                 None::<bool>,

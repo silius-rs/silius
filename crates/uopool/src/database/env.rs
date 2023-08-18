@@ -1,3 +1,4 @@
+use super::tables::TABLES;
 use reth_db::{
     database::{Database, DatabaseGAT},
     mdbx::{
@@ -8,8 +9,6 @@ use reth_db::{
     Error, TableType,
 };
 use std::{fmt::Display, path::PathBuf};
-
-use super::tables::TABLES;
 
 // Code adapted from: https://github.com/paradigmxyz/reth/blob/main/crates/storage/db/src/implementation/mdbx/mod.rs
 #[derive(Debug)]

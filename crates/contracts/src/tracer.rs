@@ -30,7 +30,7 @@ pub struct Level {
     pub access: HashMap<Address, ReadsAndWrites>,
     pub opcodes: HashMap<String, u64>,
     #[serde(rename = "contractSize")]
-    pub contract_size: HashMap<Address, u64>,
+    pub contract_size: HashMap<Address, ContractSizeInfo>,
     pub oog: Option<bool>,
 }
 
@@ -38,6 +38,13 @@ pub struct Level {
 pub struct ReadsAndWrites {
     pub reads: HashMap<String, u64>,
     pub writes: HashMap<String, u64>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ContractSizeInfo {
+    pub opcode: String,
+    #[serde(rename = "contractSize")]
+    pub contract_size: u64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -167,8 +174,12 @@ pub const JS_TRACER: &str = r#"
             const idx = opcode.startsWith('EXT') ? 0 : 1;
             const addr = toAddress(log.stack.peek(idx).toString(16));
             const addrHex = toHex(addr);
-            if (this.currentLevel.contractSize[addrHex] == null) {
-                this.currentLevel.contractSize[addrHex] = db.getCode(addr).length;
+            // this.debug.push('op=' + opcode + ' last=' + this.lastOp + ' stacksize=' + log.stack.length() + ' addr=' + addrHex)
+            if (this.currentLevel.contractSize[addrHex] == null && !isPrecompiled(addr)) {
+                this.currentLevel.contractSize[addrHex] = {
+                    contractSize: db.getCode(addr).length,
+                    opcode
+                }
             }
         }
         this.lastOp = opcode;
