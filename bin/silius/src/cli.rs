@@ -53,7 +53,7 @@ pub struct RpcServiceOpts {
 
     /// Enables or disables the HTTP RPC.
     ///
-    /// By default, this option is set to true.
+    /// By default, this option is set to false.
     /// - To enable: `--http`.
     /// - To disable: no `--http` flag.
     #[clap(long)]
@@ -61,7 +61,7 @@ pub struct RpcServiceOpts {
 
     /// Enables or disables the WebSocket RPC.
     ///
-    /// By default, this option is set to true.
+    /// By default, this option is set to false.
     /// - To enable: `--ws`
     /// - To disable: no `--ws` flag.
     #[clap(long)]
