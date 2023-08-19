@@ -62,15 +62,16 @@ impl Bundler {
             .clone()
             .get_balance(self.wallet.signer.address(), None)
             .await?;
+        let beneficiary = if balance < self.min_balance {
+            self.wallet.signer.address()
+        } else {
+            self.beneficiary
+        };
 
         let mut tx: TypedTransaction = ep
             .handle_ops(
                 uos.clone().into_iter().map(Into::into).collect(),
-                if balance < self.min_balance {
-                    self.wallet.signer.address()
-                } else {
-                    self.beneficiary
-                },
+                beneficiary,
             )
             .tx
             .clone();
@@ -86,6 +87,13 @@ impl Bundler {
 
         let tx_receipt = tx.await?;
 
+        info!(
+            "Bundle successfully sent, tx hash: {:?}, account: {:?}, entry point: {:?}, beneficiary: {:?}",
+            tx_hash,
+            self.wallet.signer.address(),
+            self.entry_point,
+            beneficiary
+        );
         trace!("Transaction receipt: {tx_receipt:?}");
 
         Ok(tx_hash)
