@@ -1,5 +1,5 @@
 use crate::utils::{parse_address, parse_u256, parse_uopool_mode};
-use clap::{ArgAction::Set, Parser};
+use clap::Parser;
 use ethers::types::{Address, U256};
 use silius_primitives::UoPoolMode;
 use std::net::SocketAddr;
@@ -54,17 +54,17 @@ pub struct RpcServiceOpts {
     /// Enables or disables the HTTP RPC.
     ///
     /// By default, this option is set to true.
-    /// - To enable: `--http`, `--http true`, or no `http` flag.
-    /// - To disable: `--http false`.
-    #[clap(long, action = Set, num_args=0..=1, default_value = "true", default_missing_value = "true")]
+    /// - To enable: `--http`.
+    /// - To disable: no `--http` flag.
+    #[clap(long)]
     pub http: bool,
 
     /// Enables or disables the WebSocket RPC.
     ///
     /// By default, this option is set to true.
-    /// - To enable: `--ws`, `--ws true`, or no `ws` flag.
-    /// - To disable: `--ws false`.
-    #[clap(long, action = Set, num_args=0..=1, default_value = "true", default_missing_value = "true")]
+    /// - To enable: `--ws`
+    /// - To disable: no `--ws` flag.
+    #[clap(long)]
     pub ws: bool,
 
     #[clap(long, value_delimiter = ',', default_value = "*")]
@@ -119,9 +119,6 @@ mod tests {
             "--rpc-api",
             "eth,debug,web3",
             "--http",
-            "true",
-            "--ws",
-            "false",
             "--cors-domain",
             "127.0.0.1:4321",
         ];
@@ -135,6 +132,34 @@ mod tests {
                 ],
                 http: true,
                 ws: false,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts_when_http_is_false_ws_is_true() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--ws",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: false,
+                ws: true,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
             },
             RpcServiceOpts::try_parse_from(args).unwrap()
@@ -160,8 +185,8 @@ mod tests {
                     String::from("debug"),
                     String::from("web3")
                 ],
-                http: true,
-                ws: true,
+                http: false,
+                ws: false,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
             },
             RpcServiceOpts::try_parse_from(args).unwrap()
