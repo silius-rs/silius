@@ -35,15 +35,23 @@ pub struct Opt {
 async fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
 
+    if !opt.rpc_opts.is_enabled() {
+        return Err(anyhow::anyhow!("No RPC protocol is enabled"));
+    }
+
     tracing_subscriber::fmt::init();
 
     info!("Starting bundler JSON-RPC server...");
 
     let api: HashSet<String> = HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
 
-    let mut server = JsonRpcServer::new(opt.rpc_opts.rpc_listen_address.clone())
-        .with_proxy(opt.eth_client_address)
-        .with_cors(opt.rpc_opts.cors_domain);
+    let mut server = JsonRpcServer::new(
+        opt.rpc_opts.rpc_listen_address.clone(),
+        opt.rpc_opts.http,
+        opt.rpc_opts.ws,
+    )
+    .with_proxy(opt.eth_client_address)
+    .with_cors(opt.rpc_opts.cors_domain);
 
     if api.contains("web3") {
         server.add_method(Web3ApiServerImpl {}.into_rpc())?;
@@ -75,8 +83,8 @@ async fn main() -> Result<()> {
 
     let _handle = server.start().await?;
     info!(
-        "Started bundler JSON-RPC server at {:}",
-        opt.rpc_opts.rpc_listen_address
+        "Started bundler JSON-RPC server at {:} with http: {:?} ws: {:?}",
+        opt.rpc_opts.rpc_listen_address, opt.rpc_opts.http, opt.rpc_opts.ws
     );
 
     pending::<Result<()>>().await

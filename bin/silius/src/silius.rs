@@ -41,9 +41,6 @@ pub struct Opt {
     #[clap(long, default_value="3000000", value_parser=parse_u256)]
     pub max_verification_gas: U256,
 
-    #[clap(long)]
-    pub no_rpc: bool,
-
     #[clap(flatten)]
     pub rpc_opts: RpcServiceOpts,
 
@@ -146,14 +143,16 @@ fn main() -> Result<()> {
                     opt.bundler_opts.bundler_grpc_listen_address
                 );
 
-                if !opt.no_rpc {
+                if opt.rpc_opts.is_enabled() {
+
                     info!("Starting bundler JSON-RPC server...");
                     tokio::spawn({
                         async move {
                             let api: HashSet<String> =
                                 HashSet::from_iter(opt.rpc_opts.rpc_api.iter().cloned());
 
-                            let mut server = JsonRpcServer::new(opt.rpc_opts.rpc_listen_address.clone()).with_proxy(opt.eth_client_address)
+                            let mut server = JsonRpcServer::new(opt.rpc_opts.rpc_listen_address.clone(), opt.rpc_opts.http, opt.rpc_opts.ws)
+                            .with_proxy(opt.eth_client_address)
                             .with_cors(opt.rpc_opts.cors_domain);
 
                             if api.contains("web3") {
@@ -186,8 +185,10 @@ fn main() -> Result<()> {
 
                             let _handle = server.start().await?;
                             info!(
-                                "Started bundler JSON-RPC server at {:}",
-                                opt.rpc_opts.rpc_listen_address
+                                "Started bundler JSON-RPC server at {:} with http: {:?} ws: {:?}",
+                                opt.rpc_opts.rpc_listen_address,
+                                opt.rpc_opts.http,
+                                opt.rpc_opts.ws
                             );
 
                             pending::<Result<()>>().await

@@ -34,10 +34,10 @@ Create wallet for bundler:
 cargo run --release --bin create-wallet -- --output-path ${HOME}/.silius --chain-id 5
 ```
 
-Run bundler (with user operation pool and JSON-RPC API): 
+Run bundler (with user operation pool and JSON-RPC API):
 
 ```bash
-cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --http --ws
 ```
 
 Run only user operation pool:
@@ -46,10 +46,10 @@ Run only user operation pool:
 cargo run --release --bin silius-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
 ```
 
-Run only JSON-RPC API: 
+Run only JSON-RPC API:
 
 ```bash
-cargo run --release --bin silius-rpc
+cargo run --release --bin silius-rpc --http --ws
 ```
 
 ## Supported networks

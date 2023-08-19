@@ -51,8 +51,34 @@ pub struct RpcServiceOpts {
     #[clap(long, value_delimiter=',', default_value = "eth", value_parser = ["eth", "debug", "web3"])]
     pub rpc_api: Vec<String>,
 
+    /// Enables or disables the HTTP RPC.
+    ///
+    /// By default, this option is set to false.
+    /// - To enable: `--http`.
+    /// - To disable: no `--http` flag.
+    #[clap(long)]
+    pub http: bool,
+
+    /// Enables or disables the WebSocket RPC.
+    ///
+    /// By default, this option is set to false.
+    /// - To enable: `--ws`
+    /// - To disable: no `--ws` flag.
+    #[clap(long)]
+    pub ws: bool,
+
     #[clap(long, value_delimiter = ',', default_value = "*")]
     pub cors_domain: Vec<String>,
+}
+
+impl RpcServiceOpts {
+    /// Checks if either HTTP or WebSocket RPC is enabled.
+    ///
+    /// # Returns
+    /// * `bool` - Returns `true` if either HTTP or WebSocket RPC is enabled, otherwise `false`.
+    pub fn is_enabled(&self) -> bool {
+        self.http || self.ws
+    }
 }
 
 #[cfg(test)]
@@ -91,6 +117,194 @@ mod tests {
                 bundle_interval: 10,
             },
             BundlerServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts_when_http_and_ws_flag() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--http",
+            "--ws",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: true,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts_when_http_is_true_ws_is_false() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--http",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: false,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts_when_http_is_false_ws_is_true() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--ws",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: false,
+                ws: true,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn rpc_service_opts_when_no_http_and_ws_flag() {
+        let args = vec![
+            "rpcserviceopts",
+            "--rpc-listen-address",
+            "127.0.0.1:1234",
+            "--rpc-api",
+            "eth,debug,web3",
+            "--cors-domain",
+            "127.0.0.1:4321",
+        ];
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: false,
+                ws: false,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            },
+            RpcServiceOpts::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn is_enabled_return_true_when_only_http() {
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: false,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            }
+            .is_enabled(),
+            true
+        );
+    }
+
+    #[test]
+    fn is_enabled_return_true_when_only_ws() {
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: false,
+                ws: true,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            }
+            .is_enabled(),
+            true
+        );
+    }
+
+    #[test]
+    fn is_enabled_return_true_when_http_and_ws_are_true() {
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: true,
+                ws: true,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            }
+            .is_enabled(),
+            true
+        );
+    }
+
+    #[test]
+    fn is_enabled_return_false_when_http_and_ws_are_false() {
+        assert_eq!(
+            RpcServiceOpts {
+                rpc_listen_address: String::from("127.0.0.1:1234"),
+                rpc_api: vec![
+                    String::from("eth"),
+                    String::from("debug"),
+                    String::from("web3")
+                ],
+                http: false,
+                ws: false,
+                cors_domain: vec![String::from("127.0.0.1:4321")],
+            }
+            .is_enabled(),
+            false
         );
     }
 }
