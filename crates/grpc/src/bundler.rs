@@ -197,8 +197,7 @@ pub fn bundler_service_run(
     eth_client_address: String,
     chain: Chain,
     beneficiary: Address,
-    _gas_factor: U256,
-    _min_balance: U256,
+    min_balance: U256,
     bundle_interval: u64,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 ) {
@@ -211,6 +210,7 @@ pub fn bundler_service_run(
                 beneficiary,
                 *ep,
                 chain,
+                min_balance,
             )
         })
         .collect();

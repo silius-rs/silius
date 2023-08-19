@@ -136,7 +136,6 @@ fn main() -> Result<()> {
                     opt.eth_client_address.clone(),
                     chain,
                     opt.bundler_opts.beneficiary,
-                    opt.bundler_opts.gas_factor,
                     opt.bundler_opts.min_balance,
                     opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),

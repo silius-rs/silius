@@ -30,10 +30,7 @@ pub struct BundlerServiceOpts {
     #[clap(long, value_parser=parse_address)]
     pub beneficiary: Address,
 
-    #[clap(long, default_value = "600", value_parser=parse_u256)]
-    pub gas_factor: U256,
-
-    #[clap(long, default_value = "1", value_parser=parse_u256)]
+    #[clap(long, default_value = "100000000000000000", value_parser=parse_u256)]
     pub min_balance: U256,
 
     #[clap(long, default_value = "127.0.0.1:3002")]
@@ -69,10 +66,8 @@ mod tests {
             "bundleropts",
             "--beneficiary",
             "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
-            "--gas-factor",
-            "600",
             "--min-balance",
-            "1",
+            "100000000000000000",
             "--bundler-grpc-listen-address",
             "127.0.0.1:3002",
             "--bundle-interval",
@@ -82,8 +77,7 @@ mod tests {
             BundlerServiceOpts {
                 beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
                     .unwrap(),
-                gas_factor: U256::from(600),
-                min_balance: U256::from(1),
+                min_balance: U256::from(100000000000000000_u64),
                 bundler_grpc_listen_address: SocketAddr::new(
                     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                     3002
