@@ -28,9 +28,9 @@ enum JsonRpcProtocolType {
     /// Both HTTP and WS.
     Both,
     /// Only HTTP.
-    OnlyHttp,
+    Http,
     /// Only WS.
-    OnlyWs,
+    Ws,
 }
 
 impl JsonRpcServer {
@@ -133,8 +133,8 @@ impl JsonRpcServer {
         let protocol_type = self.protocol_type()?;
         match protocol_type {
             JsonRpcProtocolType::Both => Ok(ServerBuilder::new()),
-            JsonRpcProtocolType::OnlyHttp => Ok(ServerBuilder::new().http_only()),
-            JsonRpcProtocolType::OnlyWs => Ok(ServerBuilder::new().ws_only()),
+            JsonRpcProtocolType::Http => Ok(ServerBuilder::new().http_only()),
+            JsonRpcProtocolType::Ws => Ok(ServerBuilder::new().ws_only()),
         }
     }
 
@@ -145,8 +145,8 @@ impl JsonRpcServer {
     fn protocol_type(&self) -> anyhow::Result<JsonRpcProtocolType> {
         match (self.http, self.ws) {
             (true, true) => Ok(JsonRpcProtocolType::Both),
-            (true, false) => Ok(JsonRpcProtocolType::OnlyHttp),
-            (false, true) => Ok(JsonRpcProtocolType::OnlyWs),
+            (true, false) => Ok(JsonRpcProtocolType::Http),
+            (false, true) => Ok(JsonRpcProtocolType::Ws),
             (false, false) => Err(anyhow::anyhow!("No protocol type selected")),
         }
     }
