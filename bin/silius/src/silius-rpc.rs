@@ -35,6 +35,10 @@ pub struct Opt {
 async fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
 
+    if !opt.rpc_opts.is_enabled() {
+        return Err(anyhow::anyhow!("No RPC protocol is enabled"));
+    }
+
     tracing_subscriber::fmt::init();
 
     info!("Starting bundler JSON-RPC server...");

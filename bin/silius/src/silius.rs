@@ -41,9 +41,6 @@ pub struct Opt {
     #[clap(long, default_value="3000000", value_parser=parse_u256)]
     pub max_verification_gas: U256,
 
-    #[clap(long)]
-    pub no_rpc: bool,
-
     #[clap(flatten)]
     pub rpc_opts: RpcServiceOpts,
 
@@ -146,7 +143,8 @@ fn main() -> Result<()> {
                     opt.bundler_opts.bundler_grpc_listen_address
                 );
 
-                if !opt.no_rpc {
+                if opt.rpc_opts.is_enabled() {
+
                     info!("Starting bundler JSON-RPC server...");
                     tokio::spawn({
                         async move {
