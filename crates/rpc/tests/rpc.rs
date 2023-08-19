@@ -9,7 +9,7 @@ use silius_rpc::JsonRpcServer;
 use tokio;
 
 #[tokio::test]
-async fn test_only_http_rpc_server() {
+async fn only_http_rpc_server() {
     let address = test_address();
     let http_enabled = true;
     let ws_disabled = false;
@@ -33,7 +33,7 @@ async fn test_only_http_rpc_server() {
 }
 
 #[tokio::test]
-async fn test_only_ws_rpc_server() {
+async fn only_ws_rpc_server() {
     let address = test_address();
     let http_disabled = false;
     let ws_enabled = true;
@@ -59,7 +59,7 @@ async fn test_only_ws_rpc_server() {
 }
 
 #[tokio::test]
-async fn test_http_and_ws_rpc_server() {
+async fn http_and_ws_rpc_server() {
     let address = test_address();
     let http_enabled = true;
     let ws_enabled = true;
