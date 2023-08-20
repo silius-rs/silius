@@ -32,7 +32,7 @@ impl Reputation for MemoryReputation {
     type ReputationEntries = Vec<ReputationEntry>;
     type Error = anyhow::Error;
 
-    /// Initialize an instance of the [MemoryReputation](MemoryReputation) 
+    /// Initialize an instance of the [MemoryReputation](MemoryReputation)
     fn init(
         &mut self,
         min_inclusion_denominator: u64,
