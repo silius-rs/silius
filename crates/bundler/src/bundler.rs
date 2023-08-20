@@ -2,7 +2,7 @@ use ethers::{
     prelude::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::Signer,
-    types::{transaction::eip2718::TypedTransaction, Address, H256},
+    types::{transaction::eip2718::TypedTransaction, Address, H256, U256},
 };
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{Chain, UserOperation, Wallet};
@@ -16,6 +16,7 @@ pub struct Bundler {
     pub beneficiary: Address,
     pub entry_point: Address,
     pub chain: Chain,
+    pub min_balance: U256,
 }
 
 impl Bundler {
@@ -25,6 +26,7 @@ impl Bundler {
         beneficiary: Address,
         entry_point: Address,
         chain: Chain,
+        min_balance: U256,
     ) -> Self {
         Self {
             wallet,
@@ -32,6 +34,7 @@ impl Bundler {
             beneficiary,
             entry_point,
             chain,
+            min_balance,
         }
     }
 
@@ -55,10 +58,20 @@ impl Bundler {
             .clone()
             .get_transaction_count(self.wallet.signer.address(), None)
             .await?;
+        let balance = client
+            .clone()
+            .get_balance(self.wallet.signer.address(), None)
+            .await?;
+        let beneficiary = if balance < self.min_balance {
+            self.wallet.signer.address()
+        } else {
+            self.beneficiary
+        };
+
         let mut tx: TypedTransaction = ep
             .handle_ops(
                 uos.clone().into_iter().map(Into::into).collect(),
-                self.beneficiary,
+                beneficiary,
             )
             .tx
             .clone();
@@ -74,6 +87,13 @@ impl Bundler {
 
         let tx_receipt = tx.await?;
 
+        info!(
+            "Bundle successfully sent, tx hash: {:?}, account: {:?}, entry point: {:?}, beneficiary: {:?}",
+            tx_hash,
+            self.wallet.signer.address(),
+            self.entry_point,
+            beneficiary
+        );
         trace!("Transaction receipt: {tx_receipt:?}");
 
         Ok(tx_hash)

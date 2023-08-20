@@ -87,6 +87,7 @@ impl<M: MiddlewareError> From<M> for SimulationCheckError {
     }
 }
 
+/// Code hash - hash of the code of the contract
 #[derive(
     Debug,
     Default,
@@ -105,4 +106,5 @@ pub struct CodeHash {
     pub hash: H256,
 }
 
+/// Storage map
 pub type StorageMap = HashMap<Address, HashMap<String, u64>>;
