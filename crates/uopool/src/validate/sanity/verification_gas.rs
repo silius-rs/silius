@@ -22,7 +22,7 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _helper: &mut SanityHelper<M>,
+        _helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
         if uo.verification_gas_limit > self.max_verification_gas {
             return Err(SanityCheckError::HighVerificationGasLimit {

@@ -33,7 +33,7 @@ pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static> {
     /// An array of [SanityChecks](SanityCheck).
     sanity_checks: Vec<Box<dyn SanityCheck<M>>>,
     /// An array of [SimulationCheck](SimulationCheck).
-    simulation_checks: Vec<Box<dyn SimulationCheck<M>>>,
+    simulation_checks: Vec<Box<dyn SimulationCheck>>,
     /// An array of [SimulationTraceChecks](SimulationTraceCheck).
     simulation_trace_checks: Vec<Box<dyn SimulationTraceCheck<M>>>,
 }
@@ -132,7 +132,7 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
     /// A reference to [self](StandardUserOperationValidator).
     pub fn with_simulation_check(
         mut self,
-        simulation_check: impl SimulationCheck<M> + 'static,
+        simulation_check: impl SimulationCheck + 'static,
     ) -> Self {
         self.simulation_checks.push(Box::new(simulation_check));
         self
@@ -171,7 +171,7 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
         let mut out: UserOperationValidationOutcome = Default::default();
 
         if !self.sanity_checks.is_empty() && mode.contains(UserOperationValidatorMode::Sanity) {
-            let mut sanity_helper = SanityHelper {
+            let sanity_helper = SanityHelper {
                 mempool,
                 reputation,
                 eth_client: self.eth_client.clone(),
@@ -181,7 +181,7 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
 
             for sanity_check in self.sanity_checks.iter() {
                 sanity_check
-                    .check_user_operation(uo, &mut sanity_helper)
+                    .check_user_operation(uo, &sanity_helper)
                     .await?;
             }
         }
@@ -196,17 +196,12 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
             && mode.contains(UserOperationValidatorMode::Simulation)
         {
             let mut sim_helper = SimulationHelper {
-                mempool,
-                reputation,
-                eth_client: self.eth_client.clone(),
-                entry_point: self.entry_point.clone(),
-                chain: self.chain,
                 simulate_validation_result: &sim_res,
                 valid_after: None,
             };
 
             for sim_check in self.simulation_checks.iter() {
-                sim_check.check_user_operation(uo, &mut sim_helper).await?;
+                sim_check.check_user_operation(uo, &mut sim_helper)?;
             }
 
             out.valid_after = sim_helper.valid_after;

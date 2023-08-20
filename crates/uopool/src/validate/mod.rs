@@ -72,27 +72,21 @@ pub trait SanityCheck<M: Middleware>: Send + Sync {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError>;
 }
 
 /// The [UserOperation](UserOperation) simulation check helper trait.
-pub struct SimulationHelper<'a, M: Middleware + 'static> {
-    mempool: &'a MempoolBox<VecUo, VecCh>,
-    reputation: &'a ReputationBox<Vec<ReputationEntry>>,
-    eth_client: Arc<M>,
-    entry_point: EntryPoint<M>,
-    chain: Chain,
+pub struct SimulationHelper<'a> {
     simulate_validation_result: &'a SimulateValidationResult,
     valid_after: Option<U256>,
 }
 
-#[async_trait::async_trait]
-pub trait SimulationCheck<M: Middleware>: Send + Sync {
-    async fn check_user_operation(
+pub trait SimulationCheck: Send + Sync {
+    fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationHelper<M>,
+        helper: &mut SimulationHelper,
     ) -> Result<(), SimulationCheckError>;
 }
 

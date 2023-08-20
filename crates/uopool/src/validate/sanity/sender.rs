@@ -17,7 +17,7 @@ impl<M: Middleware> SanityCheck<M> for SenderOrInitCode {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
         let code = helper.eth_client.get_code(uo.sender, None).await?;
         if (code.is_empty() && uo.init_code.is_empty())

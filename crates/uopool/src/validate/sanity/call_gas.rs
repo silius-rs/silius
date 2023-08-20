@@ -21,7 +21,7 @@ impl<M: Middleware> SanityCheck<M> for CallGas {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
         let exec_res = match helper.entry_point.simulate_handle_op(uo.clone()).await {
             Ok(res) => res,

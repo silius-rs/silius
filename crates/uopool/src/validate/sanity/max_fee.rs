@@ -22,7 +22,7 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
         if uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
             return Err(SanityCheckError::HighMaxPriorityFeePerGas {

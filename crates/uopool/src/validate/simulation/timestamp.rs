@@ -1,5 +1,5 @@
 use crate::validate::{utils::extract_timestamps, SimulationCheck, SimulationHelper};
-use ethers::{providers::Middleware, types::U256};
+use ethers::types::U256;
 use silius_primitives::{
     simulation::{SimulationCheckError, EXPIRATION_TIMESTAMP_DIFF},
     UserOperation,
@@ -8,8 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Timestamp;
 
-#[async_trait::async_trait]
-impl<M: Middleware> SimulationCheck<M> for Timestamp {
+impl SimulationCheck for Timestamp {
     /// The [check_user_operation] method implementation that checks the timestamp of the [UserOperation](UserOperation).
     ///
     /// # Arguments
@@ -18,10 +17,10 @@ impl<M: Middleware> SimulationCheck<M> for Timestamp {
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationCheckError] error.
-    async fn check_user_operation(
+    fn check_user_operation(
         &self,
         _uo: &UserOperation,
-        helper: &mut SimulationHelper<M>,
+        helper: &mut SimulationHelper,
     ) -> Result<(), SimulationCheckError> {
         let (valid_after, valid_until) = extract_timestamps(helper.simulate_validation_result);
 

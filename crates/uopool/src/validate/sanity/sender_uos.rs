@@ -25,7 +25,7 @@ impl<M: Middleware> SanityCheck<M> for SenderUos {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
         if helper.mempool.get_number_by_sender(&uo.sender) == 0 {
             return Ok(());

@@ -93,7 +93,7 @@ where
 
         let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
 
-        match uo_pool.add_user_operation(uo, Some(res)).await {
+        match uo_pool.add_user_operation(uo, res).await {
             Ok(uo_hash) => Ok(Response::new(AddResponse {
                 res: AddResult::Added as i32,
                 data: serde_json::to_string(&uo_hash)

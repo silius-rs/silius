@@ -17,7 +17,7 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
