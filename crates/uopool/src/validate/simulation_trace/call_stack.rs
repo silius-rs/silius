@@ -16,6 +16,14 @@ use silius_primitives::{
 pub struct CallStack;
 
 impl CallStack {
+    /// The helper method that parses the call stack.
+    ///
+    /// # Arguments
+    /// `trace` - The [JsTracerFrame] that contains the call stack to parse
+    /// `calls` - The vector of [CallEntry] that will be filled with the parsed call stack
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     fn parse_call_stack(
         &self,
         trace: &JsTracerFrame,
@@ -81,6 +89,14 @@ impl CallStack {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
+    /// The [check_user_operation] method implementation that performs the call stack trace check.
+    ///
+    /// # Arguments
+    /// `_uo` - Not used in this check
+    /// `helper` - The [SimulationTraceHelper](crate::validate::SimulationTraceHelper)
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     async fn check_user_operation(
         &self,
         uo: &UserOperation,

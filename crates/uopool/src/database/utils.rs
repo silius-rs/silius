@@ -9,6 +9,7 @@ use silius_primitives::{
     reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
 };
 
+/// Cretaes a compression & decompression wrapper for a type(20 or 32 bytes) that is used in the database.
 macro_rules! construct_wrap_hash {
     ($type:ty, $name:ident, $n_bytes:expr ) => {
         #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -54,6 +55,7 @@ macro_rules! construct_wrap_hash {
     };
 }
 
+/// Cretaes a compression & decompression wrapper for a type(struct) that is used in the database.
 macro_rules! construct_wrap_struct {
     ($type:ty, $name:ident ) => {
         #[derive(

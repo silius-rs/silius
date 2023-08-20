@@ -1,3 +1,4 @@
+//! The database implementation of the [Mempool](crate::mempool::Mempool) trait. Primarily used for storing mempool information in a local database.
 use self::env::Env;
 use reth_libmdbx::EnvironmentKind;
 use std::path::PathBuf;

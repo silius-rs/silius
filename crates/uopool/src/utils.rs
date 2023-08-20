@@ -25,6 +25,7 @@ pub fn equal_code_hashes(hashes: &Vec<CodeHash>, hashes_prev: &Vec<CodeHash>) ->
     true
 }
 
+/// Struct to calculate the pre-verification gas of a [UserOperation](UserOperation)
 // https://github.com/eth-infinitism/bundler/blob/main/packages/sdk/src/calcPreVerificationGas.ts#L44-L52
 pub struct Overhead {
     pub fixed: U256,
@@ -51,6 +52,14 @@ impl Default for Overhead {
 }
 
 impl Overhead {
+    /// Calculates the pre-verification gas of a [UserOperation](UserOperation)
+    /// The function first packs the [UserOperation](UserOperation) by calling the [pack](UserOperation::pack) method, then extracts the call data for gas calculation.
+    ///
+    /// # Arguments
+    /// `uo` - The [UserOperation](UserOperation) to calculate the pre-verification gas for
+    ///
+    /// # Returns
+    /// The pre-verification gas of the [UserOperation](UserOperation)
     pub fn calculate_pre_verification_gas(&self, uo: &UserOperation) -> U256 {
         let uo_pack = uo.pack();
         let call_data: U256 = U256::from(
@@ -75,12 +84,31 @@ impl Overhead {
     }
 }
 
+/// Helper function to calculate the valid gas of a [UserOperation](UserOperation)
+/// The function is invoked by the [check_valid_gas](crates::uopool::validate::sanity::check_valid_gas) method.
+///
+/// # Arguments
+/// `gas_price` - The gas price
+/// `gas_incr_perc` - The gas increase percentage
+///
+/// # Returns
+/// The valid gas of the [UserOperation](UserOperation)
 pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
     let gas_price = gas_price.as_u64() as f64;
     let gas_incr_perc = gas_incr_perc.as_u64() as f64;
     ((gas_price * (1.0 + gas_incr_perc / 100.0)).ceil() as u64).into()
 }
 
+/// Helper function to calculate the call gas limit of a [UserOperation](UserOperation)
+/// The function is invoked by the [estimate_user_operation_gas](crates::uopool::estimate::estimate_user_operation_gas) method.
+///
+/// # Arguments
+/// `paid` - The paid gas
+/// `pre_op_gas` - The pre-operation gas
+/// `fee_per_gas` - The fee per gas
+///
+/// # Returns
+/// The call gas limit of the [UserOperation](UserOperation)
 pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
     paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
 }

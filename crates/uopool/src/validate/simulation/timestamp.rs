@@ -10,6 +10,14 @@ pub struct Timestamp;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationCheck<M> for Timestamp {
+    /// The [check_user_operation] method implementation that checks the timestamp of the [UserOperation](UserOperation).
+    ///
+    /// # Arguments
+    /// `_uo` - Not used in this check
+    /// `helper` - The [SimulationHelper](crate::validate::SimulationHelper)
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     async fn check_user_operation(
         &self,
         _uo: &UserOperation,

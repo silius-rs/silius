@@ -7,6 +7,14 @@ pub struct Signature;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationCheck<M> for Signature {
+    /// The [check_user_operation] method implementation that validates the signature of the user operation.
+    ///
+    /// # Arguments
+    /// `_uo` - Not used in this check
+    /// `helper` - The [SimulationHelper](crate::validate::SimulationHelper)
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     async fn check_user_operation(
         &self,
         _uo: &UserOperation,

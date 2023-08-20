@@ -38,18 +38,41 @@ pub type VecCh = Vec<CodeHash>;
 
 const LATEST_SCAN_DEPTH: u64 = 1000;
 
+/// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
+/// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
 pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
+    /// The unique ID of the mempool
     pub id: MempoolId,
+    /// The [EntryPoint](EntryPoint) contract object
     pub entry_point: EntryPoint<M>,
+    /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
+    /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
     pub mempool: MempoolBox<VecUo, VecCh>,
+    /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
     pub reputation: ReputationBox<Vec<ReputationEntry>>,
+    /// The Ethereum client [Middleware](ethers::providers::Middleware)
     pub eth_client: Arc<M>,
+    // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
+    // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
 }
 
 impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
+    /// Creates a new [UoPool](UoPool) object
+    ///
+    /// # Arguments
+    /// `entry_point` - The [EntryPoint](EntryPoint) contract object
+    /// `validator` - The [UserOperationValidator](UserOperationValidator) object
+    /// `mempool` - The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
+    /// `reputation` - The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
+    /// `eth_client` - The Ethereum client [Middleware](ethers::providers::Middleware)
+    /// `max_verification_gas` - The maximum gas limit for [UserOperation](UserOperation) gas verification.
+    /// `chain` - The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
+    ///
+    /// # Returns
+    /// `Self` - The [UoPool](UoPool) object
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         entry_point: EntryPoint<M>,
@@ -72,27 +95,57 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         }
     }
 
+    /// Returns the [EntryPoint](EntryPoint) contract address
+    ///
+    /// # Returns
+    /// `Address` - The [EntryPoint](EntryPoint) contract address
     pub fn entry_point_address(&self) -> Address {
         self.entry_point.address()
     }
 
+    /// Returns all of the [UserOperations](UserOperation) in the mempool
+    ///
+    /// # Returns
+    /// `Vec<UserOperation>` - An array of [UserOperations](UserOperation)
     pub fn get_all(&self) -> Vec<UserOperation> {
         self.mempool.get_all()
     }
 
+    /// Returns an array of [ReputationEntry](ReputationEntry) for entities.
+    ///
+    /// # Returns
+    /// `Vec<ReputationEntry>` - An array of [ReputationEntry](ReputationEntry)
     pub fn get_reputation(&self) -> Vec<ReputationEntry> {
         self.reputation.get_all()
     }
 
+    /// Sets the [ReputationEntry](ReputationEntry) for entities
+    ///
+    /// # Arguments
+    /// `reputation` - An array of [ReputationEntry](ReputationEntry)
+    ///
+    /// # Returns
+    /// `()` - Returns nothing
     pub fn set_reputation(&mut self, reputation: Vec<ReputationEntry>) -> anyhow::Result<()> {
         self.reputation.set_entities(reputation)
     }
 
+    /// Batch clears the [Mempool](Mempool) and [Reputation](Reputation).
+    ///
+    /// # Returns
+    /// `()` - Returns nothing
     pub fn clear(&mut self) {
         self.mempool.clear();
         self.reputation.clear();
     }
 
+    /// Validates a single [UserOperation](UserOperation) and returns the validation outcome by calling [UserOperationValidator::validate_user_operation](UserOperationValidator::validate_user_operation)
+    ///
+    /// # Arguments
+    /// `uo` - The [UserOperation](UserOperation) to validate
+    ///
+    /// # Returns
+    /// `Result<UserOperationValidationOutcome, ValidationError>` - The validation outcome
     pub async fn validate_user_operation(
         &self,
         uo: &UserOperation,
@@ -110,6 +163,15 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     }
 
     /// Adds a single validated user operation into the pool
+    /// Indirectly invoked by [EthApiServer::send_user_operation](EthApiServer::send_user_operation) via [UoPoolService::add](UoPoolService::add) to add a [UserOperation](UserOperation) into the mempool
+    /// The function first validates the [UserOperation](UserOperation) by calling [UoPool::validate_user_operation](UoPool::validate_user_operation). If [UserOperation](UserOperation) passes the validation, then adds it into the mempool by calling [Mempool::add](Mempool::add).
+    ///
+    /// # Arguments
+    /// `uo` - The [UserOperation](UserOperation) to add
+    /// `res` - The [UserOperationValidationOutcome](UserOperationValidationOutcome) of the validation
+    ///
+    /// # Returns
+    /// `Result<UserOperationHash, AddError>` - The hash of the added [UserOperation](UserOperation)
     pub async fn add_user_operation(
         &mut self,
         uo: UserOperation,
@@ -163,10 +225,23 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         }
     }
 
+    /// Sorts the [UserOperations](UserOperation) in the mempool by calling the [Mempool::get_sorted](Mempool::get_sorted) function
+    ///
+    /// # Returns
+    /// `Result<Vec<UserOperation>, anyhow::Error>` - The sorted [UserOperations](UserOperation)
     pub fn get_sorted_user_operations(&self) -> anyhow::Result<Vec<UserOperation>> {
         self.mempool.get_sorted()
     }
 
+    /// Bundles an array of [UserOperations](UserOperation)
+    /// The function first checks the reputations of the entiries, then validate each [UserOperation](UserOperation) by calling [UoPool::validate_user_operation](UoPool::validate_user_operation).
+    /// If the [UserOperations](UserOperation) passes the validation, push it into the `uos_valid` array.
+    ///
+    /// # Arguments
+    /// `uos` - An array of [UserOperations](UserOperation) to bundle
+    ///
+    /// # Returns
+    /// `Result<Vec<UserOperation>, anyhow::Error>` - The bundled [UserOperations](UserOperation).
     pub async fn bundle_user_operations(
         &mut self,
         uos: Vec<UserOperation>,
@@ -312,6 +387,10 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         Ok(uos_valid)
     }
 
+    /// Gets the block base fee per gas
+    ///
+    /// # Returns
+    /// `Result<U256, anyhow::Error>` - The block base fee per gas.
     pub async fn base_fee_per_gas(&self) -> anyhow::Result<U256> {
         let block = self
             .eth_client
@@ -323,6 +402,14 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             .ok_or(format_err!("No base fee found"))
     }
 
+    /// Estimates the `verification_gas_limit`, `call_gas_limit` and `pre_verification_gas` for a user operation.
+    /// The function is indirectly invoked by the `estimate_user_operation_gas` JSON RPC method.
+    ///
+    /// # Arguments
+    /// * `uo` - The [UserOperation](UserOperation) to estimate the gas for.
+    ///
+    /// # Returns
+    /// `Result<UserOperationGasEstimation, SimulationCheckError>` - The gas estimation result, which includes the `verification_gas_limit`, `call_gas_limit` and `pre_verification_gas`.
     pub async fn estimate_user_operation_gas(
         &self,
         uo: &UserOperation,
@@ -391,6 +478,13 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         })
     }
 
+    /// Filters the events logged from the [EntryPoint](EntryPoint) contract for a given user operation hash.
+    ///
+    /// # Arguments
+    /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to filter the events for.
+    ///
+    /// # Returns
+    /// `Result<Option<(UserOperationEventFilter, LogMeta)>, anyhow::Error>` - The filtered event, if any.
     pub async fn get_user_operation_event_meta(
         &self,
         uo_hash: &UserOperationHash,
@@ -410,6 +504,14 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         Ok(event)
     }
 
+    /// Gets the user operation by hash.
+    /// The function is indirectly invoked by the `get_user_operation_by_hash` JSON RPC method.
+    ///
+    /// # Arguments
+    /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to get the user operation for.
+    ///
+    /// # Returns
+    /// `Result<UserOperationByHash, anyhow::Error>` - The user operation, if any.
     pub async fn get_user_operation_by_hash(
         &self,
         uo_hash: &UserOperationHash,
@@ -442,6 +544,14 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         Err(format_err!("No user operation found"))
     }
 
+    /// Gets the [UserOperationReceipt](UserOperationReceipt) by hash.
+    /// The function is indirectly invoked by the `get_user_operation_receipt` JSON RPC method.
+    ///
+    /// # Arguments
+    /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to get the user operation receipt for.
+    ///
+    /// # Returns
+    /// `Result<UserOperationReceipt, anyhow::Error>` - The user operation receipt, if any.
     pub async fn get_user_operation_receipt(
         &self,
         uo_hash: &UserOperationHash,
@@ -473,6 +583,11 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         Err(format_err!("No user operation found"))
     }
 
+    /// Queries the [EntryPoint](EntryPoint) contract for the past events logged that are included in the current block.
+    /// If [UserOperation](UserOperation) is found, it is removed from the [UserOperationQueue](UserOperationQueue), while simultaneously incrementing the reputation of the sender and paymaster.
+    ///
+    /// # Returns
+    /// `Result<(), anyhow::Error>` - None if the query was successful.
     pub async fn handle_past_events(&mut self) -> anyhow::Result<()> {
         let block_num = self.eth_client.get_block_number().await?;
         let block_st = std::cmp::max(
@@ -504,11 +619,25 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         Ok(())
     }
 
+    /// Removes the [UserOperation](UserOperation) from the [UserOperationQueue](UserOperationQueue) given the [UserOperationHash](UserOperationHash).
+    ///
+    /// # Arguments
+    /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to remove the user operation for.
+    ///
+    /// # Returns
+    /// `Option<()>` - None if the user operation was successfully removed.
     pub fn remove_user_operation(&mut self, uo_hash: &UserOperationHash) -> Option<()> {
         self.mempool.remove(uo_hash).ok();
         None
     }
 
+    /// Removes multiple [UserOperations](UserOperation) from the [UserOperationQueue](UserOperationQueue) given an array of [UserOperationHash](UserOperationHash).
+    ///
+    /// # Arguments
+    /// * `uo_hashes` - The array of [UserOperationHash](UserOperationHash) to remove the user operations for.
+    ///
+    /// # Returns
+    /// `Option<()>` - None
     pub fn remove_user_operations(&mut self, uo_hashes: Vec<UserOperationHash>) {
         for uo_hash in uo_hashes {
             self.remove_user_operation(&uo_hash);

@@ -22,16 +22,32 @@ use silius_primitives::{
 };
 use std::sync::Arc;
 
+/// Standard implementation of [UserOperationValidator](UserOperationValidator).
 pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static> {
+    /// Ethereum exeuctionclient.
     eth_client: Arc<M>,
+    /// The [EntryPoint](EntryPoint) object.
     entry_point: EntryPoint<M>,
+    /// A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     chain: Chain,
+    /// An array of [SanityChecks](SanityCheck).
     sanity_checks: Vec<Box<dyn SanityCheck<M>>>,
+    /// An array of [SimulationCheck](SimulationCheck).
     simulation_checks: Vec<Box<dyn SimulationCheck<M>>>,
+    /// An array of [SimulationTraceChecks](SimulationTraceCheck).
     simulation_trace_checks: Vec<Box<dyn SimulationTraceCheck<M>>>,
 }
 
 impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
+    /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator).
+    ///
+    /// # Arguments
+    /// `eth_client` - Ethereum exeuction client.
+    /// `entry_point` - [EntryPoint](EntryPoint) object.
+    /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
+    ///
+    /// # Returns
+    /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
     pub fn new(eth_client: Arc<M>, entry_point: EntryPoint<M>, chain: Chain) -> Self {
         Self {
             eth_client,
@@ -43,6 +59,13 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
         }
     }
 
+    /// Simulates validation of a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
+    ///
+    /// # Arguments
+    /// `uo` - [UserOperation](UserOperation) to simulate validation on.
+    ///
+    /// # Returns
+    /// A [SimulateValidationResult](crate::entry_point::SimulateValidationResult) if the simulation was successful, otherwise a [SimulationCheckError](crate::simulation::SimulationCheckError).
     async fn simulate_validation(
         &self,
         uo: &UserOperation,
@@ -62,6 +85,13 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
         }
     }
 
+    /// Simulates validation of a [UserOperation](UserOperation) via the [simulate_validation_trace](crate::entry_point::EntryPoint::simulate_validation_trace) method of the [entry_point](crate::entry_point::EntryPoint)
+    ///
+    /// # Arguments
+    /// `uo` - [UserOperation](UserOperation) to simulate validation on.
+    ///
+    /// # Returns
+    /// A [GethTrace](ethers::types::GethTrace) if the simulation was successful, otherwise a [SimulationCheckError](crate::simulation::SimulationCheckError).
     async fn simulate_validation_trace(
         &self,
         uo: &UserOperation,
@@ -81,11 +111,25 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
         }
     }
 
+    /// Pushes a [SanityCheck](SanityCheck) to the sanity_checks array.
+    ///
+    /// # Arguments
+    /// `sanity_check` - [SanityCheck](SanityCheck) to push.
+    ///
+    /// # Returns
+    /// A reference to [self](StandardUserOperationValidator).
     pub fn with_sanity_check(mut self, sanity_check: impl SanityCheck<M> + 'static) -> Self {
         self.sanity_checks.push(Box::new(sanity_check));
         self
     }
 
+    /// Pushes a [SimulationCheck](SimulationCheck) to the simulation_checks array.
+    ///
+    /// # Arguments
+    /// `simulation_check` - [SimulationCheck](SimulationCheck) to push.
+    ///
+    /// # Returns
+    /// A reference to [self](StandardUserOperationValidator).
     pub fn with_simulation_check(
         mut self,
         simulation_check: impl SimulationCheck<M> + 'static,
@@ -106,6 +150,17 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
 
 #[async_trait::async_trait]
 impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOperationValidator<M> {
+    /// Validates a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
+    /// The function also optionally performs sanity checks and simulation checks if the [UserOperationValidatorMode](UserOperationValidatorMode) contains the respective flags.
+    ///
+    /// # Arguments
+    /// `uo` - [UserOperation](UserOperation) to validate.
+    /// `mempool` - [MempoolBox](crate::mempool::MempoolBox) to check for duplicate [UserOperation](UserOperation)s.
+    /// `reputation` - [ReputationBox](crate::reputation::ReputationBox).
+    /// `mode` - [UserOperationValidatorMode](UserOperationValidatorMode) flag.
+    ///
+    /// # Returns
+    /// A [UserOperationValidationOutcome](UserOperationValidationOutcome) if the validation was successful, otherwise a [ValidationError](ValidationError).
     async fn validate_user_operation(
         &self,
         uo: &UserOperation,

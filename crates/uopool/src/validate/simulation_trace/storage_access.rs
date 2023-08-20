@@ -15,6 +15,15 @@ use std::collections::{HashMap, HashSet};
 pub struct StorageAccess;
 
 impl StorageAccess {
+    /// The helper method that parses the slots from the JS trace.
+    ///
+    /// # Arguments
+    /// `keccak` - The keccak of the JS trace
+    /// `info` - The stake info
+    /// `slots` - The slots to parse
+    ///
+    /// # Returns
+    /// None
     fn parse_slots(
         &self,
         keccak: Vec<Bytes>,
@@ -41,6 +50,15 @@ impl StorageAccess {
         }
     }
 
+    /// The helper method that checks if the slot is associated with the address.
+    ///
+    /// # Arguments
+    /// `addr` - The address to check
+    /// `slot` - The slot to check
+    /// `slots` - The slots to check
+    ///
+    /// # Returns
+    /// true if the slot is associated with the address, otherwise false.
     fn associated_with_slot(
         &self,
         addr: &Address,
@@ -74,6 +92,14 @@ impl StorageAccess {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
+    /// The [check_user_operation] method implementation that checks if the user operation access storage other than the one associated with itself.
+    ///
+    /// # Arguments
+    /// `uo` - The [UserOperation](UserOperation) to check
+    /// `helper` - The [SimulationTraceHelper](crate::validate::SimulationTraceHelper)
+    ///
+    /// # Returns
+    /// None if the check passes, otherwise a [SimulationCheckError] error.
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
