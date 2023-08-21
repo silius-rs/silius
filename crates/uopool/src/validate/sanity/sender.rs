@@ -19,7 +19,11 @@ impl<M: Middleware> SanityCheck<M> for SenderOrInitCode {
         uo: &UserOperation,
         helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError> {
-        let code = helper.eth_client.get_code(uo.sender, None).await?;
+        let code = helper
+            .entry_point
+            .eth_client()
+            .get_code(uo.sender, None)
+            .await?;
         if (code.is_empty() && uo.init_code.is_empty())
             || (!code.is_empty() && !uo.init_code.is_empty())
         {

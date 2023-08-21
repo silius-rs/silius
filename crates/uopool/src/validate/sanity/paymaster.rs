@@ -21,7 +21,7 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
     ) -> Result<(), SanityCheckError> {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                let code = helper.eth_client.get_code(addr, None).await?;
+                let code = helper.entry_point.eth_client().get_code(addr, None).await?;
 
                 if !code.is_empty() {
                     let deposit_info =

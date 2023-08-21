@@ -369,23 +369,22 @@ pub async fn uopool_service_run(
 
             let entry_point = EntryPoint::<Provider<Http>>::new(eth_client.clone(), ep);
 
-            let mut validator =
-                StandardUserOperationValidator::new(eth_client.clone(), entry_point.clone(), chain)
-                    .with_sanity_check(SenderOrInitCode)
-                    .with_sanity_check(VerificationGas {
-                        max_verification_gas,
-                    })
-                    .with_sanity_check(Paymaster)
-                    .with_sanity_check(CallGas)
-                    .with_sanity_check(MaxFee {
-                        min_priority_fee_per_gas,
-                    })
-                    .with_sanity_check(SenderUos {
-                        max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
-                        gas_increase_perc: GAS_INCREASE_PERC.into(),
-                    })
-                    .with_simulation_check(Signature)
-                    .with_simulation_check(Timestamp);
+            let mut validator = StandardUserOperationValidator::new(entry_point.clone(), chain)
+                .with_sanity_check(SenderOrInitCode)
+                .with_sanity_check(VerificationGas {
+                    max_verification_gas,
+                })
+                .with_sanity_check(Paymaster)
+                .with_sanity_check(CallGas)
+                .with_sanity_check(MaxFee {
+                    min_priority_fee_per_gas,
+                })
+                .with_sanity_check(SenderUos {
+                    max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
+                    gas_increase_perc: GAS_INCREASE_PERC.into(),
+                })
+                .with_simulation_check(Signature)
+                .with_simulation_check(Timestamp);
 
             if uo_pool_mode != UoPoolMode::Unsafe {
                 validator = validator
@@ -404,7 +403,6 @@ pub async fn uopool_service_run(
                     validator,
                     Box::<MemoryMempool>::default(),
                     reputation,
-                    eth_client.clone(),
                     max_verification_gas,
                     chain,
                 ),

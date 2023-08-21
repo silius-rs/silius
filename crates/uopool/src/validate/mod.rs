@@ -15,7 +15,6 @@ use silius_primitives::{
     uopool::ValidationError,
     Chain, UserOperation, UserOperationHash,
 };
-use std::sync::Arc;
 
 pub mod sanity;
 pub mod simulation;
@@ -62,7 +61,6 @@ pub trait UserOperationValidator: Send + Sync {
 pub struct SanityHelper<'a, M: Middleware + 'static> {
     mempool: &'a MempoolBox<VecUo, VecCh>,
     reputation: &'a ReputationBox<Vec<ReputationEntry>>,
-    eth_client: Arc<M>,
     entry_point: EntryPoint<M>,
     chain: Chain,
 }
@@ -94,7 +92,6 @@ pub trait SimulationCheck: Send + Sync {
 pub struct SimulationTraceHelper<'a, M: Middleware + 'static> {
     mempool: &'a MempoolBox<VecUo, VecCh>,
     reputation: &'a ReputationBox<Vec<ReputationEntry>>,
-    eth_client: Arc<M>,
     entry_point: EntryPoint<M>,
     chain: Chain,
     simulate_validation_result: &'a SimulateValidationResult,

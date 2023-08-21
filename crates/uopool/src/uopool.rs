@@ -27,10 +27,7 @@ use silius_primitives::{
     Chain, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 use tracing::trace;
 
 pub type VecUo = Vec<UserOperation>;
@@ -51,8 +48,6 @@ pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     pub mempool: MempoolBox<VecUo, VecCh>,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
     pub reputation: ReputationBox<Vec<ReputationEntry>>,
-    /// The Ethereum client [Middleware](ethers::providers::Middleware)
-    pub eth_client: Arc<M>,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
@@ -79,7 +74,6 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         validator: V,
         mempool: MempoolBox<VecUo, VecCh>,
         reputation: ReputationBox<Vec<ReputationEntry>>,
-        eth_client: Arc<M>,
         max_verification_gas: U256,
         chain: Chain,
     ) -> Self {
@@ -89,7 +83,6 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             validator,
             mempool,
             reputation,
-            eth_client,
             max_verification_gas,
             chain,
         }
@@ -391,7 +384,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// `Result<U256, anyhow::Error>` - The block base fee per gas.
     pub async fn base_fee_per_gas(&self) -> anyhow::Result<U256> {
         let block = self
-            .eth_client
+            .entry_point
+            .eth_client()
             .get_block(BlockNumber::Latest)
             .await?
             .ok_or(format_err!("No block found"))?;
@@ -518,7 +512,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
 
         if let Some((event, log_meta)) = event {
             if let Some((uo, ep)) = self
-                .eth_client
+                .entry_point
+                .eth_client()
                 .get_transaction(log_meta.transaction_hash)
                 .await?
                 .and_then(|tx| {
@@ -558,7 +553,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
 
         if let Some((event, log_meta)) = event {
             if let Some(tx_receipt) = self
-                .eth_client
+                .entry_point
+                .eth_client()
                 .get_transaction_receipt(log_meta.transaction_hash)
                 .await?
             {
@@ -587,7 +583,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// # Returns
     /// `Result<(), anyhow::Error>` - None if the query was successful.
     pub async fn handle_past_events(&mut self) -> anyhow::Result<()> {
-        let block_num = self.eth_client.get_block_number().await?;
+        let block_num = self.entry_point.eth_client().get_block_number().await?;
         let block_st = std::cmp::max(
             1u64,
             block_num

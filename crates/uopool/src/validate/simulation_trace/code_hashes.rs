@@ -86,7 +86,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
             .collect::<Vec<Address>>();
 
         let hashes: &mut Vec<CodeHash> = &mut vec![];
-        self.get_code_hashes(addrs, hashes, &helper.eth_client)
+        self.get_code_hashes(addrs, hashes, &helper.entry_point.eth_client())
             .await?;
 
         let uo_hash = uo.hash(&helper.entry_point.address(), &helper.chain.id().into());

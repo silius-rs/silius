@@ -108,35 +108,33 @@ async fn setup(
     let entry_point2 = EntryPoint::new(Arc::new(provider.clone()), ep.address);
     let c = Chain::from(chain_id);
 
-    let validator =
-        StandardUserOperationValidator::new(Arc::new(provider), entry_point2, c.clone())
-            .with_sanity_check(SenderOrInitCode {})
-            .with_sanity_check(VerificationGas {
-                max_verification_gas: U256::from(3000000_u64),
-            })
-            .with_sanity_check(Paymaster {})
-            .with_sanity_check(CallGas {})
-            .with_sanity_check(MaxFee {
-                min_priority_fee_per_gas: U256::from(1u64),
-            })
-            .with_sanity_check(SenderUos {
-                max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
-                gas_increase_perc: GAS_INCREASE_PERC.into(),
-            })
-            .with_simulation_check(Signature)
-            .with_simulation_check(Timestamp)
-            .with_simulation_trace_check(Gas)
-            .with_simulation_trace_check(Opcodes)
-            .with_simulation_trace_check(StorageAccess)
-            .with_simulation_trace_check(CallStack)
-            .with_simulation_trace_check(CodeHashes);
+    let validator = StandardUserOperationValidator::new(entry_point2, c.clone())
+        .with_sanity_check(SenderOrInitCode {})
+        .with_sanity_check(VerificationGas {
+            max_verification_gas: U256::from(3000000_u64),
+        })
+        .with_sanity_check(Paymaster {})
+        .with_sanity_check(CallGas {})
+        .with_sanity_check(MaxFee {
+            min_priority_fee_per_gas: U256::from(1u64),
+        })
+        .with_sanity_check(SenderUos {
+            max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
+            gas_increase_perc: GAS_INCREASE_PERC.into(),
+        })
+        .with_simulation_check(Signature)
+        .with_simulation_check(Timestamp)
+        .with_simulation_trace_check(Gas)
+        .with_simulation_trace_check(Opcodes)
+        .with_simulation_trace_check(StorageAccess)
+        .with_simulation_trace_check(CallStack)
+        .with_simulation_trace_check(CodeHashes);
 
     let pool = UoPool::<ClientType, StandardUserOperationValidator<Provider<Http>>>::new(
         entry_point,
         validator,
         mempools,
         reputation,
-        client.clone(),
         3000000_u64.into(),
         c,
     );

@@ -32,7 +32,8 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
         }
 
         let block = helper
-            .eth_client
+            .entry_point
+            .eth_client()
             .get_block(BlockNumber::Latest)
             .await
             .map_err(|err| SanityCheckError::UnknownError {

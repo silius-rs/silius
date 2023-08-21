@@ -20,12 +20,9 @@ use silius_primitives::{
     reputation::ReputationEntry, simulation::SimulationCheckError, uopool::ValidationError, Chain,
     UserOperation,
 };
-use std::sync::Arc;
 
 /// Standard implementation of [UserOperationValidator](UserOperationValidator).
 pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static> {
-    /// Ethereum exeuctionclient.
-    eth_client: Arc<M>,
     /// The [EntryPoint](EntryPoint) object.
     entry_point: EntryPoint<M>,
     /// A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
@@ -42,15 +39,13 @@ impl<M: Middleware + Clone + 'static> StandardUserOperationValidator<M> {
     /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator).
     ///
     /// # Arguments
-    /// `eth_client` - Ethereum exeuction client.
     /// `entry_point` - [EntryPoint](EntryPoint) object.
     /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     ///
     /// # Returns
     /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
-    pub fn new(eth_client: Arc<M>, entry_point: EntryPoint<M>, chain: Chain) -> Self {
+    pub fn new(entry_point: EntryPoint<M>, chain: Chain) -> Self {
         Self {
-            eth_client,
             entry_point,
             chain,
             sanity_checks: vec![],
@@ -174,7 +169,6 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
             let sanity_helper = SanityHelper {
                 mempool,
                 reputation,
-                eth_client: self.eth_client.clone(),
                 entry_point: self.entry_point.clone(),
                 chain: self.chain,
             };
@@ -223,7 +217,6 @@ impl<M: Middleware + Clone + 'static> UserOperationValidator for StandardUserOpe
             let mut sim_helper = SimulationTraceHelper {
                 mempool,
                 reputation,
-                eth_client: self.eth_client.clone(),
                 entry_point: self.entry_point.clone(),
                 chain: self.chain,
                 simulate_validation_result: &sim_res,
