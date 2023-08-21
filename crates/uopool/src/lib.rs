@@ -11,7 +11,7 @@ pub mod validate;
 
 pub use database::mempool::DatabaseMempool;
 pub use memory::{mempool::MemoryMempool, reputation::MemoryReputation};
-pub use mempool::{mempool_id, MempoolId};
-pub use reputation::Reputation;
-pub use uopool::UoPool;
+pub use mempool::{mempool_id, Mempool, MempoolBox, MempoolId};
+pub use reputation::{Reputation, ReputationBox};
+pub use uopool::{UoPool, VecCh, VecUo};
 pub use utils::Overhead;

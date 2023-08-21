@@ -3,13 +3,109 @@ use ethers::{
     types::{Address, H256, U256},
     utils::{keccak256, to_checksum},
 };
+use parking_lot::RwLock;
 use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 pub type MempoolId = H256;
 
-pub type MempoolBox<T, U> =
-    Box<dyn Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync>;
+#[derive(Debug)]
+pub struct MempoolBox<T, U, P>
+where
+    P: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+{
+    inner: Arc<RwLock<P>>,
+}
+
+impl<T, U, P> Clone for MempoolBox<T, U, P>
+where
+    P: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T, U, P> MempoolBox<T, U, P>
+where
+    P: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+{
+    pub fn new(inner: P) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(inner)),
+        }
+    }
+}
+
+impl<T, U, M> Mempool for MempoolBox<T, U, M>
+where
+    T: Debug + IntoIterator<Item = UserOperation>,
+    U: Debug + IntoIterator<Item = CodeHash>,
+    M: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+{
+    type CodeHashes = U;
+    type Error = anyhow::Error;
+    type UserOperations = T;
+
+    fn get_all(&self) -> T {
+        self.inner.read().get_all()
+    }
+
+    fn clear(&mut self) {
+        self.inner.write().clear()
+    }
+
+    fn add(
+        &mut self,
+        uo: UserOperation,
+        ep: &Address,
+        chain_id: &U256,
+    ) -> Result<UserOperationHash, anyhow::Error> {
+        self.inner.write().add(uo, ep, chain_id)
+    }
+
+    fn set_code_hashes(
+        &mut self,
+        uo_hash: &UserOperationHash,
+        hashes: &U,
+    ) -> Result<(), anyhow::Error> {
+        self.inner.write().set_code_hashes(uo_hash, hashes)
+    }
+
+    fn get(&self, uo_hash: &UserOperationHash) -> Result<Option<UserOperation>, Self::Error> {
+        self.inner.read().get(uo_hash)
+    }
+
+    fn get_all_by_sender(&self, addr: &Address) -> Self::UserOperations {
+        self.inner.read().get_all_by_sender(addr)
+    }
+
+    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Self::CodeHashes {
+        self.inner.read().get_code_hashes(uo_hash)
+    }
+
+    fn get_number_by_sender(&self, addr: &Address) -> usize {
+        self.inner.read().get_number_by_sender(addr)
+    }
+
+    fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation> {
+        self.inner.read().get_prev_by_sender(uo)
+    }
+
+    fn get_sorted(&self) -> Result<Self::UserOperations, Self::Error> {
+        self.inner.read().get_sorted()
+    }
+
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, Self::Error> {
+        self.inner.read().has_code_hashes(uo_hash)
+    }
+
+    fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<(), Self::Error> {
+        self.inner.write().remove(uo_hash)
+    }
+}
 
 pub fn mempool_id(ep: &Address, chain_id: &U256) -> MempoolId {
     H256::from_slice(

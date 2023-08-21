@@ -1,74 +1,79 @@
+use crate::proto::uopool::*;
 use crate::{
+    builder::UoPoolBuiler,
     proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
-    utils::{parse_addr, parse_hash, parse_uo, parse_uo_pool_mut},
+    utils::{parse_addr, parse_hash, parse_uo},
 };
-use crate::{proto::uopool::*, utils::parse_uo_pool};
 use anyhow::Result;
 use async_trait::async_trait;
-use dashmap::{
-    mapref::one::{Ref, RefMut},
-    DashMap,
-};
+use dashmap::DashMap;
 use ethers::{
     providers::{Http, Middleware, Provider},
-    types::{Address, H256, U256},
+    types::{Address, U256},
 };
-use silius_contracts::{entry_point::EntryPointErr, EntryPoint};
-use silius_primitives::{
-    reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
-    uopool::AddError,
-    Chain, UoPoolMode,
-};
+use silius_contracts::entry_point::EntryPointErr;
+use silius_primitives::reputation::ReputationEntry;
+use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
 use silius_uopool::{
-    mempool_id,
-    validate::{
-        sanity::{
-            call_gas::CallGas, max_fee::MaxFee, paymaster::Paymaster, sender::SenderOrInitCode,
-            sender_uos::SenderUos, verification_gas::VerificationGas,
-        },
-        simulation::{signature::Signature, timestamp::Timestamp},
-        simulation_trace::{
-            call_stack::CallStack, code_hashes::CodeHashes, external_contracts::ExternalContracts,
-            gas::Gas, opcodes::Opcodes, storage_access::StorageAccess,
-        },
-        validator::StandardUserOperationValidator,
-        UserOperationValidator,
-    },
-    MemoryMempool, MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
+    mempool_id, validate::validator::StandardUserOperationValidator, MemoryMempool,
+    MemoryReputation, MempoolId, Reputation, UoPool as UserOperationPool,
 };
+use silius_uopool::{Mempool, VecCh, VecUo};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tonic::{Request, Response, Status};
+use tonic::{Code, Request, Response, Status};
 use tracing::{info, warn};
 
-const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
-const GAS_INCREASE_PERC: u64 = 10;
+pub const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
+pub const GAS_INCREASE_PERC: u64 = 10;
 
-pub struct UoPoolService<M: Middleware + 'static, V: UserOperationValidator> {
-    pub uo_pools: Arc<DashMap<MempoolId, UserOperationPool<M, V>>>,
+type StandardUserPool<M, P, R> =
+    UserOperationPool<M, StandardUserOperationValidator<M, P, R>, P, R>;
+
+pub struct UoPoolService<M, P, R>
+where
+    M: Middleware + Clone + 'static,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
+    pub uo_pools: Arc<DashMap<MempoolId, UoPoolBuiler<M, P, R>>>,
     pub chain: Chain,
 }
 
-impl<M: Middleware + 'static, V: UserOperationValidator> UoPoolService<M, V> {
-    pub fn new(uo_pools: Arc<DashMap<MempoolId, UserOperationPool<M, V>>>, chain: Chain) -> Self {
+impl<M, P, R> UoPoolService<M, P, R>
+where
+    M: Middleware + Clone + 'static,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
+    pub fn new(uo_pools: Arc<DashMap<MempoolId, UoPoolBuiler<M, P, R>>>, chain: Chain) -> Self {
         Self { uo_pools, chain }
     }
 
-    fn get_uo_pool(&self, ep: &Address) -> Option<Ref<H256, UserOperationPool<M, V>>> {
+    fn get_uo_pool(&self, ep: &Address) -> tonic::Result<StandardUserPool<M, P, R>> {
         let m_id = mempool_id(ep, &U256::from(self.chain.id()));
-        self.uo_pools.get(&m_id)
-    }
-
-    fn get_uo_pool_mut(&self, ep: &Address) -> Option<RefMut<H256, UserOperationPool<M, V>>> {
-        let m_id = mempool_id(ep, &U256::from(self.chain.id()));
-        self.uo_pools.get_mut(&m_id)
+        self.uo_pools
+            .get(&m_id)
+            .map(|b| b.uo_pool())
+            .ok_or(Status::new(
+                Code::Unavailable,
+                "User operation pool is not available",
+            ))
     }
 }
 
 #[async_trait]
-impl<M: Middleware + 'static, V: UserOperationValidator + 'static> uo_pool_server::UoPool
-    for UoPoolService<M, V>
+impl<M, P, R> uo_pool_server::UoPool for UoPoolService<M, P, R>
 where
     EntryPointErr: From<<M as Middleware>::Error>,
+    M: Middleware + Clone + 'static,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error>
+        + Send
+        + Sync
+        + 'static,
 {
     async fn add(&self, req: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
         let req = req.into_inner();
@@ -77,7 +82,7 @@ where
         let ep = parse_addr(req.ep)?;
 
         let res = {
-            let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
+            let uo_pool = self.get_uo_pool(&ep)?;
             match uo_pool.validate_user_operation(&uo).await {
                 Ok(res) => res,
                 Err(err) => {
@@ -91,7 +96,7 @@ where
             }
         };
 
-        let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
+        let mut uo_pool = self.get_uo_pool(&ep)?;
 
         match uo_pool.add_user_operation(uo, res).await {
             Ok(uo_hash) => Ok(Response::new(AddResponse {
@@ -117,7 +122,7 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
+        let mut uo_pool = self.get_uo_pool(&ep)?;
 
         uo_pool.remove_user_operations(req.hashes.into_iter().map(Into::into).collect());
 
@@ -141,7 +146,7 @@ where
             eps: self
                 .uo_pools
                 .iter()
-                .map(|mempool| mempool.entry_point_address().into())
+                .map(|mempool| mempool.uo_pool().entry_point_address().into())
                 .collect(),
         }))
     }
@@ -155,7 +160,7 @@ where
         let uo = parse_uo(req.uo)?;
         let ep = parse_addr(req.ep)?;
 
-        let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
+        let uo_pool = self.get_uo_pool(&ep)?;
 
         Ok(Response::new(
             match uo_pool.estimate_user_operation_gas(&uo).await {
@@ -184,14 +189,14 @@ where
         let ep = parse_addr(req.ep)?;
 
         let uos = {
-            let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
+            let uo_pool = self.get_uo_pool(&ep)?;
             uo_pool.get_sorted_user_operations().map_err(|e| {
                 tonic::Status::internal(format!("Get sorted uos internal error: {e}"))
             })?
         };
 
         let uos_valid = {
-            let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
+            let mut uo_pool = self.get_uo_pool(&ep)?;
             uo_pool
                 .bundle_user_operations(uos)
                 .await
@@ -210,7 +215,7 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
+        let mut uo_pool = self.get_uo_pool(&ep)?;
 
         uo_pool
             .handle_past_events()
@@ -229,7 +234,11 @@ where
         let uo_hash = parse_hash(req.hash)?;
 
         for uo_pool in self.uo_pools.iter() {
-            if let Ok(uo_by_hash) = uo_pool.get_user_operation_by_hash(&uo_hash.into()).await {
+            if let Ok(uo_by_hash) = uo_pool
+                .uo_pool()
+                .get_user_operation_by_hash(&uo_hash.into())
+                .await
+            {
                 return Ok(Response::new(GetUserOperationByHashResponse {
                     user_operation: Some(uo_by_hash.user_operation.into()),
                     entry_point: Some(uo_by_hash.entry_point.into()),
@@ -252,7 +261,11 @@ where
         let uo_hash = parse_hash(req.hash)?;
 
         for uo_pool in self.uo_pools.iter() {
-            if let Ok(uo_receipt) = uo_pool.get_user_operation_receipt(&uo_hash.into()).await {
+            if let Ok(uo_receipt) = uo_pool
+                .uo_pool()
+                .get_user_operation_receipt(&uo_hash.into())
+                .await
+            {
                 return Ok(Response::new(GetUserOperationReceiptResponse {
                     user_operation_hash: Some(uo_receipt.user_operation_hash.into()),
                     sender: Some(uo_receipt.sender.into()),
@@ -278,7 +291,7 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
+        let uo_pool = self.get_uo_pool(&ep)?;
 
         Ok(Response::new(GetAllResponse {
             uos: uo_pool.get_all().into_iter().map(Into::into).collect(),
@@ -286,8 +299,8 @@ where
     }
 
     async fn clear(&self, _req: Request<()>) -> Result<Response<()>, Status> {
-        self.uo_pools.iter_mut().for_each(|mut uo_pool| {
-            uo_pool.clear();
+        self.uo_pools.iter_mut().for_each(|uo_pool| {
+            uo_pool.uo_pool().clear();
         });
         Ok(Response::new(()))
     }
@@ -299,7 +312,7 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let uo_pool = parse_uo_pool(self.get_uo_pool(&ep))?;
+        let uo_pool = self.get_uo_pool(&ep)?;
 
         Ok(Response::new(GetAllReputationResponse {
             rep: uo_pool
@@ -317,7 +330,7 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let mut uo_pool = parse_uo_pool_mut(self.get_uo_pool_mut(&ep))?;
+        let mut uo_pool = self.get_uo_pool(&ep)?;
 
         let res = Response::new(SetReputationResponse {
             res: match uo_pool.set_reputation(req.rep.iter().map(|re| re.clone().into()).collect())
@@ -349,73 +362,38 @@ pub async fn uopool_service_run(
 
         let m_map = Arc::new(DashMap::<
             MempoolId,
-            UserOperationPool<Provider<Http>, StandardUserOperationValidator<Provider<Http>>>,
+            UoPoolBuiler<Provider<Http>, MemoryMempool, MemoryReputation>,
         >::new());
 
         for ep in eps {
             let id = mempool_id(&ep, &U256::from(chain.id()));
-
-            let mut reputation = Box::<MemoryReputation>::default();
-            reputation.init(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
+            let builder = UoPoolBuiler::new(
+                uo_pool_mode == UoPoolMode::Unsafe,
+                eth_client.clone(),
+                ep,
+                chain,
+                max_verification_gas,
                 min_stake,
                 min_unstake_delay,
+                min_priority_fee_per_gas,
+                whitelist.clone(),
+                MemoryMempool::default(),
+                MemoryReputation::default(),
             );
-            for addr in whitelist.iter() {
-                reputation.add_whitelist(addr);
-            }
-
-            let entry_point = EntryPoint::<Provider<Http>>::new(eth_client.clone(), ep);
-
-            let mut validator = StandardUserOperationValidator::new(entry_point.clone(), chain)
-                .with_sanity_check(SenderOrInitCode)
-                .with_sanity_check(VerificationGas {
-                    max_verification_gas,
-                })
-                .with_sanity_check(Paymaster)
-                .with_sanity_check(CallGas)
-                .with_sanity_check(MaxFee {
-                    min_priority_fee_per_gas,
-                })
-                .with_sanity_check(SenderUos {
-                    max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
-                    gas_increase_perc: GAS_INCREASE_PERC.into(),
-                })
-                .with_simulation_check(Signature)
-                .with_simulation_check(Timestamp);
-
-            if uo_pool_mode != UoPoolMode::Unsafe {
-                validator = validator
-                    .with_simulation_trace_check(Gas)
-                    .with_simulation_trace_check(Opcodes)
-                    .with_simulation_trace_check(ExternalContracts)
-                    .with_simulation_trace_check(StorageAccess)
-                    .with_simulation_trace_check(CallStack)
-                    .with_simulation_trace_check(CodeHashes);
-            }
-
-            m_map.insert(
-                id,
-                UserOperationPool::<Provider<Http>, StandardUserOperationValidator<Provider<Http>>>::new(
-                    entry_point,
-                    validator,
-                    Box::<MemoryMempool>::default(),
-                    reputation,
-                    max_verification_gas,
-                    chain,
-                ),
-            );
+            m_map.insert(id, builder);
         }
 
-        let svc = uo_pool_server::UoPoolServer::new(UoPoolService::new(m_map.clone(), chain));
+        let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
+            Provider<Http>,
+            MemoryMempool,
+            MemoryReputation,
+        >::new(m_map.clone(), chain));
 
         tokio::spawn(async move {
             loop {
-                m_map.iter_mut().for_each(|mut m| {
+                m_map.iter_mut().for_each(|m| {
                     let _ = m
-                        .value_mut()
+                        .uo_pool()
                         .reputation
                         .update_hourly()
                         .map_err(|e| warn!("Failed to update hourly reputation: {:?}", e));

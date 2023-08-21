@@ -1,16 +1,22 @@
 use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
     validate::{SanityCheck, SanityHelper},
-    Overhead,
+    Overhead, Reputation,
 };
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{sanity::SanityCheckError, UserOperation};
+use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
 
 pub struct VerificationGas {
     pub max_verification_gas: U256,
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware> SanityCheck<M> for VerificationGas {
+impl<M: Middleware, P, R> SanityCheck<M, P, R> for VerificationGas
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that performs the check on verification gas.
     ///
     /// # Arguments
@@ -22,7 +28,7 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _helper: &SanityHelper<M>,
+        _helper: &SanityHelper<M, P, R>,
     ) -> Result<(), SanityCheckError> {
         if uo.verification_gas_limit > self.max_verification_gas {
             return Err(SanityCheckError::HighVerificationGasLimit {

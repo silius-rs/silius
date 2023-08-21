@@ -1,7 +1,13 @@
-use crate::validate::{SimulationTraceCheck, SimulationTraceHelper};
+use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
+    validate::{SimulationTraceCheck, SimulationTraceHelper},
+    Reputation,
+};
 use ethers::providers::Middleware;
 use silius_primitives::{
     consts::entities::LEVEL_TO_ENTITY,
+    reputation::ReputationEntry,
     simulation::{SimulationCheckError, CREATE2_OPCODE},
     UserOperation,
 };
@@ -9,11 +15,15 @@ use silius_primitives::{
 pub struct ExternalContracts;
 
 #[async_trait::async_trait]
-impl<M: Middleware> SimulationTraceCheck<M> for ExternalContracts {
+impl<M: Middleware, P, R> SimulationTraceCheck<M, P, R> for ExternalContracts
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M>,
+        helper: &mut SimulationTraceHelper<M, P, R>,
     ) -> Result<(), SimulationCheckError> {
         for (i, _) in LEVEL_TO_ENTITY.iter().enumerate() {
             if let Some(l) = helper.js_trace.number_levels.get(i) {

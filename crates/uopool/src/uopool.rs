@@ -1,12 +1,12 @@
 use crate::{
-    mempool::MempoolBox,
+    mempool::{Mempool, MempoolBox},
     mempool_id,
     reputation::ReputationBox,
     utils::calculate_call_gas_limit,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
-    MempoolId, Overhead,
+    MempoolId, Overhead, Reputation,
 };
 use anyhow::format_err;
 use ethers::{
@@ -37,7 +37,11 @@ const LATEST_SCAN_DEPTH: u64 = 1000;
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
-pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
+pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R>, P, R>
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The unique ID of the mempool
     pub id: MempoolId,
     /// The [EntryPoint](EntryPoint) contract object
@@ -45,16 +49,20 @@ pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
     /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    pub mempool: MempoolBox<VecUo, VecCh>,
+    pub mempool: MempoolBox<VecUo, VecCh, P>,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
-    pub reputation: ReputationBox<Vec<ReputationEntry>>,
+    pub reputation: ReputationBox<Vec<ReputationEntry>, R>,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
 }
 
-impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
+impl<M: Middleware + 'static, V: UserOperationValidator<P, R>, P, R> UoPool<M, V, P, R>
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// Creates a new [UoPool](UoPool) object
     ///
     /// # Arguments
@@ -72,8 +80,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     pub fn new(
         entry_point: EntryPoint<M>,
         validator: V,
-        mempool: MempoolBox<VecUo, VecCh>,
-        reputation: ReputationBox<Vec<ReputationEntry>>,
+        mempool: MempoolBox<VecUo, VecCh, P>,
+        reputation: ReputationBox<Vec<ReputationEntry>, R>,
         max_verification_gas: U256,
         chain: Chain,
     ) -> Self {

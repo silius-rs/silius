@@ -1,10 +1,16 @@
 use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
+    Reputation,
 };
 use ethers::{providers::Middleware, types::U256};
 use silius_primitives::{
-    consts::entities::ACCOUNT, reputation::StakeInfo, sanity::SanityCheckError, UserOperation,
+    consts::entities::ACCOUNT,
+    reputation::{ReputationEntry, StakeInfo},
+    sanity::SanityCheckError,
+    UserOperation,
 };
 
 pub struct SenderUos {
@@ -13,7 +19,11 @@ pub struct SenderUos {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware> SanityCheck<M> for SenderUos {
+impl<M: Middleware, P, R> SanityCheck<M, P, R> for SenderUos
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that performs the sanity check on the [UserOperation](UserOperation) sender.
     ///
     /// # Arguments
@@ -25,7 +35,7 @@ impl<M: Middleware> SanityCheck<M> for SenderUos {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M>,
+        helper: &SanityHelper<M, P, R>,
     ) -> Result<(), SanityCheckError> {
         if helper.mempool.get_number_by_sender(&uo.sender) == 0 {
             return Ok(());

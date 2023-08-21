@@ -1,11 +1,20 @@
-use crate::validate::{SanityCheck, SanityHelper};
+use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
+    validate::{SanityCheck, SanityHelper},
+    Reputation,
+};
 use ethers::providers::Middleware;
-use silius_primitives::{sanity::SanityCheckError, UserOperation};
+use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
 
 pub struct SenderOrInitCode;
 
 #[async_trait::async_trait]
-impl<M: Middleware> SanityCheck<M> for SenderOrInitCode {
+impl<M: Middleware, P, R> SanityCheck<M, P, R> for SenderOrInitCode
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that performs the check whether the [UserOperation](UserOperation) is a deployment or a transaction.
     ///
     /// # Arguments
@@ -17,7 +26,7 @@ impl<M: Middleware> SanityCheck<M> for SenderOrInitCode {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M>,
+        helper: &SanityHelper<M, P, R>,
     ) -> Result<(), SanityCheckError> {
         let code = helper
             .entry_point

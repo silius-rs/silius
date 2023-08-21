@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+mod builder;
 mod bundler;
 mod proto;
 mod uopool;

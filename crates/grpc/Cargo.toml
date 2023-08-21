@@ -16,7 +16,7 @@ arrayref = "0.3"
 async-trait = { workspace = true }
 dashmap = "5.4.0"
 ethers = { workspace = true }
-parking_lot = "0.12"
+parking_lot = { workspace = true }
 prost = "0.11"
 serde_json = { workspace = true }
 silius-bundler = { path = "../bundler" }
