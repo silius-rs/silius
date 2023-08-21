@@ -13,7 +13,7 @@ default-run = "silius"
 
 [dependencies]
 
-anyhow = "1"
+anyhow = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
 ethers = { workspace = true }
