@@ -11,7 +11,7 @@ use ethers_flashbots::{
 };
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{
-    consts::{flashbots_relay_endpoints, supported_networks},
+    consts::{flashbots_relay_endpoints, supported_networks, SendBundleMode},
     Chain, UserOperation, Wallet,
 };
 use std::{sync::Arc, time::Duration};
@@ -24,15 +24,6 @@ type FlashbotsClientType<M> =
 
 /// A type alias for the Ethereum Signer client
 type EthClientType<M> = Arc<SignerMiddleware<M, LocalWallet>>;
-
-/// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
-#[derive(Clone, Debug, PartialEq)]
-pub enum SendBundleMode {
-    /// Send the bundle to a Ethereum execution client
-    EthClient,
-    /// Send the bundle to Flashbots relay
-    Flashbots,
-}
 
 /// The `Bundler` struct is used to represent a bundler with necessary properties
 #[derive(Clone, Debug)]
@@ -465,7 +456,7 @@ mod test {
             generate_bundle_req, generate_fb_middleware, send_fb_bundle, simulate_fb_bundle,
         },
         mock_relay::{MockFlashbotsBlockBuilderRelay, MockFlashbotsRelayServer, INIT_BLOCK},
-        Bundler, SendBundleMode,
+        Bundler,
     };
     use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
     use alloy_sol_types::{sol, SolCall};
@@ -480,7 +471,10 @@ mod test {
         utils::{parse_units, Anvil, AnvilInstance},
     };
     use jsonrpsee::server::{ServerBuilder, ServerHandle};
-    use silius_primitives::{consts::flashbots_relay_endpoints, Chain, Wallet};
+    use silius_primitives::{
+        consts::{flashbots_relay_endpoints, SendBundleMode},
+        Chain, Wallet,
+    };
     use std::env;
 
     sol! {

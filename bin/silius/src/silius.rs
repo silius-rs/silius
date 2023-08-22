@@ -9,13 +9,14 @@ use silius::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
-use silius_bundler::SendBundleMode;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
 use silius_primitives::{
-    chain::SUPPORTED_CHAINS, consts::flashbots_relay_endpoints, Chain, Wallet,
+    chain::SUPPORTED_CHAINS,
+    consts::{flashbots_relay_endpoints, SendBundleMode},
+    Chain, Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -97,7 +98,7 @@ fn main() -> Result<()> {
                 }
 
                 let wallet: Wallet;
-                if opt.rpc_opts.build_fb_signer == Some(true) {
+                if opt.bundler_opts.build_fb_signer == Some(true) {
                     wallet = Wallet::from_file(
                         opt.mnemonic_file.clone(),
                         &chain_id,
@@ -153,7 +154,7 @@ fn main() -> Result<()> {
                     opt.bundler_opts.min_balance,
                     opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),
-                    match opt.rpc_opts.send_bundle_mode.as_deref() {
+                    match opt.bundler_opts.send_bundle_mode.as_deref() {
                         Some(mode) => match mode {
                             "eth-client" => SendBundleMode::EthClient,
                             "flashbots" => SendBundleMode::Flashbots,
@@ -161,7 +162,7 @@ fn main() -> Result<()> {
                         },
                         None => SendBundleMode::EthClient,
                     },
-                    match opt.rpc_opts.clone().send_bundle_mode {
+                    match opt.bundler_opts.clone().send_bundle_mode {
                         Some(mode) => match mode.clone().as_str() {
                             "eth-client" => None,
                             "flashbots" => Some(vec![

@@ -4,7 +4,7 @@ use ethers::types::U256;
 pub const SUPPORTED_CHAINS: [&str; 5] = [
     "mainnet", // Ethereum mainnet
     "goerli",  // Ethereum goerli testnet
-    "sepolia", // Ethereum goerli testnet
+    "sepolia", // Ethereum sepolia testnet
     "dev",     // Development chain
     "mumbai",  // Polygon PoS testnet
 ];
