@@ -64,8 +64,23 @@ pub struct RpcServiceOpts {
     #[clap(long)]
     pub ws: bool,
 
+    /// Configures the CORS filter.
+    ///
+    /// By default, this option is set to `*`.
     #[clap(long, value_delimiter = ',', default_value = "*")]
     pub cors_domain: Vec<String>,
+
+    /// Enables or disables the creation of Flashbots bundler signer.
+    ///
+    /// By default, this option is set to false.
+    #[clap(long)]
+    pub build_fb_signer: Option<bool>,
+
+    /// Srts the send bundle mode.
+    ///
+    /// By default, this option is set to `eth-client`.
+    #[clap(long)]
+    pub send_bundle_mode: Option<String>,
 }
 
 impl RpcServiceOpts {
@@ -138,6 +153,8 @@ mod tests {
                 http: true,
                 ws: true,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             },
             RpcServiceOpts::try_parse_from(args).unwrap()
         );
@@ -166,6 +183,8 @@ mod tests {
                 http: true,
                 ws: false,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             },
             RpcServiceOpts::try_parse_from(args).unwrap()
         );
@@ -194,6 +213,8 @@ mod tests {
                 http: false,
                 ws: true,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             },
             RpcServiceOpts::try_parse_from(args).unwrap()
         );
@@ -221,6 +242,8 @@ mod tests {
                 http: false,
                 ws: false,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             },
             RpcServiceOpts::try_parse_from(args).unwrap()
         );
@@ -239,6 +262,8 @@ mod tests {
                 http: true,
                 ws: false,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             }
             .is_enabled(),
             true
@@ -258,6 +283,8 @@ mod tests {
                 http: false,
                 ws: true,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             }
             .is_enabled(),
             true
@@ -277,6 +304,8 @@ mod tests {
                 http: true,
                 ws: true,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             }
             .is_enabled(),
             true
@@ -296,6 +325,8 @@ mod tests {
                 http: false,
                 ws: false,
                 cors_domain: vec![String::from("127.0.0.1:4321")],
+                build_fb_signer: None,
+                send_bundle_mode: None,
             }
             .is_enabled(),
             false

@@ -9,11 +9,14 @@ use silius::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
     utils::{parse_address, parse_u256, run_until_ctrl_c},
 };
+use silius_bundler::SendBundleMode;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
-use silius_primitives::{chain::SUPPORTED_CHAINS, Chain, Wallet};
+use silius_primitives::{
+    chain::SUPPORTED_CHAINS, consts::flashbots_relay_endpoints, Chain, Wallet,
+};
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
     eth_api::{EthApiServer, EthApiServerImpl},
@@ -58,6 +61,7 @@ pub struct Opt {
 fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
 
+    std::env::set_var("RUST_LOG", "info");
     tracing_subscriber::fmt::init();
 
     std::thread::Builder::new()
@@ -92,9 +96,22 @@ fn main() -> Result<()> {
                     }
                 }
 
-                let wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id)
+                let wallet: Wallet;
+                if opt.rpc_opts.build_fb_signer == Some(true) {
+                    wallet = Wallet::from_file(
+                        opt.mnemonic_file.clone(),
+                        &chain_id,
+                        true,
+                    )
                     .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
-                info!("{:?}", wallet.signer);
+                    info!("Wallet Signer {:?}", wallet.signer);
+                    info!("Flashbots Signer {:?}", wallet.fb_signer);
+                } else {
+                    wallet = Wallet::from_file(opt.mnemonic_file.clone(), &chain_id, false)
+                        .map_err(|error| format_err!("Could not load mnemonic file: {}", error))?;
+                    info!("{:?}", wallet.signer);
+                }
+
 
                 if !opt.no_uopool {
                     info!("Starting uopool gRPC service...");
@@ -136,6 +153,24 @@ fn main() -> Result<()> {
                     opt.bundler_opts.min_balance,
                     opt.bundler_opts.bundle_interval,
                     uopool_grpc_client.clone(),
+                    match opt.rpc_opts.send_bundle_mode.as_deref() {
+                        Some(mode) => match mode {
+                            "eth-client" => SendBundleMode::EthClient,
+                            "flashbots" => SendBundleMode::Flashbots,
+                            _ => SendBundleMode::EthClient,
+                        },
+                        None => SendBundleMode::EthClient,
+                    },
+                    match opt.rpc_opts.clone().send_bundle_mode {
+                        Some(mode) => match mode.clone().as_str() {
+                            "eth-client" => None,
+                            "flashbots" => Some(vec![
+                                flashbots_relay_endpoints::FLASHBOTS.to_string(),
+                            ]),
+                            _ => None,
+                        },
+                        None => None,
+                    },
                 );
                 info!(
                     "Started bundler gRPC service at {:}",

@@ -1,8 +1,10 @@
 use ethers::types::U256;
 
 /// Currently supported chains
-pub const SUPPORTED_CHAINS: [&str; 3] = [
-    "sepolia", // Ethereum testnet
+pub const SUPPORTED_CHAINS: [&str; 5] = [
+    "mainnet", // Ethereum mainnet
+    "goerli",  // Ethereum goerli testnet
+    "sepolia", // Ethereum goerli testnet
     "dev",     // Development chain
     "mumbai",  // Polygon PoS testnet
 ];

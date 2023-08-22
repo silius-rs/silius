@@ -1,3 +1,5 @@
 /target
 .local
 .vscode
+**/.env
+.env
