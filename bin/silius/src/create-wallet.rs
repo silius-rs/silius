@@ -18,6 +18,9 @@ pub struct Opt {
 
     #[clap(long, value_parser=parse_u256, default_value="1")]
     pub chain_id: U256,
+
+    #[clap(long)]
+    pub build_fb_wallet: Option<bool>,
 }
 
 fn main() -> Result<()> {
@@ -34,8 +37,14 @@ fn main() -> Result<()> {
             .map(ExpandedPathBuf)?
     };
 
-    let wallet = Wallet::build_random(path, &opt.chain_id)?;
-    info!("{:?}", wallet.signer);
+    if opt.build_fb_wallet == Some(true) {
+        let wallet = Wallet::build_random(path, &opt.chain_id, true)?;
+        info!("Wallet Signer {:?}", wallet.signer);
+        info!("Flashbots Signer {:?}", wallet.fb_signer);
+    } else {
+        let wallet = Wallet::build_random(path, &opt.chain_id, false)?;
+        info!("Wallet Signer {:?}", wallet.signer);
+    }
 
     Ok(())
 }

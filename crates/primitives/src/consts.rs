@@ -37,3 +37,36 @@ pub mod entities {
 
     pub const LEVEL_TO_ENTITY: [&str; NUMBER_LEVELS] = [FACTORY, ACCOUNT, PAYMASTER];
 }
+
+/// Builder JSON-RPC Endpoints
+pub mod flashbots_relay_endpoints {
+    pub const FLASHBOTS: &str = "https://relay.flashbots.net";
+    pub const FLASHBOTS_GOERLI: &str = "https://relay-goerli.flashbots.net";
+    pub const BUILDER0X69: &str = "http://builder0x69.io/";
+    pub const EDENNETWORK: &str = "https://api.edennetwork.io/v1/bundle";
+    pub const BEAVERBUILD: &str = "https://rpc.beaverbuild.org/";
+    pub const LIGHTSPEEDBUILDER: &str = "https://rpc.lightspeedbuilder.info/";
+    pub const ETH_BUILDER: &str = "https://eth-builder.com/";
+    pub const ULTRASOUND: &str = "https://relay.ultrasound.money/";
+    pub const AGNOSTIC_RELAY: &str = "https://agnostic-relay.net/";
+    pub const RELAYOOR_WTF: &str = "https://relayooor.wtf/";
+    pub const RSYNC_BUILDER: &str = "https://rsync-builder.xyz/";
+}
+
+/// Supported networks' IDs
+pub mod supported_networks {
+    pub const MAINNET: u64 = 1;
+    pub const GOERLI: u64 = 5;
+    pub const SEPOLIA: u64 = 11155111;
+    pub const DEV: u64 = 1337;
+    pub const MUMBAI: u64 = 80001;
+}
+
+/// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
+#[derive(Clone, Debug, PartialEq)]
+pub enum SendBundleMode {
+    /// Send the bundle to a Ethereum execution client
+    EthClient,
+    /// Send the bundle to Flashbots relay
+    Flashbots,
+}
