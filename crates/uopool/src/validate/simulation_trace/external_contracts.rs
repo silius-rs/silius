@@ -28,6 +28,16 @@ impl<M: Middleware> SimulationTraceCheck<M> for ExternalContracts {
                         });
                     }
                 }
+
+                // TODO: uncomment when bundler spec tests updated
+                // for (addr, info) in l.ext_code_access_info.iter() {
+                //     if *addr == helper.entry_point.address() {
+                //         return Err(SimulationCheckError::Opcode {
+                //             entity: LEVEL_TO_ENTITY[i].to_string(),
+                //             opcode: info.clone(),
+                //         });
+                //     }
+                // }
             }
         }
 

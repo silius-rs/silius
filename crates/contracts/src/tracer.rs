@@ -31,6 +31,8 @@ pub struct Level {
     pub opcodes: HashMap<String, u64>,
     #[serde(rename = "contractSize")]
     pub contract_size: HashMap<Address, ContractSizeInfo>,
+    #[serde(rename = "extCodeAccessInfo")]
+    pub ext_code_access_info: HashMap<Address, String>,
     pub oog: Option<bool>,
 }
 
@@ -153,7 +155,8 @@ pub const JS_TRACER: &str = r#"
                 this.currentLevel = this.numberLevels[this.numberCounter] = {
                     access: {},
                     opcodes: {},
-                    contractSize: {}
+                    contractSize: {},
+                    extCodeAccessInfo: {}
                 };
             }
             this.lastOp = '';
@@ -169,13 +172,30 @@ pub const JS_TRACER: &str = r#"
                 this.countSlot(this.currentLevel.opcodes, opcode);
             }
         }
+
+        // store all addresses touched by EXTCODE* opcodes
+        if (opcode.match(/^(EXT.*)$/) != null) {
+            const addr = toAddress(log.stack.peek(0).toString(16))
+            const addrHex = toHex(addr)
+            // only store the last EXTCODE* opcode per address - could even be a boolean for our current use-case
+            this.currentLevel.extCodeAccessInfo[addrHex] = opcode
+        }
+
+        // not using 'isPrecompiled' to only allow the ones defined by the ERC-4337 as stateless precompiles
+        const isAllowedPrecompiled = function(address) {
+            const addrHex = toHex(address)
+            const addressInt = parseInt(addrHex)
+            // this.debug.push(`isPrecompiled address=${addrHex} addressInt=${addressInt}`)
+            return addressInt > 0 && addressInt < 10
+        };
+
         if (opcode.match(/^(EXT.*|CALL|CALLCODE|DELEGATECALL|STATICCALL|CREATE2)$/) != null) {
             // this.debug.push('op= opcode + ' last= this.lastOp + ' stacksize= log.stack.length())
             const idx = opcode.startsWith('EXT') ? 0 : 1;
             const addr = toAddress(log.stack.peek(idx).toString(16));
             const addrHex = toHex(addr);
             // this.debug.push('op=' + opcode + ' last=' + this.lastOp + ' stacksize=' + log.stack.length() + ' addr=' + addrHex)
-            if (this.currentLevel.contractSize[addrHex] == null && !isPrecompiled(addr)) {
+            if (this.currentLevel.contractSize[addrHex] == null && !isAllowedPrecompiled(addr)) {
                 this.currentLevel.contractSize[addrHex] = {
                     contractSize: db.getCode(addr).length,
                     opcode
@@ -205,8 +225,7 @@ pub const JS_TRACER: &str = r#"
                 // if (len === 64) {
                 this.keccak.push(toHex(log.memory.slice(ofs, ofs + len)));
             }
-        }
-        else if (opcode.startsWith('LOG')) {
+        } else if (opcode.startsWith('LOG')) {
             const count = parseInt(opcode.substring(3));
             const ofs = parseInt(log.stack.peek(0).toString());
             const len = parseInt(log.stack.peek(1).toString());

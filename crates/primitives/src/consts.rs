@@ -61,12 +61,3 @@ pub mod supported_networks {
     pub const DEV: u64 = 1337;
     pub const MUMBAI: u64 = 80001;
 }
-
-/// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
-#[derive(Clone, Debug, PartialEq)]
-pub enum SendBundleMode {
-    /// Send the bundle to a Ethereum execution client
-    EthClient,
-    /// Send the bundle to Flashbots relay
-    Flashbots,
-}

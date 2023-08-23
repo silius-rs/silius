@@ -14,7 +14,7 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 Rust version: 1.71.1
 
-1. libclang, `libclang-dev` on Debian/Ubuntu.
+1. libclang, `libclang-dev` and `libssl-dev` on Debian/Ubuntu.
 2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.11.6](https://github.com/ethereum/go-ethereum/releases/tag/v1.11.6)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
 3. [`solc`](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
 4. [`cargo-sort`](https://crates.io/crates/cargo-sort) and [`cargo-udeps`](https://crates.io/crates/cargo-udeps).
@@ -63,10 +63,9 @@ Bundler was tested on the following networks:
 
 ## Supported entry point
 The address of the entry point smart contract is the same on all EVM networks.
-| Address         | Commit   | Audited                                       |
-| :--------:      | :-------:| :-------:                                     |
-| [0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789](https://blockscan.com/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789) | [9b5f2e4](https://github.com/eth-infinitism/account-abstraction/commit/9b5f2e4bb30a81aa30761749d9e2e43fee64c768) | [April 2023](https://blog.openzeppelin.com/eip-4337-ethereum-account-abstraction-incremental-audit)
-
+| Address    | Version   | Commit    | Audited   |
+| :--------: | :-------: | :-------: | :-------: |
+| [0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789](https://blockscan.com/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789) | 0.6.0 | [9b5f2e4](https://github.com/eth-infinitism/account-abstraction/commit/9b5f2e4bb30a81aa30761749d9e2e43fee64c768) | [April 2023](https://blog.openzeppelin.com/eip-4337-ethereum-account-abstraction-incremental-audit)
 
 ## Examples
 
@@ -90,7 +89,7 @@ make lint
 make test
 ```
 
-Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [f7c993031d4bb5f0940c5282298c911ec15a5fb7](https://github.com/eth-infinitism/bundler-spec-tests/tree/f7c993031d4bb5f0940c5282298c911ec15a5fb7)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [8f830db54809c454059c5648dfd4bdaa842a2303](https://github.com/eth-infinitism/bundler-spec-tests/tree/f7c993031d4bb5f0940c5282298c911ec15a5fb7)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
 
 ## Contact
 
@@ -100,6 +99,10 @@ The best place for the discussion is the dedicated [Telegram group](https://t.me
 
 - Vid Kersic: [GitHub](https://github.com/Vid201), [Twitter](https://twitter.com/vidkersic)
 - WillQ: [GitHub](https://github.com/zsluedem), [Twitter](https://twitter.com/zsluedem06)
+
+## Projects using Silius
+
+- [Luban the Paymaster](https://github.com/da-bao-jian/luban-the-paymaster): A Cross-chain Tx Sponsorship Protocol.
 
 ## Licenses
 
@@ -120,3 +123,5 @@ Silius is an open-source project and a public good. If you want to help the proj
 - [Akula](https://github.com/akula-bft/akula)
 - [ethers-rs](https://github.com/gakonst/ethers-rs)
 - [Reth](https://github.com/paradigmxyz/reth)
+- [Lighthouse](https://github.com/sigp/lighthouse)
+- [Alloy](https://github.com/alloy-rs)

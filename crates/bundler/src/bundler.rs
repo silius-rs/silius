@@ -11,7 +11,8 @@ use ethers_flashbots::{
 };
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{
-    consts::{flashbots_relay_endpoints, supported_networks, SendBundleMode},
+    bundler::SendBundleMode,
+    consts::{flashbots_relay_endpoints, supported_networks},
     Chain, UserOperation, Wallet,
 };
 use std::{sync::Arc, time::Duration};
@@ -472,8 +473,7 @@ mod test {
     };
     use jsonrpsee::server::{ServerBuilder, ServerHandle};
     use silius_primitives::{
-        consts::{flashbots_relay_endpoints, SendBundleMode},
-        Chain, Wallet,
+        bundler::SendBundleMode, consts::flashbots_relay_endpoints, Chain, Wallet,
     };
     use std::env;
 
