@@ -1,0 +1,27 @@
+version: "3"
+services:
+  silius:
+    image: ghcr.io/vid201/silius:v0.1.0-alpha-113-gbc8b7b0
+    # restart: always
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ~/.silius:/data/silius
+    command:
+      - --mnemonic-file
+      - /data/silius/0xa0C558eB101f4FdC7d7B8d131AeCb3dE9a1B42Ec
+      - --beneficiary
+      - 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+      - --eth-client-address
+      - http://geth-dev:8545
+      - --no-uopool
+    links:
+      - geth-dev
+    depends_on:
+      geth-dev:
+        condition: service_started
+  geth-dev:
+    build: bundler-spec-test/geth-dev
+    ports:
+      - 8545:8545
