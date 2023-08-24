@@ -14,9 +14,8 @@ use silius_grpc::{
     uopool_service_run,
 };
 use silius_primitives::{
-    chain::SUPPORTED_CHAINS,
-    consts::{flashbots_relay_endpoints, SendBundleMode},
-    Chain, Wallet,
+    bundler::SendBundleMode, chain::SUPPORTED_CHAINS, consts::flashbots_relay_endpoints, Chain,
+    Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},

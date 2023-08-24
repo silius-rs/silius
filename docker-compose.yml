@@ -1,0 +1,22 @@
+version: "3"
+services:
+  silius:
+    image: ghcr.io/vid201/silius:latest
+    network_mode: host
+    volumes:
+      - ./bundler-spec-test/keys:/data/silius
+    command:
+      - --rpc-listen-address 
+      - 0.0.0.0:3000 
+      - --eth-client-address 
+      - http://127.0.0.1:8545
+      - --mnemonic-file 
+      - data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 
+      - --beneficiary 
+      - 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 
+      - --entry-points 
+      - 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 
+      - --http 
+      - --ws 
+      - --rpc-api 
+      - eth,debug,web3

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use ethers::types::{Address, H256, U256};
 use parking_lot::Mutex;
 use silius_bundler::Bundler;
-use silius_primitives::{consts::SendBundleMode, Chain, UserOperation, Wallet};
+use silius_primitives::{bundler::SendBundleMode, Chain, UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};

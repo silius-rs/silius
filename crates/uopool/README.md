@@ -12,4 +12,4 @@ The UserOperation alternative mempool implementation according to the [ERC-4337 
 ### `reputation` module
 * `reputation` module provides the `Reputation` trait that defines the interface for reputation-realted operations.
 ### `database` and `memory` modules
-* `database` and `memory` modules provide different implementations of the `Mempool` trait, depending on the use case.
+* `database` and `memory` modules provide different implementations of the `Mempool` and `Reputation` traits, depending on the use case.
