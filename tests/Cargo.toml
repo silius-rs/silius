@@ -10,8 +10,7 @@ description = """
 AA (ERC-4337) bundler integration tests
 """
 
-[dev-dependencies]
-
+[dependencies]
 anyhow = "1"
 ethers = { workspace = true }
 silius-contracts = { path = "../crates/contracts" }
@@ -19,3 +18,6 @@ silius-primitives = { path = "../crates/primitives" }
 silius-uopool = { path = "../crates/uopool" }
 tempdir = "0.3.7"
 tokio = { workspace = true }
+
+[package.metadata.cargo-udeps.ignore]
+normal = ["silius-contracts", "silius-primitives", "silius-uopool"]
