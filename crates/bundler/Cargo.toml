@@ -12,8 +12,7 @@ AA (ERC-4337) bundler bundling implementation
 
 [dependencies]
 
-anyhow = "1"
-
+anyhow = { workspace = true }
 async-trait = "0.1"
 bytes = "1.4.0"
 ethers = { workspace = true }

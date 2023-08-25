@@ -1,4 +1,9 @@
-use crate::validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper};
+use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
+    validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
+    Reputation,
+};
 use ethers::{abi::AbiDecode, providers::Middleware};
 use silius_contracts::{
     entry_point::{ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS},
@@ -6,6 +11,7 @@ use silius_contracts::{
 };
 use silius_primitives::{
     consts::entities::{LEVEL_TO_ENTITY, PAYMASTER},
+    reputation::ReputationEntry,
     simulation::{
         SimulationCheckError, CREATE_OPCODE, PAYMASTER_VALIDATION_FUNCTION, RETURN_OPCODE,
         REVERT_OPCODE,
@@ -88,7 +94,11 @@ impl CallStack {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
+impl<M: Middleware, P, R> SimulationTraceCheck<M, P, R> for CallStack
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that performs the call stack trace check.
     ///
     /// # Arguments
@@ -100,7 +110,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M>,
+        helper: &mut SimulationTraceHelper<M, P, R>,
     ) -> Result<(), SimulationCheckError> {
         if helper.stake_info.is_none() {
             helper.stake_info = Some(extract_stake_info(uo, helper.simulate_validation_result));

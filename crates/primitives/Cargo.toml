@@ -11,14 +11,14 @@ AA (ERC-4337) bundler commonly used types
 """
 
 [dependencies]
-anyhow = "1"
+anyhow = { workspace = true }
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethers = { workspace = true }
 expanded-pathbuf = "0.1"
 lazy_static = "1.4.0"
 rustc-hex = "^2.0.1"
 serde = "1"
-serde_json = "1"
+serde_json = { workspace = true }
 ssz_rs = "0.8.0"
 ssz_rs_derive = "0.8.0"
 strum = "0.24"

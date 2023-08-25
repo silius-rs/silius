@@ -21,6 +21,7 @@ use ethers::{
 };
 use silius_contracts::EntryPoint;
 use silius_primitives::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
+use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::simulation::SimulationCheckError;
 use silius_primitives::uopool::ValidationError;
 use silius_primitives::{Chain, UserOperation};
@@ -41,7 +42,10 @@ use silius_uopool::validate::validator::StandardUserOperationValidator;
 use silius_uopool::validate::{
     UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
 };
-use silius_uopool::{mempool_id, MemoryMempool, MemoryReputation, Reputation, UoPool};
+use silius_uopool::{
+    mempool_id, MemoryMempool, MemoryReputation, Mempool, MempoolBox, Reputation, ReputationBox,
+    UoPool, VecCh, VecUo,
+};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -49,7 +53,12 @@ use std::sync::Arc;
 const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 const GAS_INCREASE_PERC: u64 = 10;
 
-struct TestContext<M: Middleware + 'static, V: UserOperationValidator + 'static> {
+struct TestContext<M: Middleware + 'static, V, P, R>
+where
+    V: UserOperationValidator<P, R> + 'static,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     pub client: Arc<M>,
     pub _geth: GethInstance,
     pub entry_point: DeployedContract<EntryPointContract<M>>,
@@ -58,11 +67,17 @@ struct TestContext<M: Middleware + 'static, V: UserOperationValidator + 'static>
     pub storage_factory: DeployedContract<TestStorageAccountFactory<M>>,
     pub _rules_factory: DeployedContract<TestRulesAccountFactory<M>>,
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
-    pub uopool: UoPool<M, V>,
+    pub uopool: UoPool<M, V, P, R>,
 }
 
-async fn setup(
-) -> anyhow::Result<TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>> {
+type Context = TestContext<
+    ClientType,
+    StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation>,
+    MemoryMempool,
+    MemoryReputation,
+>;
+
+async fn setup() -> anyhow::Result<Context> {
     let chain_id = 1337u64;
     let (_geth, _client, provider) = setup_geth().await?;
     let client = Arc::new(_client);
@@ -100,63 +115,64 @@ async fn setup(
     let m_id = mempool_id(&ep.address, &U256::from(chain_id));
     let mut ep_map = HashMap::new();
     ep_map.insert(m_id, EntryPoint::new(client.clone(), ep.address));
-    let mempools = Box::new(MemoryMempool::default());
-    let mut reputation = Box::new(MemoryReputation::default());
+    let mempools = MemoryMempool::default();
+    let mut reputation = MemoryReputation::default();
     reputation.init(10, 10, 10, 1u64.into(), 1u64.into());
 
     let entry_point = EntryPoint::new(client.clone(), ep.address);
     let entry_point2 = EntryPoint::new(Arc::new(provider.clone()), ep.address);
     let c = Chain::from(chain_id);
 
-    let validator =
-        StandardUserOperationValidator::new(Arc::new(provider), entry_point2, c.clone())
-            .with_sanity_check(SenderOrInitCode {})
-            .with_sanity_check(VerificationGas {
-                max_verification_gas: U256::from(3000000_u64),
-            })
-            .with_sanity_check(Paymaster {})
-            .with_sanity_check(CallGas {})
-            .with_sanity_check(MaxFee {
-                min_priority_fee_per_gas: U256::from(1u64),
-            })
-            .with_sanity_check(SenderUos {
-                max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
-                gas_increase_perc: GAS_INCREASE_PERC.into(),
-            })
-            .with_simulation_check(Signature)
-            .with_simulation_check(Timestamp)
-            .with_simulation_trace_check(Gas)
-            .with_simulation_trace_check(Opcodes)
-            .with_simulation_trace_check(StorageAccess)
-            .with_simulation_trace_check(CallStack)
-            .with_simulation_trace_check(CodeHashes);
+    let validator = StandardUserOperationValidator::new(entry_point2, c.clone())
+        .with_sanity_check(SenderOrInitCode {})
+        .with_sanity_check(VerificationGas {
+            max_verification_gas: U256::from(3000000_u64),
+        })
+        .with_sanity_check(Paymaster {})
+        .with_sanity_check(CallGas {})
+        .with_sanity_check(MaxFee {
+            min_priority_fee_per_gas: U256::from(1u64),
+        })
+        .with_sanity_check(SenderUos {
+            max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
+            gas_increase_perc: GAS_INCREASE_PERC.into(),
+        })
+        .with_simulation_check(Signature)
+        .with_simulation_check(Timestamp)
+        .with_simulation_trace_check(Gas)
+        .with_simulation_trace_check(Opcodes)
+        .with_simulation_trace_check(StorageAccess)
+        .with_simulation_trace_check(CallStack)
+        .with_simulation_trace_check(CodeHashes);
 
-    let pool = UoPool::<ClientType, StandardUserOperationValidator<Provider<Http>>>::new(
+    let pool = UoPool::<
+        ClientType,
+        StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation>,
+        MemoryMempool,
+        MemoryReputation,
+    >::new(
         entry_point,
         validator,
-        mempools,
-        reputation,
-        client.clone(),
+        MempoolBox::new(mempools),
+        ReputationBox::new(reputation),
         3000000_u64.into(),
         c,
     );
 
-    Ok(
-        TestContext::<ClientType, StandardUserOperationValidator<Provider<Http>>> {
-            client: client.clone(),
-            _geth,
-            entry_point: ep,
-            paymaster,
-            opcodes_factory,
-            storage_factory,
-            _rules_factory: rules_factory,
-            storage_account: DeployedContract::new(
-                TestRulesAccount::new(storage_account_address, client.clone()),
-                storage_account_address,
-            ),
-            uopool: pool,
-        },
-    )
+    Ok(Context {
+        client: client.clone(),
+        _geth,
+        entry_point: ep,
+        paymaster,
+        opcodes_factory,
+        storage_factory,
+        _rules_factory: rules_factory,
+        storage_account: DeployedContract::new(
+            TestRulesAccount::new(storage_account_address, client.clone()),
+            storage_account_address,
+        ),
+        uopool: pool,
+    })
 }
 
 async fn create_storage_factory_init_code(
@@ -191,7 +207,7 @@ async fn create_opcode_factory_init_code(init_func: String) -> anyhow::Result<(B
 }
 
 async fn create_test_user_operation(
-    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
+    context: &Context,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
@@ -242,7 +258,7 @@ async fn create_test_user_operation(
 }
 
 fn existing_storage_account_user_operation(
-    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
+    context: &Context,
     validate_rule: String,
     pm_rule: String,
 ) -> UserOperation {
@@ -267,7 +283,7 @@ fn existing_storage_account_user_operation(
 }
 
 async fn validate(
-    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
+    context: &Context,
     uo: UserOperation,
 ) -> Result<UserOperationValidationOutcome, ValidationError> {
     context
@@ -283,7 +299,7 @@ async fn validate(
 }
 
 async fn test_user_operation(
-    context: &TestContext<ClientType, StandardUserOperationValidator<Provider<Http>>>,
+    context: &Context,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,

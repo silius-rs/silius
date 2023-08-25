@@ -1,16 +1,25 @@
-use crate::validate::{SanityCheck, SanityHelper};
+use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
+    validate::{SanityCheck, SanityHelper},
+    Reputation,
+};
 use ethers::{
     providers::Middleware,
     types::{BlockNumber, U256},
 };
-use silius_primitives::{sanity::SanityCheckError, UserOperation};
+use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
 
 pub struct MaxFee {
     pub min_priority_fee_per_gas: U256,
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware> SanityCheck<M> for MaxFee {
+impl<M: Middleware, P, R> SanityCheck<M, P, R> for MaxFee
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that checks the max fee
     ///
     /// # Arguments
@@ -22,7 +31,7 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M, P, R>,
     ) -> Result<(), SanityCheckError> {
         if uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
             return Err(SanityCheckError::HighMaxPriorityFeePerGas {
@@ -32,7 +41,8 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
         }
 
         let block = helper
-            .eth_client
+            .entry_point
+            .eth_client()
             .get_block(BlockNumber::Latest)
             .await
             .map_err(|err| SanityCheckError::UnknownError {

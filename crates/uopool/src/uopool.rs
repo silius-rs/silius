@@ -1,12 +1,12 @@
 use crate::{
-    mempool::MempoolBox,
+    mempool::{Mempool, MempoolBox},
     mempool_id,
     reputation::ReputationBox,
     utils::calculate_call_gas_limit,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
-    MempoolId, Overhead,
+    MempoolId, Overhead, Reputation,
 };
 use anyhow::format_err;
 use ethers::{
@@ -27,10 +27,7 @@ use silius_primitives::{
     Chain, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 use tracing::trace;
 
 pub type VecUo = Vec<UserOperation>;
@@ -40,7 +37,11 @@ const LATEST_SCAN_DEPTH: u64 = 1000;
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
-pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
+pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R>, P, R>
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The unique ID of the mempool
     pub id: MempoolId,
     /// The [EntryPoint](EntryPoint) contract object
@@ -48,18 +49,20 @@ pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
     /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    pub mempool: MempoolBox<VecUo, VecCh>,
+    pub mempool: MempoolBox<VecUo, VecCh, P>,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
-    pub reputation: ReputationBox<Vec<ReputationEntry>>,
-    /// The Ethereum client [Middleware](ethers::providers::Middleware)
-    pub eth_client: Arc<M>,
+    pub reputation: ReputationBox<Vec<ReputationEntry>, R>,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
 }
 
-impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
+impl<M: Middleware + 'static, V: UserOperationValidator<P, R>, P, R> UoPool<M, V, P, R>
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// Creates a new [UoPool](UoPool) object
     ///
     /// # Arguments
@@ -77,9 +80,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     pub fn new(
         entry_point: EntryPoint<M>,
         validator: V,
-        mempool: MempoolBox<VecUo, VecCh>,
-        reputation: ReputationBox<Vec<ReputationEntry>>,
-        eth_client: Arc<M>,
+        mempool: MempoolBox<VecUo, VecCh, P>,
+        reputation: ReputationBox<Vec<ReputationEntry>, R>,
         max_verification_gas: U256,
         chain: Chain,
     ) -> Self {
@@ -89,7 +91,6 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             validator,
             mempool,
             reputation,
-            eth_client,
             max_verification_gas,
             chain,
         }
@@ -175,10 +176,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     pub async fn add_user_operation(
         &mut self,
         uo: UserOperation,
-        res: Option<UserOperationValidationOutcome>,
+        res: UserOperationValidationOutcome,
     ) -> Result<UserOperationHash, AddError> {
-        let res = res.unwrap_or(self.validate_user_operation(&uo).await?);
-
         if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);
         }
@@ -393,7 +392,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// `Result<U256, anyhow::Error>` - The block base fee per gas.
     pub async fn base_fee_per_gas(&self) -> anyhow::Result<U256> {
         let block = self
-            .eth_client
+            .entry_point
+            .eth_client()
             .get_block(BlockNumber::Latest)
             .await?
             .ok_or(format_err!("No block found"))?;
@@ -520,7 +520,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
 
         if let Some((event, log_meta)) = event {
             if let Some((uo, ep)) = self
-                .eth_client
+                .entry_point
+                .eth_client()
                 .get_transaction(log_meta.transaction_hash)
                 .await?
                 .and_then(|tx| {
@@ -560,7 +561,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
 
         if let Some((event, log_meta)) = event {
             if let Some(tx_receipt) = self
-                .eth_client
+                .entry_point
+                .eth_client()
                 .get_transaction_receipt(log_meta.transaction_hash)
                 .await?
             {
@@ -589,7 +591,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// # Returns
     /// `Result<(), anyhow::Error>` - None if the query was successful.
     pub async fn handle_past_events(&mut self) -> anyhow::Result<()> {
-        let block_num = self.eth_client.get_block_number().await?;
+        let block_num = self.entry_point.eth_client().get_block_number().await?;
         let block_st = std::cmp::max(
             1u64,
             block_num

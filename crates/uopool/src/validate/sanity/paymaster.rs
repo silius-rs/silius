@@ -1,11 +1,25 @@
-use crate::validate::{SanityCheck, SanityHelper};
+use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
+    validate::{SanityCheck, SanityHelper},
+    Reputation,
+};
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{get_address, reputation::Status, sanity::SanityCheckError, UserOperation};
+use silius_primitives::{
+    get_address,
+    reputation::{ReputationEntry, Status},
+    sanity::SanityCheckError,
+    UserOperation,
+};
 
 pub struct Paymaster;
 
 #[async_trait::async_trait]
-impl<M: Middleware> SanityCheck<M> for Paymaster {
+impl<M: Middleware, P, R> SanityCheck<M, P, R> for Paymaster
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that performs the sanity check on the paymaster.
     ///
     /// # Arguments
@@ -17,11 +31,11 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M, P, R>,
     ) -> Result<(), SanityCheckError> {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                let code = helper.eth_client.get_code(addr, None).await?;
+                let code = helper.entry_point.eth_client().get_code(addr, None).await?;
 
                 if !code.is_empty() {
                     let deposit_info =

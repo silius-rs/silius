@@ -1,6 +1,9 @@
 use crate::{
+    mempool::Mempool,
+    uopool::{VecCh, VecUo},
     utils::equal_code_hashes,
     validate::{SimulationTraceCheck, SimulationTraceHelper},
+    Reputation,
 };
 use ethers::{
     providers::Middleware,
@@ -8,6 +11,7 @@ use ethers::{
     utils::keccak256,
 };
 use silius_primitives::{
+    reputation::ReputationEntry,
     simulation::{CodeHash, SimulationCheckError},
     UserOperation,
 };
@@ -64,7 +68,11 @@ impl CodeHashes {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
+impl<M: Middleware, P, R> SimulationTraceCheck<M, P, R> for CodeHashes
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     /// The [check_user_operation] method implementation that checks the code hashes
     ///
     /// # Arguments
@@ -76,7 +84,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M>,
+        helper: &mut SimulationTraceHelper<M, P, R>,
     ) -> Result<(), SimulationCheckError> {
         let addrs = helper
             .js_trace
@@ -86,7 +94,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
             .collect::<Vec<Address>>();
 
         let hashes: &mut Vec<CodeHash> = &mut vec![];
-        self.get_code_hashes(addrs, hashes, &helper.eth_client)
+        self.get_code_hashes(addrs, hashes, &helper.entry_point.eth_client())
             .await?;
 
         let uo_hash = uo.hash(&helper.entry_point.address(), &helper.chain.id().into());

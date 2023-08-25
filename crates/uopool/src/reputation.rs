@@ -1,12 +1,133 @@
 use ethers::types::{Address, Bytes, U256};
+use parking_lot::RwLock;
 use silius_primitives::{
     get_address,
     reputation::{ReputationEntry, ReputationError, ReputationStatus, StakeInfo, Status},
 };
-use std::{fmt::Debug, ops::Deref};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
-pub type ReputationBox<T> =
-    Box<dyn Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync>;
+#[derive(Debug)]
+pub struct ReputationBox<T, R>
+where
+    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync + Debug,
+{
+    inner: Arc<RwLock<R>>,
+}
+
+impl<T, R> Clone for ReputationBox<T, R>
+where
+    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync + Debug,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<T, R> ReputationBox<T, R>
+where
+    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync + Debug,
+{
+    pub fn new(inner: R) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(inner)),
+        }
+    }
+}
+
+impl<T, R> Reputation for ReputationBox<T, R>
+where
+    T: Debug + IntoIterator<Item = ReputationEntry>,
+    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync,
+{
+    type Error = anyhow::Error;
+    type ReputationEntries = T;
+    fn add_blacklist(&mut self, addr: &Address) -> bool {
+        self.inner.write().add_blacklist(addr)
+    }
+
+    fn add_whitelist(&mut self, addr: &Address) -> bool {
+        self.inner.write().add_whitelist(addr)
+    }
+
+    fn get_all(&self) -> Self::ReputationEntries {
+        self.inner.read().get_all()
+    }
+
+    fn clear(&mut self) {
+        self.inner.write().clear()
+    }
+
+    fn get(&mut self, addr: &Address) -> Result<ReputationEntry, Self::Error> {
+        self.inner.write().get(addr)
+    }
+    fn get_status(&self, addr: &Address) -> Result<ReputationStatus, Self::Error> {
+        self.inner.read().get_status(addr)
+    }
+
+    fn get_status_from_bytes(&self, bytes: &Bytes) -> Result<ReputationStatus, Self::Error> {
+        self.inner.read().get_status_from_bytes(bytes)
+    }
+
+    fn increment_included(&mut self, addr: &Address) -> Result<(), Self::Error> {
+        self.inner.write().increment_included(addr)
+    }
+    fn increment_seen(&mut self, addr: &Address) -> Result<(), Self::Error> {
+        self.inner.write().increment_seen(addr)
+    }
+
+    fn init(
+        &mut self,
+        min_inclusion_denominator: u64,
+        throttling_slack: u64,
+        ban_slack: u64,
+        min_stake: U256,
+        min_unstake_delay: U256,
+    ) {
+        self.inner.write().init(
+            min_inclusion_denominator,
+            throttling_slack,
+            ban_slack,
+            min_stake,
+            min_unstake_delay,
+        )
+    }
+    fn is_blacklist(&self, addr: &Address) -> bool {
+        self.inner.read().is_blacklist(addr)
+    }
+
+    fn is_whitelist(&self, addr: &Address) -> bool {
+        self.inner.read().is_whitelist(addr)
+    }
+
+    fn remove_blacklist(&mut self, addr: &Address) -> bool {
+        self.inner.write().remove_blacklist(addr)
+    }
+    fn remove_whitelist(&mut self, addr: &Address) -> bool {
+        self.inner.write().remove_whitelist(addr)
+    }
+
+    fn set(&mut self, addr: &Address) -> Result<(), Self::Error> {
+        self.inner.write().set(addr)
+    }
+
+    fn set_entities(&mut self, entries: Self::ReputationEntries) -> Result<(), Self::Error> {
+        self.inner.write().set_entities(entries)
+    }
+
+    fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), Self::Error> {
+        self.inner.write().update_handle_ops_reverted(addr)
+    }
+
+    fn update_hourly(&mut self) -> Result<(), Self::Error> {
+        self.inner.write().update_hourly()
+    }
+
+    fn verify_stake(&self, title: &str, info: Option<StakeInfo>) -> Result<(), ReputationError> {
+        self.inner.read().verify_stake(title, info)
+    }
+}
 
 /// Reputation trait is imeplemented by [DatabaseMempool](DatabaseMempool) and [MemoryMempool](MemoryMempool) according to [Reputation scoring and throttling/banning for global entities](https://eips.ethereum.org/EIPS/eip-4337#reputation-scoring-and-throttlingbanning-for-global-entities) requirements.
 /// [UserOperation’s](UserOperation) storage access rules prevent them from interfere with each other. But “global” entities - paymasters, factories and aggregators are accessed by multiple UserOperations, and thus might invalidate multiple previously-valid UserOperations.

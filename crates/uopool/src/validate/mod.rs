@@ -1,8 +1,9 @@
 //! User operation validator module provides all the necessary traits and types for validations.
 use crate::{
-    mempool::MempoolBox,
+    mempool::{Mempool, MempoolBox},
     reputation::ReputationBox,
     uopool::{VecCh, VecUo},
+    Reputation,
 };
 use enumset::{EnumSet, EnumSetType};
 use ethers::{providers::Middleware, types::U256};
@@ -15,7 +16,6 @@ use silius_primitives::{
     uopool::ValidationError,
     Chain, UserOperation, UserOperationHash,
 };
-use std::sync::Arc;
 
 pub mod sanity;
 pub mod simulation;
@@ -48,59 +48,69 @@ pub enum UserOperationValidatorMode {
 /// The [UserOperation](UserOperation) validator trait.
 /// The [UserOperationValidator](UserOperationValidator) is a composable trait that allows bundler to choose validation rules(sanity, simultation, simulation trace) to apply.
 #[async_trait::async_trait]
-pub trait UserOperationValidator: Send + Sync {
+pub trait UserOperationValidator<P, R>: Send + Sync
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     async fn validate_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &MempoolBox<VecUo, VecCh>,
-        reputation: &ReputationBox<Vec<ReputationEntry>>,
+        mempool: &MempoolBox<VecUo, VecCh, P>,
+        reputation: &ReputationBox<Vec<ReputationEntry>, R>,
         mode: EnumSet<UserOperationValidatorMode>,
-    ) -> Result<UserOperationValidationOutcome, ValidationError>;
+    ) -> Result<UserOperationValidationOutcome, ValidationError>
+    where
+        P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync;
 }
 
 /// The [UserOperation](UserOperation) sanity check helper trait.
-pub struct SanityHelper<'a, M: Middleware + 'static> {
-    mempool: &'a MempoolBox<VecUo, VecCh>,
-    reputation: &'a ReputationBox<Vec<ReputationEntry>>,
-    eth_client: Arc<M>,
+pub struct SanityHelper<'a, M: Middleware + 'static, P, R>
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
+    mempool: &'a MempoolBox<VecUo, VecCh, P>,
+    reputation: &'a ReputationBox<Vec<ReputationEntry>, R>,
     entry_point: EntryPoint<M>,
     chain: Chain,
 }
 
 #[async_trait::async_trait]
-pub trait SanityCheck<M: Middleware>: Send + Sync {
+pub trait SanityCheck<M: Middleware, P, R>: Send + Sync
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SanityHelper<M>,
+        helper: &SanityHelper<M, P, R>,
     ) -> Result<(), SanityCheckError>;
 }
 
 /// The [UserOperation](UserOperation) simulation check helper trait.
-pub struct SimulationHelper<'a, M: Middleware + 'static> {
-    mempool: &'a MempoolBox<VecUo, VecCh>,
-    reputation: &'a ReputationBox<Vec<ReputationEntry>>,
-    eth_client: Arc<M>,
-    entry_point: EntryPoint<M>,
-    chain: Chain,
+pub struct SimulationHelper<'a> {
     simulate_validation_result: &'a SimulateValidationResult,
     valid_after: Option<U256>,
 }
 
-#[async_trait::async_trait]
-pub trait SimulationCheck<M: Middleware>: Send + Sync {
-    async fn check_user_operation(
+pub trait SimulationCheck: Send + Sync {
+    fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationHelper<M>,
+        helper: &mut SimulationHelper,
     ) -> Result<(), SimulationCheckError>;
 }
 
 /// The [UserOperation](UserOperation) simulation trace check helper trait.
-pub struct SimulationTraceHelper<'a, M: Middleware + 'static> {
-    mempool: &'a MempoolBox<VecUo, VecCh>,
-    reputation: &'a ReputationBox<Vec<ReputationEntry>>,
-    eth_client: Arc<M>,
+pub struct SimulationTraceHelper<'a, M: Middleware + 'static, P, R>
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
+    mempool: &'a MempoolBox<VecUo, VecCh, P>,
+    reputation: &'a ReputationBox<Vec<ReputationEntry>, R>,
     entry_point: EntryPoint<M>,
     chain: Chain,
     simulate_validation_result: &'a SimulateValidationResult,
@@ -110,10 +120,14 @@ pub struct SimulationTraceHelper<'a, M: Middleware + 'static> {
 }
 
 #[async_trait::async_trait]
-pub trait SimulationTraceCheck<M: Middleware>: Send + Sync {
+pub trait SimulationTraceCheck<M: Middleware, P, R>: Send + Sync
+where
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+{
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M>,
+        helper: &mut SimulationTraceHelper<M, P, R>,
     ) -> Result<(), SimulationCheckError>;
 }
