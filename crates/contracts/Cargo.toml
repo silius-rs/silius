@@ -26,4 +26,4 @@ tokio = { workspace = true }
 [build-dependencies]
 anyhow = "1"
 ethers = { workspace = true, features = ["solc-full"] }
-ethers-solc = "2.0.8"
+ethers-solc = { workspace = true }
