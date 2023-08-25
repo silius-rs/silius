@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         paymaster_and_data: Bytes::new(),
         signature: Bytes::default(),
     };
-    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &U256::from(5))?;
+    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &U256::from(5), false)?;
     let user_op = uo_wallet
         .sign_uo(
             &user_op,
