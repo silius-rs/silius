@@ -16,7 +16,7 @@ use silius_uopool::{
 
 use crate::uopool::{GAS_INCREASE_PERC, MAX_UOS_PER_UNSTAKED_SENDER};
 
-pub struct UoPoolBuiler<M, P, R>
+pub struct UoPoolBuilder<M, P, R>
 where
     M: Middleware + Clone + 'static,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
@@ -35,7 +35,7 @@ where
     reputation: ReputationBox<Vec<ReputationEntry>, R>,
 }
 
-impl<M, P, R> UoPoolBuiler<M, P, R>
+impl<M, P, R> UoPoolBuilder<M, P, R>
 where
     M: Middleware + Clone + 'static,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
@@ -85,11 +85,9 @@ where
     pub fn uo_pool(&self) -> UoPool<M, StandardUserOperationValidator<M, P, R>, P, R> {
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
-        let entry_point2 = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
-
         let validator = if self.is_unsafe {
             StandardUserOperationValidator::new_canonical_unsafe(
-                entry_point2,
+                entry_point.clone(),
                 self.chain,
                 self.max_verification_gas,
                 self.min_priority_fee_per_gas,
@@ -98,7 +96,7 @@ where
             )
         } else {
             StandardUserOperationValidator::new_canonical(
-                entry_point2,
+                entry_point.clone(),
                 self.chain,
                 self.max_verification_gas,
                 self.min_priority_fee_per_gas,

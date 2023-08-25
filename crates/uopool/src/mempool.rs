@@ -9,6 +9,9 @@ use std::{fmt::Debug, sync::Arc};
 
 pub type MempoolId = H256;
 
+/// A thread safe wrapper around a [Mempool](Mempool)
+///
+/// The Mempool box provide a RwLock for the inner Mempool which could be multi-thread accessed
 #[derive(Debug)]
 pub struct MempoolBox<T, U, P>
 where

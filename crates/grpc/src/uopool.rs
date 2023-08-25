@@ -1,6 +1,6 @@
 use crate::proto::uopool::*;
 use crate::{
-    builder::UoPoolBuiler,
+    builder::UoPoolBuilder,
     proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
     utils::{parse_addr, parse_hash, parse_uo},
 };
@@ -35,7 +35,7 @@ where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
 {
-    pub uo_pools: Arc<DashMap<MempoolId, UoPoolBuiler<M, P, R>>>,
+    pub uo_pools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R>>>,
     pub chain: Chain,
 }
 
@@ -45,7 +45,7 @@ where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
 {
-    pub fn new(uo_pools: Arc<DashMap<MempoolId, UoPoolBuiler<M, P, R>>>, chain: Chain) -> Self {
+    pub fn new(uo_pools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R>>>, chain: Chain) -> Self {
         Self { uo_pools, chain }
     }
 
@@ -362,12 +362,12 @@ pub async fn uopool_service_run(
 
         let m_map = Arc::new(DashMap::<
             MempoolId,
-            UoPoolBuiler<Provider<Http>, MemoryMempool, MemoryReputation>,
+            UoPoolBuilder<Provider<Http>, MemoryMempool, MemoryReputation>,
         >::new());
 
         for ep in eps {
             let id = mempool_id(&ep, &U256::from(chain.id()));
-            let builder = UoPoolBuiler::new(
+            let builder = UoPoolBuilder::new(
                 uo_pool_mode == UoPoolMode::Unsafe,
                 eth_client.clone(),
                 ep,

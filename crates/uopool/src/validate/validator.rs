@@ -83,8 +83,8 @@ where
     /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
     /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
-    /// `max_uos_per_unstaked_sender` -
-    /// `gas_increase_perc` -
+    /// `max_uos_per_unstaked_sender` - max user operations that bundler would accept from one sender
+    /// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
     ///
     /// # Returns
     /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
@@ -118,8 +118,24 @@ where
             .with_simulation_trace_check(StorageAccess)
             .with_simulation_trace_check(CallStack)
             .with_simulation_trace_check(CodeHashes)
+            .with_simulation_trace_check(ExternalContracts)
     }
 
+    /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator)
+    /// with the default sanity checks
+    /// Simulation checks are not included in this method.
+    /// The unsafe model could be useful for L2 bundler.
+    ///
+    /// # Arguments
+    /// `entry_point` - [EntryPoint](EntryPoint) object.
+    /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
+    /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
+    /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
+    /// `max_uos_per_unstaked_sender` - max user operations that bundler would accept from one sender
+    /// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
+    ///
+    /// # Returns
+    /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
     pub fn new_canonical_unsafe(
         entry_point: EntryPoint<M>,
         chain: Chain,
