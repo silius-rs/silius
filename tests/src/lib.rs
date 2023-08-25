@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
-#[cfg(test)]
-mod common;
+pub mod common;
 #[cfg(test)]
 mod simulation_tests;
 #[cfg(test)]
