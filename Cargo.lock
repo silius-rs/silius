@@ -5346,8 +5346,8 @@ name = "silius-contracts"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "ethers 2.0.8 (git+https://github.com/gakonst/ethers-rs?rev=fa3017715a298728d9fb341933818a5d0d84c2dc)",
- "ethers-solc 2.0.8 (git+https://github.com/gakonst/ethers-rs?rev=fa3017715a298728d9fb341933818a5d0d84c2dc)",
+ "ethers 2.0.8",
+ "ethers-solc 2.0.8",
  "lazy_static",
  "serde",
  "serde_json",

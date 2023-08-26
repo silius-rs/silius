@@ -26,4 +26,4 @@ tokio = { workspace = true }
 [build-dependencies]
 anyhow = "1"
 ethers = { workspace = true, features = ["solc-full"] }
-ethers-solc = { workspace = true }
+ethers-solc = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc" }
