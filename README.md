@@ -1,5 +1,11 @@
 # <h1 align="center"> Silius </h1>
 
+![CI workflow](https://github.com/vid201/silius/actions/workflows/ci.yml/badge.svg)
+![Docker workflow](https://github.com/vid201/silius/actions/workflows/publish_image.yml/badge.svg)
+[![Telegram Group](https://img.shields.io/endpoint?color=neon&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2F%2BsKeRcN4j3MM3NmNk)](https://t.me/+sKeRcN4j3MM3NmNk)
+[![GitHub stars](https://img.shields.io/github/stars/vid201/silius.svg?style=social&label=Star&maxAge=2592000)](https://github.com/vid201/silius/stargazers/)
+[![GitHub forks](https://img.shields.io/github/forks/vid201/silius.svg?style=social&label=Fork&maxAge=2592000)](https://github.com/vid201/silius/network/)
+
 <p align="center">Silius - <a href="https://eips.ethereum.org/EIPS/eip-4337">ERC-4337 (Account Abstraction)</a> bundler implementation in Rust.</p>
 
 <p align="center">
@@ -14,7 +20,7 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 Rust version: 1.71.1
 
-1. libclang, `libclang-dev` and `libssl-dev` on Debian/Ubuntu.
+1. `libclang-dev`, `pkg-config` and `libssl-dev` on Debian/Ubuntu.
 2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.11.6](https://github.com/ethereum/go-ethereum/releases/tag/v1.11.6)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
 3. [`solc`](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
 4. [`cargo-sort`](https://crates.io/crates/cargo-sort) and [`cargo-udeps`](https://crates.io/crates/cargo-udeps).
@@ -89,7 +95,7 @@ make lint
 make test
 ```
 
-Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [8f830db54809c454059c5648dfd4bdaa842a2303](https://github.com/eth-infinitism/bundler-spec-tests/tree/f7c993031d4bb5f0940c5282298c911ec15a5fb7)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [e193753db1910fb6d0ee2661d96a8d8f79d6c7d8](https://github.com/eth-infinitism/bundler-spec-tests/tree/e193753db1910fb6d0ee2661d96a8d8f79d6c7d8)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
 
 ## Contact
 

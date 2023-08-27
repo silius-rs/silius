@@ -15,7 +15,8 @@ lazy_static! {
     pub static ref RETURN_OPCODE: String = "RETURN".to_string();
     pub static ref REVERT_OPCODE: String = "REVERT".to_string();
     pub static ref CREATE_OPCODE: String = "CREATE".to_string();
-    pub static ref PAYMASTER_VALIDATION_FUNCTION: String = "validatePaymasterUserOp".to_string();
+    pub static ref VALIDATE_PAYMASTER_USER_OP_FUNCTION: String =
+        "validatePaymasterUserOp".to_string();
     pub static ref FORBIDDEN_OPCODES: HashSet<String> = {
         let mut set = HashSet::new();
         set.insert("GASPRICE".to_string());
@@ -107,4 +108,4 @@ pub struct CodeHash {
 }
 
 /// Storage map
-pub type StorageMap = HashMap<Address, HashMap<String, u64>>;
+pub type StorageMap = HashMap<Address, HashMap<String, String>>;

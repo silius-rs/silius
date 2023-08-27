@@ -84,7 +84,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           repository: eth-infinitism/bundler-spec-tests
-          ref: '8f830db54809c454059c5648dfd4bdaa842a2303'
+          ref: 'e193753db1910fb6d0ee2661d96a8d8f79d6c7d8'
           submodules: true
       - uses: actions/checkout@v3
         with:

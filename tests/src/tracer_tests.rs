@@ -104,25 +104,13 @@ async fn count_opcode_depth_bigger_than_1() -> anyhow::Result<()> {
         ret.logs[0].data.to_vec(),
     )))?;
     assert_eq!(log.success, true);
-    assert_eq!(*ret.number_levels[0].opcodes.get("TIMESTAMP").unwrap(), 1);
-    Ok(())
-}
-
-#[tokio::test]
-async fn not_count_opcodes_on_depth_equal_1() -> anyhow::Result<()> {
-    let c = setup().await?;
-    let contract: &BaseContract = c.tracer_test.contract().deref().deref();
-    let func_data = contract
-        .abi()
-        .function("callTimeStamp")?
-        .encode_input(&[])?;
-    let ret = trace_call(&c, Bytes::from(func_data)).await?;
-    assert_eq!(ret.number_levels[0].opcodes.get("TIMESTAMP"), None);
-    let debug_log = ret.debug.join(",");
-    assert!(debug_log
-        .matches("REVERT")
-        .collect::<Vec<&str>>()
-        .is_empty());
+    assert_eq!(
+        *ret.calls_from_entry_point[0]
+            .opcodes
+            .get("TIMESTAMP")
+            .unwrap(),
+        1
+    );
     Ok(())
 }
 
@@ -185,7 +173,10 @@ async fn should_report_direct_use_of_gas_opcode() -> anyhow::Result<()> {
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let func_data = contract.abi().function("testCallGas")?.encode_input(&[])?;
     let ret = trace_exec_self(&c, func_data, false, false).await?;
-    assert_eq!(*ret.number_levels[0].opcodes.get("GAS").unwrap(), 1);
+    assert_eq!(
+        *ret.calls_from_entry_point[0].opcodes.get("GAS").unwrap(),
+        1
+    );
     Ok(())
 }
 
@@ -199,6 +190,6 @@ async fn should_ignore_gas_used_as_part_of_call() -> anyhow::Result<()> {
         .function("execSelf")?
         .encode_input(&[Token::Bytes(do_nothing.to_vec()), Token::Bool(false)])?;
     let ret = trace_exec_self(&c, call_do_nothing, false, false).await?;
-    assert_eq!(ret.number_levels[0].opcodes.get("GAS"), None);
+    assert_eq!(ret.calls_from_entry_point[0].opcodes.get("GAS"), None);
     Ok(())
 }

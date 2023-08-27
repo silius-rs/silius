@@ -5,7 +5,7 @@ use super::gen::entry_point_api::{
 use super::gen::stake_manager_api::DepositInfo;
 pub use super::gen::{
     EntryPointAPI, EntryPointAPIEvents, StakeManagerAPI, UserOperationEventFilter,
-    ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS,
+    ValidatePaymasterUserOpReturn, SELECTORS_INDICES, SELECTORS_NAMES,
 };
 use super::tracer::JS_TRACER;
 use crate::gen::ExecutionResult;

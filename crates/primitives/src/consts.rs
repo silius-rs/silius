@@ -21,19 +21,16 @@ pub mod rpc_error_codes {
 
 /// Entities
 pub mod entities {
-    /// Markers used in entry point smart contracts to differentiate between parts of user operation
-    // https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/core/EntryPoint.sol#L514
     // 0 - factory, 1 - sender/account, 2 - paymaster
-    // opcode NUMBER is marker between levels
     pub const NUMBER_LEVELS: usize = 3;
 
     pub const FACTORY: &str = "factory";
     pub const ACCOUNT: &str = "account";
     pub const PAYMASTER: &str = "paymaster";
 
-    pub const FACTORY_INDEX: usize = 0;
-    pub const ACCOUNT_INDEX: usize = 1;
-    pub const PAYMASTER_INDEX: usize = 2;
+    pub const FACTORY_LEVEL: usize = 0;
+    pub const ACCOUNT_LEVEL: usize = 1;
+    pub const PAYMASTER_LEVEL: usize = 2;
 
     pub const LEVEL_TO_ENTITY: [&str; NUMBER_LEVELS] = [FACTORY, ACCOUNT, PAYMASTER];
 }

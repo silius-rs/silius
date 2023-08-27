@@ -6,8 +6,7 @@ use crate::{
 };
 use ethers::providers::Middleware;
 use silius_primitives::{
-    consts::entities::LEVEL_TO_ENTITY, reputation::ReputationEntry,
-    simulation::SimulationCheckError, UserOperation,
+    reputation::ReputationEntry, simulation::SimulationCheckError, UserOperation,
 };
 
 pub struct Gas;
@@ -31,13 +30,12 @@ where
         _uo: &UserOperation,
         helper: &mut SimulationTraceHelper<M, P, R>,
     ) -> Result<(), SimulationCheckError> {
-        for (i, _) in LEVEL_TO_ENTITY.iter().enumerate() {
-            if let Some(l) = helper.js_trace.number_levels.get(i) {
-                if l.oog.unwrap_or(false) {
-                    return Err(SimulationCheckError::OutOfGas {});
-                }
+        for call_info in helper.js_trace.calls_from_entry_point.iter() {
+            if call_info.oog.unwrap_or(false) {
+                return Err(SimulationCheckError::OutOfGas {});
             }
         }
+
         Ok(())
     }
 }
