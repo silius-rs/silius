@@ -9,8 +9,9 @@ use ethers::{
     types::{Address, Bytes, U256},
     utils::keccak256,
 };
+use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
-    consts::entities::{FACTORY_INDEX, LEVEL_TO_ENTITY, NUMBER_LEVELS},
+    consts::entities::{FACTORY_LEVEL, LEVEL_TO_ENTITY, NUMBER_LEVELS},
     reputation::{ReputationEntry, StakeInfo},
     simulation::SimulationCheckError,
     UserOperation,
@@ -128,9 +129,15 @@ where
         let mut slot_staked = String::new();
         let stake_info = helper.stake_info.unwrap_or_default();
 
-        for (i, stake_info_i) in stake_info.iter().enumerate() {
-            if let Some(l) = helper.js_trace.number_levels.get(i) {
-                for (addr, acc) in &l.access {
+        for call_info in helper.js_trace.calls_from_entry_point.iter() {
+            let level = SELECTORS_INDICES
+                .get(call_info.top_level_method_sig.as_ref())
+                .cloned();
+
+            if let Some(l) = level {
+                let stake_info_l = stake_info[l];
+
+                for (addr, acc) in &call_info.access {
                     if *addr == uo.sender || *addr == helper.entry_point.address() {
                         continue;
                     }
@@ -145,13 +152,13 @@ where
                     {
                         if self.associated_with_slot(&uo.sender, &slot, &slots)? {
                             if !(uo.init_code.is_empty()
-                                || uo.sender == stake_info_i.address
-                                    && stake_info[FACTORY_INDEX].is_staked())
+                                || uo.sender == stake_info_l.address
+                                    && stake_info[FACTORY_LEVEL].is_staked())
                             {
                                 slot_staked = slot.clone();
                             }
-                        } else if *addr == stake_info_i.address
-                            || self.associated_with_slot(&stake_info_i.address, &slot, &slots)?
+                        } else if *addr == stake_info_l.address
+                            || self.associated_with_slot(&stake_info_l.address, &slot, &slots)?
                         {
                             slot_staked = slot.clone();
                         } else {
@@ -159,9 +166,9 @@ where
                         }
                     }
 
-                    if !slot_staked.is_empty() && !stake_info_i.is_staked() {
+                    if !slot_staked.is_empty() && !stake_info_l.is_staked() {
                         return Err(SimulationCheckError::Unstaked {
-                            entity: LEVEL_TO_ENTITY[i].to_string(),
+                            entity: LEVEL_TO_ENTITY[l].to_string(),
                             message: format!("accessed slot {addr} slot {slot_staked}"),
                         });
                     }

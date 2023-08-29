@@ -88,7 +88,7 @@ where
     ) -> Result<(), SimulationCheckError> {
         let addrs = helper
             .js_trace
-            .number_levels
+            .calls_from_entry_point
             .iter()
             .flat_map(|l| l.contract_size.keys().copied().collect::<Vec<Address>>())
             .collect::<Vec<Address>>();

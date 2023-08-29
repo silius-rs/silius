@@ -4,7 +4,7 @@ services:
     image: ghcr.io/vid201/silius:latest
     network_mode: host
     volumes:
-      - ./bundler-spec-test/keys:/data/silius
+      - ./bundler-spec-tests/keys:/data/silius
     command:
       - --rpc-listen-address 
       - 0.0.0.0:3000 

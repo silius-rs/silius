@@ -32,15 +32,13 @@ name = "user-operation"
 path = "user_operation.rs"
 
 [[example]]
-name = "simple_account_create"
-path = "simple_account/simple_account_create.rs"
+name = "simple-account-create"
+path = "simple_account/create.rs"
 
 [[example]]
-name = "simple_account_deposit"
+name = "simple-account-deposit"
 path = "simple_account/deposit.rs"
 
 [[example]]
-name = "simple_account_transfer"
+name = "simple-account-transfer"
 path = "simple_account/transfer.rs"
-
-

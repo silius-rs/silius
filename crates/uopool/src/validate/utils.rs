@@ -104,7 +104,7 @@ pub fn extract_stake_info(
 pub fn extract_storage_map(js_trace: &JsTracerFrame) -> StorageMap {
     let mut storage_map = StorageMap::default();
 
-    for l in js_trace.number_levels.iter() {
+    for l in js_trace.calls_from_entry_point.iter() {
         for (addr, acc) in l.access.iter() {
             storage_map.insert(*addr, acc.reads.clone());
         }

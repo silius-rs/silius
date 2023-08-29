@@ -6,15 +6,15 @@ use crate::{
 };
 use ethers::{abi::AbiDecode, providers::Middleware};
 use silius_contracts::{
-    entry_point::{ValidatePaymasterUserOpReturn, CONTRACTS_FUNCTIONS},
+    entry_point::{ValidatePaymasterUserOpReturn, SELECTORS_NAMES},
     tracer::{Call, CallEntry, JsTracerFrame},
 };
 use silius_primitives::{
     consts::entities::{LEVEL_TO_ENTITY, PAYMASTER},
     reputation::ReputationEntry,
     simulation::{
-        SimulationCheckError, CREATE_OPCODE, PAYMASTER_VALIDATION_FUNCTION, RETURN_OPCODE,
-        REVERT_OPCODE,
+        SimulationCheckError, CREATE_OPCODE, RETURN_OPCODE, REVERT_OPCODE,
+        VALIDATE_PAYMASTER_USER_OP_FUNCTION,
     },
     UserOperation,
 };
@@ -55,7 +55,7 @@ impl CallStack {
                     } else {
                         let m: Option<String> = {
                             if let Some(m) = top.method {
-                                CONTRACTS_FUNCTIONS.get(m.as_ref()).cloned()
+                                SELECTORS_NAMES.get(m.as_ref()).cloned()
                             } else {
                                 None
                             }
@@ -141,7 +141,7 @@ where
             // paymaster
             for (i, stake_info) in helper.stake_info.unwrap_or_default().iter().enumerate() {
                 if LEVEL_TO_ENTITY[i] == PAYMASTER
-                    && call.method == Some(PAYMASTER_VALIDATION_FUNCTION.clone())
+                    && call.method == Some(VALIDATE_PAYMASTER_USER_OP_FUNCTION.clone())
                     && call.to == Some(stake_info.address)
                 {
                     if let Some(ret) = call.ret.as_ref() {

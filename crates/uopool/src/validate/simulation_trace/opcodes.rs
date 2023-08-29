@@ -1,10 +1,9 @@
 use crate::{
-    mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
-    Reputation,
+    Mempool, Reputation, VecCh, VecUo,
 };
 use ethers::providers::Middleware;
+use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
     consts::entities::{FACTORY, LEVEL_TO_ENTITY},
     reputation::ReputationEntry,
@@ -33,25 +32,27 @@ where
         _uo: &UserOperation,
         helper: &mut SimulationTraceHelper<M, P, R>,
     ) -> Result<(), SimulationCheckError> {
-        for (i, _) in LEVEL_TO_ENTITY.iter().enumerate() {
-            if let Some(l) = helper.js_trace.number_levels.get(i) {
-                for op in l.opcodes.keys() {
+        for call_info in helper.js_trace.calls_from_entry_point.iter() {
+            let level = SELECTORS_INDICES
+                .get(call_info.top_level_method_sig.as_ref())
+                .cloned();
+
+            if let Some(l) = level {
+                for op in call_info.opcodes.keys() {
                     if FORBIDDEN_OPCODES.contains(op) {
                         return Err(SimulationCheckError::Opcode {
-                            entity: LEVEL_TO_ENTITY[i].to_string(),
+                            entity: LEVEL_TO_ENTITY[l].to_string(),
                             opcode: op.clone(),
                         });
                     }
                 }
-            }
 
-            if let Some(l) = helper.js_trace.number_levels.get(i) {
-                if let Some(c) = l.opcodes.get(&*CREATE2_OPCODE) {
-                    if LEVEL_TO_ENTITY[i] == FACTORY && *c == 1 {
+                if let Some(c) = call_info.opcodes.get(&*CREATE2_OPCODE) {
+                    if LEVEL_TO_ENTITY[l] == FACTORY && *c == 1 {
                         continue;
                     }
                     return Err(SimulationCheckError::Opcode {
-                        entity: LEVEL_TO_ENTITY[i].to_string(),
+                        entity: LEVEL_TO_ENTITY[l].to_string(),
                         opcode: CREATE2_OPCODE.to_string(),
                     });
                 }
