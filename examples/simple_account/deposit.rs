@@ -1,5 +1,3 @@
-use std::{env, sync::Arc, time::Duration};
-
 use ethers::{
     prelude::{gas_oracle::ProviderOracle, MiddlewareBuilder, SignerMiddleware},
     providers::{Http, Middleware, Provider},
@@ -10,6 +8,7 @@ use ethers::{
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::consts::entry_point::ADDRESS;
 use silius_tests::common::gen::SimpleAccountFactory;
+use std::{env, sync::Arc, time::Duration};
 
 // stackup simple account factory
 const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";

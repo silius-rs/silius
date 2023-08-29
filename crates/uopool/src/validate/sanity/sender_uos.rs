@@ -12,6 +12,7 @@ use silius_primitives::{
     sanity::SanityCheckError,
     UserOperation,
 };
+use std::fmt::Debug;
 
 pub struct SenderUos {
     pub max_uos_per_unstaked_sender: usize,
@@ -19,10 +20,11 @@ pub struct SenderUos {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SanityCheck<M, P, R> for SenderUos
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for SenderUos
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the sanity check on the [UserOperation](UserOperation) sender.
     ///
@@ -35,7 +37,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R>,
+        helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         if helper.mempool.get_number_by_sender(&uo.sender) == 0 {
             return Ok(());

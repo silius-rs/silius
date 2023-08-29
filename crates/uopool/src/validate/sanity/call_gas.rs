@@ -12,10 +12,10 @@ use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, U
 pub struct CallGas;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SanityCheck<M, P, R> for CallGas
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for CallGas
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The `check_user_operation` method implementation for the `CallGas` sanity check.
     ///
@@ -28,7 +28,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R>,
+        helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         let exec_res = match helper.entry_point.simulate_handle_op(uo.clone()).await {
             Ok(res) => res,

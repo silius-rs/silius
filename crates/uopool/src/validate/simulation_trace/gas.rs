@@ -12,10 +12,10 @@ use silius_primitives::{
 pub struct Gas;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SimulationTraceCheck<M, P, R> for Gas
+impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for Gas
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that checks if the user operation runs out of gas
     ///
@@ -28,7 +28,7 @@ where
     async fn check_user_operation(
         &self,
         _uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R>,
+        helper: &mut SimulationTraceHelper<M, P, R, E>,
     ) -> Result<(), SimulationCheckError> {
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             if call_info.oog.unwrap_or(false) {

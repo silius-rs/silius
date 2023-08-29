@@ -14,7 +14,7 @@ AA (ERC-4337) bundler commonly used types
 anyhow = { workspace = true }
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethers = { workspace = true }
-expanded-pathbuf = "0.1"
+expanded-pathbuf = { workspace = true }
 lazy_static = "1.4.0"
 rustc-hex = "^2.0.1"
 serde = "1"

@@ -7,7 +7,7 @@ use ethers::{
 use expanded_pathbuf::ExpandedPathBuf;
 use silius::{
     cli::{BundlerServiceOpts, RpcServiceOpts, UoPoolServiceOpts},
-    utils::{parse_address, parse_u256, run_until_ctrl_c},
+    utils::{parse_address, parse_u256, run_until_ctrl_c, unwrap_path_or_home},
 };
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
@@ -114,9 +114,12 @@ fn main() -> Result<()> {
 
 
                 if !opt.no_uopool {
+                    let datadir = unwrap_path_or_home(opt.uopool_opts.datadir)?;
+
                     info!("Starting uopool gRPC service...");
                     uopool_service_run(
                         opt.uopool_opts.uopool_grpc_listen_address,
+                        datadir,
                         opt.entry_points.clone(),
                         eth_client,
                         chain,

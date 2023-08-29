@@ -12,10 +12,10 @@ pub struct VerificationGas {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SanityCheck<M, P, R> for VerificationGas
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for VerificationGas
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that performs the check on verification gas.
     ///
@@ -28,7 +28,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _helper: &SanityHelper<M, P, R>,
+        _helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         if uo.verification_gas_limit > self.max_verification_gas {
             return Err(SanityCheckError::HighVerificationGasLimit {

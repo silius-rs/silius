@@ -28,6 +28,7 @@ use silius_primitives::{
     UserOperationReceipt,
 };
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Display};
 use tracing::trace;
 
 pub type VecUo = Vec<UserOperation>;
@@ -37,10 +38,11 @@ const LATEST_SCAN_DEPTH: u64 = 1000;
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
-pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R>, P, R>
+pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug,
 {
     /// The unique ID of the mempool
     pub id: MempoolId,
@@ -49,19 +51,20 @@ where
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
     /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    pub mempool: MempoolBox<VecUo, VecCh, P>,
+    pub mempool: MempoolBox<VecUo, VecCh, P, E>,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
-    pub reputation: ReputationBox<Vec<ReputationEntry>, R>,
+    pub reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
 }
 
-impl<M: Middleware + 'static, V: UserOperationValidator<P, R>, P, R> UoPool<M, V, P, R>
+impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug + Display,
 {
     /// Creates a new [UoPool](UoPool) object
     ///
@@ -80,8 +83,8 @@ where
     pub fn new(
         entry_point: EntryPoint<M>,
         validator: V,
-        mempool: MempoolBox<VecUo, VecCh, P>,
-        reputation: ReputationBox<Vec<ReputationEntry>, R>,
+        mempool: MempoolBox<VecUo, VecCh, P, E>,
+        reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
         max_verification_gas: U256,
         chain: Chain,
     ) -> Self {
@@ -127,7 +130,7 @@ where
     ///
     /// # Returns
     /// `()` - Returns nothing
-    pub fn set_reputation(&mut self, reputation: Vec<ReputationEntry>) -> anyhow::Result<()> {
+    pub fn set_reputation(&mut self, reputation: Vec<ReputationEntry>) -> Result<(), E> {
         self.reputation.set_entities(reputation)
     }
 
@@ -228,7 +231,7 @@ where
     ///
     /// # Returns
     /// `Result<Vec<UserOperation>, anyhow::Error>` - The sorted [UserOperations](UserOperation)
-    pub fn get_sorted_user_operations(&self) -> anyhow::Result<Vec<UserOperation>> {
+    pub fn get_sorted_user_operations(&self) -> Result<Vec<UserOperation>, E> {
         self.mempool.get_sorted()
     }
 
@@ -607,12 +610,18 @@ where
             match event {
                 EntryPointAPIEvents::UserOperationEventFilter(uo_event) => {
                     self.remove_user_operation(&uo_event.user_op_hash.into());
-                    self.reputation.increment_included(&uo_event.sender)?;
-                    self.reputation.increment_included(&uo_event.paymaster)?;
+                    self.reputation
+                        .increment_included(&uo_event.sender)
+                        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+                    self.reputation
+                        .increment_included(&uo_event.paymaster)
+                        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
                     // TODO: include event aggregator
                 }
                 EntryPointAPIEvents::AccountDeployedFilter(event) => {
-                    self.reputation.increment_included(&event.factory)?;
+                    self.reputation
+                        .increment_included(&event.factory)
+                        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
                 }
                 _ => (),
             }

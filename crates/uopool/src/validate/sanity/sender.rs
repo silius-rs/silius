@@ -10,10 +10,10 @@ use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, U
 pub struct SenderOrInitCode;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SanityCheck<M, P, R> for SenderOrInitCode
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for SenderOrInitCode
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that performs the check whether the [UserOperation](UserOperation) is a deployment or a transaction.
     ///
@@ -26,7 +26,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R>,
+        helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         let code = helper
             .entry_point

@@ -1,13 +1,17 @@
 use crate::utils::{parse_address, parse_u256, parse_uopool_mode};
 use clap::Parser;
 use ethers::types::{Address, U256};
+use expanded_pathbuf::ExpandedPathBuf;
 use silius_primitives::UoPoolMode;
 use std::net::SocketAddr;
 
-#[derive(Clone, Debug, Parser, PartialEq)]
+#[derive(Clone, Debug, Parser)]
 pub struct UoPoolServiceOpts {
     #[clap(long, default_value = "127.0.0.1:3001")]
     pub uopool_grpc_listen_address: SocketAddr,
+
+    #[clap(long)]
+    pub datadir: Option<ExpandedPathBuf>,
 
     #[clap(long, value_parser=parse_u256, default_value = "1")]
     pub min_stake: U256,

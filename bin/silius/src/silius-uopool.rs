@@ -6,7 +6,7 @@ use ethers::{
 };
 use silius::{
     cli::UoPoolServiceOpts,
-    utils::{parse_address, parse_u256},
+    utils::{parse_address, parse_u256, unwrap_path_or_home},
 };
 use silius_grpc::uopool_service_run;
 use silius_primitives::{chain::SUPPORTED_CHAINS, Chain};
@@ -62,10 +62,13 @@ async fn main() -> Result<()> {
         }
     }
 
+    let datadir = unwrap_path_or_home(opt.uopool_opts.datadir)?;
+
     info!("Starting uopool gRPC service...");
 
     uopool_service_run(
         opt.uopool_opts.uopool_grpc_listen_address,
+        datadir,
         opt.entry_points,
         eth_client,
         chain,

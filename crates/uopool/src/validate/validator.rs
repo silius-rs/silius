@@ -33,29 +33,31 @@ use silius_primitives::{
     reputation::ReputationEntry, simulation::SimulationCheckError, uopool::ValidationError, Chain,
     UserOperation,
 };
+use std::fmt::{Debug, Display};
 
 /// Standard implementation of [UserOperationValidator](UserOperationValidator).
-pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, P, R>
+pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The [EntryPoint](EntryPoint) object.
     entry_point: EntryPoint<M>,
     /// A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     chain: Chain,
     /// An array of [SanityChecks](SanityCheck).
-    sanity_checks: Vec<Box<dyn SanityCheck<M, P, R>>>,
+    sanity_checks: Vec<Box<dyn SanityCheck<M, P, R, E>>>,
     /// An array of [SimulationCheck](SimulationCheck).
     simulation_checks: Vec<Box<dyn SimulationCheck>>,
     /// An array of [SimulationTraceChecks](SimulationTraceCheck).
-    simulation_trace_checks: Vec<Box<dyn SimulationTraceCheck<M, P, R>>>,
+    simulation_trace_checks: Vec<Box<dyn SimulationTraceCheck<M, P, R, E>>>,
 }
 
-impl<M: Middleware + Clone + 'static, P, R> StandardUserOperationValidator<M, P, R>
+impl<M: Middleware + Clone + 'static, P, R, E> StandardUserOperationValidator<M, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug + Display,
 {
     /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator).
     ///
@@ -219,7 +221,10 @@ where
     ///
     /// # Returns
     /// A reference to [self](StandardUserOperationValidator).
-    pub fn with_sanity_check(mut self, sanity_check: impl SanityCheck<M, P, R> + 'static) -> Self {
+    pub fn with_sanity_check(
+        mut self,
+        sanity_check: impl SanityCheck<M, P, R, E> + 'static,
+    ) -> Self {
         self.sanity_checks.push(Box::new(sanity_check));
         self
     }
@@ -241,7 +246,7 @@ where
 
     pub fn with_simulation_trace_check(
         mut self,
-        simulation_trace_check: impl SimulationTraceCheck<M, P, R> + 'static,
+        simulation_trace_check: impl SimulationTraceCheck<M, P, R, E> + 'static,
     ) -> Self {
         self.simulation_trace_checks
             .push(Box::new(simulation_trace_check));
@@ -250,11 +255,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware + Clone + 'static, P, R> UserOperationValidator<P, R>
-    for StandardUserOperationValidator<M, P, R>
+impl<M: Middleware + Clone + 'static, P, R, E> UserOperationValidator<P, R, E>
+    for StandardUserOperationValidator<M, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug + Display,
 {
     /// Validates a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
     /// The function also optionally performs sanity checks and simulation checks if the [UserOperationValidatorMode](UserOperationValidatorMode) contains the respective flags.
@@ -270,8 +276,8 @@ where
     async fn validate_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &MempoolBox<VecUo, VecCh, P>,
-        reputation: &ReputationBox<Vec<ReputationEntry>, R>,
+        mempool: &MempoolBox<VecUo, VecCh, P, E>,
+        reputation: &ReputationBox<Vec<ReputationEntry>, R, E>,
         mode: EnumSet<UserOperationValidatorMode>,
     ) -> Result<UserOperationValidationOutcome, ValidationError> {
         let mut out: UserOperationValidationOutcome = Default::default();

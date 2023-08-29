@@ -17,7 +17,7 @@ anyhow = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
 ethers = { workspace = true }
-expanded-pathbuf = "0.1"
+expanded-pathbuf = { workspace = true }
 log = "0.4.19"
 pin-utils = "0.1"
 silius-bundler = { path = "../../crates/bundler" }
