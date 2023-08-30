@@ -100,6 +100,7 @@ jobs:
         with:
           name: silius
           path: silius-artifact
+
       - run: mv silius-artifact/silius /usr/local/bin/
       - run: chmod a+x /usr/local/bin/silius
       - run: chmod a+x silius/bundler-spec-tests/launcher.sh
