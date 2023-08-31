@@ -15,10 +15,10 @@ pub struct MaxFee {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SanityCheck<M, P, R> for MaxFee
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for MaxFee
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that checks the max fee
     ///
@@ -31,7 +31,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R>,
+        helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         if uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
             return Err(SanityCheckError::HighMaxPriorityFeePerGas {

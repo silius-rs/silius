@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+use crate::uopool::{GAS_INCREASE_PERC, MAX_UOS_PER_UNSTAKED_SENDER};
 use ethers::{
     providers::Middleware,
     types::{Address, U256},
@@ -13,14 +12,14 @@ use silius_uopool::{
     validate::validator::StandardUserOperationValidator, Mempool, MempoolBox, Reputation,
     ReputationBox, UoPool, VecCh, VecUo,
 };
+use std::fmt::{Debug, Display};
+use std::sync::Arc;
 
-use crate::uopool::{GAS_INCREASE_PERC, MAX_UOS_PER_UNSTAKED_SENDER};
-
-pub struct UoPoolBuilder<M, P, R>
+pub struct UoPoolBuilder<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     is_unsafe: bool,
     eth_client: Arc<M>,
@@ -31,15 +30,16 @@ where
     min_unstake_delay: U256,
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
-    mempool: MempoolBox<VecUo, VecCh, P>,
-    reputation: ReputationBox<Vec<ReputationEntry>, R>,
+    mempool: MempoolBox<VecUo, VecCh, P, E>,
+    reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
 }
 
-impl<M, P, R> UoPoolBuilder<M, P, R>
+impl<M, P, R, E> UoPoolBuilder<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug + Display,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -55,8 +55,8 @@ where
         mempool: P,
         reputation: R,
     ) -> Self {
-        let mempool = MempoolBox::<VecUo, VecCh, P>::new(mempool);
-        let mut reputation = ReputationBox::<Vec<ReputationEntry>, R>::new(reputation);
+        let mempool = MempoolBox::<VecUo, VecCh, P, E>::new(mempool);
+        let mut reputation = ReputationBox::<Vec<ReputationEntry>, R, E>::new(reputation);
         reputation.init(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,
@@ -82,7 +82,7 @@ where
         }
     }
 
-    pub fn uo_pool(&self) -> UoPool<M, StandardUserOperationValidator<M, P, R>, P, R> {
+    pub fn uo_pool(&self) -> UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E> {
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
         let validator = if self.is_unsafe {
@@ -105,7 +105,7 @@ where
             )
         };
 
-        UoPool::<M, StandardUserOperationValidator<M, P, R>, P, R>::new(
+        UoPool::<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>::new(
             entry_point,
             validator,
             self.mempool.clone(),

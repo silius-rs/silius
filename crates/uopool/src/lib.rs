@@ -9,7 +9,9 @@ mod uopool;
 mod utils;
 pub mod validate;
 
-pub use database::mempool::DatabaseMempool;
+pub use database::{
+    init_env, mempool::DatabaseMempool, reputation::DatabaseReputation, DBError, WriteMap,
+};
 pub use memory::{mempool::MemoryMempool, reputation::MemoryReputation};
 pub use mempool::{mempool_id, Mempool, MempoolBox, MempoolId};
 pub use reputation::{Reputation, ReputationBox};

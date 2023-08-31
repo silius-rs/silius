@@ -5380,6 +5380,7 @@ dependencies = [
  "async-trait",
  "dashmap",
  "ethers 2.0.8",
+ "expanded-pathbuf",
  "parking_lot",
  "prost",
  "prost-build",

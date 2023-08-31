@@ -13,16 +13,16 @@ pub type MempoolId = H256;
 ///
 /// The Mempool box provide a RwLock for the inner Mempool which could be multi-thread accessed
 #[derive(Debug)]
-pub struct MempoolBox<T, U, P>
+pub struct MempoolBox<T, U, P, E>
 where
-    P: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = T, CodeHashes = U, Error = E> + Send + Sync,
 {
     inner: Arc<RwLock<P>>,
 }
 
-impl<T, U, P> Clone for MempoolBox<T, U, P>
+impl<T, U, P, E> Clone for MempoolBox<T, U, P, E>
 where
-    P: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = T, CodeHashes = U, Error = E> + Send + Sync,
 {
     fn clone(&self) -> Self {
         Self {
@@ -31,9 +31,9 @@ where
     }
 }
 
-impl<T, U, P> MempoolBox<T, U, P>
+impl<T, U, P, E> MempoolBox<T, U, P, E>
 where
-    P: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = T, CodeHashes = U, Error = E> + Send + Sync,
 {
     pub fn new(inner: P) -> Self {
         Self {
@@ -42,14 +42,15 @@ where
     }
 }
 
-impl<T, U, M> Mempool for MempoolBox<T, U, M>
+impl<T, U, M, E> Mempool for MempoolBox<T, U, M, E>
 where
     T: Debug + IntoIterator<Item = UserOperation>,
     U: Debug + IntoIterator<Item = CodeHash>,
-    M: Mempool<UserOperations = T, CodeHashes = U, Error = anyhow::Error> + Send + Sync,
+    M: Mempool<UserOperations = T, CodeHashes = U, Error = E> + Send + Sync,
+    E: Debug,
 {
     type CodeHashes = U;
-    type Error = anyhow::Error;
+    type Error = E;
     type UserOperations = T;
 
     fn get_all(&self) -> T {
@@ -65,7 +66,7 @@ where
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> Result<UserOperationHash, anyhow::Error> {
+    ) -> Result<UserOperationHash, Self::Error> {
         self.inner.write().add(uo, ep, chain_id)
     }
 
@@ -73,7 +74,7 @@ where
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: &U,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<(), Self::Error> {
         self.inner.write().set_code_hashes(uo_hash, hashes)
     }
 

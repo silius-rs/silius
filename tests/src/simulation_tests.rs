@@ -47,17 +47,19 @@ use silius_uopool::{
     UoPool, VecCh, VecUo,
 };
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
 const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 const GAS_INCREASE_PERC: u64 = 10;
 
-struct TestContext<M: Middleware + 'static, V, P, R>
+struct TestContext<M: Middleware + 'static, V, P, R, E>
 where
-    V: UserOperationValidator<P, R> + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    V: UserOperationValidator<P, R, E> + 'static,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug,
 {
     pub client: Arc<M>,
     pub _geth: GethInstance,
@@ -67,14 +69,15 @@ where
     pub storage_factory: DeployedContract<TestStorageAccountFactory<M>>,
     pub _rules_factory: DeployedContract<TestRulesAccountFactory<M>>,
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
-    pub uopool: UoPool<M, V, P, R>,
+    pub uopool: UoPool<M, V, P, R, E>,
 }
 
 type Context = TestContext<
     ClientType,
-    StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation>,
+    StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation, anyhow::Error>,
     MemoryMempool,
     MemoryReputation,
+    anyhow::Error,
 >;
 
 async fn setup() -> anyhow::Result<Context> {
@@ -147,9 +150,15 @@ async fn setup() -> anyhow::Result<Context> {
 
     let pool = UoPool::<
         ClientType,
-        StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation>,
+        StandardUserOperationValidator<
+            Provider<Http>,
+            MemoryMempool,
+            MemoryReputation,
+            anyhow::Error,
+        >,
         MemoryMempool,
         MemoryReputation,
+        anyhow::Error,
     >::new(
         entry_point,
         validator,

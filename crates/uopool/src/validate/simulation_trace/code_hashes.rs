@@ -15,6 +15,7 @@ use silius_primitives::{
     simulation::{CodeHash, SimulationCheckError},
     UserOperation,
 };
+use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::task::JoinSet;
 
@@ -68,10 +69,11 @@ impl CodeHashes {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SimulationTraceCheck<M, P, R> for CodeHashes
+impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for CodeHashes
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug + Display,
 {
     /// The [check_user_operation] method implementation that checks the code hashes
     ///
@@ -84,7 +86,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R>,
+        helper: &mut SimulationTraceHelper<M, P, R, E>,
     ) -> Result<(), SimulationCheckError> {
         let addrs = helper
             .js_trace

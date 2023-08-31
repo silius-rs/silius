@@ -1,5 +1,3 @@
-use std::{env, str::FromStr, sync::Arc, time::Duration};
-
 use ethers::{
     prelude::{MiddlewareBuilder, SignerMiddleware},
     providers::{Http, Middleware, Provider},
@@ -13,6 +11,7 @@ use silius_primitives::consts::entry_point::ADDRESS;
 use silius_primitives::UserOperation;
 use silius_primitives::Wallet as UoWallet;
 use silius_tests::common::gen::SimpleAccountFactory;
+use std::{env, str::FromStr, sync::Arc, time::Duration};
 
 // stackup simple account factory
 const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";

@@ -8,7 +8,7 @@ use reth_db::{
     },
     Error, TableType,
 };
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, fs, path::PathBuf};
 
 // Code adapted from: https://github.com/paradigmxyz/reth/blob/main/crates/storage/db/src/implementation/mdbx/mod.rs
 #[derive(Debug)]
@@ -74,6 +74,8 @@ fn default_page_size() -> usize {
 impl<E: EnvironmentKind> Env<E> {
     /// Sets up the database environment
     pub fn open(path: PathBuf) -> anyhow::Result<Self> {
+        fs::create_dir_all(&path)?;
+
         let env = Environment::new()
             .set_max_dbs(TABLES.len())
             .set_geometry(Geometry {

@@ -16,15 +16,15 @@ use silius_primitives::{
 pub struct ExternalContracts;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SimulationTraceCheck<M, P, R> for ExternalContracts
+impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for ExternalContracts
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R>,
+        helper: &mut SimulationTraceHelper<M, P, R, E>,
     ) -> Result<(), SimulationCheckError> {
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             let level = SELECTORS_INDICES

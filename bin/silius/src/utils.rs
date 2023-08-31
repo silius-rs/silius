@@ -1,8 +1,22 @@
+use dirs::home_dir;
 use ethers::types::{Address, U256};
+use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
 use silius_primitives::UoPoolMode;
 use std::{future::Future, str::FromStr};
 use tracing::info;
+
+/// Unwrap path or returns home directory
+pub fn unwrap_path_or_home(path: Option<ExpandedPathBuf>) -> anyhow::Result<ExpandedPathBuf> {
+    if let Some(path) = path {
+        Ok(path)
+    } else {
+        home_dir()
+            .map(|h| h.join(".silius"))
+            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
+            .map(ExpandedPathBuf)
+    }
+}
 
 /// Parses address from string
 pub fn parse_address(s: &str) -> Result<Address, String> {

@@ -7,16 +7,16 @@ use silius_primitives::{
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 #[derive(Debug)]
-pub struct ReputationBox<T, R>
+pub struct ReputationBox<T, R, E>
 where
-    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync + Debug,
+    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync + Debug,
 {
     inner: Arc<RwLock<R>>,
 }
 
-impl<T, R> Clone for ReputationBox<T, R>
+impl<T, R, E> Clone for ReputationBox<T, R, E>
 where
-    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync + Debug,
+    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync + Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -25,9 +25,9 @@ where
     }
 }
 
-impl<T, R> ReputationBox<T, R>
+impl<T, R, E> ReputationBox<T, R, E>
 where
-    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync + Debug,
+    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync + Debug,
 {
     pub fn new(inner: R) -> Self {
         Self {
@@ -36,13 +36,15 @@ where
     }
 }
 
-impl<T, R> Reputation for ReputationBox<T, R>
+impl<T, R, E> Reputation for ReputationBox<T, R, E>
 where
     T: Debug + IntoIterator<Item = ReputationEntry>,
-    R: Reputation<ReputationEntries = T, Error = anyhow::Error> + Send + Sync,
+    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync,
+    E: Debug,
 {
-    type Error = anyhow::Error;
     type ReputationEntries = T;
+    type Error = E;
+
     fn add_blacklist(&mut self, addr: &Address) -> bool {
         self.inner.write().add_blacklist(addr)
     }

@@ -11,14 +11,16 @@ use silius_primitives::{
     sanity::SanityCheckError,
     UserOperation,
 };
+use std::fmt::Debug;
 
 pub struct Paymaster;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R> SanityCheck<M, P, R> for Paymaster
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Paymaster
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = anyhow::Error> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = anyhow::Error> + Send + Sync,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the sanity check on the paymaster.
     ///
@@ -31,7 +33,7 @@ where
     async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R>,
+        helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
