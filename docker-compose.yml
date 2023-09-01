@@ -4,12 +4,15 @@ services:
     image: ghcr.io/vid201/silius:latest
     network_mode: host
     volumes:
-      - ./bundler-spec-tests/keys:/data/silius
+      - ./bundler-spec-tests/keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266:/data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - ./db:/data/silius/db
     command:
       - --rpc-listen-address 
       - 0.0.0.0:3000 
       - --eth-client-address 
       - http://127.0.0.1:8545
+      - --datadir
+      - data/silius
       - --mnemonic-file 
       - data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 
       - --beneficiary 

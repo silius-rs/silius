@@ -25,6 +25,10 @@ RUN make build
 # run
 FROM frolvlad/alpine-glibc
 
+RUN mkdir -p /data/silius
+
+RUN apk add openssl1.1-compat
+
 COPY --from=builder /silius/target/release/silius /usr/local/bin/silius
 
 EXPOSE 3000

@@ -16,7 +16,11 @@ For more information: https://hackmd.io/@Vid201/aa-bundler-rust
 
 <i>This project is still under active development.</i>
 
-## Prerequisites
+## Getting started
+
+### Native
+
+<b>Prerequisites:</b>
 
 Rust version: 1.71.1
 
@@ -24,8 +28,6 @@ Rust version: 1.71.1
 2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.11.6](https://github.com/ethereum/go-ethereum/releases/tag/v1.11.6)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
 3. [`solc`](https://docs.soliditylang.org/en/v0.8.17/installing-solidity.html) >=0.8.12.
 4. [`cargo-sort`](https://crates.io/crates/cargo-sort) and [`cargo-udeps`](https://crates.io/crates/cargo-udeps).
-
-## How to run?
 
 Set up third-party dependencies (ERC-4337 smart contracts and bundler tests):
 
@@ -56,6 +58,12 @@ Run only JSON-RPC API:
 
 ```bash
 cargo run --release --bin silius-rpc --http --ws
+```
+
+### Docker
+
+```bash
+docker run --net=host -v ./bundler-spec-tests/keys:/data/silius -v ./db:/data/silius/db ghcr.io/vid201/silius:latest --rpc-listen-address 0.0.0.0:3000 --eth-client-address http://127.0.0.1:8545 --datadir data/silius --mnemonic-file data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 --http --ws --rpc-api eth,debug,web3 
 ```
 
 ## Supported networks
