@@ -3,3 +3,4 @@
 .vscode
 **/.env
 .env
+db

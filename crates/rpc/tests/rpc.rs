@@ -1,85 +1,102 @@
 mod common;
 
+use crate::common::{test_port, ADDRESS};
 use common::{
-    build_http_client, build_ws_client, test_address, DummyEthApiClient, DummyEthApiServer,
-    DummyEthApiServerImpl,
+    build_http_client, build_ws_client, DummyEthApiClient, DummyEthApiServer, DummyEthApiServerImpl,
 };
 use ethers::types::U64;
-use silius_rpc::JsonRpcServer;
+use silius_rpc::{JsonRpcServer, JsonRpcServerType};
+use std::net::IpAddr;
 use tokio;
 
 #[tokio::test]
 async fn only_http_rpc_server() {
-    let address = test_address();
-    let http_enabled = true;
-    let ws_disabled = false;
-    let mut server = JsonRpcServer::new(address.clone(), http_enabled, ws_disabled);
+    let addr = IpAddr::from(ADDRESS);
+    let port = test_port();
+    let http: bool = true;
+    let ws = false;
+
+    let mut server = JsonRpcServer::new(http, addr.clone(), port, ws, addr.clone(), port);
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_method(DummyEthApiServerImpl { chain_id }.into_rpc())
+        .add_methods(
+            DummyEthApiServerImpl { chain_id }.into_rpc(),
+            JsonRpcServerType::Http,
+        )
         .unwrap();
 
-    let handle = server.start().await.unwrap();
-    tokio::spawn(handle.stopped());
+    let (http_handle, _ws_handle) = server.start().await.unwrap();
+    tokio::spawn(http_handle.unwrap().stopped());
 
     // http client return success response
-    let http_client = build_http_client(address.clone()).unwrap();
+    let http_client = build_http_client(addr.clone(), port).unwrap();
     let http_response = DummyEthApiClient::chain_id(&http_client).await.unwrap();
     assert_eq!(http_response, chain_id);
 
     // ws client cannot connect to http server
-    assert!(build_ws_client(address.clone()).await.is_err());
+    assert!(build_ws_client(addr, port).await.is_err());
 }
 
 #[tokio::test]
 async fn only_ws_rpc_server() {
-    let address = test_address();
-    let http_disabled = false;
-    let ws_enabled = true;
-    let mut server = JsonRpcServer::new(address.clone(), http_disabled, ws_enabled);
+    let addr = IpAddr::from(ADDRESS);
+    let port = test_port();
+    let http = false;
+    let ws = true;
+    let mut server = JsonRpcServer::new(http, addr.clone(), port, ws, addr.clone(), port);
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_method(DummyEthApiServerImpl { chain_id }.into_rpc())
+        .add_methods(
+            DummyEthApiServerImpl { chain_id }.into_rpc(),
+            JsonRpcServerType::Ws,
+        )
         .unwrap();
 
-    let handle = server.start().await.unwrap();
-    tokio::spawn(handle.stopped());
+    let (_http_handle, ws_handle) = server.start().await.unwrap();
+    tokio::spawn(ws_handle.unwrap().stopped());
 
     // http client return error response
-    let http_client = build_http_client(address.clone()).unwrap();
+    let http_client = build_http_client(addr.clone(), port).unwrap();
     let http_response = DummyEthApiClient::chain_id(&http_client).await;
     assert!(http_response.is_err());
 
     // ws client return success response
-    let ws_client = build_ws_client(address.clone()).await.unwrap();
+    let ws_client = build_ws_client(addr, port).await.unwrap();
     let ws_response = DummyEthApiClient::chain_id(&ws_client).await.unwrap();
     assert_eq!(ws_response, chain_id);
 }
 
 #[tokio::test]
 async fn http_and_ws_rpc_server() {
-    let address = test_address();
-    let http_enabled = true;
-    let ws_enabled = true;
-    let mut server = JsonRpcServer::new(address.clone(), http_enabled, ws_enabled);
+    let addr = IpAddr::from(ADDRESS);
+    let port = test_port();
+    let http = true;
+    let ws = true;
+    let mut server = JsonRpcServer::new(http, addr.clone(), port, ws, addr.clone(), port);
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_method(DummyEthApiServerImpl { chain_id }.into_rpc())
+        .add_methods(
+            DummyEthApiServerImpl { chain_id }.into_rpc(),
+            JsonRpcServerType::Both,
+        )
         .unwrap();
 
-    let handle = server.start().await.unwrap();
-    tokio::spawn(handle.stopped());
+    let (http_handle, ws_handle) = server.start().await.unwrap();
+    tokio::spawn({
+        http_handle.unwrap().stopped().await;
+        ws_handle.unwrap().stopped()
+    });
 
     // http client return success response
-    let http_client = build_http_client(address.clone()).unwrap();
+    let http_client = build_http_client(addr.clone(), port).unwrap();
     let http_response = DummyEthApiClient::chain_id(&http_client).await.unwrap();
     assert_eq!(http_response, chain_id);
 
     // ws client return success response
-    let ws_client = build_ws_client(address.clone()).await.unwrap();
+    let ws_client = build_ws_client(addr, port).await.unwrap();
     let ws_response = DummyEthApiClient::chain_id(&ws_client).await.unwrap();
     assert_eq!(ws_response, chain_id);
 }

@@ -39,31 +39,37 @@ make setup-thirdparty
 Create wallet for bundler:
 
 ```bash
-cargo run --release --bin create-wallet -- --output-path ${HOME}/.silius --chain-id 5
+cargo run --release -- create-wallet --output-path ${HOME}/.silius --chain-id 5
 ```
 
 Run bundler (with user operation pool and JSON-RPC API):
 
 ```bash
-cargo run --release -- --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --http --ws
+cargo run --release -- bundler --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789 --http --ws
+```
+
+Run only bundling component:
+
+```bash
+cargo run --release -- bundling --eth-client-address http://127.0.0.1:8545 --mnemonic-file ${HOME}/.silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
 ```
 
 Run only user operation pool:
 
 ```bash
-cargo run --release --bin silius-uopool -- --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+cargo run --release -- uopool --eth-client-address http://127.0.0.1:8545 --entry-points 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
 ```
 
 Run only JSON-RPC API:
 
 ```bash
-cargo run --release --bin silius-rpc --http --ws
+cargo run --release -- rpc --http --ws
 ```
 
 ### Docker
 
 ```bash
-docker run --net=host -v ./bundler-spec-tests/keys:/data/silius -v ./db:/data/silius/db ghcr.io/vid201/silius:latest --rpc-listen-address 0.0.0.0:3000 --eth-client-address http://127.0.0.1:8545 --datadir data/silius --mnemonic-file data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 --http --ws --rpc-api eth,debug,web3 
+docker run --net=host -v ./bundler-spec-tests/keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266:/data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 -v ./db:/data/silius/db ghcr.io/vid201/silius:latest bundler --eth-client-address http://127.0.0.1:8545 --datadir data/silius --mnemonic-file data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --entry-points 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 --http --http.addr 0.0.0.0 --http.port 3000 --http.api eth,debug,web3 --ws --ws.addr 0.0.0.0 --ws.port 3001 --ws.api eth,debug,web3
 ```
 
 ## Supported networks
@@ -117,6 +123,7 @@ The best place for the discussion is the dedicated [Telegram group](https://t.me
 ## Projects using Silius
 
 - [Luban the Paymaster](https://github.com/da-bao-jian/luban-the-paymaster): A Cross-chain Tx Sponsorship Protocol.
+- [Ethers UserOp](https://github.com/qi-protocol/ethers-userop/): An ether-rs middleware to craft UserOperations.
 
 ## Licenses
 

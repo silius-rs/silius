@@ -11,4 +11,4 @@ mod rpc;
 mod web3;
 pub mod web3_api;
 
-pub use rpc::JsonRpcServer;
+pub use rpc::{JsonRpcServer, JsonRpcServerType};

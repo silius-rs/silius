@@ -5,26 +5,37 @@ use jsonrpsee::{
     server::{ServerBuilder, ServerHandle},
     Methods,
 };
+use std::net::{IpAddr, SocketAddr};
 use tower::ServiceBuilder;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 /// JsonRpcServer is a wrapper around the `jsonrpsee` [ServerBuilder](https://docs.rs/jsonrpsee/3.0.0-beta.1/jsonrpsee/server/struct.ServerBuilder.html).
 pub struct JsonRpcServer {
-    /// The address to listen on.
-    listen_address: String,
-    /// The [cors layer](CorsLayer) to filter requests.
-    cors_layer: Option<CorsLayer>,
-    /// The [proxy layer](ProxyJsonRpcLayer) to forward requests.
-    proxy_layer: Option<ProxyJsonRpcLayer>,
     /// Whether to start an HTTP server.
     http: bool,
+    /// HTTP address to listen on.
+    http_addr: IpAddr,
+    /// HTTP port to listen on.
+    http_port: u16,
+    /// The HTTP RPC methods to be exposed.
+    http_methods: Methods,
+    /// The [cors layer](CorsLayer) for HTTP server to filter requests.
+    http_cors_layer: Option<CorsLayer>,
     /// Whether to start a WS server.
     ws: bool,
-    /// The RPC methods to be exposed.
-    methods: Methods,
+    /// WS address to listen on.
+    ws_addr: IpAddr,
+    /// WS port to listen on.
+    ws_port: u16,
+    /// The WS RPC methods to be exposed.
+    ws_methods: Methods,
+    /// The [cors layer](CorsLayer) for WS server to filter requests.   
+    ws_cors_layer: Option<CorsLayer>,
+    /// The [proxy layer](ProxyJsonRpcLayer) to forward requests.
+    proxy_layer: Option<ProxyJsonRpcLayer>,
 }
 
-enum JsonRpcProtocolType {
+pub enum JsonRpcServerType {
     /// Both HTTP and WS.
     Both,
     /// Only HTTP.
@@ -37,18 +48,35 @@ impl JsonRpcServer {
     /// Create a new JsonRpcServer.
     ///
     /// # Arguments
-    /// * `listen_address: String` - The address to listen on.
+    /// * `http: bool` - Whether to start an HTTP server.
+    /// * `http_addr: IpAddr` - HTTP address to listen on.
+    /// * `http_port: u16` - HTTP port to listen on.
+    /// * `ws: bool` - Whether to start a WS server.
+    /// * `ws_addr: IpAddr` - WS address to listen on.
+    /// * `ws_port: u16` - WS port to listen on.
     ///
     /// # Returns
     /// * `Self` - A new [JsonRpcServer](JsonRpcServer) instance.
-    pub fn new(listen_address: String, http: bool, ws: bool) -> Self {
+    pub fn new(
+        http: bool,
+        http_addr: IpAddr,
+        http_port: u16,
+        ws: bool,
+        ws_addr: IpAddr,
+        ws_port: u16,
+    ) -> Self {
         Self {
-            listen_address,
-            cors_layer: None,
-            proxy_layer: None,
             http,
+            http_addr,
+            http_port,
+            http_methods: Methods::new(),
+            http_cors_layer: None,
             ws,
-            methods: Methods::new(),
+            ws_addr,
+            ws_port,
+            ws_methods: Methods::new(),
+            ws_cors_layer: None,
+            proxy_layer: None,
         }
     }
 
@@ -56,10 +84,11 @@ impl JsonRpcServer {
     ///
     /// # Arguments
     /// * `cors_domain: Vec<String>` - A list of CORS filters in the form of String.
+    /// * `typ: JsonRpcServerType` - The type of the server.
     ///
     /// # Returns
     /// * `Self` - A new [JsonRpcServer](JsonRpcServer) instance.
-    pub fn with_cors(mut self, cors_domain: Vec<String>) -> Self {
+    pub fn with_cors(mut self, cors_domain: &[String], typ: JsonRpcServerType) -> Self {
         let cors_layer = if cors_domain.iter().any(|d| d == "*") {
             CorsLayer::new()
                 .allow_headers(Any)
@@ -80,7 +109,15 @@ impl JsonRpcServer {
                 .allow_origin(AllowOrigin::list(origins))
         };
 
-        self.cors_layer = Some(cors_layer);
+        match typ {
+            JsonRpcServerType::Both => {
+                self.http_cors_layer = Some(cors_layer.clone());
+                self.ws_cors_layer = Some(cors_layer);
+            }
+            JsonRpcServerType::Http => self.http_cors_layer = Some(cors_layer),
+            JsonRpcServerType::Ws => self.ws_cors_layer = Some(cors_layer),
+        }
+
         self
     }
 
@@ -96,58 +133,67 @@ impl JsonRpcServer {
         self
     }
 
-    /// Add a method to the RPC server.
+    /// Add methods to the RPC server.
     ///
     /// # Arguments
     /// * `methods: impl Into<Methods>` - The RPC methods to be exposed.
+    /// * `typ: JsonRpcServerType` - The type of the server.
     ///
     /// # Returns
     /// * `Result<(), Error>` - None if no error.
-    pub fn add_method(&mut self, methods: impl Into<Methods>) -> Result<(), Error> {
-        self.methods.merge(methods).map_err(|e| e.into())
+    pub fn add_methods(
+        &mut self,
+        methods: impl Into<Methods>,
+        typ: JsonRpcServerType,
+    ) -> Result<(), Error> {
+        let methods: Methods = methods.into();
+
+        match typ {
+            JsonRpcServerType::Both => {
+                self.http_methods.merge(methods.clone())?;
+                self.ws_methods.merge(methods).map_err(|e| e.into())
+            }
+            JsonRpcServerType::Http => self.http_methods.merge(methods).map_err(|e| e.into()),
+            JsonRpcServerType::Ws => self.ws_methods.merge(methods).map_err(|e| e.into()),
+        }
     }
 
     /// Start the [json RPC server](JsonRpcServer)
     ///
     /// # Returns
-    /// * `Result<ServerHandle, Error>` - The [handle](ServerHandle) of the server.
-    pub async fn start(&self) -> anyhow::Result<ServerHandle> {
-        let service = ServiceBuilder::new()
-            .option_layer(self.cors_layer.clone())
-            .option_layer(self.proxy_layer.clone());
+    /// * `Result<(Option<ServerHandle>, Option<ServerHandle>), Error>` - The [handle]((Option<ServerHandle>, Option<ServerHandle>)) of the HTTP and WS servers.
+    pub async fn start(&self) -> anyhow::Result<(Option<ServerHandle>, Option<ServerHandle>)> {
+        let http_handle = if self.http {
+            let service = ServiceBuilder::new()
+                .option_layer(self.http_cors_layer.clone())
+                .option_layer(self.proxy_layer.clone());
 
-        let server = self
-            .server_builder()?
-            .set_middleware(service)
-            .build(&self.listen_address)
-            .await?;
+            let server = ServerBuilder::new()
+                .http_only()
+                .set_middleware(service)
+                .build(SocketAddr::new(self.http_addr, self.http_port))
+                .await?;
 
-        Ok(server.start(self.methods.clone())?)
-    }
+            Some(server.start(self.http_methods.clone())?)
+        } else {
+            None
+        };
+        let ws_handle = if self.ws {
+            let service = ServiceBuilder::new()
+                .option_layer(self.ws_cors_layer.clone())
+                .option_layer(self.proxy_layer.clone());
 
-    /// Create a [ServerBuilder](ServerBuilder) based on the server type.
-    ///
-    /// # Returns
-    /// * `Result<ServerBuilder, Error>` - The [ServerBuilder](ServerBuilder) instance.
-    fn server_builder(&self) -> anyhow::Result<ServerBuilder> {
-        let protocol_type = self.protocol_type()?;
-        match protocol_type {
-            JsonRpcProtocolType::Both => Ok(ServerBuilder::new()),
-            JsonRpcProtocolType::Http => Ok(ServerBuilder::new().http_only()),
-            JsonRpcProtocolType::Ws => Ok(ServerBuilder::new().ws_only()),
-        }
-    }
+            let server = ServerBuilder::new()
+                .ws_only()
+                .set_middleware(service)
+                .build(SocketAddr::new(self.ws_addr, self.ws_port))
+                .await?;
 
-    /// Get the protocol type based on the server configuration.
-    ///
-    /// # Returns
-    /// * `Result<JsonRpcProtocolType, Error>` - The [JsonRpcProtocolType](JsonRpcProtocolType) instance.
-    fn protocol_type(&self) -> anyhow::Result<JsonRpcProtocolType> {
-        match (self.http, self.ws) {
-            (true, true) => Ok(JsonRpcProtocolType::Both),
-            (true, false) => Ok(JsonRpcProtocolType::Http),
-            (false, true) => Ok(JsonRpcProtocolType::Ws),
-            (false, false) => Err(anyhow::anyhow!("No protocol type selected")),
-        }
+            Some(server.start(self.ws_methods.clone())?)
+        } else {
+            None
+        };
+
+        Ok((http_handle, ws_handle))
     }
 }

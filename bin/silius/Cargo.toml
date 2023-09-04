@@ -1,6 +1,6 @@
 [package]
 name = "silius"
-version = "0.1.0"
+version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -9,10 +9,8 @@ rust-version = { workspace = true }
 description = """
 AA (ERC-4337) bundler - Silius
 """
-default-run = "silius"
 
 [dependencies]
-
 anyhow = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
@@ -27,22 +25,3 @@ silius-rpc = { path = "../../crates/rpc" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-[lib]
-path = "src/lib.rs"
-
-[[bin]]
-path = "src/silius.rs"
-name = "silius"
-
-[[bin]]
-path = "src/silius-uopool.rs"
-name = "silius-uopool"
-
-[[bin]]
-path = "src/silius-rpc.rs"
-name = "silius-rpc"
-
-[[bin]]
-path = "src/create-wallet.rs"
-name = "create-wallet"

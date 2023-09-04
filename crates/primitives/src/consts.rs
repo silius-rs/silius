@@ -58,3 +58,11 @@ pub mod supported_networks {
     pub const DEV: u64 = 1337;
     pub const MUMBAI: u64 = 80001;
 }
+
+/// Networking related constants
+pub mod networking {
+    pub const DEFAULT_HTTP_RPC_PORT: u16 = 3000;
+    pub const DEFAULT_WS_RPC_PORT: u16 = 3001;
+    pub const DEFAULT_UOPOOL_GRPC_PORT: u16 = 3002;
+    pub const DEFAULT_BUNDLER_GRPC_PORT: u16 = 3003;
+}

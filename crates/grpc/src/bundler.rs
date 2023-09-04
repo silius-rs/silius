@@ -191,7 +191,7 @@ impl bundler_server::Bundler for BundlerService {
 
 #[allow(clippy::too_many_arguments)]
 pub fn bundler_service_run(
-    grpc_listen_address: SocketAddr,
+    addr: SocketAddr,
     wallet: Wallet,
     eps: Vec<Address>,
     eth_client_address: String,
@@ -212,7 +212,7 @@ pub fn bundler_service_run(
                 beneficiary,
                 *ep,
                 chain,
-                send_bundle_mode.clone(),
+                send_bundle_mode,
                 relay_endpoints.clone(),
                 min_balance,
             )
@@ -221,14 +221,11 @@ pub fn bundler_service_run(
         .collect();
 
     let bundler_service = BundlerService::new(bundlers, uopool_grpc_client);
-
-    info!("Bundler gRPC server starting on {}", grpc_listen_address);
-
     bundler_service.start_bundling(bundle_interval);
 
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = bundler_server::BundlerServer::new(bundler_service);
-        builder.add_service(svc).serve(grpc_listen_address).await
+        builder.add_service(svc).serve(addr).await
     });
 }

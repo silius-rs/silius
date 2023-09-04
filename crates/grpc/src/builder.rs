@@ -82,7 +82,7 @@ where
         }
     }
 
-    pub fn uo_pool(&self) -> UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E> {
+    pub fn uopool(&self) -> UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E> {
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
         let validator = if self.is_unsafe {
