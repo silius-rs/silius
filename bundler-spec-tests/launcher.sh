@@ -10,7 +10,8 @@ case $1 in
 
  start)
 	docker-compose up -d
-    RUST_LOG=silius=TRACE silius bundler \
+    silius bundler \
+        --verbosity 4 \
         --eth-client-address http://localhost:8545 \
         --mnemonic-file keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
         --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \

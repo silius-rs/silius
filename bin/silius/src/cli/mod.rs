@@ -59,7 +59,7 @@ pub enum Commands {
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    std::env::set_var("RUST_LOG", cli.get_log_level());
+    std::env::set_var("RUST_LOG", format!("silius={}", cli.get_log_level()));
     tracing_subscriber::fmt::init();
 
     std::thread::Builder::new()
