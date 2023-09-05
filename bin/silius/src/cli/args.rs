@@ -394,7 +394,7 @@ mod tests {
                     String::from("debug"),
                     String::from("web3")
                 ],
-                http_corsdomain: vec![String::from("_")],
+                http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: false,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 ws_port: 3001,
@@ -493,7 +493,7 @@ mod tests {
                     String::from("debug"),
                     String::from("web3")
                 ],
-                http_corsdomain: vec![String::from("_")],
+                http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: false,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 ws_port: 3001,
