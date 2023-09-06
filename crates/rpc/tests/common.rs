@@ -6,18 +6,20 @@ use jsonrpsee::{
     core::{Error as RpcError, RpcResult},
     proc_macros::rpc,
 };
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicU16, Ordering};
 
+pub static ADDRESS: Ipv4Addr = Ipv4Addr::UNSPECIFIED;
 static PORT: AtomicU16 = AtomicU16::new(8000);
-/// test_address returns a address on localhost with a increasing port number.
+
+/// test_port returns a port with a increasing port number.
 /// This is to prevent multiple tests from using the same port.
 ///
 /// # Returns
-/// * `String` - A localhost address with a increasing port number.
-pub fn test_address() -> String {
+/// * `u16` - A port with a increasing port number.
+pub fn test_port() -> u16 {
     let port = PORT.fetch_add(1, Ordering::SeqCst);
-    SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port)).to_string()
+    port
 }
 
 #[rpc(client, server, namespace = "eth")]
@@ -38,12 +40,12 @@ impl DummyEthApiServer for DummyEthApiServerImpl {
     }
 }
 
-pub fn build_http_client(address: String) -> Result<HttpClient, RpcError> {
-    HttpClientBuilder::default().build(format!("http://{}", address))
+pub fn build_http_client(addr: IpAddr, port: u16) -> Result<HttpClient, RpcError> {
+    HttpClientBuilder::default().build(format!("http://{}:{}", addr, port))
 }
 
-pub async fn build_ws_client(address: String) -> Result<WsClient, RpcError> {
+pub async fn build_ws_client(addr: IpAddr, port: u16) -> Result<WsClient, RpcError> {
     WsClientBuilder::default()
-        .build(format!("ws://{}", address))
+        .build(format!("ws://{}:{}", addr, port))
         .await
 }

@@ -196,7 +196,7 @@ where
                     let _ = self.mempool.set_code_hashes(&uo_hash, &code_hashes);
                 }
 
-                trace!("User operation {uo:?} added to the mempool {}", self.id);
+                trace!("{uo:?} added to the mempool {:?}", self.id);
 
                 // update reputation
                 self.reputation

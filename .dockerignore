@@ -1,6 +1,7 @@
-docs
-target
-thirdparty/account-abstraction/*
-thirdparty/bundler/*
 .github
+docs
 Dockerfile
+bundler-spec-tests
+target
+crates/contrarcts/thirdparty/account-abstraction/*
+tests/thirdparty/bundler/*

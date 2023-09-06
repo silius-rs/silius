@@ -2,7 +2,7 @@ use dirs::home_dir;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
-use silius_primitives::UoPoolMode;
+use silius_primitives::{bundler::SendBundleMode, UoPoolMode};
 use std::{future::Future, str::FromStr};
 use tracing::info;
 
@@ -26,6 +26,11 @@ pub fn parse_address(s: &str) -> Result<Address, String> {
 /// Parses U256 from string
 pub fn parse_u256(s: &str) -> Result<U256, String> {
     U256::from_str_radix(s, 10).map_err(|_| format!("String {s} is not a valid U256"))
+}
+
+/// Parses SendBundleMode from string
+pub fn parse_send_bundle_mode(s: &str) -> Result<SendBundleMode, String> {
+    SendBundleMode::from_str(s).map_err(|_| format!("String {s} is not a valid SendBundleMode"))
 }
 
 /// Parses UoPoolMode from string

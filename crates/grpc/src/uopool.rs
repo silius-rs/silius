@@ -25,7 +25,7 @@ use silius_uopool::{
 use std::fmt::{Debug, Display};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
-use tracing::{info, warn};
+use tracing::warn;
 
 pub const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 pub const GAS_INCREASE_PERC: u64 = 10;
@@ -39,7 +39,7 @@ where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
-    pub uo_pools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>,
+    pub uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>,
     pub chain: Chain,
 }
 
@@ -50,15 +50,15 @@ where
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
 {
-    pub fn new(uo_pools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>, chain: Chain) -> Self {
-        Self { uo_pools, chain }
+    pub fn new(uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>, chain: Chain) -> Self {
+        Self { uopools, chain }
     }
 
-    fn get_uo_pool(&self, ep: &Address) -> tonic::Result<StandardUserPool<M, P, R, E>> {
+    fn get_uopool(&self, ep: &Address) -> tonic::Result<StandardUserPool<M, P, R, E>> {
         let m_id = mempool_id(ep, &U256::from(self.chain.id()));
-        self.uo_pools
+        self.uopools
             .get(&m_id)
-            .map(|b| b.uo_pool())
+            .map(|b| b.uopool())
             .ok_or(Status::new(
                 Code::Unavailable,
                 "User operation pool is not available",
@@ -82,8 +82,8 @@ where
         let ep = parse_addr(req.ep)?;
 
         let res = {
-            let uo_pool = self.get_uo_pool(&ep)?;
-            match uo_pool.validate_user_operation(&uo).await {
+            let uopool = self.get_uopool(&ep)?;
+            match uopool.validate_user_operation(&uo).await {
                 Ok(res) => res,
                 Err(err) => {
                     return Ok(Response::new(AddResponse {
@@ -96,9 +96,9 @@ where
             }
         };
 
-        let mut uo_pool = self.get_uo_pool(&ep)?;
+        let mut uopool = self.get_uopool(&ep)?;
 
-        match uo_pool.add_user_operation(uo, res).await {
+        match uopool.add_user_operation(uo, res).await {
             Ok(uo_hash) => Ok(Response::new(AddResponse {
                 res: AddResult::Added as i32,
                 data: serde_json::to_string(&uo_hash)
@@ -122,9 +122,9 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let mut uo_pool = self.get_uo_pool(&ep)?;
+        let mut uopool = self.get_uopool(&ep)?;
 
-        uo_pool.remove_user_operations(req.hashes.into_iter().map(Into::into).collect());
+        uopool.remove_user_operations(req.hashes.into_iter().map(Into::into).collect());
 
         Ok(Response::new(()))
     }
@@ -144,9 +144,9 @@ where
     ) -> Result<Response<GetSupportedEntryPointsResponse>, Status> {
         Ok(Response::new(GetSupportedEntryPointsResponse {
             eps: self
-                .uo_pools
+                .uopools
                 .iter()
-                .map(|mempool| mempool.uo_pool().entry_point_address().into())
+                .map(|mempool| mempool.uopool().entry_point_address().into())
                 .collect(),
         }))
     }
@@ -160,10 +160,10 @@ where
         let uo = parse_uo(req.uo)?;
         let ep = parse_addr(req.ep)?;
 
-        let uo_pool = self.get_uo_pool(&ep)?;
+        let uopool = self.get_uopool(&ep)?;
 
         Ok(Response::new(
-            match uo_pool.estimate_user_operation_gas(&uo).await {
+            match uopool.estimate_user_operation_gas(&uo).await {
                 Ok(gas) => EstimateUserOperationGasResponse {
                     res: EstimateUserOperationGasResult::Estimated as i32,
                     data: serde_json::to_string(&gas).map_err(|err| {
@@ -189,15 +189,15 @@ where
         let ep = parse_addr(req.ep)?;
 
         let uos = {
-            let uo_pool = self.get_uo_pool(&ep)?;
-            uo_pool.get_sorted_user_operations().map_err(|e| {
+            let uopool = self.get_uopool(&ep)?;
+            uopool.get_sorted_user_operations().map_err(|e| {
                 tonic::Status::internal(format!("Get sorted uos internal error: {e}"))
             })?
         };
 
         let uos_valid = {
-            let mut uo_pool = self.get_uo_pool(&ep)?;
-            uo_pool
+            let mut uopool = self.get_uopool(&ep)?;
+            uopool
                 .bundle_user_operations(uos)
                 .await
                 .map_err(|e| tonic::Status::internal(format!("Bundle uos internal error: {e}")))?
@@ -215,9 +215,9 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let mut uo_pool = self.get_uo_pool(&ep)?;
+        let mut uopool = self.get_uopool(&ep)?;
 
-        uo_pool
+        uopool
             .handle_past_events()
             .await
             .map_err(|e| tonic::Status::internal(format!("Failed to handle past events: {e:?}")))?;
@@ -233,9 +233,9 @@ where
 
         let uo_hash = parse_hash(req.hash)?;
 
-        for uo_pool in self.uo_pools.iter() {
-            if let Ok(uo_by_hash) = uo_pool
-                .uo_pool()
+        for uopool in self.uopools.iter() {
+            if let Ok(uo_by_hash) = uopool
+                .uopool()
                 .get_user_operation_by_hash(&uo_hash.into())
                 .await
             {
@@ -260,9 +260,9 @@ where
 
         let uo_hash = parse_hash(req.hash)?;
 
-        for uo_pool in self.uo_pools.iter() {
-            if let Ok(uo_receipt) = uo_pool
-                .uo_pool()
+        for uopool in self.uopools.iter() {
+            if let Ok(uo_receipt) = uopool
+                .uopool()
                 .get_user_operation_receipt(&uo_hash.into())
                 .await
             {
@@ -291,16 +291,16 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let uo_pool = self.get_uo_pool(&ep)?;
+        let uopool = self.get_uopool(&ep)?;
 
         Ok(Response::new(GetAllResponse {
-            uos: uo_pool.get_all().into_iter().map(Into::into).collect(),
+            uos: uopool.get_all().into_iter().map(Into::into).collect(),
         }))
     }
 
     async fn clear(&self, _req: Request<()>) -> Result<Response<()>, Status> {
-        self.uo_pools.iter_mut().for_each(|uo_pool| {
-            uo_pool.uo_pool().clear();
+        self.uopools.iter_mut().for_each(|uopool| {
+            uopool.uopool().clear();
         });
         Ok(Response::new(()))
     }
@@ -312,10 +312,10 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let uo_pool = self.get_uo_pool(&ep)?;
+        let uopool = self.get_uopool(&ep)?;
 
         Ok(Response::new(GetAllReputationResponse {
-            rep: uo_pool
+            rep: uopool
                 .get_reputation()
                 .into_iter()
                 .map(Into::into)
@@ -330,11 +330,10 @@ where
         let req = req.into_inner();
 
         let ep = parse_addr(req.ep)?;
-        let mut uo_pool = self.get_uo_pool(&ep)?;
+        let mut uopool = self.get_uopool(&ep)?;
 
         let res = Response::new(SetReputationResponse {
-            res: match uo_pool.set_reputation(req.rep.iter().map(|re| re.clone().into()).collect())
-            {
+            res: match uopool.set_reputation(req.rep.iter().map(|re| re.clone().into()).collect()) {
                 Ok(_) => SetReputationResult::SetReputation as i32,
                 Err(_) => SetReputationResult::NotSetReputation as i32,
             },
@@ -346,7 +345,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 pub async fn uopool_service_run(
-    grpc_listen_address: SocketAddr,
+    addr: SocketAddr,
     datadir: ExpandedPathBuf,
     eps: Vec<Address>,
     eth_client: Arc<Provider<Http>>,
@@ -356,7 +355,7 @@ pub async fn uopool_service_run(
     min_unstake_delay: U256,
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
-    uo_pool_mode: UoPoolMode,
+    upool_mode: UoPoolMode,
 ) -> Result<()> {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
@@ -378,7 +377,7 @@ pub async fn uopool_service_run(
         for ep in eps {
             let id = mempool_id(&ep, &U256::from(chain.id()));
             let builder = UoPoolBuilder::new(
-                uo_pool_mode == UoPoolMode::Unsafe,
+                upool_mode == UoPoolMode::Unsafe,
                 eth_client.clone(),
                 ep,
                 chain,
@@ -404,7 +403,7 @@ pub async fn uopool_service_run(
             loop {
                 m_map.iter_mut().for_each(|m| {
                     let _ = m
-                        .uo_pool()
+                        .uopool()
                         .reputation
                         .update_hourly()
                         .map_err(|e| warn!("Failed to update hourly reputation: {:?}", e));
@@ -413,9 +412,7 @@ pub async fn uopool_service_run(
             }
         });
 
-        info!("UoPool gRPC server starting on {}", grpc_listen_address);
-
-        builder.add_service(svc).serve(grpc_listen_address).await
+        builder.add_service(svc).serve(addr).await
     });
 
     tokio::time::sleep(Duration::from_secs(1)).await;

@@ -19,19 +19,19 @@ pub struct Wallet {
 
 impl Wallet {
     /// Builds a `Wallet` and construct using a randomly generated number
-    /// if `build_fb_wallet` is true, then a Flashbots wallet is also built, otherwise it is set to None
+    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to None
     ///
     /// # Arguments
     /// * `path` - The path to the file where the mnemonic phrase will be written
     /// * `chain_id` - The chain id of the blockchain network to be used
-    /// * `build_fb_wallet` - Whether to build a Flashbots wallet
+    /// * `flashbots_key` - Whether to create a Flashbots key
     ///
     /// # Returns
     /// * `Self` - A new `Wallet` instance
     pub fn build_random(
         path: ExpandedPathBuf,
         chain_id: &U256,
-        build_fb_wallet: bool,
+        flashbots_key: bool,
     ) -> anyhow::Result<Self> {
         let mut rng = rand::thread_rng();
 
@@ -44,7 +44,7 @@ impl Wallet {
             .expect("Failed to derive wallet")
             .build_random(&mut rng)?;
 
-        if build_fb_wallet {
+        if flashbots_key {
             let mut entries = fs::read_dir(&path)?;
             let entry = entries.next().expect("No file found")?;
 
@@ -67,19 +67,19 @@ impl Wallet {
     }
 
     /// Create a new wallet from the given file containing the mnemonic phrase
-    /// if `build_fb_wallet` is true, then a Flashbots wallet is also built, otherwise it is set to None
+    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to None
     ///
     /// # Arguments
     /// * `path` - The path to the file where the mnemonic phrase is stored
     /// * `chain_id` - The chain id of the blockchain network to be used
-    /// * `build_fb_wallet` - Whether to build a Flashbots wallet
+    /// * `flashbots_key` - Whether to create a Flashbots key
     ///
     /// # Returns
     /// * `Self` - A new `Wallet` instance
     pub fn from_file(
         path: ExpandedPathBuf,
         chain_id: &U256,
-        build_fb_wallet: bool,
+        flashbots_key: bool,
     ) -> anyhow::Result<Self> {
         let wallet_builder = MnemonicBuilder::<English>::default().phrase(path.to_path_buf());
 
@@ -89,7 +89,7 @@ impl Wallet {
             .expect("Failed to derive wallet")
             .build()?;
 
-        if build_fb_wallet {
+        if flashbots_key {
             let fb_wallet = wallet_builder
                 .derivation_path("m/44'/60'/0'/0/1")
                 .expect("Failed to derive wallet")
@@ -108,20 +108,16 @@ impl Wallet {
     }
 
     /// Create a new wallet from the given mnemonic phrase
-    /// if `build_fb_wallet` is true, then a Flashbots wallet is also built, otherwise it is set to None
+    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to None
     ///
     /// # Arguments
     /// * `phrase` - The mnemonic phrase
     /// * `chain_id` - The chain id of the blockchain network to be used
-    /// * `build_fb_wallet` - Whether to build a Flashbots wallet
+    /// * `flashbots_key` - Whether to create a Flashbots key
     ///
     /// # Returns
     /// * `Self` - A new `Wallet` instance
-    pub fn from_phrase(
-        phrase: &str,
-        chain_id: &U256,
-        build_fb_wallet: bool,
-    ) -> anyhow::Result<Self> {
+    pub fn from_phrase(phrase: &str, chain_id: &U256, flashbots_key: bool) -> anyhow::Result<Self> {
         let wallet_builder = MnemonicBuilder::<English>::default().phrase(phrase);
 
         let wallet = wallet_builder
@@ -130,7 +126,7 @@ impl Wallet {
             .expect("Failed to derive wallet")
             .build()?;
 
-        if build_fb_wallet {
+        if flashbots_key {
             let fb_wallet = wallet_builder
                 .derivation_path("m/44'/60'/0'/0/1")
                 .expect("Failed to derive wallet")
