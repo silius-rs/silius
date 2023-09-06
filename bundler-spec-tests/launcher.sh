@@ -17,11 +17,11 @@ case $1 in
         --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
         --entry-points 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 \
         --http \
-        --http.api 0.0.0.0 \
+        --http.addr 0.0.0.0 \
         --http.port 3000 \
         --http.api eth,debug,web3 \
         --ws \
-        --ws.api 0.0.0.0 \
+        --ws.addr 0.0.0.0 \
         --ws.port 3001 \
         --ws.api eth,debug,web3 & echo $! > bundler.pid
     popd
