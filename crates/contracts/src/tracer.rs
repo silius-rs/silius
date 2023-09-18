@@ -1,5 +1,5 @@
-use anyhow::format_err;
 use ethers::types::{Address, Bytes, GethTrace, U256};
+use eyre::format_err;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -15,7 +15,7 @@ pub struct JsTracerFrame {
 }
 
 impl TryFrom<GethTrace> for JsTracerFrame {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(val: GethTrace) -> Result<Self, Self::Error> {
         match val {
             GethTrace::Known(val) => Err(format_err!("Invalid geth trace: {val:?}")),

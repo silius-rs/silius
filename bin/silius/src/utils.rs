@@ -1,5 +1,8 @@
 use dirs::home_dir;
-use ethers::types::{Address, U256};
+use ethers::{
+    providers::{Provider, Ws},
+    types::{Address, U256},
+};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
 use silius_primitives::{bundler::SendBundleMode, UoPoolMode};
@@ -7,13 +10,13 @@ use std::{future::Future, str::FromStr};
 use tracing::info;
 
 /// Unwrap path or returns home directory
-pub fn unwrap_path_or_home(path: Option<ExpandedPathBuf>) -> anyhow::Result<ExpandedPathBuf> {
+pub fn unwrap_path_or_home(path: Option<ExpandedPathBuf>) -> eyre::Result<ExpandedPathBuf> {
     if let Some(path) = path {
         Ok(path)
     } else {
         home_dir()
             .map(|h| h.join(".silius"))
-            .ok_or_else(|| anyhow::anyhow!("Get Home directory error"))
+            .ok_or_else(|| eyre::eyre!("Get Home directory error"))
             .map(ExpandedPathBuf)
     }
 }
@@ -63,4 +66,10 @@ where
     }
 
     Ok(())
+}
+
+/// Creates ethers provider with WebSockets connection
+pub async fn create_ws_provider(addr: &str) -> eyre::Result<Provider<Ws>> {
+    let provider = Provider::<Ws>::connect_with_reconnects(addr, 100).await?;
+    Ok(provider)
 }

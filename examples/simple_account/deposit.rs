@@ -16,7 +16,7 @@ const CREATE_INDEX: u64 = 1;
 const SEND_VALUE: &str = "0.01"; // ether unit
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> eyre::Result<()> {
     let seed_phrase = env::var("SEED_PHRASE").unwrap();
     let provider_url = env::var("PROVIDER_URL").unwrap();
     let wallet = MnemonicBuilder::<English>::default()

@@ -7,6 +7,10 @@ ENTRYPOINT geth \
       --http.api personal,eth,net,web3,debug \
       --http.corsdomain '*' \
       --http.addr "0.0.0.0" \
+      --ws \
+      --ws.api personal,eth,net,web3,debug \
+      --ws.origins '*' \
+      --ws.addr "0.0.0.0" \
       --nodiscover --maxpeers 0 --mine \
       --networkid 1337 \
       --dev \

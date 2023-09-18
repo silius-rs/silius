@@ -8,12 +8,12 @@ use crate::{
     },
     MempoolId, Overhead, Reputation,
 };
-use anyhow::format_err;
 use ethers::{
     prelude::LogMeta,
-    providers::Middleware,
+    providers::{Middleware, PubsubClient},
     types::{Address, BlockNumber, U256, U64},
 };
+use eyre::format_err;
 use silius_contracts::{
     entry_point::{EntryPointAPIEvents, EntryPointErr, UserOperationEventFilter},
     utils::parse_from_input_data,
@@ -40,6 +40,7 @@ const LATEST_SCAN_DEPTH: u64 = 1000;
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
 pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E>
 where
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug,
@@ -62,6 +63,7 @@ where
 
 impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
 where
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
@@ -230,7 +232,7 @@ where
     /// Sorts the [UserOperations](UserOperation) in the mempool by calling the [Mempool::get_sorted](Mempool::get_sorted) function
     ///
     /// # Returns
-    /// `Result<Vec<UserOperation>, anyhow::Error>` - The sorted [UserOperations](UserOperation)
+    /// `Result<Vec<UserOperation>, eyre::Error>` - The sorted [UserOperations](UserOperation)
     pub fn get_sorted_user_operations(&self) -> Result<Vec<UserOperation>, E> {
         self.mempool.get_sorted()
     }
@@ -243,11 +245,11 @@ where
     /// `uos` - An array of [UserOperations](UserOperation) to bundle
     ///
     /// # Returns
-    /// `Result<Vec<UserOperation>, anyhow::Error>` - The bundled [UserOperations](UserOperation).
+    /// `Result<Vec<UserOperation>, eyre::Error>` - The bundled [UserOperations](UserOperation).
     pub async fn bundle_user_operations(
         &mut self,
         uos: Vec<UserOperation>,
-    ) -> anyhow::Result<Vec<UserOperation>> {
+    ) -> eyre::Result<Vec<UserOperation>> {
         let mut uos_valid = vec![];
         let mut senders = HashSet::new();
         let mut gas_total = U256::zero();
@@ -392,8 +394,8 @@ where
     /// Gets the block base fee per gas
     ///
     /// # Returns
-    /// `Result<U256, anyhow::Error>` - The block base fee per gas.
-    pub async fn base_fee_per_gas(&self) -> anyhow::Result<U256> {
+    /// `Result<U256, eyre::Error>` - The block base fee per gas.
+    pub async fn base_fee_per_gas(&self) -> eyre::Result<U256> {
         let block = self
             .entry_point
             .eth_client()
@@ -487,11 +489,11 @@ where
     /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to filter the events for.
     ///
     /// # Returns
-    /// `Result<Option<(UserOperationEventFilter, LogMeta)>, anyhow::Error>` - The filtered event, if any.
+    /// `Result<Option<(UserOperationEventFilter, LogMeta)>, eyre::Error>` - The filtered event, if any.
     pub async fn get_user_operation_event_meta(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> anyhow::Result<Option<(UserOperationEventFilter, LogMeta)>> {
+    ) -> eyre::Result<Option<(UserOperationEventFilter, LogMeta)>> {
         let mut event: Option<(UserOperationEventFilter, LogMeta)> = None;
         let filter = self
             .entry_point
@@ -514,11 +516,11 @@ where
     /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to get the user operation for.
     ///
     /// # Returns
-    /// `Result<UserOperationByHash, anyhow::Error>` - The user operation, if any.
+    /// `Result<UserOperationByHash, eyre::Error>` - The user operation, if any.
     pub async fn get_user_operation_by_hash(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> anyhow::Result<UserOperationByHash> {
+    ) -> eyre::Result<UserOperationByHash> {
         let event = self.get_user_operation_event_meta(uo_hash).await?;
 
         if let Some((event, log_meta)) = event {
@@ -555,11 +557,11 @@ where
     /// * `uo_hash` - The [UserOperationHash](UserOperationHash) to get the user operation receipt for.
     ///
     /// # Returns
-    /// `Result<UserOperationReceipt, anyhow::Error>` - The user operation receipt, if any.
+    /// `Result<UserOperationReceipt, eyre::Error>` - The user operation receipt, if any.
     pub async fn get_user_operation_receipt(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> anyhow::Result<UserOperationReceipt> {
+    ) -> eyre::Result<UserOperationReceipt> {
         let event = self.get_user_operation_event_meta(uo_hash).await?;
 
         if let Some((event, log_meta)) = event {
@@ -592,8 +594,8 @@ where
     /// If [UserOperation](UserOperation) is found, it is removed from the [UserOperationQueue](UserOperationQueue), while simultaneously incrementing the reputation of the sender and paymaster.
     ///
     /// # Returns
-    /// `Result<(), anyhow::Error>` - None if the query was successful.
-    pub async fn handle_past_events(&mut self) -> anyhow::Result<()> {
+    /// `Result<(), eyre::Error>` - None if the query was successful.
+    pub async fn handle_past_events(&mut self) -> eyre::Result<()> {
         let block_num = self.entry_point.eth_client().get_block_number().await?;
         let block_st = std::cmp::max(
             1u64,
@@ -612,16 +614,16 @@ where
                     self.remove_user_operation(&uo_event.user_op_hash.into());
                     self.reputation
                         .increment_included(&uo_event.sender)
-                        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+                        .map_err(|err| eyre::eyre!(err.to_string()))?;
                     self.reputation
                         .increment_included(&uo_event.paymaster)
-                        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+                        .map_err(|err| eyre::eyre!(err.to_string()))?;
                     // TODO: include event aggregator
                 }
                 EntryPointAPIEvents::AccountDeployedFilter(event) => {
                     self.reputation
                         .increment_included(&event.factory)
-                        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+                        .map_err(|err| eyre::eyre!(err.to_string()))?;
                 }
                 _ => (),
             }

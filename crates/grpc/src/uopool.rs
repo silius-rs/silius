@@ -4,14 +4,15 @@ use crate::{
     proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
     utils::{parse_addr, parse_hash, parse_uo},
 };
-use anyhow::Result;
 use async_trait::async_trait;
 use dashmap::DashMap;
+use ethers::providers::PubsubClient;
 use ethers::{
-    providers::{Http, Middleware, Provider},
+    providers::Middleware,
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
+use eyre::Result;
 use silius_contracts::entry_point::EntryPointErr;
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
@@ -36,6 +37,7 @@ type StandardUserPool<M, P, R, E> =
 pub struct UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
@@ -46,6 +48,7 @@ where
 impl<M, P, R, E> UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
@@ -71,6 +74,7 @@ impl<M, P, R, E> uo_pool_server::UoPool for UoPoolService<M, P, R, E>
 where
     EntryPointErr: From<<M as Middleware>::Error>,
     M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync + 'static,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
     E: Debug + Display + 'static,
@@ -344,11 +348,11 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn uopool_service_run(
+pub async fn uopool_service_run<M>(
     addr: SocketAddr,
     datadir: ExpandedPathBuf,
     eps: Vec<Address>,
-    eth_client: Arc<Provider<Http>>,
+    eth_client: Arc<M>,
     chain: Chain,
     max_verification_gas: U256,
     min_stake: U256,
@@ -356,18 +360,18 @@ pub async fn uopool_service_run(
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
     upool_mode: UoPoolMode,
-) -> Result<()> {
+) -> Result<()>
+where
+    EntryPointErr: From<<M as Middleware>::Error>,
+    M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
+{
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
         let m_map = Arc::new(DashMap::<
             MempoolId,
-            UoPoolBuilder<
-                Provider<Http>,
-                DatabaseMempool<WriteMap>,
-                DatabaseReputation<WriteMap>,
-                DBError,
-            >,
+            UoPoolBuilder<M, DatabaseMempool<WriteMap>, DatabaseReputation<WriteMap>, DBError>,
         >::new());
 
         let env = Arc::new(init_env::<WriteMap>(datadir.join("db")).expect("Init mdbx failed"));
@@ -393,7 +397,7 @@ pub async fn uopool_service_run(
         }
 
         let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
-            Provider<Http>,
+            M,
             DatabaseMempool<WriteMap>,
             DatabaseReputation<WriteMap>,
             DBError,

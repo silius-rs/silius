@@ -11,12 +11,11 @@ AA (ERC-4337) bundler bundling implementation
 """
 
 [dependencies]
-
-anyhow = { workspace = true }
 async-trait = "0.1"
 bytes = "1.4.0"
 ethers = { workspace = true }
 ethers-flashbots = { git = "https://github.com/qi-protocol/ethers-flashbots.git", branch = "master" }
+eyre = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 silius-contracts = { path = "../contracts" }
@@ -32,5 +31,3 @@ dotenv = "0.15.0"
 ethers-flashbots-test = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", branch = "master" }
 jsonrpsee = { version = "0.20.0", features = ["server", "macros", "client"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-

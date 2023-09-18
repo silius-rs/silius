@@ -1,7 +1,10 @@
 use super::args::{BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, UoPoolArgs};
-use crate::bundler::{create_wallet, launch_bundler, launch_bundling, launch_rpc, launch_uopool};
+use crate::{
+    bundler::{create_wallet, launch_bundler, launch_bundling, launch_rpc, launch_uopool},
+    utils::create_ws_provider,
+};
 use clap::Parser;
-use std::future::pending;
+use std::{future::pending, sync::Arc};
 
 /// Start the bundler with all components (bundling component, user operation mempool, RPC server)
 #[derive(Debug, Parser)]
@@ -25,8 +28,9 @@ pub struct BundlerCommand {
 
 impl BundlerCommand {
     /// Execute the command
-    pub async fn execute(self) -> anyhow::Result<()> {
-        launch_bundler(self.bundler, self.uopool, self.common, self.rpc).await?;
+    pub async fn execute(self) -> eyre::Result<()> {
+        let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
+        launch_bundler(self.bundler, self.uopool, self.common, self.rpc, eth_client).await?;
         pending().await
     }
 }
@@ -49,10 +53,11 @@ pub struct BundlingCommand {
 
 impl BundlingCommand {
     /// Execute the command
-    pub async fn execute(self) -> anyhow::Result<()> {
+    pub async fn execute(self) -> eyre::Result<()> {
+        let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
         launch_bundling(
             self.bundler,
-            self.common.eth_client_address,
+            eth_client,
             self.common.chain,
             self.common.entry_points,
             self.uopool_grpc_listen_address,
@@ -76,10 +81,11 @@ pub struct UoPoolCommand {
 
 impl UoPoolCommand {
     /// Execute the command
-    pub async fn execute(self) -> anyhow::Result<()> {
+    pub async fn execute(self) -> eyre::Result<()> {
+        let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
         launch_uopool(
             self.uopool,
-            self.common.eth_client_address,
+            eth_client,
             self.common.chain,
             self.common.entry_points,
         )
@@ -95,10 +101,6 @@ pub struct RpcCommand {
     #[clap(flatten)]
     rpc: RpcArgs,
 
-    /// Ethereum execution client RPC endpoint
-    #[clap(long, default_value = "http://127.0.0.1:8545")]
-    pub eth_client_address: String,
-
     /// UoPool gRPC listen address
     #[clap(long, default_value = "http://127.0.0.1:3002")]
     pub uopool_grpc_listen_address: String,
@@ -110,10 +112,9 @@ pub struct RpcCommand {
 
 impl RpcCommand {
     /// Execute the command
-    pub async fn execute(self) -> anyhow::Result<()> {
+    pub async fn execute(self) -> eyre::Result<()> {
         launch_rpc(
             self.rpc,
-            self.eth_client_address,
             self.uopool_grpc_listen_address,
             self.bundler_grpc_listen_address,
         )
@@ -132,7 +133,7 @@ pub struct CreateWalletCommand {
 
 impl CreateWalletCommand {
     /// Execute the command
-    pub fn execute(self) -> anyhow::Result<()> {
+    pub fn execute(self) -> eyre::Result<()> {
         create_wallet(self.create_wallet)
     }
 }

@@ -23,7 +23,7 @@ struct Context<M> {
     tracer_test: DeployedContract<TracerTest<M>>,
 }
 
-async fn setup() -> anyhow::Result<Context<ClientType>> {
+async fn setup() -> eyre::Result<Context<ClientType>> {
     let (_geth, _client, _) = setup_geth().await?;
     let client = Arc::new(_client);
 
@@ -38,7 +38,7 @@ async fn setup() -> anyhow::Result<Context<ClientType>> {
 async fn trace_call<M: Middleware + 'static>(
     c: &Context<M>,
     func_data: Bytes,
-) -> anyhow::Result<JsTracerFrame> {
+) -> eyre::Result<JsTracerFrame> {
     let req = TransactionRequest::new()
         .to(c.tracer_test.address)
         .data(func_data);
@@ -71,7 +71,7 @@ async fn trace_exec_self<M: Middleware + 'static>(
     func_data: Vec<u8>,
     use_number: bool,
     extra_wrapper: bool,
-) -> anyhow::Result<JsTracerFrame> {
+) -> eyre::Result<JsTracerFrame> {
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let func = contract.abi().function("execSelf")?;
     let exec_test_call_gas =
@@ -86,7 +86,7 @@ async fn trace_exec_self<M: Middleware + 'static>(
 }
 
 #[tokio::test]
-async fn count_opcode_depth_bigger_than_1() -> anyhow::Result<()> {
+async fn count_opcode_depth_bigger_than_1() -> eyre::Result<()> {
     let c = setup().await?;
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let func_data = contract
@@ -115,7 +115,7 @@ async fn count_opcode_depth_bigger_than_1() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn trace_exec_self_should_revert() -> anyhow::Result<()> {
+async fn trace_exec_self_should_revert() -> eyre::Result<()> {
     let c = setup().await?;
     let ret = trace_exec_self(&c, Bytes::from_str("0xdead")?.to_vec(), true, true).await?;
     assert!(
@@ -142,7 +142,7 @@ async fn trace_exec_self_should_revert() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn trace_exec_self_call_itself() -> anyhow::Result<()> {
+async fn trace_exec_self_call_itself() -> eyre::Result<()> {
     let c = setup().await?;
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let inner_call = contract.abi().function("doNothing")?.encode_input(&[])?;
@@ -168,7 +168,7 @@ async fn trace_exec_self_call_itself() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn should_report_direct_use_of_gas_opcode() -> anyhow::Result<()> {
+async fn should_report_direct_use_of_gas_opcode() -> eyre::Result<()> {
     let c = setup().await?;
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let func_data = contract.abi().function("testCallGas")?.encode_input(&[])?;
@@ -181,7 +181,7 @@ async fn should_report_direct_use_of_gas_opcode() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn should_ignore_gas_used_as_part_of_call() -> anyhow::Result<()> {
+async fn should_ignore_gas_used_as_part_of_call() -> eyre::Result<()> {
     let c = setup().await?;
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let do_nothing = contract.abi().function("doNothing")?.encode_input(&[])?;

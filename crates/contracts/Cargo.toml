@@ -11,9 +11,8 @@ AA (ERC-4337) bundler smart contract interfaces
 """
 
 [dependencies]
-
-anyhow = { workspace = true }
 ethers = { workspace = true }
+eyre = { workspace = true }
 lazy_static = "1.4.0"
 serde = "1"
 serde_json = "1"
@@ -24,6 +23,6 @@ thiserror = "1"
 tokio = { workspace = true }
 
 [build-dependencies]
-anyhow = { workspace = true }
 ethers = { workspace = true, features = ["solc-full"] }
 ethers-solc = "2.0.8"
+eyre = { workspace = true }

@@ -1,16 +1,13 @@
-use anyhow;
 use async_trait::async_trait;
 use ethers::{
     middleware::SignerMiddleware,
     prelude::LocalWallet,
     providers::{Http, Middleware, Provider},
-    types::U256,
+    types::{Bytes, H256, U256, U64},
 };
-use ethers_flashbots_test::{
-    relay::SendBundleResponse, BundleRequest, BundleTransaction, SimulatedBundle,
-    SimulatedTransaction,
-};
+use ethers_flashbots_test::{relay::SendBundleResponse, SimulatedBundle, SimulatedTransaction};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -32,8 +29,8 @@ pub struct MockFlashbotsBlockBuilderRelay {
 
 #[cfg(test)]
 impl MockFlashbotsBlockBuilderRelay {
-    pub async fn new(port: u64) -> anyhow::Result<Self> {
-        let url = format!("http://localhost:{}", port).to_string();
+    pub async fn new(port: u64) -> eyre::Result<Self> {
+        let url = format!("http://127.0.0.1:{}", port).to_string();
         let mock_eth_client = Provider::<Http>::try_from(&url)?;
 
         // Create a wallet and SignerMiddleware
@@ -62,15 +59,7 @@ impl MockFlashbotsRelayServer for MockFlashbotsBlockBuilderRelay {
     }
 
     async fn call_bundle(&self, bundle_req: BundleRequest) -> RpcResult<SimulatedBundle> {
-        let txs: Vec<_> = bundle_req
-            .transactions()
-            .iter()
-            .map(|tx| match tx {
-                BundleTransaction::Raw(inner) => (*inner).clone(),
-                _ => panic!("Not a raw transaction"),
-            })
-            .map(|tx| tx.to_vec())
-            .collect();
+        let txs: Vec<_> = bundle_req.transactions;
 
         let mut simulated_bundle = SimulatedBundle::default();
         simulated_bundle.simulation_block = INIT_BLOCK.into();
@@ -103,4 +92,38 @@ impl MockFlashbotsRelayServer for MockFlashbotsBlockBuilderRelay {
 
         Ok(simulated_bundle)
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleRequest {
+    #[serde(rename = "txs")]
+    // #[serde(serialize_with = "serialize_txs")]
+    // transactions: Vec<BundleTransaction>,
+    pub transactions: Vec<Bytes>,
+    #[serde(rename = "revertingTxHashes")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    revertible_transaction_hashes: Vec<H256>,
+
+    #[serde(rename = "blockNumber")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_block: Option<U64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    min_timestamp: Option<u64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_timestamp: Option<u64>,
+
+    #[serde(rename = "stateBlockNumber")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    simulation_block: Option<U64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "timestamp")]
+    simulation_timestamp: Option<u64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "baseFee")]
+    simulation_basefee: Option<u64>,
 }
