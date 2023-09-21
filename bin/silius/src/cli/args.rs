@@ -70,7 +70,7 @@ pub struct UoPoolArgs {
     pub datadir: Option<ExpandedPathBuf>,
 
     /// Max allowed verification gas.
-    #[clap(long, default_value="3000000", value_parser=parse_u256)]
+    #[clap(long, default_value="5000000", value_parser=parse_u256)]
     pub max_verification_gas: U256,
 
     /// Minimum stake required for entities.

@@ -1,4 +1,5 @@
 version: "3"
+
 services:
   silius:
     image: ghcr.io/vid201/silius:latest

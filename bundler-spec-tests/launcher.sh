@@ -10,9 +10,10 @@ case $1 in
 
  start)
 	docker-compose up -d
+    sleep 2
     silius bundler \
         --verbosity 4 \
-        --eth-client-address ws://localhost:8545 \
+        --eth-client-address ws://127.0.0.1:8546 \
         --mnemonic-file keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
         --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
         --entry-points 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 \

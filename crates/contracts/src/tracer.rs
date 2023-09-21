@@ -165,7 +165,10 @@ pub const JS_TRACER: &str = r#"
             this.lastThreeOpcodes.shift();
         }
         // this.debug.push(this.lastOp + '-' + opcode + '-' + log.getDepth() + '-' + log.getGas() + '-' + log.getCost())
-        if (log.getGas() < log.getCost()) {
+        if (log.getGas() < log.getCost() || (
+            // special rule for SSTORE with gas metering
+            opcode === 'SSTORE' && log.getGas() < 2300)
+        ) {
             this.currentLevel.oog = true;
         }
         if (opcode === 'REVERT' || opcode === 'RETURN') {
