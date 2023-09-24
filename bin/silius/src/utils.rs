@@ -70,6 +70,6 @@ where
 
 /// Creates ethers provider with WebSockets connection
 pub async fn create_ws_provider(addr: &str) -> eyre::Result<Provider<Ws>> {
-    let provider = Provider::<Ws>::connect_with_reconnects(addr, 100).await?;
+    let provider = Provider::<Ws>::connect_with_reconnects(addr, usize::MAX).await?;
     Ok(provider)
 }

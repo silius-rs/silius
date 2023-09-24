@@ -22,7 +22,9 @@ rust-version = "1.71.1"
 
 [workspace.dependencies]
 async-trait = "0.1"
-ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc", features = ["ws"] }
+ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc", features = [
+    "ws",
+] }
 expanded-pathbuf = "0.1"
 eyre = "0.6.8"
 parking_lot = "0.12"
@@ -37,3 +39,5 @@ debug = true
 [patch]
 [patch.crates-io]
 revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }
+[patch."https://github.com/gakonst/ethers-rs"]
+ethers = { git = "https://github.com/Vid201/ethers-rs", branch = "chore/ws" }
