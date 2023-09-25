@@ -172,8 +172,8 @@ pub mod tests {
             pre_verification_gas: U256::max_value(),
             max_fee_per_gas: U256::max_value(),
             max_priority_fee_per_gas: U256::max_value(),
-            paymaster_and_data: Bytes::from(vec![255; 1024]),
-            signature: Bytes::from(vec![255; 1024]), // Large signature
+            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),          // Large signature
         };
 
         assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 110020.into());
@@ -202,8 +202,8 @@ pub mod tests {
             pre_verification_gas: U256::max_value(),
             max_fee_per_gas: U256::max_value(),
             max_priority_fee_per_gas: U256::max_value(),
-            paymaster_and_data: Bytes::from(vec![255; 1024]),
-            signature: Bytes::from(vec![255; 1024]), // Large signature
+            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),          // Large signature
         };
 
         assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 1549132.into());
@@ -233,8 +233,8 @@ pub mod tests {
             pre_verification_gas: U256::max_value(),
             max_fee_per_gas: U256::max_value(),
             max_priority_fee_per_gas: U256::max_value(),
-            paymaster_and_data: Bytes::from(vec![255; 1024]),
-            signature: Bytes::from(vec![255; 1024]), // Large signature
+            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),          // Large signature
         };
 
         // This test is mainly to check if the function can handle the overflow scenario without panicking.
