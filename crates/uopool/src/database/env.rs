@@ -73,7 +73,7 @@ fn default_page_size() -> usize {
 
 impl<E: EnvironmentKind> Env<E> {
     /// Sets up the database environment
-    pub fn open(path: PathBuf) -> anyhow::Result<Self> {
+    pub fn open(path: PathBuf) -> eyre::Result<Self> {
         fs::create_dir_all(&path)?;
 
         let env = Environment::new()

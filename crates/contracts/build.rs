@@ -6,7 +6,7 @@ fn compile(
     source: &PathBuf,
     build_info: &PathBuf,
     target: &PathBuf,
-) -> anyhow::Result<()> {
+) -> eyre::Result<()> {
     let build_path_config = ProjectPathsConfig::builder()
         .sources(source)
         .artifacts(target)
@@ -27,7 +27,7 @@ fn compile(
     Ok(())
 }
 
-fn compile_aa_smart_contracts() -> anyhow::Result<()> {
+fn compile_aa_smart_contracts() -> eyre::Result<()> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("thirdparty/account-abstraction");
     let target = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
     let build_info = root.join("contracts").join("build-info");

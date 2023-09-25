@@ -3,5 +3,5 @@ docs
 Dockerfile
 bundler-spec-tests
 target
-crates/contrarcts/thirdparty/account-abstraction/*
+crates/contracts/thirdparty/account-abstraction/*
 tests/thirdparty/bundler/*

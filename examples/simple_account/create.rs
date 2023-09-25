@@ -17,7 +17,7 @@ const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454
 const CREATE_INDEX: u64 = 2;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> eyre::Result<()> {
     let seed_phrase = env::var("SEED_PHRASE").unwrap();
     let bundler_url = env::var("BUNDLER_URL").unwrap();
     let wallet = MnemonicBuilder::<English>::default()

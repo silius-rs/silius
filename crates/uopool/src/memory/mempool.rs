@@ -23,7 +23,7 @@ impl Mempool for MemoryMempool {
     type UserOperations = Vec<UserOperation>;
     /// An array of [code_hashes](CodeHash)
     type CodeHashes = Vec<CodeHash>;
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
 
     /// Adds a [UserOperation](UserOperation) to the mempool
     ///
@@ -34,13 +34,13 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Ok(UserOperationHash)` - The hash of the [UserOperation](UserOperation) that was added
-    /// * `Err(anyhow::Error)` - If the [UserOperation](UserOperation) could not be added
+    /// * `Err(eyre::Error)` - If the [UserOperation](UserOperation) could not be added
     fn add(
         &mut self,
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> anyhow::Result<UserOperationHash> {
+    ) -> eyre::Result<UserOperationHash> {
         let uo_hash = uo.hash(ep, chain_id);
 
         self.user_operations_by_sender
@@ -60,8 +60,8 @@ impl Mempool for MemoryMempool {
     /// # Returns
     /// * `Ok(Some(UserOperation))` - The [UserOperation](UserOperation) if it exists
     /// * `Ok(None)` - If the [UserOperation](UserOperation) does not exist
-    /// * `Err(anyhow::Error)` - If the [UserOperation](UserOperation) could not be retrieved
-    fn get(&self, uo_hash: &UserOperationHash) -> anyhow::Result<Option<UserOperation>> {
+    /// * `Err(eyre::Error)` - If the [UserOperation](UserOperation) could not be retrieved
+    fn get(&self, uo_hash: &UserOperationHash) -> eyre::Result<Option<UserOperation>> {
         Ok(self.user_operations.get(uo_hash).cloned())
     }
 
@@ -106,7 +106,7 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Ok(bool)` - True if the [CodeHash](CodeHash) exists. Otherwise, false.
-    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> anyhow::Result<bool> {
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> eyre::Result<bool> {
         Ok(self.code_hashes_by_user_operation.contains_key(uo_hash))
     }
 
@@ -118,12 +118,12 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Ok(())` - If the [CodeHash](CodeHash) was set
-    /// * `Err(anyhow::Error)` - If the [CodeHash](CodeHash) could not be set
+    /// * `Err(eyre::Error)` - If the [CodeHash](CodeHash) could not be set
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: &Self::CodeHashes,
-    ) -> anyhow::Result<(), Self::Error> {
+    ) -> eyre::Result<(), Self::Error> {
         self.code_hashes_by_user_operation
             .insert(*uo_hash, hashes.clone());
         Ok(())
@@ -151,14 +151,14 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Ok(())` - If the [UserOperation](UserOperation) was removed
-    /// * `Err(anyhow::Error)` - If the [UserOperation](UserOperation) could not be removed
-    fn remove(&mut self, uo_hash: &UserOperationHash) -> anyhow::Result<()> {
+    /// * `Err(eyre::Error)` - If the [UserOperation](UserOperation) could not be removed
+    fn remove(&mut self, uo_hash: &UserOperationHash) -> eyre::Result<()> {
         let uo: UserOperation;
 
         if let Some(user_op) = self.user_operations.get(uo_hash) {
             uo = user_op.clone();
         } else {
-            return Err(anyhow::anyhow!("User operation not found"));
+            return Err(eyre::eyre!("User operation not found"));
         }
 
         self.user_operations.remove(uo_hash);
@@ -180,7 +180,7 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Ok(Vec<UserOperation>)` - The sorted [UserOperations](UserOperation)
-    fn get_sorted(&self) -> anyhow::Result<Self::UserOperations> {
+    fn get_sorted(&self) -> eyre::Result<Self::UserOperations> {
         let mut uos: Vec<UserOperation> = self.user_operations.values().cloned().collect();
         uos.sort_by(|a, b| {
             if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {

@@ -171,7 +171,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     ///
     /// # Returns
     /// * `Ok(())` - If the [CodeHash](CodeHash) was set
-    /// * `Err(anyhow::Error)` - If the [CodeHash](CodeHash) could not be set
+    /// * `Err(eyre::Error)` - If the [CodeHash](CodeHash) could not be set
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
@@ -198,7 +198,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     ///
     /// # Returns
     /// * `Ok(())` - If the [UserOperation](UserOperation) was removed
-    /// * `Err(anyhow::Error)` - If the [UserOperation](UserOperation) could not be removed
+    /// * `Err(eyre::Error)` - If the [UserOperation](UserOperation) could not be removed
     fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<(), DBError> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 

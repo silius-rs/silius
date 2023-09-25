@@ -1,5 +1,5 @@
 use super::middleware::ProxyJsonRpcLayer;
-use anyhow::Error;
+use eyre::Error;
 use hyper::{http::HeaderValue, Method};
 use jsonrpsee::{
     server::{ServerBuilder, ServerHandle},
@@ -162,7 +162,7 @@ impl JsonRpcServer {
     ///
     /// # Returns
     /// * `Result<(Option<ServerHandle>, Option<ServerHandle>), Error>` - The [handle]((Option<ServerHandle>, Option<ServerHandle>)) of the HTTP and WS servers.
-    pub async fn start(&self) -> anyhow::Result<(Option<ServerHandle>, Option<ServerHandle>)> {
+    pub async fn start(&self) -> eyre::Result<(Option<ServerHandle>, Option<ServerHandle>)> {
         let http_handle = if self.http {
             let service = ServiceBuilder::new()
                 .option_layer(self.http_cors_layer.clone())

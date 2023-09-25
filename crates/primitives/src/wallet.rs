@@ -14,7 +14,7 @@ pub struct Wallet {
     /// Signing key of the wallet
     pub signer: ethers::signers::Wallet<SigningKey>,
     /// Flashbots signing key of the wallet
-    pub fb_signer: Option<ethers::signers::Wallet<SigningKey>>,
+    pub flashbots_signer: Option<ethers::signers::Wallet<SigningKey>>,
 }
 
 impl Wallet {
@@ -32,7 +32,7 @@ impl Wallet {
         path: ExpandedPathBuf,
         chain_id: &U256,
         flashbots_key: bool,
-    ) -> anyhow::Result<Self> {
+    ) -> eyre::Result<Self> {
         let mut rng = rand::thread_rng();
 
         fs::create_dir_all(&path)?;
@@ -48,7 +48,7 @@ impl Wallet {
             let mut entries = fs::read_dir(&path)?;
             let entry = entries.next().expect("No file found")?;
 
-            let fb_wallet = MnemonicBuilder::<English>::default()
+            let flashbots_wallet = MnemonicBuilder::<English>::default()
                 .phrase(entry.path())
                 .derivation_path("m/44'/60'/0'/0/1")
                 .expect("Failed to derive wallet")
@@ -56,12 +56,12 @@ impl Wallet {
 
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
+                flashbots_signer: Some(flashbots_wallet.with_chain_id(chain_id.as_u64())),
             })
         } else {
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: None,
+                flashbots_signer: None,
             })
         }
     }
@@ -80,7 +80,7 @@ impl Wallet {
         path: ExpandedPathBuf,
         chain_id: &U256,
         flashbots_key: bool,
-    ) -> anyhow::Result<Self> {
+    ) -> eyre::Result<Self> {
         let wallet_builder = MnemonicBuilder::<English>::default().phrase(path.to_path_buf());
 
         let wallet = wallet_builder
@@ -90,19 +90,19 @@ impl Wallet {
             .build()?;
 
         if flashbots_key {
-            let fb_wallet = wallet_builder
+            let flashbots_wallet = wallet_builder
                 .derivation_path("m/44'/60'/0'/0/1")
                 .expect("Failed to derive wallet")
                 .build()?;
 
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
+                flashbots_signer: Some(flashbots_wallet.with_chain_id(chain_id.as_u64())),
             })
         } else {
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: None,
+                flashbots_signer: None,
             })
         }
     }
@@ -117,7 +117,7 @@ impl Wallet {
     ///
     /// # Returns
     /// * `Self` - A new `Wallet` instance
-    pub fn from_phrase(phrase: &str, chain_id: &U256, flashbots_key: bool) -> anyhow::Result<Self> {
+    pub fn from_phrase(phrase: &str, chain_id: &U256, flashbots_key: bool) -> eyre::Result<Self> {
         let wallet_builder = MnemonicBuilder::<English>::default().phrase(phrase);
 
         let wallet = wallet_builder
@@ -127,18 +127,18 @@ impl Wallet {
             .build()?;
 
         if flashbots_key {
-            let fb_wallet = wallet_builder
+            let flashbots_wallet = wallet_builder
                 .derivation_path("m/44'/60'/0'/0/1")
                 .expect("Failed to derive wallet")
                 .build()?;
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: Some(fb_wallet.with_chain_id(chain_id.as_u64())),
+                flashbots_signer: Some(flashbots_wallet.with_chain_id(chain_id.as_u64())),
             })
         } else {
             Ok(Self {
                 signer: wallet.with_chain_id(chain_id.as_u64()),
-                fb_signer: None,
+                flashbots_signer: None,
             })
         }
     }
@@ -157,7 +157,7 @@ impl Wallet {
         uo: &UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> anyhow::Result<UserOperation> {
+    ) -> eyre::Result<UserOperation> {
         let h = uo.hash(ep, chain_id);
         let sig = self.signer.sign_message(h.0.as_bytes()).await?;
         Ok(UserOperation {

@@ -70,7 +70,7 @@ pub struct UoPoolArgs {
     pub datadir: Option<ExpandedPathBuf>,
 
     /// Max allowed verification gas.
-    #[clap(long, default_value="3000000", value_parser=parse_u256)]
+    #[clap(long, default_value="5000000", value_parser=parse_u256)]
     pub max_verification_gas: U256,
 
     /// Minimum stake required for entities.
@@ -98,7 +98,7 @@ pub struct UoPoolArgs {
 #[derive(Debug, Clone, Parser)]
 pub struct BundlerAndUoPoolArgs {
     /// Ethereum execution client RPC endpoint.
-    #[clap(long, default_value = "http://127.0.0.1:8545")]
+    #[clap(long, default_value = "ws://127.0.0.1:8546")]
     pub eth_client_address: String,
 
     /// Chain information.
@@ -172,6 +172,10 @@ pub struct RpcArgs {
     /// By default, this option is set to `*`.
     #[clap(long = "ws.origins", value_delimiter = ',', default_value = "*")]
     pub ws_origins: Vec<String>,
+
+    /// Ethereum execution client proxy HTTP RPC endpoint
+    #[clap(long)]
+    pub eth_client_proxy_address: Option<String>,
 }
 
 impl RpcArgs {
@@ -296,6 +300,7 @@ mod tests {
                     String::from("web3")
                 ],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
+                eth_client_proxy_address: None,
             },
             RpcArgs::try_parse_from(args).unwrap()
         );
@@ -331,6 +336,7 @@ mod tests {
                 ws_port: 3001,
                 ws_api: vec![String::from("eth"),],
                 ws_origins: vec![String::from("*")],
+                eth_client_proxy_address: None,
             },
             RpcArgs::try_parse_from(args).unwrap()
         );
@@ -366,6 +372,7 @@ mod tests {
                     String::from("web3")
                 ],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
+                eth_client_proxy_address: None,
             },
             RpcArgs::try_parse_from(args).unwrap()
         );
@@ -400,6 +407,7 @@ mod tests {
                 ws_port: 3001,
                 ws_api: vec![String::from("eth"),],
                 ws_origins: vec![String::from("*")],
+                eth_client_proxy_address: None,
             },
             RpcArgs::try_parse_from(args).unwrap()
         );
@@ -423,6 +431,7 @@ mod tests {
                 ws_port: 3001,
                 ws_api: vec![String::from("eth"),],
                 ws_origins: vec![String::from("*")],
+                eth_client_proxy_address: None,
             }
             .is_enabled(),
             true
@@ -447,6 +456,7 @@ mod tests {
                     String::from("web3")
                 ],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
+                eth_client_proxy_address: None,
             }
             .is_enabled(),
             true
@@ -475,6 +485,7 @@ mod tests {
                     String::from("web3")
                 ],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
+                eth_client_proxy_address: None,
             }
             .is_enabled(),
             true
@@ -499,6 +510,7 @@ mod tests {
                 ws_port: 3001,
                 ws_api: vec![String::from("eth"),],
                 ws_origins: vec![String::from("*")],
+                eth_client_proxy_address: None,
             }
             .is_enabled(),
             false

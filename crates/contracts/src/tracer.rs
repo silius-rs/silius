@@ -1,5 +1,5 @@
-use anyhow::format_err;
 use ethers::types::{Address, Bytes, GethTrace, U256};
+use eyre::format_err;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -15,7 +15,7 @@ pub struct JsTracerFrame {
 }
 
 impl TryFrom<GethTrace> for JsTracerFrame {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(val: GethTrace) -> Result<Self, Self::Error> {
         match val {
             GethTrace::Known(val) => Err(format_err!("Invalid geth trace: {val:?}")),
@@ -165,7 +165,10 @@ pub const JS_TRACER: &str = r#"
             this.lastThreeOpcodes.shift();
         }
         // this.debug.push(this.lastOp + '-' + opcode + '-' + log.getDepth() + '-' + log.getGas() + '-' + log.getCost())
-        if (log.getGas() < log.getCost()) {
+        if (log.getGas() < log.getCost() || (
+            // special rule for SSTORE with gas metering
+            opcode === 'SSTORE' && log.getGas() < 2300)
+        ) {
             this.currentLevel.oog = true;
         }
         if (opcode === 'REVERT' || opcode === 'RETURN') {

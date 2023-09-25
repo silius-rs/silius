@@ -31,7 +31,7 @@ RUN apk add openssl1.1-compat
 
 COPY --from=builder /silius/target/release/silius /usr/local/bin/silius
 
-EXPOSE 3000
+EXPOSE 3000 3001
 
 ENTRYPOINT ["usr/local/bin/silius"]
 

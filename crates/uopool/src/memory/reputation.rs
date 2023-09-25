@@ -30,7 +30,7 @@ pub struct MemoryReputation {
 impl Reputation for MemoryReputation {
     /// An array of [`ReputationEntry`](silius_primitives::reputation::ReputationEntry)
     type ReputationEntries = Vec<ReputationEntry>;
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
 
     /// Initialize an instance of the [MemoryReputation](MemoryReputation)
     fn init(

@@ -53,9 +53,9 @@ jobs:
           sudo add-apt-repository ppa:ethereum/ethereum
           sudo apt-get update
           sudo apt-get install solc
-          wget -c https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.11.6-ea9e62ca.tar.gz
-          tar -xf geth-linux-amd64-1.11.6-ea9e62ca.tar.gz
-          mv geth-linux-amd64-1.11.6-ea9e62ca/geth /usr/local/bin/
+          wget -c https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.12.0-e501b3b0.tar.gz
+          tar -xf geth-linux-amd64-1.12.0-e501b3b0.tar.gz
+          mv geth-linux-amd64-1.12.0-e501b3b0/geth /usr/local/bin/
           chmod a+x /usr/local/bin/geth
       
       - name: Build
@@ -111,4 +111,4 @@ jobs:
       - run: npm install -g yarn
 
       - name: Run tests
-        run: pdm run test --launcher-script silius/bundler-spec-tests/launcher.sh --url http://localhost:3000
+        run: pdm run test --launcher-script silius/bundler-spec-tests/launcher.sh --url http://127.0.0.1:3000

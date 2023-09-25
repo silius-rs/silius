@@ -11,7 +11,7 @@ use crate::common::{
 };
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
-use ethers::providers::{Http, Provider};
+use ethers::providers::{Provider, PubsubClient, Ws};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::Address;
 use ethers::utils::{parse_units, GethInstance};
@@ -54,8 +54,10 @@ use std::sync::Arc;
 const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 const GAS_INCREASE_PERC: u64 = 10;
 
-struct TestContext<M: Middleware + 'static, V, P, R, E>
+struct TestContext<M, V, P, R, E>
 where
+    M: Middleware + 'static,
+    <M as Middleware>::Provider: PubsubClient,
     V: UserOperationValidator<P, R, E> + 'static,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
@@ -74,13 +76,13 @@ where
 
 type Context = TestContext<
     ClientType,
-    StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation, anyhow::Error>,
+    StandardUserOperationValidator<Provider<Ws>, MemoryMempool, MemoryReputation, eyre::Error>,
     MemoryMempool,
     MemoryReputation,
-    anyhow::Error,
+    eyre::Error,
 >;
 
-async fn setup() -> anyhow::Result<Context> {
+async fn setup() -> eyre::Result<Context> {
     let chain_id = 1337u64;
     let (_geth, _client, provider) = setup_geth().await?;
     let client = Arc::new(_client);
@@ -150,15 +152,10 @@ async fn setup() -> anyhow::Result<Context> {
 
     let pool = UoPool::<
         ClientType,
-        StandardUserOperationValidator<
-            Provider<Http>,
-            MemoryMempool,
-            MemoryReputation,
-            anyhow::Error,
-        >,
+        StandardUserOperationValidator<Provider<Ws>, MemoryMempool, MemoryReputation, eyre::Error>,
         MemoryMempool,
         MemoryReputation,
-        anyhow::Error,
+        eyre::Error,
     >::new(
         entry_point,
         validator,
@@ -187,7 +184,7 @@ async fn setup() -> anyhow::Result<Context> {
 async fn create_storage_factory_init_code(
     salt: u64,
     init_func: String,
-) -> anyhow::Result<(Bytes, Bytes)> {
+) -> eyre::Result<(Bytes, Bytes)> {
     let c = setup().await?;
     let contract: &BaseContract = c.storage_factory.contract().deref().deref();
     let func = contract.abi().function("create")?;
@@ -201,7 +198,7 @@ async fn create_storage_factory_init_code(
     Ok((init_code.into(), init_func.into()))
 }
 
-async fn create_opcode_factory_init_code(init_func: String) -> anyhow::Result<(Bytes, Bytes)> {
+async fn create_opcode_factory_init_code(init_func: String) -> eyre::Result<(Bytes, Bytes)> {
     let c = setup().await?;
     let contract: &BaseContract = c.opcodes_factory.contract().deref().deref();
     let token = vec![Token::String(init_func)];
@@ -222,7 +219,7 @@ async fn create_test_user_operation(
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> anyhow::Result<UserOperation> {
+) -> eyre::Result<UserOperation> {
     let paymaster_and_data = if let Some(rule) = pm_rule {
         let mut data = vec![];
         data.extend_from_slice(context.paymaster.address.as_bytes());
@@ -241,7 +238,7 @@ async fn create_test_user_operation(
     let call_init_code_for_addr = context.client.call(&tx, None).await?;
 
     let (head, address) = call_init_code_for_addr.split_at(12);
-    anyhow::ensure!(
+    eyre::ensure!(
         !head.iter().any(|i| *i != 0),
         format!(
             "call init code returns non address data : {:?}",
@@ -338,7 +335,7 @@ async fn test_existing_user_operation(
 }
 
 #[tokio::test]
-async fn accept_plain_request() -> anyhow::Result<()> {
+async fn accept_plain_request() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
@@ -359,7 +356,7 @@ async fn accept_plain_request() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn reject_unkown_rule() -> anyhow::Result<()> {
+async fn reject_unkown_rule() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
@@ -383,7 +380,7 @@ async fn reject_unkown_rule() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn fail_with_bad_opcode_in_ctr() -> anyhow::Result<()> {
+async fn fail_with_bad_opcode_in_ctr() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("coinbase".to_string())
         .await
@@ -407,7 +404,7 @@ async fn fail_with_bad_opcode_in_ctr() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
+async fn fail_with_bad_opcode_in_paymaster() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
@@ -431,7 +428,7 @@ async fn fail_with_bad_opcode_in_paymaster() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
+async fn fail_with_bad_opcode_in_validation() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
@@ -455,7 +452,7 @@ async fn fail_with_bad_opcode_in_validation() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn fail_if_create_too_many() -> anyhow::Result<()> {
+async fn fail_if_create_too_many() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
         .await
@@ -479,7 +476,7 @@ async fn fail_if_create_too_many() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn fail_referencing_self_token() -> anyhow::Result<()> {
+async fn fail_referencing_self_token() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
@@ -545,7 +542,7 @@ async fn fail_to_access_other_address_struct_data() {
 }
 
 #[tokio::test]
-async fn fail_if_referencing_other_token_balance() -> anyhow::Result<()> {
+async fn fail_if_referencing_other_token_balance() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
@@ -577,7 +574,7 @@ async fn fail_if_referencing_self_token_balance_after_wallet_creation() {
 }
 
 #[tokio::test]
-async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> {
+async fn fail_with_unstaked_paymaster_returning_context() -> eyre::Result<()> {
     let c = setup().await?;
     let pm = deploy_test_storage_account(c.client.clone())
         .await
@@ -616,7 +613,7 @@ async fn fail_with_unstaked_paymaster_returning_context() -> anyhow::Result<()> 
 }
 
 #[tokio::test]
-async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<()> {
+async fn fail_with_validation_recursively_calls_handle_ops() -> eyre::Result<()> {
     let c = setup().await?;
     let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
         .await
@@ -647,7 +644,7 @@ async fn fail_with_validation_recursively_calls_handle_ops() -> anyhow::Result<(
 }
 
 #[tokio::test]
-async fn succeed_with_inner_revert() -> anyhow::Result<()> {
+async fn succeed_with_inner_revert() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await
@@ -667,7 +664,7 @@ async fn succeed_with_inner_revert() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn fail_with_inner_oog_revert() -> anyhow::Result<()> {
+async fn fail_with_inner_oog_revert() -> eyre::Result<()> {
     let c = setup().await?;
     let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
         .await

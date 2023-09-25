@@ -56,10 +56,14 @@ pub enum Commands {
     CreateWallet(commands::CreateWalletCommand),
 }
 
-pub fn run() -> anyhow::Result<()> {
+pub fn run() -> eyre::Result<()> {
     let cli = Cli::parse();
 
-    std::env::set_var("RUST_LOG", format!("silius={}", cli.get_log_level()));
+    let rust_log = match std::env::var("RUST_LOG") {
+        Ok(val) => format!("{},silius={}", val, cli.get_log_level()),
+        Err(_) => format!("silius={}", cli.get_log_level()),
+    };
+    std::env::set_var("RUST_LOG", rust_log);
     tracing_subscriber::fmt::init();
 
     std::thread::Builder::new()

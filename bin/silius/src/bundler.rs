@@ -3,7 +3,7 @@ use crate::{
     utils::unwrap_path_or_home,
 };
 use ethers::{
-    providers::{Http, Middleware, Provider},
+    providers::{Middleware, Provider, Ws},
     types::Address,
 };
 use silius_grpc::{
@@ -27,10 +27,11 @@ pub async fn launch_bundler(
     uopool_args: UoPoolArgs,
     common_args: BundlerAndUoPoolArgs,
     rpc_args: RpcArgs,
-) -> anyhow::Result<()> {
+    eth_client: Arc<Provider<Ws>>,
+) -> eyre::Result<()> {
     launch_uopool(
         uopool_args.clone(),
-        common_args.eth_client_address.clone(),
+        eth_client.clone(),
         common_args.chain.clone(),
         common_args.entry_points.clone(),
     )
@@ -38,7 +39,7 @@ pub async fn launch_bundler(
 
     launch_bundling(
         bundler_args.clone(),
-        common_args.eth_client_address.clone(),
+        eth_client.clone(),
         common_args.chain,
         common_args.entry_points,
         format!(
@@ -50,7 +51,6 @@ pub async fn launch_bundler(
 
     launch_rpc(
         rpc_args,
-        common_args.eth_client_address,
         format!(
             "http://{:?}:{:?}",
             uopool_args.uopool_addr, uopool_args.uopool_port
@@ -67,18 +67,17 @@ pub async fn launch_bundler(
 
 pub async fn launch_bundling(
     args: BundlerArgs,
-    eth_client_address: String,
+    eth_client: Arc<Provider<Ws>>,
     chain: Option<String>,
     entry_points: Vec<Address>,
     uopool_grpc_listen_address: String,
-) -> anyhow::Result<()> {
+) -> eyre::Result<()> {
     info!("Starting bundling gRPC service...");
 
-    let eth_client = Arc::new(Provider::<Http>::try_from(eth_client_address.clone())?);
     let eth_client_version = check_connected_chain(eth_client.clone(), chain).await?;
     info!(
-        "Bundling component connected to Ethereum execution client at {}: {}",
-        eth_client_address, eth_client_version
+        "Bundling component connected to Ethereum execution client with version {}",
+        eth_client_version,
     );
 
     let chain_id = eth_client.get_chainid().await?;
@@ -87,12 +86,12 @@ pub async fn launch_bundling(
     let wallet: Wallet;
     if args.send_bundle_mode == SendBundleMode::Flashbots {
         wallet = Wallet::from_file(args.mnemonic_file.into(), &chain_id, true)
-            .map_err(|error| anyhow::format_err!("Could not load mnemonic file: {}", error))?;
+            .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
         info!("Wallet Signer {:?}", wallet.signer);
-        info!("Flashbots Signer {:?}", wallet.fb_signer);
+        info!("Flashbots Signer {:?}", wallet.flashbots_signer);
     } else {
         wallet = Wallet::from_file(args.mnemonic_file.into(), &chain_id, false)
-            .map_err(|error| anyhow::format_err!("Could not load mnemonic file: {}", error))?;
+            .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
         info!("{:?}", wallet.signer);
     }
 
@@ -104,7 +103,7 @@ pub async fn launch_bundling(
         SocketAddr::new(args.bundler_addr, args.bundler_port),
         wallet,
         entry_points,
-        eth_client_address,
+        eth_client,
         chain_conn,
         args.beneficiary,
         args.min_balance,
@@ -128,17 +127,16 @@ pub async fn launch_bundling(
 
 pub async fn launch_uopool(
     args: UoPoolArgs,
-    eth_client_address: String,
+    eth_client: Arc<Provider<Ws>>,
     chain: Option<String>,
     entry_points: Vec<Address>,
-) -> anyhow::Result<()> {
+) -> eyre::Result<()> {
     info!("Starting uopool gRPC service...");
 
-    let eth_client = Arc::new(Provider::<Http>::try_from(eth_client_address.clone())?);
     let eth_client_version = check_connected_chain(eth_client.clone(), chain).await?;
     info!(
-        "UoPool connected to Ethereum execution client at {}: {}",
-        eth_client_address, eth_client_version
+        "UoPool component connected to Ethereum execution client with version {}",
+        eth_client_version
     );
 
     let chain_id = Chain::from(eth_client.get_chainid().await?);
@@ -149,7 +147,7 @@ pub async fn launch_uopool(
         SocketAddr::new(args.uopool_addr, args.uopool_port),
         datadir,
         entry_points,
-        eth_client.clone(),
+        eth_client,
         chain_id,
         args.max_verification_gas,
         args.min_stake,
@@ -170,12 +168,11 @@ pub async fn launch_uopool(
 
 pub async fn launch_rpc(
     args: RpcArgs,
-    eth_client_address: String,
     uopool_grpc_listen_address: String,
     bundler_grpc_listen_address: String,
-) -> anyhow::Result<()> {
+) -> eyre::Result<()> {
     if !args.is_enabled() {
-        return Err(anyhow::anyhow!("No RPC protocol is enabled"));
+        return Err(eyre::eyre!("No RPC protocol is enabled"));
     }
 
     info!("Starting bundler JSON-RPC server...");
@@ -189,8 +186,11 @@ pub async fn launch_rpc(
         args.ws_port,
     )
     .with_cors(&args.http_corsdomain, JsonRpcServerType::Http)
-    .with_cors(&args.ws_origins, JsonRpcServerType::Ws)
-    .with_proxy(eth_client_address);
+    .with_cors(&args.ws_origins, JsonRpcServerType::Ws);
+
+    if let Some(eth_client_proxy_address) = args.eth_client_proxy_address.clone() {
+        server = server.with_proxy(eth_client_proxy_address);
+    }
 
     let http_api: HashSet<String> = HashSet::from_iter(args.http_api.iter().cloned());
     let ws_api: HashSet<String> = HashSet::from_iter(args.ws_api.iter().cloned());
@@ -262,13 +262,13 @@ pub async fn launch_rpc(
             "Started bundler JSON-RPC server with http: {:?}:{:?}, ws: {:?}:{:?}",
             args.http_addr, args.http_port, args.ws_addr, args.ws_port,
         );
-        pending::<anyhow::Result<()>>().await
+        pending::<eyre::Result<()>>().await
     });
 
     Ok(())
 }
 
-pub fn create_wallet(args: CreateWalletArgs) -> anyhow::Result<()> {
+pub fn create_wallet(args: CreateWalletArgs) -> eyre::Result<()> {
     info!(
         "Creating bundler wallet... Storing to: {:?}",
         args.output_path
@@ -279,7 +279,7 @@ pub fn create_wallet(args: CreateWalletArgs) -> anyhow::Result<()> {
     if args.flashbots_key {
         let wallet = Wallet::build_random(path, &args.chain_id, true)?;
         info!("Wallet signer {:?}", wallet.signer);
-        info!("Flashbots signer {:?}", wallet.fb_signer);
+        info!("Flashbots signer {:?}", wallet.flashbots_signer);
     } else {
         let wallet = Wallet::build_random(path, &args.chain_id, false)?;
         info!("Wallet signer {:?}", wallet.signer);
@@ -289,15 +289,15 @@ pub fn create_wallet(args: CreateWalletArgs) -> anyhow::Result<()> {
 }
 
 async fn check_connected_chain(
-    eth_client: Arc<Provider<Http>>,
+    eth_client: Arc<Provider<Ws>>,
     chain: Option<String>,
-) -> anyhow::Result<String> {
+) -> eyre::Result<String> {
     let chain_id = eth_client.get_chainid().await?;
     let chain_conn = Chain::from(chain_id);
 
     if let Some(chain_opt) = chain {
         if chain_conn.name() != chain_opt {
-            return Err(anyhow::format_err!(
+            return Err(eyre::format_err!(
                 "Tried to connect to the execution client of different chain: {} != {}",
                 chain_opt,
                 chain_conn.name()

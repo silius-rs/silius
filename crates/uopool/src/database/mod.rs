@@ -11,7 +11,7 @@ pub mod reputation;
 mod tables;
 mod utils;
 
-pub fn init_env<E: EnvironmentKind>(path: PathBuf) -> anyhow::Result<Env<E>> {
+pub fn init_env<E: EnvironmentKind>(path: PathBuf) -> eyre::Result<Env<E>> {
     let env = Env::open(path)?;
     env.create_tables()?;
     Ok(env)

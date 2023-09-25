@@ -2,6 +2,7 @@ use crate::proto::bundler::*;
 use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
 use crate::uo_pool_client::UoPoolClient;
 use async_trait::async_trait;
+use ethers::providers::{Middleware, PubsubClient};
 use ethers::types::{Address, H256, U256};
 use parking_lot::Mutex;
 use silius_bundler::Bundler;
@@ -10,8 +11,12 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 
-pub struct BundlerService {
-    pub bundlers: Vec<Bundler>,
+pub struct BundlerService<M>
+where
+    M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
+{
+    pub bundlers: Vec<Bundler<M>>,
     pub running: Arc<Mutex<bool>>,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 }
@@ -21,9 +26,13 @@ fn is_running(running: Arc<Mutex<bool>>) -> bool {
     *r
 }
 
-impl BundlerService {
+impl<M> BundlerService<M>
+where
+    M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
+{
     pub fn new(
-        bundlers: Vec<Bundler>,
+        bundlers: Vec<Bundler<M>>,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     ) -> Self {
         Self {
@@ -36,7 +45,7 @@ impl BundlerService {
     async fn get_user_operations(
         uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
         ep: &Address,
-    ) -> anyhow::Result<Vec<UserOperation>> {
+    ) -> eyre::Result<Vec<UserOperation>> {
         let req = Request::new(GetSortedRequest {
             ep: Some((*ep).into()),
         });
@@ -49,7 +58,7 @@ impl BundlerService {
         Ok(uos)
     }
 
-    pub async fn send_bundles(&self) -> anyhow::Result<H256> {
+    pub async fn send_bundles(&self) -> eyre::Result<H256> {
         let mut tx_hashes: Vec<H256> = vec![];
 
         for bundler in self.bundlers.iter() {
@@ -83,7 +92,7 @@ impl BundlerService {
     async fn handle_past_events(
         uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
         ep: &Address,
-    ) -> anyhow::Result<()> {
+    ) -> eyre::Result<()> {
         let req = Request::new(HandlePastEventRequest {
             ep: Some((*ep).into()),
         });
@@ -151,7 +160,11 @@ impl BundlerService {
 }
 
 #[async_trait]
-impl bundler_server::Bundler for BundlerService {
+impl<M> bundler_server::Bundler for BundlerService<M>
+where
+    M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
+{
     async fn set_bundler_mode(
         &self,
         req: Request<SetModeRequest>,
@@ -190,11 +203,11 @@ impl bundler_server::Bundler for BundlerService {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn bundler_service_run(
+pub fn bundler_service_run<M>(
     addr: SocketAddr,
     wallet: Wallet,
     eps: Vec<Address>,
-    eth_client_address: String,
+    eth_client: Arc<M>,
     chain: Chain,
     beneficiary: Address,
     min_balance: U256,
@@ -202,13 +215,16 @@ pub fn bundler_service_run(
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     send_bundle_mode: SendBundleMode,
     relay_endpoints: Option<Vec<String>>,
-) {
-    let bundlers: Vec<Bundler> = eps
+) where
+    M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
+{
+    let bundlers: Vec<Bundler<M>> = eps
         .iter()
         .map(|ep| {
             Bundler::new(
                 wallet.clone(),
-                eth_client_address.clone(),
+                eth_client.clone(),
                 beneficiary,
                 *ep,
                 chain,

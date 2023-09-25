@@ -1,6 +1,6 @@
 use crate::uopool::{GAS_INCREASE_PERC, MAX_UOS_PER_UNSTAKED_SENDER};
 use ethers::{
-    providers::Middleware,
+    providers::{Middleware, PubsubClient},
     types::{Address, U256},
 };
 use silius_contracts::EntryPoint;
@@ -18,6 +18,7 @@ use std::sync::Arc;
 pub struct UoPoolBuilder<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
@@ -37,6 +38,7 @@ where
 impl<M, P, R, E> UoPoolBuilder<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
+    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,

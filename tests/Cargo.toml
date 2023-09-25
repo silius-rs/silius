@@ -11,8 +11,8 @@ AA (ERC-4337) bundler integration tests
 """
 
 [dependencies]
-anyhow = { workspace = true }
 ethers = { workspace = true }
+eyre = { workspace = true }
 silius-contracts = { path = "../crates/contracts" }
 silius-primitives = { path = "../crates/primitives" }
 silius-uopool = { path = "../crates/uopool" }
