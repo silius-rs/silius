@@ -73,32 +73,23 @@ impl Overhead {
         });
 
         // per_user_op_word * (uo_pack.len() + 31) / 32
-        // -> per_user_op_word * (word_len / 32)
-        // -> (per_user_op_word * word_len) / 32
-        // -> (per_user_op_word * word_len) / 32 + rounding_cost
-        let word_len = uo_pack.len() + 31;
-        let rounding_const_word_cost = U256::from(if (word_len) % 32 > 0 { 1 } else { 0 });
-        let word_cost = self
-            .per_user_op_word
-            .saturating_mul(U256::from(word_len))
-            .checked_div(U256::from(32))
-            .unwrap_or_default()
-            .saturating_add(rounding_const_word_cost);
+        // -> (per_user_op_word * (uo_pack.len() + 31)) / 32
+        // -> (per_user_op_word * (uo_pack.len() + 31)) / 32 + rounding_const
+        let word_cost = div_ceil(
+            self.per_user_op_word
+                .saturating_mul(U256::from(uo_pack.len() + 31)),
+            U256::from(32),
+        );
+        // let word_cost = self
+        //     .per_user_op_word
+        //     .saturating_mul(U256::from(word_len))
+        //     .checked_div(U256::from(32))
+        //     .unwrap_or_default()
+        //     .saturating_add(rounding_const_word_cost);
 
         // fixed / bundle_size
-        // -> fixed / bundle_size + rounding_cost
-        let rounding_const_fixed_divided_by_bundle_size = U256::from(
-            if self.fixed.checked_rem(self.bundle_size).unwrap_or_default() > U256::zero() {
-                1
-            } else {
-                0
-            },
-        );
-        let fixed_divided_by_bundle_size = self
-            .fixed
-            .checked_div(self.bundle_size)
-            .unwrap_or_default()
-            .saturating_add(rounding_const_fixed_divided_by_bundle_size);
+        // -> fixed / bundle_size + rounding_const
+        let fixed_divided_by_bundle_size = div_ceil(self.fixed, self.bundle_size);
 
         fixed_divided_by_bundle_size
             .saturating_add(call_data)
@@ -120,9 +111,25 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
     // (gas_price * (1 + gas_incr_perc / 100)
     // -> (100 / 100) * (gas_price * ( 1 + gas_incr_perc / 100 ))
     // -> (gas_price * ( 100 + gas_incr_perc )) / 100
-    // -> (gas_price * ( 100 + gas_incr_perc )) / 100 + rounding_cost
+    // -> (gas_price * ( 100 + gas_incr_perc )) / 100 + rounding_const
     let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(U256::from(100)));
     let denominator = U256::from(100);
+    div_ceil(numerator, denominator)
+}
+
+/// Performs division and rounds up to the nearest integer.
+///
+/// This function takes a numerator and a denominator of type `U256`,
+/// performs the division, and rounds up if there is a remainder.
+///
+/// # Examples
+///
+/// ```
+/// # use your_crate::U256; // Replace with the actual import
+/// let result = div_ceil(U256::from(10), U256::from(3));
+/// assert_eq!(result, U256::from(4));
+/// ```
+pub fn div_ceil(numerator: U256, denominator: U256) -> U256 {
     let rounding_const = U256::from(
         if numerator.checked_rem(denominator).unwrap_or_default() > U256::zero() {
             1
@@ -269,7 +276,7 @@ pub mod tests {
     }
 
     #[test]
-    fn valid_gas_calculation_when_no_rounding_up_case() {
+    fn valid_gas_calculation_when_no_round_up_case() {
         let gas_price = U256::from(100);
         let gas_incr_perc = U256::from(10);
         let valid_gas = calculate_valid_gas(gas_price, gas_incr_perc);
@@ -277,7 +284,7 @@ pub mod tests {
     }
 
     #[test]
-    fn valid_gas_calculation_when_rounding_up_case() {
+    fn valid_gas_calculation_when_round_up_case() {
         let gas_price = U256::from(10);
         let gas_incr_perc = U256::from(11);
         assert_eq!(calculate_valid_gas(gas_price, gas_incr_perc), 12.into());
