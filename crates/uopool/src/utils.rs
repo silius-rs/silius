@@ -72,21 +72,33 @@ impl Overhead {
             acc.saturating_add(*byte_cost)
         });
 
+        // per_user_op_word * (uo_pack.len() + 31) / 32
+        // -> per_user_op_word * (word_len / 32)
+        // -> (per_user_op_word * word_len) / 32
+        // -> (per_user_op_word * word_len) / 32 + rounding_cost
         let word_len = uo_pack.len() + 31;
+        let rounding_const_word_cost = U256::from(if (word_len) % 32 > 0 { 1 } else { 0 });
         let word_cost = self
             .per_user_op_word
             .saturating_mul(U256::from(word_len))
             .checked_div(U256::from(32))
             .unwrap_or_default()
-            .saturating_add(U256::from(if (word_len) % 32 > 0 { 1 } else { 0 }));
+            .saturating_add(rounding_const_word_cost);
 
+        // fixed / bundle_size
+        // -> fixed / bundle_size + rounding_cost
+        let rounding_const_fixed_divided_by_bundle_size = U256::from(
+            if self.fixed.checked_rem(self.bundle_size).unwrap_or_default() > U256::zero() {
+                1
+            } else {
+                0
+            },
+        );
         let fixed_divided_by_bundle_size = self
             .fixed
-            .saturating_mul(U256::from(1_000_000))
             .checked_div(self.bundle_size)
             .unwrap_or_default()
-            .checked_div(U256::from(1_000_000))
-            .unwrap_or_default();
+            .saturating_add(rounding_const_fixed_divided_by_bundle_size);
 
         fixed_divided_by_bundle_size
             .saturating_add(call_data)
@@ -105,19 +117,23 @@ impl Overhead {
 /// # Returns
 /// The valid gas of the [UserOperation](UserOperation)
 pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
-    // ((gas_price * (1 + gas_incr_perc / 100))
+    // (gas_price * (1 + gas_incr_perc / 100)
     // -> (100 / 100) * (gas_price * ( 1 + gas_incr_perc / 100 ))
-    // -> (1 / 100) * (gas_price * ( 100 + gas_incr_perc ))
+    // -> (gas_price * ( 100 + gas_incr_perc )) / 100
+    // -> (gas_price * ( 100 + gas_incr_perc )) / 100 + rounding_cost
     let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(U256::from(100)));
     let denominator = U256::from(100);
-    let quotient = numerator.checked_div(denominator).unwrap_or_default();
-    let remainder = numerator.checked_rem(denominator).unwrap_or_default();
-
-    if remainder.is_zero() {
-        quotient
-    } else {
-        quotient.saturating_add(U256::from(1))
-    }
+    let rounding_const = U256::from(
+        if numerator.checked_rem(denominator).unwrap_or_default() > U256::zero() {
+            1
+        } else {
+            0
+        },
+    );
+    numerator
+        .checked_div(denominator)
+        .unwrap_or_default()
+        .saturating_add(rounding_const)
 }
 
 /// Helper function to calculate the call gas limit of a [UserOperation](UserOperation)
