@@ -105,9 +105,19 @@ impl Overhead {
 /// # Returns
 /// The valid gas of the [UserOperation](UserOperation)
 pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
-    let gas_price = gas_price.as_u64() as f64;
-    let gas_incr_perc = gas_incr_perc.as_u64() as f64;
-    ((gas_price * (1.0 + gas_incr_perc / 100.0)).ceil() as u64).into()
+    // ((gas_price * (1 + gas_incr_perc / 100))
+    // -> (100 / 100) * (gas_price * ( 1 + gas_incr_perc / 100 ))
+    // -> (1 / 100) * (gas_price * ( 100 + gas_incr_perc ))
+    let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(U256::from(100)));
+    let denominator = U256::from(100);
+    let quotient = numerator.checked_div(denominator).unwrap_or_default();
+    let remainder = numerator.checked_rem(denominator).unwrap_or_default();
+
+    if remainder.is_zero() {
+        quotient
+    } else {
+        quotient.saturating_add(U256::from(1))
+    }
 }
 
 /// Helper function to calculate the call gas limit of a [UserOperation](UserOperation)
@@ -240,6 +250,21 @@ pub mod tests {
         // This test is mainly to check if the function can handle the overflow scenario without panicking.
         // We don't have a specific expected value in this case.
         let _ = gas_oh.calculate_pre_verification_gas(&uo);
+    }
+
+    #[test]
+    fn valid_gas_calculation_when_no_rounding_up_case() {
+        let gas_price = U256::from(100);
+        let gas_incr_perc = U256::from(10);
+        let valid_gas = calculate_valid_gas(gas_price, gas_incr_perc);
+        assert_eq!(valid_gas, 110.into());
+    }
+
+    #[test]
+    fn valid_gas_calculation_when_rounding_up_case() {
+        let gas_price = U256::from(10);
+        let gas_incr_perc = U256::from(11);
+        assert_eq!(calculate_valid_gas(gas_price, gas_incr_perc), 12.into());
     }
 
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
