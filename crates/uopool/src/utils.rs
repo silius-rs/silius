@@ -1,4 +1,4 @@
-use ethers::types::{u256_from_f64_saturating, Address, H256, U256};
+use ethers::types::{Address, H256, U256};
 use silius_primitives::{simulation::CodeHash, UserOperation};
 use std::{collections::HashMap, ops::Deref};
 
