@@ -62,25 +62,36 @@ impl Overhead {
     /// The pre-verification gas of the [UserOperation](UserOperation)
     pub fn calculate_pre_verification_gas(&self, uo: &UserOperation) -> U256 {
         let uo_pack = uo.pack();
-        let call_data: U256 = U256::from(
-            uo_pack
-                .deref()
-                .iter()
-                .map(|&x| {
-                    if x == 0 {
-                        self.zero_byte.as_u128()
-                    } else {
-                        self.non_zero_byte.as_u128()
-                    }
-                })
-                .sum::<u128>(),
-        );
-        let len_in_word = ((uo_pack.len() + 31) as f64) / 32_f64;
-        u256_from_f64_saturating(
-            (self.fixed.as_u128() as f64) / (self.bundle_size.as_u128() as f64)
-                + ((call_data + self.per_user_op).as_u128() as f64)
-                + (self.per_user_op_word.as_u128() as f64) * len_in_word,
-        )
+
+        let call_data = uo_pack.deref().iter().fold(U256::zero(), |acc, &x| {
+            let byte_cost = if x == 0 {
+                &self.zero_byte
+            } else {
+                &self.non_zero_byte
+            };
+            acc.saturating_add(*byte_cost)
+        });
+
+        let word_len = uo_pack.len() + 31;
+        let word_cost = self
+            .per_user_op_word
+            .saturating_mul(U256::from(word_len))
+            .checked_div(U256::from(32))
+            .unwrap_or_default()
+            .saturating_add(U256::from(if (word_len) % 32 > 0 { 1 } else { 0 }));
+
+        let fixed_divided_by_bundle_size = self
+            .fixed
+            .saturating_mul(U256::from(1_000_000))
+            .checked_div(self.bundle_size)
+            .unwrap_or_default()
+            .checked_div(U256::from(1_000_000))
+            .unwrap_or_default();
+
+        fixed_divided_by_bundle_size
+            .saturating_add(call_data)
+            .saturating_add(self.per_user_op)
+            .saturating_add(word_cost)
     }
 }
 
