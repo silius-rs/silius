@@ -146,6 +146,91 @@ pub mod tests {
         assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 45340.into());
     }
 
+    #[test]
+    fn pre_verification_gas_calculation_with_large_user_operation() {
+        let gas_oh = Overhead::default();
+        let uo = UserOperation {
+            sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54"
+                .parse()
+                .unwrap(),
+            nonce: U256::max_value(),
+            init_code: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            call_gas_limit: U256::max_value(),
+            verification_gas_limit: U256::max_value(),
+            pre_verification_gas: U256::max_value(),
+            max_fee_per_gas: U256::max_value(),
+            max_priority_fee_per_gas: U256::max_value(),
+            paymaster_and_data: Bytes::from(vec![255; 1024]),
+            signature: Bytes::from(vec![255; 1024]), // Large signature
+        };
+
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 110020.into());
+    }
+
+    #[test]
+    fn pre_verification_gas_calculation_with_large_per_user_op_word() {
+        let gas_oh = Overhead {
+            fixed: U256::from(21000),
+            per_user_op: U256::from(18300),
+            per_user_op_word: U256::from(10000),
+            zero_byte: U256::from(4),
+            non_zero_byte: U256::from(16),
+            bundle_size: U256::from(1),
+            sig_size: U256::from(65),
+        };
+        let uo = UserOperation {
+            sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54"
+                .parse()
+                .unwrap(),
+            nonce: U256::max_value(),
+            init_code: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            call_gas_limit: U256::max_value(),
+            verification_gas_limit: U256::max_value(),
+            pre_verification_gas: U256::max_value(),
+            max_fee_per_gas: U256::max_value(),
+            max_priority_fee_per_gas: U256::max_value(),
+            paymaster_and_data: Bytes::from(vec![255; 1024]),
+            signature: Bytes::from(vec![255; 1024]), // Large signature
+        };
+
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 1549132.into());
+    }
+
+    /// This test occurred overflow  when previous `calculate_pre_verification_gas` is used.
+    /// previous `calculate_pre_verification_gas` is https://github.com/Vid201/silius/blob/bd79ea0e610adff8d77ba128f53befa8401a4d77/crates/uopool/src/utils.rs#L63-L84
+    #[test]
+    fn pre_verification_gas_calculation_overflow() {
+        let gas_oh = Overhead {
+            fixed: U256::max_value(),
+            per_user_op: U256::max_value(),
+            per_user_op_word: U256::max_value(),
+            zero_byte: U256::max_value(),
+            non_zero_byte: U256::max_value(),
+            bundle_size: U256::from(1), // To avoid division by zero
+            sig_size: U256::max_value(),
+        };
+
+        let uo = UserOperation {
+            sender: Address::default(),
+            nonce: U256::max_value(),
+            init_code: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            call_gas_limit: U256::max_value(),
+            verification_gas_limit: U256::max_value(),
+            pre_verification_gas: U256::max_value(),
+            max_fee_per_gas: U256::max_value(),
+            max_priority_fee_per_gas: U256::max_value(),
+            paymaster_and_data: Bytes::from(vec![255; 1024]),
+            signature: Bytes::from(vec![255; 1024]), // Large signature
+        };
+
+        // This test is mainly to check if the function can handle the overflow scenario without panicking.
+        // We don't have a specific expected value in this case.
+        let _ = gas_oh.calculate_pre_verification_gas(&uo);
+    }
+
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
     where
         T: Mempool<UserOperations = Vec<UserOperation>> + Debug,
