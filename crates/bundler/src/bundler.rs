@@ -1,6 +1,6 @@
 use ethers::{
     prelude::{LocalWallet, SignerMiddleware},
-    providers::{Middleware, PubsubClient},
+    providers::Middleware,
     signers::Signer,
     types::{
         transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest, H256, U256, U64,
@@ -31,7 +31,6 @@ type EthClientType<M> = Arc<SignerMiddleware<Arc<M>, LocalWallet>>;
 pub struct Bundler<M>
 where
     M: Middleware + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     /// Wallet instance representing the bundler's wallet.
     pub wallet: Wallet,
@@ -56,7 +55,6 @@ where
 impl<M> Bundler<M>
 where
     M: Middleware + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     /// Create a new `Bundler` instance
     /// if `send_bundle_mode` is `SendBundleMode::Flashbots` and `relay_endpoints` is `None`, the default Flashbots relay endpoint will be used
@@ -467,7 +465,7 @@ mod test {
     use alloy_sol_types::{sol, SolCall};
     use ethers::{
         contract::abigen,
-        providers::{Http, Middleware, Provider, PubsubClient, Ws},
+        providers::{Http, Middleware, Provider, Ws},
         signers::Signer,
         types::{
             transaction::eip2718::TypedTransaction, Address, Eip1559TransactionRequest,
@@ -519,7 +517,6 @@ mod test {
     struct TestContext<M>
     where
         M: Middleware + 'static,
-        <M as Middleware>::Provider: PubsubClient,
     {
         pub bundler: Bundler<M>,
         pub entry_point: Address,

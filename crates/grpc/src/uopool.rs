@@ -6,14 +6,12 @@ use crate::{
 };
 use async_trait::async_trait;
 use dashmap::DashMap;
-use ethers::providers::PubsubClient;
 use ethers::{
     providers::Middleware,
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use eyre::Result;
-use silius_contracts::entry_point::EntryPointErr;
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
 use silius_uopool::{
@@ -37,7 +35,6 @@ type StandardUserPool<M, P, R, E> =
 pub struct UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
@@ -48,7 +45,6 @@ where
 impl<M, P, R, E> UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
@@ -72,9 +68,7 @@ where
 #[async_trait]
 impl<M, P, R, E> uo_pool_server::UoPool for UoPoolService<M, P, R, E>
 where
-    EntryPointErr: From<<M as Middleware>::Error>,
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync + 'static,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
     E: Debug + Display + 'static,
@@ -362,9 +356,7 @@ pub async fn uopool_service_run<M>(
     upool_mode: UoPoolMode,
 ) -> Result<()>
 where
-    EntryPointErr: From<<M as Middleware>::Error>,
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();

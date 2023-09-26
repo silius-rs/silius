@@ -98,7 +98,7 @@ pub struct UoPoolArgs {
 #[derive(Debug, Clone, Parser)]
 pub struct BundlerAndUoPoolArgs {
     /// Ethereum execution client RPC endpoint.
-    #[clap(long, default_value = "ws://127.0.0.1:8546")]
+    #[clap(long, default_value = "http://127.0.0.1:8545")]
     pub eth_client_address: String,
 
     /// Chain information.
