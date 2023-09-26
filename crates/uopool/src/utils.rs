@@ -128,7 +128,11 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
 /// # Returns
 /// The call gas limit of the [UserOperation](UserOperation)
 pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
-    paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
+    // paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
+    // -> (paid / fee_per_gas + rounding_cost) - pre_op_gas + Overhead::default().fixed
+    div_ceil(paid, fee_per_gas)
+        .saturating_sub(pre_op_gas)
+        .saturating_add(Overhead::default().fixed)
 }
 
 /// Performs division and rounds up to the nearest integer.
@@ -288,6 +292,28 @@ pub mod tests {
         let gas_price = U256::from(10);
         let gas_incr_perc = U256::from(11);
         assert_eq!(calculate_valid_gas(gas_price, gas_incr_perc), 12.into());
+    }
+
+    #[test]
+    fn call_gas_limit_calculation() {
+        let paid = U256::from(100);
+        let pre_op_gas = U256::from(10);
+        let fee_per_gas = U256::from(1);
+        assert_eq!(
+            calculate_call_gas_limit(paid, pre_op_gas, fee_per_gas),
+            21090.into()
+        );
+    }
+
+    #[test]
+    fn call_gas_limit_calculation_with_zero_divide() {
+        let paid = U256::from(100);
+        let pre_op_gas = U256::from(10);
+        let fee_per_gas = U256::from(0);
+        assert_eq!(
+            calculate_call_gas_limit(paid, pre_op_gas, fee_per_gas),
+            21000.into()
+        );
     }
 
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
