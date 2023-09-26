@@ -11,7 +11,7 @@ use crate::common::{
 };
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
-use ethers::providers::{Provider, PubsubClient, Ws};
+use ethers::providers::{Http, Provider};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::Address;
 use ethers::utils::{parse_units, GethInstance};
@@ -57,7 +57,6 @@ const GAS_INCREASE_PERC: u64 = 10;
 struct TestContext<M, V, P, R, E>
 where
     M: Middleware + 'static,
-    <M as Middleware>::Provider: PubsubClient,
     V: UserOperationValidator<P, R, E> + 'static,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
@@ -76,7 +75,7 @@ where
 
 type Context = TestContext<
     ClientType,
-    StandardUserOperationValidator<Provider<Ws>, MemoryMempool, MemoryReputation, eyre::Error>,
+    StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation, eyre::Error>,
     MemoryMempool,
     MemoryReputation,
     eyre::Error,
@@ -152,7 +151,12 @@ async fn setup() -> eyre::Result<Context> {
 
     let pool = UoPool::<
         ClientType,
-        StandardUserOperationValidator<Provider<Ws>, MemoryMempool, MemoryReputation, eyre::Error>,
+        StandardUserOperationValidator<
+            Provider<Http>,
+            MemoryMempool,
+            MemoryReputation,
+            eyre::Error,
+        >,
         MemoryMempool,
         MemoryReputation,
         eyre::Error,

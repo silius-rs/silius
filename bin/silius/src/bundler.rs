@@ -2,10 +2,7 @@ use crate::{
     cli::args::{BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, UoPoolArgs},
     utils::unwrap_path_or_home,
 };
-use ethers::{
-    providers::{Middleware, Provider, Ws},
-    types::Address,
-};
+use ethers::{providers::Middleware, types::Address};
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
@@ -22,13 +19,16 @@ use silius_rpc::{
 use std::{collections::HashSet, future::pending, net::SocketAddr, sync::Arc};
 use tracing::info;
 
-pub async fn launch_bundler(
+pub async fn launch_bundler<M>(
     bundler_args: BundlerArgs,
     uopool_args: UoPoolArgs,
     common_args: BundlerAndUoPoolArgs,
     rpc_args: RpcArgs,
-    eth_client: Arc<Provider<Ws>>,
-) -> eyre::Result<()> {
+    eth_client: Arc<M>,
+) -> eyre::Result<()>
+where
+    M: Middleware + Clone + 'static,
+{
     launch_uopool(
         uopool_args.clone(),
         eth_client.clone(),
@@ -65,13 +65,16 @@ pub async fn launch_bundler(
     Ok(())
 }
 
-pub async fn launch_bundling(
+pub async fn launch_bundling<M>(
     args: BundlerArgs,
-    eth_client: Arc<Provider<Ws>>,
+    eth_client: Arc<M>,
     chain: Option<String>,
     entry_points: Vec<Address>,
     uopool_grpc_listen_address: String,
-) -> eyre::Result<()> {
+) -> eyre::Result<()>
+where
+    M: Middleware + Clone + 'static,
+{
     info!("Starting bundling gRPC service...");
 
     let eth_client_version = check_connected_chain(eth_client.clone(), chain).await?;
@@ -125,12 +128,15 @@ pub async fn launch_bundling(
     Ok(())
 }
 
-pub async fn launch_uopool(
+pub async fn launch_uopool<M>(
     args: UoPoolArgs,
-    eth_client: Arc<Provider<Ws>>,
+    eth_client: Arc<M>,
     chain: Option<String>,
     entry_points: Vec<Address>,
-) -> eyre::Result<()> {
+) -> eyre::Result<()>
+where
+    M: Middleware + Clone + 'static,
+{
     info!("Starting uopool gRPC service...");
 
     let eth_client_version = check_connected_chain(eth_client.clone(), chain).await?;
@@ -288,10 +294,10 @@ pub fn create_wallet(args: CreateWalletArgs) -> eyre::Result<()> {
     Ok(())
 }
 
-async fn check_connected_chain(
-    eth_client: Arc<Provider<Ws>>,
-    chain: Option<String>,
-) -> eyre::Result<String> {
+async fn check_connected_chain<M>(eth_client: Arc<M>, chain: Option<String>) -> eyre::Result<String>
+where
+    M: Middleware + Clone + 'static,
+{
     let chain_id = eth_client.get_chainid().await?;
     let chain_conn = Chain::from(chain_id);
 

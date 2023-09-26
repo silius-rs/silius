@@ -2,7 +2,7 @@ use crate::proto::bundler::*;
 use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
 use crate::uo_pool_client::UoPoolClient;
 use async_trait::async_trait;
-use ethers::providers::{Middleware, PubsubClient};
+use ethers::providers::Middleware;
 use ethers::types::{Address, H256, U256};
 use parking_lot::Mutex;
 use silius_bundler::Bundler;
@@ -14,7 +14,6 @@ use tracing::{error, info, warn};
 pub struct BundlerService<M>
 where
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     pub bundlers: Vec<Bundler<M>>,
     pub running: Arc<Mutex<bool>>,
@@ -29,7 +28,6 @@ fn is_running(running: Arc<Mutex<bool>>) -> bool {
 impl<M> BundlerService<M>
 where
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     pub fn new(
         bundlers: Vec<Bundler<M>>,
@@ -163,7 +161,6 @@ where
 impl<M> bundler_server::Bundler for BundlerService<M>
 where
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     async fn set_bundler_mode(
         &self,
@@ -217,7 +214,6 @@ pub fn bundler_service_run<M>(
     relay_endpoints: Option<Vec<String>>,
 ) where
     M: Middleware + Clone + 'static,
-    <M as Middleware>::Provider: PubsubClient,
 {
     let bundlers: Vec<Bundler<M>> = eps
         .iter()

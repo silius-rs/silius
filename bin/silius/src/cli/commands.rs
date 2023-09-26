@@ -1,7 +1,7 @@
 use super::args::{BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, UoPoolArgs};
 use crate::{
     bundler::{create_wallet, launch_bundler, launch_bundling, launch_rpc, launch_uopool},
-    utils::create_ws_provider,
+    utils::{create_http_provider, create_ws_provider},
 };
 use clap::Parser;
 use std::{future::pending, sync::Arc};
@@ -29,8 +29,14 @@ pub struct BundlerCommand {
 impl BundlerCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
-        let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
-        launch_bundler(self.bundler, self.uopool, self.common, self.rpc, eth_client).await?;
+        if self.common.eth_client_address.clone().starts_with("http") {
+            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address)?);
+            launch_bundler(self.bundler, self.uopool, self.common, self.rpc, eth_client).await?;
+        } else {
+            let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
+            launch_bundler(self.bundler, self.uopool, self.common, self.rpc, eth_client).await?;
+        }
+
         pending().await
     }
 }
@@ -54,15 +60,28 @@ pub struct BundlingCommand {
 impl BundlingCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
-        let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
-        launch_bundling(
-            self.bundler,
-            eth_client,
-            self.common.chain,
-            self.common.entry_points,
-            self.uopool_grpc_listen_address,
-        )
-        .await?;
+        if self.common.eth_client_address.clone().starts_with("http") {
+            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address)?);
+            launch_bundling(
+                self.bundler,
+                eth_client,
+                self.common.chain,
+                self.common.entry_points,
+                self.uopool_grpc_listen_address,
+            )
+            .await?;
+        } else {
+            let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
+            launch_bundling(
+                self.bundler,
+                eth_client,
+                self.common.chain,
+                self.common.entry_points,
+                self.uopool_grpc_listen_address,
+            )
+            .await?;
+        }
+
         pending().await
     }
 }
@@ -82,14 +101,26 @@ pub struct UoPoolCommand {
 impl UoPoolCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
-        let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
-        launch_uopool(
-            self.uopool,
-            eth_client,
-            self.common.chain,
-            self.common.entry_points,
-        )
-        .await?;
+        if self.common.eth_client_address.clone().starts_with("http") {
+            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address)?);
+            launch_uopool(
+                self.uopool,
+                eth_client,
+                self.common.chain,
+                self.common.entry_points,
+            )
+            .await?;
+        } else {
+            let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
+            launch_uopool(
+                self.uopool,
+                eth_client,
+                self.common.chain,
+                self.common.entry_points,
+            )
+            .await?;
+        }
+
         pending().await
     }
 }

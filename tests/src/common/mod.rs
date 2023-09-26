@@ -5,7 +5,7 @@ use self::gen::{
 };
 use ethers::{
     prelude::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
-    providers::{Middleware, Provider, Ws},
+    providers::{Http, Middleware, Provider},
     signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer},
     types::{Address, TransactionRequest, U256},
     utils::{Geth, GethInstance},
@@ -16,7 +16,7 @@ use tempdir::TempDir;
 pub mod gen;
 
 pub const SEED_PHRASE: &str = "test test test test test test test test test test test junk";
-pub type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Ws>, LocalWallet>>;
+pub type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
 
 pub struct DeployedContract<C> {
     contract: C,
@@ -123,7 +123,7 @@ pub async fn deploy_test_coin<M: Middleware + 'static>(
     Ok(DeployedContract::new(factory, addr))
 }
 
-pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Ws>)> {
+pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Http>)> {
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
     let wallet = MnemonicBuilder::<English>::default()
@@ -131,9 +131,8 @@ pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Ws
         .build()?;
 
     let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();
-    let provider = Provider::<Ws>::connect(geth.ws_endpoint())
-        .await?
-        .interval(Duration::from_millis(5u64));
+    let provider =
+        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(5u64));
 
     let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address());

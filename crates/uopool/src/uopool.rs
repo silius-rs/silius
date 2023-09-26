@@ -10,7 +10,7 @@ use crate::{
 };
 use ethers::{
     prelude::LogMeta,
-    providers::{Middleware, PubsubClient},
+    providers::Middleware,
     types::{Address, BlockNumber, U256, U64},
 };
 use eyre::format_err;
@@ -40,7 +40,6 @@ const LATEST_SCAN_DEPTH: u64 = 1000;
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
 pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E>
 where
-    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug,
@@ -63,7 +62,6 @@ where
 
 impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
 where
-    <M as Middleware>::Provider: PubsubClient,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
