@@ -317,6 +317,16 @@ pub mod tests {
         );
     }
 
+    #[test]
+    fn div_ceil_divisible_calculation() {
+        assert_eq!(div_ceil(U256::from(10), U256::from(2)), 5.into());
+    }
+
+    #[test]
+    fn div_ceil_no_divisible_calculation() {
+        assert_eq!(div_ceil(U256::from(10), U256::from(3)), 4.into());
+    }
+
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
     where
         T: Mempool<UserOperations = Vec<UserOperation>> + Debug,
