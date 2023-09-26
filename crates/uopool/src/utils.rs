@@ -117,6 +117,20 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
     div_ceil(numerator, denominator)
 }
 
+/// Helper function to calculate the call gas limit of a [UserOperation](UserOperation)
+/// The function is invoked by the [estimate_user_operation_gas](crates::uopool::estimate::estimate_user_operation_gas) method.
+///
+/// # Arguments
+/// `paid` - The paid gas
+/// `pre_op_gas` - The pre-operation gas
+/// `fee_per_gas` - The fee per gas
+///
+/// # Returns
+/// The call gas limit of the [UserOperation](UserOperation)
+pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
+    paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
+}
+
 /// Performs division and rounds up to the nearest integer.
 ///
 /// This function takes a numerator and a denominator of type `U256`,
@@ -141,20 +155,6 @@ fn div_ceil(numerator: U256, denominator: U256) -> U256 {
         .checked_div(denominator)
         .unwrap_or_default()
         .saturating_add(rounding_const)
-}
-
-/// Helper function to calculate the call gas limit of a [UserOperation](UserOperation)
-/// The function is invoked by the [estimate_user_operation_gas](crates::uopool::estimate::estimate_user_operation_gas) method.
-///
-/// # Arguments
-/// `paid` - The paid gas
-/// `pre_op_gas` - The pre-operation gas
-/// `fee_per_gas` - The fee per gas
-///
-/// # Returns
-/// The call gas limit of the [UserOperation](UserOperation)
-pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
-    paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
 }
 
 #[cfg(test)]
