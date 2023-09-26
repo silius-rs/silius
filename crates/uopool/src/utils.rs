@@ -143,7 +143,7 @@ pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256)
 /// # Examples
 ///
 /// ```
-/// # use your_crate::U256; // Replace with the actual import
+/// use ethers::types::U256;
 /// let result = div_ceil(U256::from(10), U256::from(3));
 /// assert_eq!(result, U256::from(4));
 /// ```
