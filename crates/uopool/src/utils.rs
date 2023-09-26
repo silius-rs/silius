@@ -129,7 +129,7 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
 /// let result = div_ceil(U256::from(10), U256::from(3));
 /// assert_eq!(result, U256::from(4));
 /// ```
-pub fn div_ceil(numerator: U256, denominator: U256) -> U256 {
+fn div_ceil(numerator: U256, denominator: U256) -> U256 {
     let rounding_const = U256::from(
         if numerator.checked_rem(denominator).unwrap_or_default() > U256::zero() {
             1
