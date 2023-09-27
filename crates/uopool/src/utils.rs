@@ -1,4 +1,4 @@
-use ethers::types::{u256_from_f64_saturating, Address, H256, U256};
+use ethers::types::{Address, H256, U256};
 use silius_primitives::{simulation::CodeHash, UserOperation};
 use std::{collections::HashMap, ops::Deref};
 
@@ -62,25 +62,33 @@ impl Overhead {
     /// The pre-verification gas of the [UserOperation](UserOperation)
     pub fn calculate_pre_verification_gas(&self, uo: &UserOperation) -> U256 {
         let uo_pack = uo.pack();
-        let call_data: U256 = U256::from(
-            uo_pack
-                .deref()
-                .iter()
-                .map(|&x| {
-                    if x == 0 {
-                        self.zero_byte.as_u128()
-                    } else {
-                        self.non_zero_byte.as_u128()
-                    }
-                })
-                .sum::<u128>(),
+
+        let call_data = uo_pack.deref().iter().fold(U256::zero(), |acc, &x| {
+            let byte_cost = if x == 0 {
+                &self.zero_byte
+            } else {
+                &self.non_zero_byte
+            };
+            acc.saturating_add(*byte_cost)
+        });
+
+        // per_user_op_word * (uo_pack.len() + 31) / 32
+        // -> (per_user_op_word * (uo_pack.len() + 31)) / 32
+        // -> (per_user_op_word * (uo_pack.len() + 31)) / 32 + rounding_const
+        let word_cost = div_ceil(
+            self.per_user_op_word
+                .saturating_mul(U256::from(uo_pack.len() + 31)),
+            U256::from(32),
         );
-        let len_in_word = ((uo_pack.len() + 31) as f64) / 32_f64;
-        u256_from_f64_saturating(
-            (self.fixed.as_u128() as f64) / (self.bundle_size.as_u128() as f64)
-                + ((call_data + self.per_user_op).as_u128() as f64)
-                + (self.per_user_op_word.as_u128() as f64) * len_in_word,
-        )
+
+        // fixed / bundle_size
+        // -> fixed / bundle_size + rounding_const
+        let fixed_divided_by_bundle_size = div_ceil(self.fixed, self.bundle_size);
+
+        fixed_divided_by_bundle_size
+            .saturating_add(call_data)
+            .saturating_add(self.per_user_op)
+            .saturating_add(word_cost)
     }
 }
 
@@ -94,9 +102,13 @@ impl Overhead {
 /// # Returns
 /// The valid gas of the [UserOperation](UserOperation)
 pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
-    let gas_price = gas_price.as_u64() as f64;
-    let gas_incr_perc = gas_incr_perc.as_u64() as f64;
-    ((gas_price * (1.0 + gas_incr_perc / 100.0)).ceil() as u64).into()
+    // (gas_price * (1 + gas_incr_perc / 100)
+    // -> (100 / 100) * (gas_price * ( 1 + gas_incr_perc / 100 ))
+    // -> (gas_price * ( 100 + gas_incr_perc )) / 100
+    // -> (gas_price * ( 100 + gas_incr_perc )) / 100 + rounding_const
+    let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(U256::from(100)));
+    let denominator = U256::from(100);
+    div_ceil(numerator, denominator)
 }
 
 /// Helper function to calculate the call gas limit of a [UserOperation](UserOperation)
@@ -110,7 +122,38 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
 /// # Returns
 /// The call gas limit of the [UserOperation](UserOperation)
 pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256) -> U256 {
-    paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
+    // paid / fee_per_gas - pre_op_gas + Overhead::default().fixed
+    // -> (paid / fee_per_gas + rounding_cost) - pre_op_gas + Overhead::default().fixed
+    div_ceil(paid, fee_per_gas)
+        .saturating_sub(pre_op_gas)
+        .saturating_add(Overhead::default().fixed)
+}
+
+/// Performs division and rounds up to the nearest integer.
+///
+/// This function takes a numerator and a denominator of type `U256`,
+/// performs the division, and rounds up if there is a remainder.
+///
+/// # Examples
+///
+/// ```ignore
+/// use ethers::types::U256;
+///
+/// let result = div_ceil(U256::from(10), U256::from(3));
+/// assert_eq!(result, U256::from(4));
+/// ```
+fn div_ceil(numerator: U256, denominator: U256) -> U256 {
+    let rounding_const = U256::from(
+        if numerator.checked_rem(denominator).unwrap_or_default() > U256::zero() {
+            1
+        } else {
+            0
+        },
+    );
+    numerator
+        .checked_div(denominator)
+        .unwrap_or_default()
+        .saturating_add(rounding_const)
 }
 
 #[cfg(test)]
@@ -144,6 +187,138 @@ pub mod tests {
         };
 
         assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 45340.into());
+    }
+
+    #[test]
+    fn pre_verification_gas_calculation_with_large_user_operation() {
+        let gas_oh = Overhead::default();
+        let uo = UserOperation {
+            sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54"
+                .parse()
+                .unwrap(),
+            nonce: U256::max_value(),
+            init_code: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            call_gas_limit: U256::max_value(),
+            verification_gas_limit: U256::max_value(),
+            pre_verification_gas: U256::max_value(),
+            max_fee_per_gas: U256::max_value(),
+            max_priority_fee_per_gas: U256::max_value(),
+            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),          // Large signature
+        };
+
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 110020.into());
+    }
+
+    #[test]
+    fn pre_verification_gas_calculation_with_large_per_user_op_word() {
+        let gas_oh = Overhead {
+            fixed: U256::from(21000),
+            per_user_op: U256::from(18300),
+            per_user_op_word: U256::from(10000),
+            zero_byte: U256::from(4),
+            non_zero_byte: U256::from(16),
+            bundle_size: U256::from(1),
+            sig_size: U256::from(65),
+        };
+        let uo = UserOperation {
+            sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54"
+                .parse()
+                .unwrap(),
+            nonce: U256::max_value(),
+            init_code: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            call_gas_limit: U256::max_value(),
+            verification_gas_limit: U256::max_value(),
+            pre_verification_gas: U256::max_value(),
+            max_fee_per_gas: U256::max_value(),
+            max_priority_fee_per_gas: U256::max_value(),
+            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),          // Large signature
+        };
+
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 1549132.into());
+    }
+
+    /// This test occurred overflow when previous `calculate_pre_verification_gas` is used.
+    /// previous `calculate_pre_verification_gas` is https://github.com/Vid201/silius/blob/bd79ea0e610adff8d77ba128f53befa8401a4d77/crates/uopool/src/utils.rs#L63-L84
+    #[test]
+    fn pre_verification_gas_calculation_overflow() {
+        let gas_oh = Overhead {
+            fixed: U256::max_value(),
+            per_user_op: U256::max_value(),
+            per_user_op_word: U256::max_value(),
+            zero_byte: U256::max_value(),
+            non_zero_byte: U256::max_value(),
+            bundle_size: U256::from(1), // To avoid division by zero
+            sig_size: U256::max_value(),
+        };
+
+        let uo = UserOperation {
+            sender: Address::default(),
+            nonce: U256::max_value(),
+            init_code: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            call_gas_limit: U256::max_value(),
+            verification_gas_limit: U256::max_value(),
+            pre_verification_gas: U256::max_value(),
+            max_fee_per_gas: U256::max_value(),
+            max_priority_fee_per_gas: U256::max_value(),
+            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),          // Large signature
+        };
+
+        // This test is mainly to check if the function can handle the overflow scenario without panicking.
+        // We don't have a specific expected value in this case.
+        let _ = gas_oh.calculate_pre_verification_gas(&uo);
+    }
+
+    #[test]
+    fn valid_gas_calculation_when_no_round_up_case() {
+        let gas_price = U256::from(100);
+        let gas_incr_perc = U256::from(10);
+        let valid_gas = calculate_valid_gas(gas_price, gas_incr_perc);
+        assert_eq!(valid_gas, 110.into());
+    }
+
+    #[test]
+    fn valid_gas_calculation_when_round_up_case() {
+        let gas_price = U256::from(10);
+        let gas_incr_perc = U256::from(11);
+        assert_eq!(calculate_valid_gas(gas_price, gas_incr_perc), 12.into());
+    }
+
+    #[test]
+    fn call_gas_limit_calculation() {
+        let paid = U256::from(100);
+        let pre_op_gas = U256::from(10);
+        let fee_per_gas = U256::from(1);
+        assert_eq!(
+            calculate_call_gas_limit(paid, pre_op_gas, fee_per_gas),
+            21090.into()
+        );
+    }
+
+    #[test]
+    fn call_gas_limit_calculation_with_zero_divide() {
+        let paid = U256::from(100);
+        let pre_op_gas = U256::from(10);
+        let fee_per_gas = U256::from(0);
+        assert_eq!(
+            calculate_call_gas_limit(paid, pre_op_gas, fee_per_gas),
+            21000.into()
+        );
+    }
+
+    #[test]
+    fn div_ceil_divisible_calculation() {
+        assert_eq!(div_ceil(U256::from(10), U256::from(2)), 5.into());
+    }
+
+    #[test]
+    fn div_ceil_no_divisible_calculation() {
+        assert_eq!(div_ceil(U256::from(10), U256::from(3)), 4.into());
     }
 
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
