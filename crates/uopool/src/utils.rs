@@ -80,12 +80,6 @@ impl Overhead {
                 .saturating_mul(U256::from(uo_pack.len() + 31)),
             U256::from(32),
         );
-        // let word_cost = self
-        //     .per_user_op_word
-        //     .saturating_mul(U256::from(word_len))
-        //     .checked_div(U256::from(32))
-        //     .unwrap_or_default()
-        //     .saturating_add(rounding_const_word_cost);
 
         // fixed / bundle_size
         // -> fixed / bundle_size + rounding_const
