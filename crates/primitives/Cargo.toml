@@ -11,10 +11,12 @@ AA (ERC-4337) bundler commonly used types
 """
 
 [dependencies]
+async-stream = { workspace = true }
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethers = { workspace = true }
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
+futures-util = { workspace = true }
 lazy_static = "1.4.0"
 rustc-hex = "^2.0.1"
 serde = "1"

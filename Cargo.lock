@@ -5363,6 +5363,7 @@ dependencies = [
  "ethers 2.0.8",
  "expanded-pathbuf",
  "eyre",
+ "futures-util",
  "parking_lot",
  "prost",
  "prost-build",
@@ -5382,10 +5383,12 @@ dependencies = [
 name = "silius-primitives"
 version = "0.2.0-alpha"
 dependencies = [
+ "async-stream",
  "educe",
  "ethers 2.0.8",
  "expanded-pathbuf",
  "eyre",
+ "futures-util",
  "lazy_static",
  "rustc-hex",
  "serde",
@@ -5407,6 +5410,7 @@ dependencies = [
  "eyre",
  "git-version",
  "hyper",
+ "hyper-tls",
  "jsonrpsee 0.18.2",
  "serde",
  "serde_json",

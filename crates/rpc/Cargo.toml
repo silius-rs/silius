@@ -16,6 +16,7 @@ ethers = { workspace = true }
 eyre = { workspace = true }
 git-version = "0.3.5"
 hyper = { version = "0.14" }
+hyper-tls = { version = "0.5.0" }
 jsonrpsee = { version = "0.18.2", features = ["server", "macros", "client"] }
 serde = "1"
 serde_json = { workspace = true }

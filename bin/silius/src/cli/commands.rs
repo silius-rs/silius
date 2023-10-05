@@ -1,9 +1,9 @@
 use super::args::{BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, UoPoolArgs};
-use crate::{
-    bundler::{create_wallet, launch_bundler, launch_bundling, launch_rpc, launch_uopool},
-    utils::{create_http_provider, create_ws_provider},
-};
+use crate::bundler::{create_wallet, launch_bundler, launch_bundling, launch_rpc, launch_uopool};
 use clap::Parser;
+use silius_primitives::provider::{
+    create_http_block_streams, create_http_provider, create_ws_block_streams, create_ws_provider,
+};
 use std::{future::pending, sync::Arc};
 
 /// Start the bundler with all components (bundling component, user operation mempool, RPC server)
@@ -30,11 +30,31 @@ impl BundlerCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
-            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address)?);
-            launch_bundler(self.bundler, self.uopool, self.common, self.rpc, eth_client).await?;
+            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
+            let block_streams =
+                create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+            launch_bundler(
+                self.bundler,
+                self.uopool,
+                self.common,
+                self.rpc,
+                eth_client,
+                block_streams,
+            )
+            .await?;
         } else {
             let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
-            launch_bundler(self.bundler, self.uopool, self.common, self.rpc, eth_client).await?;
+            let block_streams =
+                create_ws_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+            launch_bundler(
+                self.bundler,
+                self.uopool,
+                self.common,
+                self.rpc,
+                eth_client,
+                block_streams,
+            )
+            .await?;
         }
 
         pending().await
@@ -61,7 +81,7 @@ impl BundlingCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
-            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address)?);
+            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
             launch_bundling(
                 self.bundler,
                 eth_client,
@@ -102,19 +122,25 @@ impl UoPoolCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
-            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address)?);
+            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
+            let block_streams =
+                create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
             launch_uopool(
                 self.uopool,
                 eth_client,
+                block_streams,
                 self.common.chain,
                 self.common.entry_points,
             )
             .await?;
         } else {
             let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
+            let block_streams =
+                create_ws_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
             launch_uopool(
                 self.uopool,
                 eth_client,
+                block_streams,
                 self.common.chain,
                 self.common.entry_points,
             )

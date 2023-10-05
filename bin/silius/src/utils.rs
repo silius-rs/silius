@@ -1,8 +1,5 @@
 use dirs::home_dir;
-use ethers::{
-    providers::{Http, Provider, Ws},
-    types::{Address, U256},
-};
+use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
 use silius_primitives::{bundler::SendBundleMode, UoPoolMode};
@@ -66,16 +63,4 @@ where
     }
 
     Ok(())
-}
-
-/// Creates ethers provider with HTTP connection
-pub fn create_http_provider(addr: &str) -> eyre::Result<Provider<Http>> {
-    let provider = Provider::<Http>::try_from(addr)?;
-    Ok(provider)
-}
-
-/// Creates ethers provider with WebSockets connection
-pub async fn create_ws_provider(addr: &str) -> eyre::Result<Provider<Ws>> {
-    let provider = Provider::<Ws>::connect_with_reconnects(addr, usize::MAX).await?;
-    Ok(provider)
 }

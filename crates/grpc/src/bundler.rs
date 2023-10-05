@@ -1,5 +1,5 @@
 use crate::proto::bundler::*;
-use crate::proto::uopool::{GetSortedRequest, HandlePastEventRequest};
+use crate::proto::uopool::GetSortedRequest;
 use crate::uo_pool_client::UoPoolClient;
 use async_trait::async_trait;
 use ethers::providers::Middleware;
@@ -9,7 +9,7 @@ use silius_bundler::Bundler;
 use silius_primitives::{bundler::SendBundleMode, Chain, UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 pub struct BundlerService<M>
 where
@@ -64,8 +64,6 @@ where
                 Self::get_user_operations(&self.uopool_grpc_client, &bundler.entry_point).await?;
             let tx_hash = bundler.send_next_bundle(&uos).await?;
 
-            Self::handle_past_events(&self.uopool_grpc_client, &bundler.entry_point).await?;
-
             tx_hashes.push(tx_hash)
         }
 
@@ -85,26 +83,6 @@ where
 
     pub fn is_running(&self) -> bool {
         is_running(self.running.clone())
-    }
-
-    async fn handle_past_events(
-        uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
-        ep: &Address,
-    ) -> eyre::Result<()> {
-        let req = Request::new(HandlePastEventRequest {
-            ep: Some((*ep).into()),
-        });
-
-        if let Some(e) = uopool_grpc_client
-            .clone()
-            .handle_past_events(req)
-            .await
-            .err()
-        {
-            warn!("Failed to handle past events: {:?}", e)
-        };
-
-        Ok(())
     }
 
     pub fn start_bundling(&self, int: u64) {
@@ -136,14 +114,6 @@ where
                             Ok(bundle) => {
                                 if let Err(e) = bundler_own.send_next_bundle(&bundle).await {
                                     error!("Error while sending bundle: {e:?}");
-                                }
-                                if let Err(e) = Self::handle_past_events(
-                                    &uopool_grpc_client,
-                                    &bundler_own.entry_point,
-                                )
-                                .await
-                                {
-                                    error!("Error while handling past events: {e:?}");
                                 }
                             }
                             Err(e) => {

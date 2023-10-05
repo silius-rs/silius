@@ -20,12 +20,15 @@ const CREATE_INDEX: u64 = 2;
 async fn main() -> eyre::Result<()> {
     let seed_phrase = env::var("SEED_PHRASE").unwrap();
     let bundler_url = env::var("BUNDLER_URL").unwrap();
+
+    let provider =
+        Provider::<Http>::try_from(bundler_url.as_str())?.interval(Duration::from_millis(10u64));
+    let chain_id = provider.get_chainid().await?.as_u64();
+
     let wallet = MnemonicBuilder::<English>::default()
         .phrase(seed_phrase.as_str())
         .build()?;
-    let provider =
-        Provider::<Http>::try_from(bundler_url.as_str())?.interval(Duration::from_millis(10u64));
-    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(5u64))
+    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address());
     let provider = Arc::new(client);
 
@@ -41,6 +44,7 @@ async fn main() -> eyre::Result<()> {
         .call()
         .await?;
     println!("Smart account addresss: {:?}", address);
+
     let nonce = provider.get_transaction_count(address, None).await?;
     let call = simple_account_factory.create_account(owner_address, U256::from(CREATE_INDEX));
     let tx: TypedTransaction = call.tx;
@@ -71,12 +75,12 @@ async fn main() -> eyre::Result<()> {
         paymaster_and_data: Bytes::new(),
         signature: Bytes::default(),
     };
-    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &U256::from(5), false)?;
+    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &chain_id.into(), false)?;
     let user_op = uo_wallet
         .sign_uo(
             &user_op,
             &ADDRESS.to_string().parse::<Address>()?,
-            &U256::from(5),
+            &chain_id.into(),
         )
         .await?;
 
@@ -116,7 +120,7 @@ async fn main() -> eyre::Result<()> {
         .sign_uo(
             &user_op,
             &ADDRESS.to_string().parse::<Address>()?,
-            &U256::from(5),
+            &chain_id.into(),
         )
         .await?;
 

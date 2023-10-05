@@ -102,7 +102,7 @@ pub struct BundlerAndUoPoolArgs {
     pub eth_client_address: String,
 
     /// Chain information.
-    #[clap(long, default_value= "dev", value_parser = SUPPORTED_CHAINS)]
+    #[clap(long, value_parser = SUPPORTED_CHAINS)]
     pub chain: Option<String>,
 
     /// Entry point addresses.

@@ -3,6 +3,7 @@ use ethers::{
     providers::{Http, Middleware, Provider},
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
     types::{Address, Bytes, U256},
+    utils::parse_ether,
 };
 use reqwest;
 use silius_contracts::EntryPoint;
@@ -11,23 +12,27 @@ use silius_primitives::consts::entry_point::ADDRESS;
 use silius_primitives::UserOperation;
 use silius_primitives::Wallet as UoWallet;
 use silius_tests::common::gen::SimpleAccountFactory;
-use std::{env, str::FromStr, sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 // stackup simple account factory
 const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";
 // 0.6.0 entrypoint address
-const CREATE_INDEX: u64 = 1;
+const CREATE_INDEX: u64 = 2;
+const TRANSFER_VALUE: &str = "0.01"; // ether unit
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     let seed_phrase = env::var("SEED_PHRASE").unwrap();
     let bundler_url = env::var("BUNDLER_URL").unwrap();
+
+    let provider =
+        Provider::<Http>::try_from(bundler_url.as_str())?.interval(Duration::from_millis(10u64));
+    let chain_id = provider.get_chainid().await?.as_u64();
+
     let wallet = MnemonicBuilder::<English>::default()
         .phrase(seed_phrase.as_str())
         .build()?;
-    let provider =
-        Provider::<Http>::try_from(bundler_url.as_str())?.interval(Duration::from_millis(10u64));
-    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(5u64))
+    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address());
     let provider = Arc::new(client);
 
@@ -54,31 +59,28 @@ async fn main() -> eyre::Result<()> {
         gas_price, priority_fee
     );
 
-    let execution = SimpleAccountExecute::new(
-        Address::from_str("0x21A14e061fe67A3060ef238DDD8Bf90c81829F7d")?,
-        U256::from(1),
-        Bytes::default(),
-    );
+    let execution =
+        SimpleAccountExecute::new(address, parse_ether(TRANSFER_VALUE)?, Bytes::default());
 
     let user_op = UserOperation {
         sender: address,
         nonce,
         init_code: Bytes::default(),
         call_data: Bytes::from(execution.encode()),
-        call_gas_limit: U256::from(10000u64),
-        verification_gas_limit: U256::from(10000u64),
+        call_gas_limit: U256::from(1),
+        verification_gas_limit: U256::from(1000000u64),
         pre_verification_gas: U256::from(1u64),
         max_fee_per_gas: U256::from(1),
         max_priority_fee_per_gas: priority_fee,
         paymaster_and_data: Bytes::new(),
         signature: Bytes::default(),
     };
-    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &U256::from(5), false)?;
+    let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &chain_id.into(), false)?;
     let user_op = uo_wallet
         .sign_uo(
             &user_op,
             &ADDRESS.to_string().parse::<Address>()?,
-            &U256::from(5),
+            &chain_id.into(),
         )
         .await?;
 
@@ -108,7 +110,10 @@ async fn main() -> eyre::Result<()> {
             .result
             .pre_verification_gas
             .saturating_add(U256::from(1000)),
-        verification_gas_limit: v.result.verification_gas_limit,
+        verification_gas_limit: v
+            .result
+            .verification_gas_limit
+            .saturating_mul(U256::from(2)),
         call_gas_limit: v.result.call_gas_limit.saturating_mul(U256::from(2)),
         max_priority_fee_per_gas: priority_fee,
         max_fee_per_gas: gas_price,
@@ -118,7 +123,7 @@ async fn main() -> eyre::Result<()> {
         .sign_uo(
             &user_op,
             &ADDRESS.to_string().parse::<Address>()?,
-            &U256::from(5),
+            &chain_id.into(),
         )
         .await?;
 

@@ -12,6 +12,7 @@ use ethers::{
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use eyre::Result;
+use silius_primitives::provider::BlockStream;
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
 use silius_uopool::{
@@ -24,7 +25,6 @@ use silius_uopool::{
 use std::fmt::{Debug, Display};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
-use tracing::warn;
 
 pub const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
 pub const GAS_INCREASE_PERC: u64 = 10;
@@ -45,9 +45,9 @@ where
 impl<M, P, R, E> UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
-    E: Debug + Display,
+    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync + 'static,
+    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
+    E: Debug + Display + 'static,
 {
     pub fn new(uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>, chain: Chain) -> Self {
         Self { uopools, chain }
@@ -206,23 +206,6 @@ where
         }))
     }
 
-    async fn handle_past_events(
-        &self,
-        req: Request<HandlePastEventRequest>,
-    ) -> Result<Response<()>, Status> {
-        let req = req.into_inner();
-
-        let ep = parse_addr(req.ep)?;
-        let mut uopool = self.get_uopool(&ep)?;
-
-        uopool
-            .handle_past_events()
-            .await
-            .map_err(|e| tonic::Status::internal(format!("Failed to handle past events: {e:?}")))?;
-
-        Ok(Response::new(()))
-    }
-
     async fn get_user_operation_by_hash(
         &self,
         req: Request<UserOperationHashRequest>,
@@ -347,6 +330,7 @@ pub async fn uopool_service_run<M>(
     datadir: ExpandedPathBuf,
     eps: Vec<Address>,
     eth_client: Arc<M>,
+    block_streams: Vec<BlockStream>,
     chain: Chain,
     max_verification_gas: U256,
     min_stake: U256,
@@ -370,7 +354,7 @@ where
         env.create_tables()
             .expect("Create mdbx database tables failed");
 
-        for ep in eps {
+        for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
             let id = mempool_id(&ep, &U256::from(chain.id()));
             let builder = UoPoolBuilder::new(
                 upool_mode == UoPoolMode::Unsafe,
@@ -385,6 +369,10 @@ where
                 DatabaseMempool::new(env.clone()),
                 DatabaseReputation::new(env.clone()),
             );
+
+            builder.register_block_updates(block_stream);
+            builder.register_reputation_updates();
+
             m_map.insert(id, builder);
         }
 
@@ -394,19 +382,6 @@ where
             DatabaseReputation<WriteMap>,
             DBError,
         >::new(m_map.clone(), chain));
-
-        tokio::spawn(async move {
-            loop {
-                m_map.iter_mut().for_each(|m| {
-                    let _ = m
-                        .uopool()
-                        .reputation
-                        .update_hourly()
-                        .map_err(|e| warn!("Failed to update hourly reputation: {:?}", e));
-                });
-                tokio::time::sleep(Duration::from_secs(60 * 60)).await;
-            }
-        });
 
         builder.add_service(svc).serve(addr).await
     });
