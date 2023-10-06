@@ -14,7 +14,7 @@ default-members = ["bin/silius"]
 
 [workspace.package]
 authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Vid201/silius"

@@ -5279,7 +5279,7 @@ dependencies = [
 
 [[package]]
 name = "silius"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "clap",
  "dirs 4.0.0",
@@ -5299,7 +5299,7 @@ dependencies = [
 
 [[package]]
 name = "silius-bundler"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "alloy-primitives 0.2.0",
  "alloy-sol-types 0.2.0",
@@ -5323,7 +5323,7 @@ dependencies = [
 
 [[package]]
 name = "silius-contracts"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "ethers 2.0.8",
  "ethers-solc 2.0.9",
@@ -5338,7 +5338,7 @@ dependencies = [
 
 [[package]]
 name = "silius-examples"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "alloy-primitives 0.3.3",
  "alloy-sol-types 0.3.2",
@@ -5355,7 +5355,7 @@ dependencies = [
 
 [[package]]
 name = "silius-grpc"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "arrayref",
  "async-trait",
@@ -5381,7 +5381,7 @@ dependencies = [
 
 [[package]]
 name = "silius-primitives"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "async-stream",
  "educe",
@@ -5403,7 +5403,7 @@ dependencies = [
 
 [[package]]
 name = "silius-rpc"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "async-trait",
  "ethers 2.0.8",
@@ -5424,7 +5424,7 @@ dependencies = [
 
 [[package]]
 name = "silius-tests"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "ethers 2.0.8",
  "eyre",
@@ -5437,7 +5437,7 @@ dependencies = [
 
 [[package]]
 name = "silius-uopool"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "async-trait",
  "educe",
