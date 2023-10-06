@@ -435,11 +435,11 @@ pub(crate) fn generate_flashbots_middleware<M: Middleware + 'static>(
 
     let mut flashbots_middleware = FlashbotsMiddleware::new(
         eth_client,
-        Url::parse(relay_endpoint.clone())?,
+        Url::parse(relay_endpoint)?,
         bundle_signer.clone(),
     );
     flashbots_middleware.set_simulation_relay(
-        Url::parse(relay_endpoint.clone()).expect("Failed to parse simulation relay URL"),
+        Url::parse(relay_endpoint).expect("Failed to parse simulation relay URL"),
         bundle_signer.clone(),
     );
 
