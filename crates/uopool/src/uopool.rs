@@ -436,13 +436,8 @@ where
         match self.entry_point.simulate_execution(uo.clone()).await {
             Ok(_) => {}
             Err(err) => {
-                return Err(match err {
-                    EntryPointErr::JsonRpcError(err) => SimulationCheckError::Execution {
-                        message: err.message,
-                    },
-                    _ => SimulationCheckError::UnknownError {
-                        message: format!("{err:?}"),
-                    },
+                return Err(SimulationCheckError::Execution {
+                    message: err.to_string(),
                 })
             }
         }
@@ -451,8 +446,11 @@ where
             Ok(res) => res,
             Err(err) => {
                 return Err(match err {
-                    EntryPointErr::JsonRpcError(err) => SimulationCheckError::Execution {
-                        message: err.message,
+                    EntryPointErr::FailedOp(err) => SimulationCheckError::Execution {
+                        message: err.to_string(),
+                    },
+                    EntryPointErr::RevertError(err) => SimulationCheckError::Execution {
+                        message: err.to_string(),
                     },
                     _ => SimulationCheckError::UnknownError {
                         message: format!("{err:?}"),
