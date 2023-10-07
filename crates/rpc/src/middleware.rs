@@ -1,4 +1,5 @@
 use hyper::{Body, Request, Response};
+use hyper_tls::HttpsConnector;
 use jsonrpsee::core::error::Error as JsonRpcError;
 use jsonrpsee::types::error::{ErrorCode, METHOD_NOT_FOUND_MSG};
 use jsonrpsee::types::ErrorObjectOwned;
@@ -106,11 +107,18 @@ where
                 if err.error.code() == ErrorCode::MethodNotFound.code()
                     && err.error.message() == METHOD_NOT_FOUND_MSG
                 {
-                    let client = hyper::Client::new();
-                    let req = Request::post(addr)
+                    let req = Request::post(addr.clone())
                         .header(hyper::header::CONTENT_TYPE, "application/json")
                         .body(Body::from(req_bb))?;
-                    let res = client.request(req).await?;
+
+                    let res = if addr.starts_with("https") {
+                        let https = HttpsConnector::new();
+                        let client = hyper::Client::builder().build::<_, hyper::Body>(https);
+                        client.request(req).await?
+                    } else {
+                        let client = hyper::Client::new();
+                        client.request(req).await?
+                    };
                     return Ok(res);
                 }
             }

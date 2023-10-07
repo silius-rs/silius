@@ -47,10 +47,7 @@ impl StorageAccess {
 
                 if kecc.starts_with(&addr_b) {
                     let k = keccak256(kecc.clone());
-                    slots
-                        .entry(entity.address)
-                        .or_insert(HashSet::new())
-                        .insert(k.into());
+                    slots.entry(entity.address).or_default().insert(k.into());
                 }
             }
         }

@@ -11,11 +11,11 @@ use crate::{
 use ethers::{
     prelude::LogMeta,
     providers::Middleware,
-    types::{Address, BlockNumber, U256, U64},
+    types::{Address, BlockNumber, U256},
 };
 use eyre::format_err;
 use silius_contracts::{
-    entry_point::{EntryPointAPIEvents, EntryPointErr, UserOperationEventFilter},
+    entry_point::{EntryPointErr, UserOperationEventFilter},
     utils::parse_from_input_data,
     EntryPoint,
 };
@@ -586,48 +586,6 @@ where
         }
 
         Err(format_err!("No user operation found"))
-    }
-
-    /// Queries the [EntryPoint](EntryPoint) contract for the past events logged that are included in the current block.
-    /// If [UserOperation](UserOperation) is found, it is removed from the [UserOperationQueue](UserOperationQueue), while simultaneously incrementing the reputation of the sender and paymaster.
-    ///
-    /// # Returns
-    /// `Result<(), eyre::Error>` - None if the query was successful.
-    pub async fn handle_past_events(&mut self) -> eyre::Result<()> {
-        let block_num = self.entry_point.eth_client().get_block_number().await?;
-        let block_st = std::cmp::max(
-            1u64,
-            block_num
-                .checked_sub(U64::from(LATEST_SCAN_DEPTH))
-                .unwrap_or(U64::from(0))
-                .as_u64(),
-        );
-
-        let filter = self.entry_point.events().from_block(block_st);
-        let events = filter.query().await?;
-
-        for event in events {
-            match event {
-                EntryPointAPIEvents::UserOperationEventFilter(uo_event) => {
-                    self.remove_user_operation(&uo_event.user_op_hash.into());
-                    self.reputation
-                        .increment_included(&uo_event.sender)
-                        .map_err(|err| eyre::eyre!(err.to_string()))?;
-                    self.reputation
-                        .increment_included(&uo_event.paymaster)
-                        .map_err(|err| eyre::eyre!(err.to_string()))?;
-                    // TODO: include event aggregator
-                }
-                EntryPointAPIEvents::AccountDeployedFilter(event) => {
-                    self.reputation
-                        .increment_included(&event.factory)
-                        .map_err(|err| eyre::eyre!(err.to_string()))?;
-                }
-                _ => (),
-            }
-        }
-
-        Ok(())
     }
 
     /// Removes the [UserOperation](UserOperation) from the [UserOperationQueue](UserOperationQueue) given the [UserOperationHash](UserOperationHash).

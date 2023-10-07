@@ -90,10 +90,6 @@ message GetUserOperationByHashResponse{
     uint64 block_number = 5;
 }
 
-message HandlePastEventRequest{
-    types.H160 ep = 1;
-}
-
 message GetUserOperationReceiptResponse{
     types.H256 user_operation_hash = 1;
     types.H160 sender = 2;
@@ -115,7 +111,6 @@ service UoPool {
     rpc EstimateUserOperationGas(EstimateUserOperationGasRequest) returns (EstimateUserOperationGasResponse);
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
     rpc GetUserOperationByHash(UserOperationHashRequest) returns (GetUserOperationByHashResponse);
-    rpc HandlePastEvents(HandlePastEventRequest) returns (google.protobuf.Empty);
     rpc GetUserOperationReceipt(UserOperationHashRequest) returns (GetUserOperationReceiptResponse);
     
     // debug

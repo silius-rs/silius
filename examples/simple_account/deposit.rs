@@ -12,18 +12,21 @@ use std::{env, sync::Arc, time::Duration};
 
 // stackup simple account factory
 const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";
-const CREATE_INDEX: u64 = 1;
+const CREATE_INDEX: u64 = 2;
 const SEND_VALUE: &str = "0.01"; // ether unit
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     let seed_phrase = env::var("SEED_PHRASE").unwrap();
     let provider_url = env::var("PROVIDER_URL").unwrap();
+
+    let provider = Provider::<Http>::try_from(provider_url)?.interval(Duration::from_millis(10u64));
+    let chain_id = provider.get_chainid().await?.as_u64();
+
     let wallet = MnemonicBuilder::<English>::default()
         .phrase(seed_phrase.as_str())
         .build()?;
-    let provider = Provider::<Http>::try_from(provider_url)?.interval(Duration::from_millis(10u64));
-    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(5u64))
+    let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address())
         .gas_oracle(ProviderOracle::new(provider.clone()));
     let provider = Arc::new(client);

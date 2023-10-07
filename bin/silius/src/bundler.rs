@@ -8,7 +8,8 @@ use silius_grpc::{
     uopool_service_run,
 };
 use silius_primitives::{
-    bundler::SendBundleMode, consts::flashbots_relay_endpoints, Chain, Wallet,
+    bundler::SendBundleMode, consts::flashbots_relay_endpoints, provider::BlockStream, Chain,
+    Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -25,6 +26,7 @@ pub async fn launch_bundler<M>(
     common_args: BundlerAndUoPoolArgs,
     rpc_args: RpcArgs,
     eth_client: Arc<M>,
+    block_streams: Vec<BlockStream>,
 ) -> eyre::Result<()>
 where
     M: Middleware + Clone + 'static,
@@ -32,6 +34,7 @@ where
     launch_uopool(
         uopool_args.clone(),
         eth_client.clone(),
+        block_streams,
         common_args.chain.clone(),
         common_args.entry_points.clone(),
     )
@@ -131,6 +134,7 @@ where
 pub async fn launch_uopool<M>(
     args: UoPoolArgs,
     eth_client: Arc<M>,
+    block_streams: Vec<BlockStream>,
     chain: Option<String>,
     entry_points: Vec<Address>,
 ) -> eyre::Result<()>
@@ -154,6 +158,7 @@ where
         datadir,
         entry_points,
         eth_client,
+        block_streams,
         chain_id,
         args.max_verification_gas,
         args.min_stake,

@@ -45,7 +45,7 @@ impl Mempool for MemoryMempool {
 
         self.user_operations_by_sender
             .entry(uo.sender)
-            .or_insert_with(Default::default)
+            .or_default()
             .insert(uo_hash);
         self.user_operations.insert(uo_hash, uo);
 

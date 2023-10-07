@@ -391,7 +391,6 @@ mod tests {
     fn deserialize_error_msg() -> eyre::Result<()> {
         let err_msg = Bytes::from_str("0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001841413934206761732076616c756573206f766572666c6f770000000000000000")?;
         let res = EntryPointAPIErrors::decode(err_msg)?;
-        println!("res: {:?}", res);
         match res {
             EntryPointAPIErrors::RevertString(s) => {
                 assert_eq!(s, "AA94 gas values overflow")
