@@ -16,7 +16,9 @@ use ethers::types::{
     Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
     GethTrace, TransactionRequest, U256,
 };
+use regex::Regex;
 use std::fmt::Display;
+use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -72,32 +74,9 @@ impl<M: Middleware + 'static> EntryPoint<M> {
             ContractError::AbiError(e) => Err(EntryPointErr::UnknownErr(format!(
                 "Contract call with abi error: {e:?} ",
             ))),
-            ContractError::MiddlewareError { e } => Err(EntryPointErr::from_middleware_err::<M>(e)),
-            ContractError::ProviderError { e } => Err(e.into()),
-            ContractError::Revert(data) => {
-                let decoded = EntryPointAPIErrors::decode(data.as_ref());
-                match decoded {
-                    Ok(res) => Ok(res),
-                    Err(e) => {
-                        // ethers-rs could not handle `require (true, "reason")` well in this case
-                        // revert with `require` error would ends up with error event signature `0x08c379a0`
-                        // we need to handle it manually
-                        let (error_sig, reason) = data.split_at(4);
-                        if error_sig == [0x08, 0xc3, 0x79, 0xa0] {
-                            return <String as AbiDecode>::decode(reason)
-                                .map(EntryPointAPIErrors::RevertString)
-                                .map_err(|e| {
-                                    EntryPointErr::DecodeErr(format!(
-                                        "{e:?} data field could not be deserialize to revert error",
-                                    ))
-                                });
-                        }
-                        Err(EntryPointErr::DecodeErr(format!(
-                            "{e:?} data field could not be deserialize to EntryPointAPIErrors",
-                        )))
-                    }
-                }
-            }
+            ContractError::MiddlewareError { e } => EntryPointErr::from_middleware_err::<M>(e),
+            ContractError::ProviderError { e } => EntryPointErr::from_provider_err(&e),
+            ContractError::Revert(data) => decode_revert_error(data),
             _ => Err(EntryPointErr::UnknownErr(format!(
                 "Unkown error: {err_msg:?}",
             ))),
@@ -154,7 +133,9 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                 },
             )
             .await
-            .map_err(|e| EntryPointErr::from_middleware_err::<M>(e))?;
+            .map_err(|e| {
+                EntryPointErr::from_middleware_err::<M>(e).expect_err("trace err is expected")
+            })?;
 
         Ok(res)
     }
@@ -234,11 +215,10 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub async fn simulate_execution<U: Into<UserOperation>>(
         &self,
         uo: U,
-    ) -> Result<(), EntryPointErr> {
+    ) -> Result<Bytes, <M as Middleware>::Error> {
         let uo: UserOperation = uo.into();
 
-        let res = self
-            .eth_client
+        self.eth_client
             .call(
                 &TransactionRequest::new()
                     .from(self.address)
@@ -247,12 +227,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                     .into(),
                 None,
             )
-            .await;
-
-        match res {
-            Ok(_) => Ok(()),
-            Err(e) => Err(EntryPointErr::from_middleware_err::<M>(e)),
-        }
+            .await
     }
 
     pub async fn simulate_handle_op<U: Into<UserOperation>>(
@@ -287,12 +262,38 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     }
 }
 
+fn decode_revert_error(data: Bytes) -> Result<EntryPointAPIErrors, EntryPointErr> {
+    let decoded = EntryPointAPIErrors::decode(data.as_ref());
+    match decoded {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            // ethers-rs could not handle `require (true, "reason")` well in this case
+            // revert with `require` error would ends up with error event signature `0x08c379a0`
+            // we need to handle it manually
+            let (error_sig, reason) = data.split_at(4);
+            if error_sig == [0x08, 0xc3, 0x79, 0xa0] {
+                return <String as AbiDecode>::decode(reason)
+                    .map(EntryPointAPIErrors::RevertString)
+                    .map_err(|e| {
+                        EntryPointErr::DecodeErr(format!(
+                            "{e:?} data field could not be deserialize to revert error",
+                        ))
+                    });
+            }
+            Err(EntryPointErr::DecodeErr(format!(
+                "{e:?} data field could not be deserialize to EntryPointAPIErrors",
+            )))
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum EntryPointErr {
     FailedOp(FailedOp),
-    JsonRpcError(JsonRpcError),
+    RevertError(String),
     NetworkErr(String),
     DecodeErr(String),
+    CallDataErr(String),
     UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
 }
 
@@ -302,38 +303,82 @@ impl Display for EntryPointErr {
     }
 }
 
-impl From<ProviderError> for EntryPointErr {
-    fn from(e: ProviderError) -> Self {
-        Self::from_provider_err(&e)
-    }
-}
-
 impl EntryPointErr {
-    fn from_provider_err(err: &ProviderError) -> Self {
+    fn from_provider_err(err: &ProviderError) -> Result<EntryPointAPIErrors, Self> {
         match err {
             ProviderError::JsonRpcClientError(err) => err
                 .as_error_response()
-                .map(|e| EntryPointErr::JsonRpcError(e.clone()))
-                .unwrap_or(EntryPointErr::UnknownErr(format!(
+                .map(Self::from_json_rpc_error)
+                .unwrap_or(Err(EntryPointErr::UnknownErr(format!(
                     "Unknown JSON-RPC client error: {err:?}"
-                ))),
-            ProviderError::HTTPError(err) => {
-                EntryPointErr::NetworkErr(format!("Entry point HTTP error: {err:?}"))
-            }
-            _ => EntryPointErr::UnknownErr(format!("Unknown error in provider: {err:?}")),
+                )))),
+            ProviderError::HTTPError(err) => Err(EntryPointErr::NetworkErr(format!(
+                "Entry point HTTP error: {err:?}"
+            ))),
+            _ => Err(EntryPointErr::UnknownErr(format!(
+                "Unknown error in provider: {err:?}"
+            ))),
         }
     }
 
-    fn from_middleware_err<M: Middleware>(err: M::Error) -> Self {
+    fn from_json_rpc_error(err: &JsonRpcError) -> Result<EntryPointAPIErrors, Self> {
+        if let Some(ref value) = err.data {
+            match value {
+                serde_json::Value::String(data) => {
+                    let re = Regex::new(r"0x[0-9a-fA-F]+").expect("Regex rules valid");
+                    let hex = if let Some(hex) = re.find(data) {
+                        hex
+                    } else {
+                        return Err(EntryPointErr::DecodeErr(format!(
+                            "Could not find hex string in {data:?}",
+                        )));
+                    };
+                    let bytes = match Bytes::from_str(hex.into()) {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            return Err(EntryPointErr::DecodeErr(format!(
+                            "Error string {data:?} could not be converted to bytes because {e:?}",
+                        )))
+                        }
+                    };
+
+                    let formal_err = decode_revert_error(bytes);
+                    match formal_err {
+                        Ok(res) => return Ok(res),
+                        Err(err) => {
+                            return Err(EntryPointErr::UnknownErr(format!(
+                                "Unknown middleware error: {err:?}"
+                            )))
+                        }
+                    };
+                }
+                other => {
+                    return Err(Self::DecodeErr(format!(
+                        "Json rpc return data {other:?} is not string"
+                    )))
+                }
+            }
+        }
+
+        Err(Self::UnknownErr(format!(
+            "Json rpc error {err:?} doesn't contain data field."
+        )))
+    }
+
+    fn from_middleware_err<M: Middleware>(
+        err: M::Error,
+    ) -> Result<EntryPointAPIErrors, EntryPointErr> {
         if let Some(err) = err.as_error_response() {
-            return EntryPointErr::JsonRpcError(err.clone());
+            return Self::from_json_rpc_error(err);
         }
 
         if let Some(err) = err.as_provider_error() {
             return EntryPointErr::from_provider_err(err);
         }
 
-        EntryPointErr::UnknownErr(format!("Unknown middleware error: {err:?}"))
+        Err(EntryPointErr::UnknownErr(format!(
+            "Unknown middleware error: {err:?}"
+        )))
     }
 }
 
