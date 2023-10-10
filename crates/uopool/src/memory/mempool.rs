@@ -16,6 +16,9 @@ pub struct MemoryMempool {
     /// A [Hashmap](std::collections::HashMap) of [UserOperationHash](UserOperationHash) to [Vec] of
     /// [CodeHash](CodeHash) for lookups by [UserOperationHash](UserOperationHash)
     code_hashes_by_user_operation: HashMap<UserOperationHash, Vec<CodeHash>>, // user_operation_hash -> (contract_address -> code_hash)
+    /// A [Hashmap](std::collections::HashMap) of [Address] to [HashSet] of
+    /// [UserOperationHash](UserOperationHash) for lookups by entity
+    user_operations_by_entity: HashMap<Address, HashSet<UserOperationHash>>, // entity -> user_operations
 }
 
 impl Mempool for MemoryMempool {
@@ -42,11 +45,24 @@ impl Mempool for MemoryMempool {
         chain_id: &U256,
     ) -> eyre::Result<UserOperationHash> {
         let uo_hash = uo.hash(ep, chain_id);
+        let (sender, factory, paymaster) = uo.get_entities();
 
         self.user_operations_by_sender
-            .entry(uo.sender)
+            .entry(sender)
             .or_default()
             .insert(uo_hash);
+        if let Some(factory) = factory {
+            self.user_operations_by_entity
+                .entry(factory)
+                .or_default()
+                .insert(uo_hash);
+        }
+        if let Some(paymaster) = paymaster {
+            self.user_operations_by_entity
+                .entry(paymaster)
+                .or_default()
+                .insert(uo_hash);
+        }
         self.user_operations.insert(uo_hash, uo);
 
         Ok(uo_hash)
@@ -94,6 +110,21 @@ impl Mempool for MemoryMempool {
     fn get_number_by_sender(&self, addr: &Address) -> usize {
         return if let Some(uos_by_sender) = self.user_operations_by_sender.get(addr) {
             uos_by_sender.len()
+        } else {
+            0
+        };
+    }
+
+    /// Gets the number of [UserOperation](UserOperation)s by entity
+    ///
+    /// # Arguments
+    /// * `addr` - The [Address](Address) of the sender
+    ///
+    /// # Returns
+    /// * `usize` - The number of [UserOperations](UserOperation) if they exist. Otherwise, 0.
+    fn get_number_by_entity(&self, addr: &Address) -> usize {
+        return if let Some(uos_by_entity) = self.user_operations_by_entity.get(addr) {
+            uos_by_entity.len()
         } else {
             0
         };
@@ -161,17 +192,59 @@ impl Mempool for MemoryMempool {
             return Err(eyre::eyre!("User operation not found"));
         }
 
+        let (sender, factory, paymaster) = uo.get_entities();
+
         self.user_operations.remove(uo_hash);
 
-        if let Some(uos) = self.user_operations_by_sender.get_mut(&uo.sender) {
+        if let Some(uos) = self.user_operations_by_sender.get_mut(&sender) {
             uos.remove(uo_hash);
 
             if uos.is_empty() {
-                self.user_operations_by_sender.remove(&uo.sender);
+                self.user_operations_by_sender.remove(&sender);
+            }
+        }
+
+        if let Some(factory) = factory {
+            if let Some(uos) = self.user_operations_by_entity.get_mut(&factory) {
+                uos.remove(uo_hash);
+
+                if uos.is_empty() {
+                    self.user_operations_by_entity.remove(&factory);
+                }
+            }
+        }
+
+        if let Some(paymaster) = paymaster {
+            if let Some(uos) = self.user_operations_by_entity.get_mut(&paymaster) {
+                uos.remove(uo_hash);
+
+                if uos.is_empty() {
+                    self.user_operations_by_entity.remove(&paymaster);
+                }
             }
         }
 
         self.code_hashes_by_user_operation.remove(uo_hash);
+
+        Ok(())
+    }
+
+    /// Removes a [UserOperation](UserOperation) by its entity
+    ///
+    /// # Arguments
+    /// * `entity` - The [Address](Address) of the entity
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the [UserOperation](UserOperation) was removed
+    /// * `Err(eyre::Error)` - If the [UserOperation](UserOperation) could not be removed
+    fn remove_by_entity(&mut self, entity: &Address) -> eyre::Result<()> {
+        let uos = self.user_operations_by_entity.get(entity).cloned();
+
+        if let Some(uos) = uos {
+            for uo_hash in uos {
+                self.remove(&uo_hash)?;
+            }
+        }
 
         Ok(())
     }
@@ -208,6 +281,7 @@ impl Mempool for MemoryMempool {
         self.user_operations.clear();
         self.user_operations_by_sender.clear();
         self.code_hashes_by_user_operation.clear();
+        self.user_operations_by_entity.clear();
     }
 }
 

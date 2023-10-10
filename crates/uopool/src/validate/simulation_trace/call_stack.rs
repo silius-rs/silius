@@ -156,6 +156,8 @@ where
                             })?;
                         let context = validate_paymaster_return.context;
 
+                        // [EREP-050]
+                        // This will be removed in the future
                         if !context.is_empty()
                             && helper
                                 .reputation

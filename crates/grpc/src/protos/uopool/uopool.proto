@@ -103,6 +103,16 @@ message GetUserOperationReceiptResponse{
     string reason = 10;
 }
 
+message GetStakeInfoRequest {
+    types.H160 addr = 1;
+    types.H160 ep = 2;
+}
+
+message GetStakeInfoResponse {
+    types.StakeInfo info = 1;
+    bool is_staked = 2;
+}
+
 service UoPool {
     rpc Add(AddRequest) returns (AddResponse);
     rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
@@ -112,9 +122,12 @@ service UoPool {
     rpc GetSortedUserOperations(GetSortedRequest) returns (GetSortedResponse);
     rpc GetUserOperationByHash(UserOperationHashRequest) returns (GetUserOperationByHashResponse);
     rpc GetUserOperationReceipt(UserOperationHashRequest) returns (GetUserOperationReceiptResponse);
+    rpc GetStakeInfo(GetStakeInfoRequest) returns (GetStakeInfoResponse);
     
     // debug
     rpc GetAll(GetAllRequest) returns (GetAllResponse);
+    rpc ClearMempool(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc ClearReputation(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc GetAllReputation(GetAllReputationRequest) returns (GetAllReputationResponse);
     rpc SetReputation(SetReputationRequest) returns (SetReputationResponse);

@@ -1,3 +1,4 @@
+use super::utils::{as_checksum_addr, as_hex_string, as_u64};
 use educe::Educe;
 use ethers::{
     prelude::{EthAbiCodec, EthAbiType},
@@ -5,18 +6,12 @@ use ethers::{
 };
 use serde::{Deserialize, Serialize};
 
-pub type ReputationStatus = u8;
-
-pub const MIN_INCLUSION_RATE_DENOMINATOR: u64 = 10;
-pub const THROTTLING_SLACK: u64 = 10;
-pub const BAN_SLACK: u64 = 50;
-
-// If the paymaster is throttle, maximum amount in one bundle is 1.
-pub const THROTTLED_MAX_INCLUDE: u64 = 1;
+pub type ReputationStatus = u64;
 
 /// All possible reputation statuses
 #[derive(Default, Clone, Educe, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 #[educe(Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum Status {
     #[default]
     OK,
@@ -62,8 +57,11 @@ impl From<ReputationStatus> for Status {
 #[educe(Debug)]
 pub struct ReputationEntry {
     pub address: Address,
+    #[serde(rename = "opsSeen", serialize_with = "as_hex_string")]
     pub uo_seen: u64,
+    #[serde(rename = "opsIncluded", serialize_with = "as_hex_string")]
     pub uo_included: u64,
+    #[serde(default, serialize_with = "as_hex_string")]
     pub status: ReputationStatus,
 }
 
@@ -71,8 +69,11 @@ pub struct ReputationEntry {
 #[derive(Clone, Copy, Default, Educe, Eq, PartialEq, Serialize, Deserialize)]
 #[educe(Debug)]
 pub struct StakeInfo {
+    #[serde(rename = "addr", serialize_with = "as_checksum_addr")]
     pub address: Address,
+    #[serde(serialize_with = "as_u64")]
     pub stake: U256,
+    #[serde(rename = "unstakeDelaySec", serialize_with = "as_u64")]
     pub unstake_delay: U256, // seconds
 }
 
@@ -82,21 +83,41 @@ impl StakeInfo {
     }
 }
 
+/// Stake info response for RPC
+#[derive(Clone, Copy, Default, Educe, Eq, PartialEq, Serialize, Deserialize)]
+#[educe(Debug)]
+pub struct StakeInfoResponse {
+    #[serde(rename = "stakeInfo")]
+    pub stake_info: StakeInfo,
+    #[serde(rename = "isStaked")]
+    pub is_staked: bool,
+}
+
 /// Error object for reputation
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ReputationError {
     EntityBanned {
         address: Address,
-        title: String,
+        entity: String,
+    },
+    ThrottledLimit {
+        address: Address,
+        entity: String,
+    },
+    UnstakedEntityVerification {
+        address: Address,
+        entity: String,
+        message: String,
     },
     StakeTooLow {
         address: Address,
-        title: String,
+        entity: String,
         min_stake: U256,
         min_unstake_delay: U256,
     },
     UnstakeDelayTooLow {
         address: Address,
-        title: String,
+        entity: String,
         min_stake: U256,
         min_unstake_delay: U256,
     },

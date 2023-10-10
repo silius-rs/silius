@@ -10,7 +10,7 @@ pub mod rpc_error_codes {
     pub const PAYMASTER: i32 = -32501;
     pub const OPCODE: i32 = -32502;
     pub const EXPIRATION: i32 = -32503;
-    pub const ENTITY_BANNED: i32 = -32504;
+    pub const ENTITY_BANNED_OR_THROTTLED: i32 = -32504;
     pub const STAKE_TOO_LOW: i32 = -32505;
     pub const SIGNATURE_AGGREGATOR: i32 = -32506;
     pub const SIGNATURE: i32 = -32507;
@@ -25,14 +25,36 @@ pub mod entities {
     pub const NUMBER_LEVELS: usize = 3;
 
     pub const FACTORY: &str = "factory";
-    pub const ACCOUNT: &str = "account";
+    pub const SENDER: &str = "account";
     pub const PAYMASTER: &str = "paymaster";
 
     pub const FACTORY_LEVEL: usize = 0;
-    pub const ACCOUNT_LEVEL: usize = 1;
+    pub const SENDER_LEVEL: usize = 1;
     pub const PAYMASTER_LEVEL: usize = 2;
 
-    pub const LEVEL_TO_ENTITY: [&str; NUMBER_LEVELS] = [FACTORY, ACCOUNT, PAYMASTER];
+    pub const LEVEL_TO_ENTITY: [&str; NUMBER_LEVELS] = [FACTORY, SENDER, PAYMASTER];
+}
+
+/// Reputation
+/// https://github.com/eth-infinitism/account-abstraction/blob/develop/eip/EIPS/eip-aa-rules.md#constants
+pub mod reputation {
+    pub const MIN_UNSTAKE_DELAY: u64 = 86400;
+    // pub const MIN_STAKE_VALUE - Adjustable per chain value, Equivalent to ~$1000 in native tokens
+    pub const SAME_SENDER_MEMPOOL_COUNT: usize = 4;
+    pub const SAME_UNSTAKED_ENTITY_MEMPOOL_COUNT: usize = 10;
+    pub const THROTTLED_ENTITY_MEMPOOL_COUNT: usize = 4;
+    pub const THROTTLED_ENTITY_LIVE_BLOCKS: usize = 4;
+    pub const THROTTLED_ENTITY_BUNDLE_COUNT: usize = 4;
+    pub const MIN_INCLUSION_RATE_DENOMINATOR: u64 = 10;
+    pub const INCLUSION_RATE_FACTOR: u64 = 10;
+    pub const THROTTLING_SLACK: u64 = 10;
+    pub const BAN_SLACK: u64 = 50;
+}
+
+/// User opereation mempool
+pub mod uopool {
+    pub const GAS_INCREASE_PERC: u64 = 10;
+    pub const LATEST_SCAN_DEPTH: u64 = 1000;
 }
 
 /// Builder JSON-RPC Endpoints

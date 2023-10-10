@@ -1,7 +1,17 @@
 pub use crate::debug::DebugApiServerImpl;
 use ethers::types::{Address, H256};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
-use silius_primitives::{reputation::ReputationEntry, BundlerMode, UserOperation};
+use serde::{Deserialize, Serialize};
+use silius_primitives::{
+    reputation::{ReputationEntry, StakeInfoResponse},
+    BundlerMode, UserOperation,
+};
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ResponseSuccess {
+    Ok,
+}
 
 /// The ERC-4337 `debug` namespace RPC methods trait
 #[rpc(server, namespace = "debug_bundler")]
@@ -10,9 +20,25 @@ pub trait DebugApi {
     ///
     ///
     /// # Returns
-    /// * `RpcResult<()>` - None
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    #[method(name = "clearMempool")]
+    async fn clear_mempool(&self) -> RpcResult<ResponseSuccess>;
+
+    /// Clears the bundler reputation
+    ///
+    ///
+    /// # Returns
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    #[method(name = "clearReputation")]
+    async fn clear_reputation(&self) -> RpcResult<ResponseSuccess>;
+
+    /// Clears the bundler mempool and reputation
+    ///
+    ///
+    /// # Returns
+    /// * `RpcResult<ResponseSuccess>` - Ok
     #[method(name = "clearState")]
-    async fn clear_state(&self) -> RpcResult<()>;
+    async fn clear_state(&self) -> RpcResult<ResponseSuccess>;
 
     /// Get all [UserOperations](UserOperation) of the mempool
     ///
@@ -31,13 +57,13 @@ pub trait DebugApi {
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<()>` - None
+    /// * `RpcResult<ResponseSuccess>` - Ok
     #[method(name = "setReputation")]
     async fn set_reputation(
         &self,
         reputation_entries: Vec<ReputationEntry>,
         entry_point: Address,
-    ) -> RpcResult<()>;
+    ) -> RpcResult<ResponseSuccess>;
 
     /// Return the all of [ReputationEntries](ReputationEntry) in the mempool.
     ///
@@ -55,9 +81,9 @@ pub trait DebugApi {
     /// * `mode: BundlerMode` - The [BundlingMode](BundlingMode) to be set.
     ///
     /// # Returns
-    /// * `RpcResult<()>` - None
+    /// * `RpcResult<ResponseSuccess>` - Ok
     #[method(name = "setBundlingMode")]
-    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<()>;
+    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<ResponseSuccess>;
 
     /// Immediately send the current bundle of user operations.
     /// This is useful for testing or in situations where waiting for the next scheduled bundle is not desirable.
@@ -67,4 +93,19 @@ pub trait DebugApi {
     /// * `RpcResult<H256>` - The hash of the bundle that was sent.
     #[method(name = "sendBundleNow")]
     async fn send_bundle_now(&self) -> RpcResult<H256>;
+
+    /// Returns the stake info of the given address.
+    ///
+    /// # Arguments
+    /// * `address: Address` - The address of the entity.
+    /// * `entry_point: Address` - The address of the entry point.
+    ///
+    /// # Returns
+    /// * `RpcResult<StakeInfoResponse>` - Stake info of the entity.
+    #[method(name = "getStakeStatus")]
+    async fn get_stake_status(
+        &self,
+        address: Address,
+        entry_point: Address,
+    ) -> RpcResult<StakeInfoResponse>;
 }

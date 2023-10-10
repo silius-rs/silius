@@ -33,5 +33,5 @@ services:
       - "3001"
       - --ws.api
       - eth,debug,web3
-      -- eth-client-proxy-address
-      -- http://127.0.0.1:8545
+      - --eth-client-proxy-address
+      - http://127.0.0.1:8545

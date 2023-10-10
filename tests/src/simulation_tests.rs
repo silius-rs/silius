@@ -20,16 +20,17 @@ use ethers::{
     types::{Bytes, U256},
 };
 use silius_contracts::EntryPoint;
-use silius_primitives::consts::entities::{ACCOUNT, FACTORY, PAYMASTER};
+use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::simulation::SimulationCheckError;
 use silius_primitives::uopool::ValidationError;
 use silius_primitives::{Chain, UserOperation};
 use silius_uopool::validate::sanity::call_gas::CallGas;
+use silius_uopool::validate::sanity::entities::Entities;
 use silius_uopool::validate::sanity::max_fee::MaxFee;
 use silius_uopool::validate::sanity::paymaster::Paymaster;
-use silius_uopool::validate::sanity::sender::SenderOrInitCode;
-use silius_uopool::validate::sanity::sender_uos::SenderUos;
+use silius_uopool::validate::sanity::sender::Sender;
+use silius_uopool::validate::sanity::unstaked_entities::UnstakedEntities;
 use silius_uopool::validate::sanity::verification_gas::VerificationGas;
 use silius_uopool::validate::simulation::signature::Signature;
 use silius_uopool::validate::simulation::timestamp::Timestamp;
@@ -43,23 +44,20 @@ use silius_uopool::validate::{
     UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
 };
 use silius_uopool::{
-    mempool_id, MemoryMempool, MemoryReputation, Mempool, MempoolBox, Reputation, ReputationBox,
-    UoPool, VecCh, VecUo,
+    mempool_id, MemoryMempool, MemoryReputation, Mempool, MempoolBox, Reputation as Rep,
+    ReputationBox, UoPool, VecCh, VecUo,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
-const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
-const GAS_INCREASE_PERC: u64 = 10;
-
 struct TestContext<M, V, P, R, E>
 where
     M: Middleware + 'static,
     V: UserOperationValidator<P, R, E> + 'static,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug,
 {
     pub client: Arc<M>,
@@ -128,19 +126,17 @@ async fn setup() -> eyre::Result<Context> {
     let c = Chain::from(chain_id);
 
     let validator = StandardUserOperationValidator::new(entry_point2, c.clone())
-        .with_sanity_check(SenderOrInitCode {})
+        .with_sanity_check(Sender)
         .with_sanity_check(VerificationGas {
             max_verification_gas: U256::from(3000000_u64),
         })
-        .with_sanity_check(Paymaster {})
-        .with_sanity_check(CallGas {})
+        .with_sanity_check(CallGas)
         .with_sanity_check(MaxFee {
             min_priority_fee_per_gas: U256::from(1u64),
         })
-        .with_sanity_check(SenderUos {
-            max_uos_per_unstaked_sender: MAX_UOS_PER_UNSTAKED_SENDER,
-            gas_increase_perc: GAS_INCREASE_PERC.into(),
-        })
+        .with_sanity_check(Paymaster)
+        .with_sanity_check(Entities)
+        .with_sanity_check(UnstakedEntities)
         .with_simulation_check(Signature)
         .with_simulation_check(Timestamp)
         .with_simulation_trace_check(Gas)
@@ -449,7 +445,7 @@ async fn fail_with_bad_opcode_in_validation() -> eyre::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==ACCOUNT && opcode == "BLOCKHASH"
+        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "BLOCKHASH"
     ));
 
     Ok(())
@@ -473,7 +469,7 @@ async fn fail_if_create_too_many() -> eyre::Result<()> {
     .await;
     assert!(matches!(
         res,
-        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==ACCOUNT && opcode == "CREATE2"
+        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "CREATE2"
     ));
 
     Ok(())

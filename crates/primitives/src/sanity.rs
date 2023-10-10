@@ -1,3 +1,4 @@
+use crate::reputation::ReputationError;
 use ethers::{
     providers::MiddlewareError,
     types::{Address, Bytes, U256},
@@ -5,7 +6,7 @@ use ethers::{
 use serde::{Deserialize, Serialize};
 
 /// Error object for sanity check
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SanityCheckError {
     SenderOrInitCode {
         sender: Address,
@@ -45,6 +46,12 @@ pub enum SanityCheckError {
         sender: Address,
         message: String,
     },
+    EntityVerification {
+        entity: String,
+        address: Address,
+        message: String,
+    },
+    Reputation(ReputationError),
     Validation {
         message: String,
     },
@@ -54,6 +61,12 @@ pub enum SanityCheckError {
     UnknownError {
         message: String,
     },
+}
+
+impl From<ReputationError> for SanityCheckError {
+    fn from(err: ReputationError) -> Self {
+        SanityCheckError::Reputation(err)
+    }
 }
 
 impl<M: MiddlewareError> From<M> for SanityCheckError {

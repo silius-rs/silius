@@ -1,21 +1,27 @@
 use crate::{
     mempool::Mempool,
     uopool::{VecCh, VecUo},
+    utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
 use ethers::providers::Middleware;
-use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
+use silius_primitives::{
+    consts::uopool::GAS_INCREASE_PERC, reputation::ReputationEntry, sanity::SanityCheckError,
+    UserOperation,
+};
+use std::fmt::Debug;
 
-pub struct SenderOrInitCode;
+pub struct Sender;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for SenderOrInitCode
+impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Sender
 where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    E: Debug,
 {
-    /// The [check_user_operation] method implementation that performs the check whether the [UserOperation](UserOperation) is a deployment or a transaction.
+    /// The [check_user_operation] method implementation that performs the check for the sender of the [UserOperation](UserOperation).
     ///
     /// # Arguments
     /// `uo` - The [UserOperation](UserOperation) to be checked.
@@ -33,6 +39,8 @@ where
             .eth_client()
             .get_code(uo.sender, None)
             .await?;
+
+        // check if sender or init code
         if (code.is_empty() && uo.init_code.is_empty())
             || (!code.is_empty() && !uo.init_code.is_empty())
         {
@@ -41,6 +49,35 @@ where
                 init_code: uo.init_code.clone(),
             });
         }
+
+        // check if prev user operation exists
+        if helper.mempool.get_number_by_sender(&uo.sender) == 0 {
+            return Ok(());
+        }
+
+        let uo_prev = helper
+            .mempool
+            .get_all_by_sender(&uo.sender)
+            .iter()
+            .find(|uo_prev| uo_prev.nonce == uo.nonce)
+            .cloned();
+
+        if let Some(uo_prev) = uo_prev {
+            if uo.max_fee_per_gas
+                < calculate_valid_gas(uo_prev.max_fee_per_gas, GAS_INCREASE_PERC.into())
+                || uo.max_priority_fee_per_gas
+                    < calculate_valid_gas(
+                        uo_prev.max_priority_fee_per_gas,
+                        GAS_INCREASE_PERC.into(),
+                    )
+            {
+                return Err(SanityCheckError::SenderVerification {
+                    sender: uo.sender,
+                    message: "couldn't replace user operation (gas increase too low)".into(),
+                });
+            }
+        }
+
         Ok(())
     }
 }

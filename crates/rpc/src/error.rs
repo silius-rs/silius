@@ -1,10 +1,9 @@
-use ethers::abi::AbiEncode;
 use jsonrpsee::types::{error::ErrorCode, ErrorObject, ErrorObjectOwned};
 use serde_json::json;
 use silius_primitives::{
     consts::rpc_error_codes::{
-        ENTITY_BANNED, EXECUTION, EXPIRATION, OPCODE, SANITY_CHECK, SIGNATURE, STAKE_TOO_LOW,
-        VALIDATION,
+        ENTITY_BANNED_OR_THROTTLED, EXECUTION, EXPIRATION, OPCODE, SANITY_CHECK, SIGNATURE,
+        STAKE_TOO_LOW, VALIDATION,
     },
     reputation::ReputationError,
     sanity::SanityCheckError,
@@ -112,9 +111,62 @@ impl From<SanityCheckError> for JsonRpcError {
             ),
             SanityCheckError::SenderVerification { sender, message } => ErrorObject::owned(
                 SANITY_CHECK,
-                format!("Sender {sender} {message}",),
+                format!("Sender {sender:?} {message}",),
                 None::<bool>,
             ),
+            SanityCheckError::EntityVerification { entity, address, message } => {
+                ErrorObject::owned(
+                    OPCODE,
+                    format!("Entity {entity} with {address:?} {message}",),
+                    None::<bool>,
+                )
+            },
+            SanityCheckError::Reputation(err) =>
+                match err {
+                    ReputationError::EntityBanned { entity, address } => {
+                        ErrorObject::owned(
+                            ENTITY_BANNED_OR_THROTTLED,
+                            format!("Entity {entity} with {address:?} is banned",),
+                            None::<bool>,
+                        )
+                    },
+                    ReputationError::ThrottledLimit { address, entity } => {
+                        ErrorObject::owned(
+                            ENTITY_BANNED_OR_THROTTLED,
+                            format!("Limit for throttled entity {entity} with {address:?} exceeded",),
+                            None::<bool>,
+                        )
+                    }
+                    ReputationError::UnstakedEntityVerification { entity, address, message } => {
+                        ErrorObject::owned(
+                            STAKE_TOO_LOW,
+                            format!("Unstaked entity {entity} with {address:?} {message}",),
+                            None::<bool>,
+                        )
+                    },
+                    ReputationError::StakeTooLow { entity, address, min_stake, min_unstake_delay } => {
+                        ErrorObject::owned(
+                            STAKE_TOO_LOW,
+                            format!("Entity {entity} with {address} has too low stake: min stake {min_stake}, min unstake delay {min_unstake_delay}",),
+                            None::<bool>,
+                        )
+                    },
+                    ReputationError::UnstakeDelayTooLow { entity, address, min_stake, min_unstake_delay } => {
+                        ErrorObject::owned(
+                            STAKE_TOO_LOW,
+                            format!("Entity {entity} with {address} has too low unstake delay: min stake {min_stake}, min unstake delay {min_unstake_delay}",),
+                            None::<bool>,
+                        )
+                    },
+                    ReputationError::UnknownError { message } => {
+                        ErrorObject::owned(
+                            SANITY_CHECK,
+                            message,
+                            None::<bool>,
+                        )
+                    }
+                }
+             ,
             SanityCheckError::Validation { message } => {
                 ErrorObject::owned(
                     VALIDATION,
@@ -204,58 +256,6 @@ impl From<SimulationCheckError> for JsonRpcError {
                 ErrorObject::owned(ErrorCode::InternalError.code(), message, None::<bool>)
             }
         })
-    }
-}
-
-impl From<ReputationError> for JsonRpcError {
-    /// Convert a [ReputationError](ReputationError) to a [JsonRpcError](JsonRpcError).
-    fn from(err: ReputationError) -> Self {
-        JsonRpcError(
-        match err {
-            ReputationError::EntityBanned { address, title } => ErrorObject::owned(
-                ENTITY_BANNED,
-                format!("{title} with address {address} is banned",),
-                Some(json!({
-                    title: address.to_string(),
-                })),
-            ),
-            ReputationError::StakeTooLow {
-                address,
-                title,
-                min_stake,
-                min_unstake_delay,
-            } => ErrorObject::owned(
-                STAKE_TOO_LOW,
-                format!(
-                    "{title} with address {address} stake is lower than {min_stake}",
-                ),
-                Some(json!({
-                    title: address.to_string(),
-                    "minimumStake": AbiEncode::encode_hex(min_stake),
-                    "minimumUnstakeDelay": AbiEncode::encode_hex(min_unstake_delay),
-                })),
-            ),
-            ReputationError::UnstakeDelayTooLow {
-                address,
-                title,
-                min_stake,
-                min_unstake_delay,
-            } => ErrorObject::owned(
-                STAKE_TOO_LOW,
-                format!(
-                    "{title} with address {address} unstake delay is lower than {min_unstake_delay}",
-                ),
-                Some(json!({
-                    title: address.to_string(),
-                    "minimumStake": AbiEncode::encode_hex(min_stake),
-                    "minimumUnstakeDelay": AbiEncode::encode_hex(min_unstake_delay),
-                })),
-            ),
-            ReputationError::UnknownError { message } => {
-                ErrorObject::owned(ErrorCode::InternalError.code(), message, None::<bool>)
-            }
-        }
-    )
     }
 }
 

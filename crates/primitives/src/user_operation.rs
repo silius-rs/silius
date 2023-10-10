@@ -1,4 +1,4 @@
-use super::utils::as_checksum;
+use super::utils::{as_checksum_addr, as_checksum_bytes, get_address};
 use ethers::{
     abi::AbiEncode,
     prelude::{EthAbiCodec, EthAbiType},
@@ -31,13 +31,14 @@ use std::{
 #[serde(rename_all = "camelCase")]
 pub struct UserOperation {
     /// Sender of the user operation
-    #[serde(serialize_with = "as_checksum")]
+    #[serde(serialize_with = "as_checksum_addr")]
     pub sender: Address,
 
     /// Nonce (anti replay protection)
     pub nonce: U256,
 
     /// Init code for the account (needed if account not yet deployed and needs to be created)
+    #[serde(serialize_with = "as_checksum_bytes")]
     pub init_code: Bytes,
 
     /// The data that is passed to the sender during the main execution call
@@ -161,6 +162,14 @@ impl UserOperation {
         self
     }
 
+    /// Gets the entities (optionally if present) involved in the user operation
+    pub fn get_entities(&self) -> (Address, Option<Address>, Option<Address>) {
+        let sender = self.sender;
+        let factory = get_address(&self.init_code);
+        let paymaster = get_address(&self.paymaster_and_data);
+        (sender, factory, paymaster)
+    }
+
     /// Creates random user operation (for testing purposes)
     #[cfg(feature = "test-utils")]
     pub fn random() -> Self {
@@ -273,7 +282,7 @@ impl From<UserOperation> for UserOperationUnsigned {
 pub struct UserOperationReceipt {
     #[serde(rename = "userOpHash")]
     pub user_operation_hash: UserOperationHash,
-    #[serde(serialize_with = "as_checksum")]
+    #[serde(serialize_with = "as_checksum_addr")]
     pub sender: Address,
     pub nonce: U256,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -292,7 +301,7 @@ pub struct UserOperationReceipt {
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationByHash {
     pub user_operation: UserOperation,
-    #[serde(serialize_with = "as_checksum")]
+    #[serde(serialize_with = "as_checksum_addr")]
     pub entry_point: Address,
     pub transaction_hash: H256,
     pub block_hash: H256,
