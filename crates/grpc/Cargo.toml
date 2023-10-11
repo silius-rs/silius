@@ -13,7 +13,6 @@ AA (ERC-4337) bundler gRPC interfaces
 [dependencies]
 arrayref = "0.3"
 async-trait = { workspace = true }
-dashmap = "5.4.0"
 ethers = { workspace = true }
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }

@@ -5,16 +5,17 @@ use crate::{
     utils::{parse_addr, parse_hash, parse_uo},
 };
 use async_trait::async_trait;
-use dashmap::DashMap;
 use ethers::{
     providers::Middleware,
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use eyre::Result;
+use parking_lot::RwLock;
 use silius_primitives::provider::BlockStream;
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
+use silius_uopool::UoPool;
 use silius_uopool::{
     init_env, DBError, DatabaseMempool, DatabaseReputation, Mempool, VecCh, VecUo, WriteMap,
 };
@@ -22,6 +23,7 @@ use silius_uopool::{
     mempool_id, validate::validator::StandardUserOperationValidator, MempoolId, Reputation,
     UoPool as UserOperationPool,
 };
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
@@ -32,13 +34,15 @@ pub const GAS_INCREASE_PERC: u64 = 10;
 type StandardUserPool<M, P, R, E> =
     UserOperationPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>;
 
+type UoPoolMap<M, P, R, E> = Arc<RwLock<HashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>>;
+
 pub struct UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
-    pub uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>,
+    pub uopools: UoPoolMap<M, P, R, E>,
     pub chain: Chain,
 }
 
@@ -49,13 +53,14 @@ where
     R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
     E: Debug + Display + 'static,
 {
-    pub fn new(uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>, chain: Chain) -> Self {
+    pub fn new(uopools: UoPoolMap<M, P, R, E>, chain: Chain) -> Self {
         Self { uopools, chain }
     }
 
     fn get_uopool(&self, ep: &Address) -> tonic::Result<StandardUserPool<M, P, R, E>> {
         let m_id = mempool_id(ep, &U256::from(self.chain.id()));
         self.uopools
+            .read()
             .get(&m_id)
             .map(|b| b.uopool())
             .ok_or(Status::new(
@@ -143,7 +148,8 @@ where
         Ok(Response::new(GetSupportedEntryPointsResponse {
             eps: self
                 .uopools
-                .iter()
+                .read()
+                .values()
                 .map(|mempool| mempool.uopool().entry_point_address().into())
                 .collect(),
         }))
@@ -214,12 +220,16 @@ where
 
         let uo_hash = parse_hash(req.hash)?;
 
-        for uopool in self.uopools.iter() {
-            if let Ok(uo_by_hash) = uopool
-                .uopool()
-                .get_user_operation_by_hash(&uo_hash.into())
-                .await
-            {
+        let uopools: Vec<UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>> = {
+            self.uopools
+                .read()
+                .iter()
+                .map(|(_, uopool)| uopool.uopool())
+                .collect()
+        };
+
+        for uopool in uopools {
+            if let Ok(uo_by_hash) = uopool.get_user_operation_by_hash(&uo_hash.into()).await {
                 return Ok(Response::new(GetUserOperationByHashResponse {
                     user_operation: Some(uo_by_hash.user_operation.into()),
                     entry_point: Some(uo_by_hash.entry_point.into()),
@@ -240,13 +250,16 @@ where
         let req = req.into_inner();
 
         let uo_hash = parse_hash(req.hash)?;
+        let uopools: Vec<UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>> = {
+            self.uopools
+                .read()
+                .iter()
+                .map(|(_, uopool)| uopool.uopool())
+                .collect()
+        };
 
-        for uopool in self.uopools.iter() {
-            if let Ok(uo_receipt) = uopool
-                .uopool()
-                .get_user_operation_receipt(&uo_hash.into())
-                .await
-            {
+        for uopool in uopools {
+            if let Ok(uo_receipt) = uopool.get_user_operation_receipt(&uo_hash.into()).await {
                 return Ok(Response::new(GetUserOperationReceiptResponse {
                     user_operation_hash: Some(uo_receipt.user_operation_hash.into()),
                     sender: Some(uo_receipt.sender.into()),
@@ -280,7 +293,7 @@ where
     }
 
     async fn clear(&self, _req: Request<()>) -> Result<Response<()>, Status> {
-        self.uopools.iter_mut().for_each(|uopool| {
+        self.uopools.read().values().for_each(|uopool| {
             uopool.uopool().clear();
         });
         Ok(Response::new(()))
@@ -345,10 +358,10 @@ where
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
-        let m_map = Arc::new(DashMap::<
+        let m_map = Arc::new(RwLock::new(HashMap::<
             MempoolId,
             UoPoolBuilder<M, DatabaseMempool<WriteMap>, DatabaseReputation<WriteMap>, DBError>,
-        >::new());
+        >::new()));
 
         let env = Arc::new(init_env::<WriteMap>(datadir.join("db")).expect("Init mdbx failed"));
         env.create_tables()
@@ -373,7 +386,7 @@ where
             builder.register_block_updates(block_stream);
             builder.register_reputation_updates();
 
-            m_map.insert(id, builder);
+            m_map.write().insert(id, builder);
         }
 
         let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
