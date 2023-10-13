@@ -89,8 +89,10 @@ where
         if !self.is_running() {
             info!("Starting auto bundling");
 
-            let mut r = self.running.lock();
-            *r = true;
+            {
+                let mut r = self.running.lock();
+                *r = true;
+            }
 
             for bundler in self.bundlers.iter() {
                 let bundler_own = bundler.clone();
@@ -100,10 +102,11 @@ where
                 tokio::spawn(async move {
                     let mut interval = tokio::time::interval(Duration::from_secs(int));
                     loop {
+                        interval.tick().await;
+
                         if !is_running(running_lock.clone()) {
                             break;
                         }
-                        interval.tick().await;
 
                         match Self::get_user_operations(
                             &uopool_grpc_client,
