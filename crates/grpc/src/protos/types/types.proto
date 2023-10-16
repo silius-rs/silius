@@ -88,3 +88,9 @@ message Log{
     H256 transaction_hash = 8;
     PbU256 log_index = 9;
 }
+
+message StakeInfo {
+    H160 address = 1;
+    uint64 stake = 2;
+    uint64 unstake_delay = 3;
+}

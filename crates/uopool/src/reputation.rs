@@ -61,9 +61,10 @@ where
         self.inner.write().clear()
     }
 
-    fn get(&mut self, addr: &Address) -> Result<ReputationEntry, Self::Error> {
-        self.inner.write().get(addr)
+    fn get(&self, addr: &Address) -> Result<ReputationEntry, Self::Error> {
+        self.inner.read().get(addr)
     }
+
     fn get_status(&self, addr: &Address) -> Result<ReputationStatus, Self::Error> {
         self.inner.read().get_status(addr)
     }
@@ -126,8 +127,8 @@ where
         self.inner.write().update_hourly()
     }
 
-    fn verify_stake(&self, title: &str, info: Option<StakeInfo>) -> Result<(), ReputationError> {
-        self.inner.read().verify_stake(title, info)
+    fn verify_stake(&self, entity: &str, info: Option<StakeInfo>) -> Result<(), ReputationError> {
+        self.inner.read().verify_stake(entity, info)
     }
 }
 
@@ -147,7 +148,7 @@ pub trait Reputation: Debug {
         min_unstake_delay: U256,
     );
     fn set(&mut self, addr: &Address) -> Result<(), Self::Error>;
-    fn get(&mut self, addr: &Address) -> Result<ReputationEntry, Self::Error>;
+    fn get(&self, addr: &Address) -> Result<ReputationEntry, Self::Error>;
     fn increment_seen(&mut self, addr: &Address) -> Result<(), Self::Error>;
     fn increment_included(&mut self, addr: &Address) -> Result<(), Self::Error>;
     fn update_hourly(&mut self) -> Result<(), Self::Error>;
@@ -159,7 +160,7 @@ pub trait Reputation: Debug {
     fn is_blacklist(&self, addr: &Address) -> bool;
     fn get_status(&self, addr: &Address) -> Result<ReputationStatus, Self::Error>;
     fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), Self::Error>;
-    fn verify_stake(&self, title: &str, info: Option<StakeInfo>) -> Result<(), ReputationError>;
+    fn verify_stake(&self, entity: &str, info: Option<StakeInfo>) -> Result<(), ReputationError>;
 
     // Try to get the reputation status from a sequence of bytes which the first 20 bytes should be the address
     // This is useful in getting the reputation directly from paymaster_and_data field and init_code field in user operation.

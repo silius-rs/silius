@@ -315,6 +315,26 @@ pub mod types {
             Self::from(value.0)
         }
     }
+
+    impl From<silius_primitives::reputation::StakeInfo> for StakeInfo {
+        fn from(value: silius_primitives::reputation::StakeInfo) -> Self {
+            Self {
+                address: Some(value.address.into()),
+                stake: value.stake.as_u64(),
+                unstake_delay: value.unstake_delay.as_u64(),
+            }
+        }
+    }
+
+    impl From<StakeInfo> for silius_primitives::reputation::StakeInfo {
+        fn from(value: StakeInfo) -> Self {
+            Self {
+                address: value.address.unwrap_or_default().into(),
+                stake: value.stake.into(),
+                unstake_delay: value.unstake_delay.into(),
+            }
+        }
+    }
 }
 
 pub mod uopool {

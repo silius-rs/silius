@@ -26,9 +26,6 @@ use std::fmt::{Debug, Display};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 
-pub const MAX_UOS_PER_UNSTAKED_SENDER: usize = 4;
-pub const GAS_INCREASE_PERC: u64 = 10;
-
 type StandardUserPool<M, P, R, E> =
     UserOperationPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>;
 
@@ -81,17 +78,7 @@ where
 
         let res = {
             let uopool = self.get_uopool(&ep)?;
-            match uopool.validate_user_operation(&uo).await {
-                Ok(res) => res,
-                Err(err) => {
-                    return Ok(Response::new(AddResponse {
-                        res: AddResult::NotAdded as i32,
-                        data: serde_json::to_string(&err).map_err(|err| {
-                            Status::internal(format!("Failed to serialize error: {err}"))
-                        })?,
-                    }))
-                }
-            }
+            uopool.validate_user_operation(&uo).await
         };
 
         let mut uopool = self.get_uopool(&ep)?;
@@ -279,6 +266,20 @@ where
         }))
     }
 
+    async fn clear_mempool(&self, _req: Request<()>) -> Result<Response<()>, Status> {
+        self.uopools.iter_mut().for_each(|uopool| {
+            uopool.uopool().clear_mempool();
+        });
+        Ok(Response::new(()))
+    }
+
+    async fn clear_reputation(&self, _req: Request<()>) -> Result<Response<()>, Status> {
+        self.uopools.iter_mut().for_each(|uopool| {
+            uopool.uopool().clear_reputation();
+        });
+        Ok(Response::new(()))
+    }
+
     async fn clear(&self, _req: Request<()>) -> Result<Response<()>, Status> {
         self.uopools.iter_mut().for_each(|uopool| {
             uopool.uopool().clear();
@@ -322,6 +323,26 @@ where
 
         Ok(res)
     }
+
+    async fn get_stake_info(
+        &self,
+        req: Request<GetStakeInfoRequest>,
+    ) -> Result<Response<GetStakeInfoResponse>, Status> {
+        let req = req.into_inner();
+
+        let ep = parse_addr(req.ep)?;
+        let addr = parse_addr(req.addr)?;
+        let uopool = self.get_uopool(&ep)?;
+
+        let res = uopool
+            .get_stake_info(&addr)
+            .await
+            .map_err(|e| tonic::Status::internal(format!("Get stake info internal error: {e}")))?;
+        Ok(Response::new(GetStakeInfoResponse {
+            info: Some(res.stake_info.into()),
+            is_staked: res.is_staked,
+        }))
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -334,7 +355,6 @@ pub async fn uopool_service_run<M>(
     chain: Chain,
     max_verification_gas: U256,
     min_stake: U256,
-    min_unstake_delay: U256,
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
     upool_mode: UoPoolMode,
@@ -363,7 +383,6 @@ where
                 chain,
                 max_verification_gas,
                 min_stake,
-                min_unstake_delay,
                 min_priority_fee_per_gas,
                 whitelist.clone(),
                 DatabaseMempool::new(env.clone()),

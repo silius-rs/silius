@@ -1,4 +1,7 @@
-use crate::{debug_api::DebugApiServer, error::JsonRpcError};
+use crate::{
+    debug_api::{DebugApiServer, ResponseSuccess},
+    error::JsonRpcError,
+};
 use async_trait::async_trait;
 use ethers::types::{Address, H256};
 use jsonrpsee::{
@@ -7,10 +10,13 @@ use jsonrpsee::{
 };
 use silius_grpc::{
     bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
-    GetAllRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest, SetReputationResult,
+    GetAllRequest, GetStakeInfoRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest,
+    SetReputationResult,
 };
 use silius_primitives::{
-    bundler::DEFAULT_BUNDLE_INTERVAL, reputation::ReputationEntry, BundlerMode, UserOperation,
+    bundler::DEFAULT_BUNDLE_INTERVAL,
+    reputation::{ReputationEntry, StakeInfoResponse},
+    BundlerMode, UserOperation,
 };
 use tonic::Request;
 
@@ -26,8 +32,42 @@ impl DebugApiServer for DebugApiServerImpl {
     ///
     ///
     /// # Returns
-    /// * `RpcResult<()>` - None if no error
-    async fn clear_state(&self) -> RpcResult<()> {
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    async fn clear_mempool(&self) -> RpcResult<ResponseSuccess> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        uopool_grpc_client
+            .clear_mempool(Request::new(()))
+            .await
+            .map_err(JsonRpcError::from)?
+            .into_inner();
+
+        Ok(ResponseSuccess::Ok)
+    }
+
+    /// Clears the bundler reputation
+    ///
+    ///
+    /// # Returns
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    async fn clear_reputation(&self) -> RpcResult<ResponseSuccess> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        uopool_grpc_client
+            .clear_reputation(Request::new(()))
+            .await
+            .map_err(JsonRpcError::from)?
+            .into_inner();
+
+        Ok(ResponseSuccess::Ok)
+    }
+
+    /// Clears the bundler mempool and reputation
+    ///
+    ///
+    /// # Returns
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    async fn clear_state(&self) -> RpcResult<ResponseSuccess> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
         uopool_grpc_client
@@ -36,7 +76,7 @@ impl DebugApiServer for DebugApiServerImpl {
             .map_err(JsonRpcError::from)?
             .into_inner();
 
-        Ok(())
+        Ok(ResponseSuccess::Ok)
     }
 
     /// Sending an [GetAllRequest](GetAllRequest) to the UoPool gRPC server
@@ -73,8 +113,12 @@ impl DebugApiServer for DebugApiServerImpl {
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<()>` - None if no error
-    async fn set_reputation(&self, entries: Vec<ReputationEntry>, ep: Address) -> RpcResult<()> {
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    async fn set_reputation(
+        &self,
+        entries: Vec<ReputationEntry>,
+        ep: Address,
+    ) -> RpcResult<ResponseSuccess> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
         let req = Request::new(SetReputationRequest {
@@ -89,7 +133,7 @@ impl DebugApiServer for DebugApiServerImpl {
             .into_inner();
 
         if res.res == SetReputationResult::SetReputation as i32 {
-            return Ok(());
+            return Ok(ResponseSuccess::Ok);
         }
 
         Err(ErrorObjectOwned::owned(
@@ -128,8 +172,8 @@ impl DebugApiServer for DebugApiServerImpl {
     /// * `mode: BundlerMode` - The [BundlingMode](BundlingMode) to be set.
     ///
     /// # Returns
-    /// * `RpcResult<()>` - None if no error
-    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<()> {
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<ResponseSuccess> {
         let mut bundler_grpc_client = self.bundler_grpc_client.clone();
 
         let req = Request::new(SetModeRequest {
@@ -138,7 +182,7 @@ impl DebugApiServer for DebugApiServerImpl {
         });
 
         match bundler_grpc_client.set_bundler_mode(req).await {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(ResponseSuccess::Ok),
             Err(s) => Err(JsonRpcError::from(s).into()),
         }
     }
@@ -160,6 +204,34 @@ impl DebugApiServer for DebugApiServerImpl {
                 .res
                 .expect("Must return send bundle tx data")
                 .into()),
+            Err(s) => Err(JsonRpcError::from(s).into()),
+        }
+    }
+
+    /// Returns the stake info of the given address.
+    ///
+    /// # Arguments
+    /// * `address: Address` - The address of the entity.
+    /// * `entry_point: Address` - The address of the entry point.
+    ///
+    /// # Returns
+    /// * `RpcResult<StakeInfoResponse>` - Stake info of the entity.
+    async fn get_stake_status(&self, addr: Address, ep: Address) -> RpcResult<StakeInfoResponse> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let req = Request::new(GetStakeInfoRequest {
+            addr: Some(addr.into()),
+            ep: Some(ep.into()),
+        });
+
+        match uopool_grpc_client.get_stake_info(req).await {
+            Ok(res) => Ok({
+                let res = res.into_inner();
+                StakeInfoResponse {
+                    stake_info: res.info.expect("Must return stake info").into(),
+                    is_staked: res.is_staked,
+                }
+            }),
             Err(s) => Err(JsonRpcError::from(s).into()),
         }
     }

@@ -1,4 +1,3 @@
-use crate::uopool::{GAS_INCREASE_PERC, MAX_UOS_PER_UNSTAKED_SENDER};
 use ethers::{
     providers::Middleware,
     types::{Address, H256, U256},
@@ -7,9 +6,12 @@ use eyre::format_err;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
 use silius_primitives::{
+    consts::reputation::{
+        BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
+    },
     get_address,
     provider::BlockStream,
-    reputation::{ReputationEntry, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
+    reputation::ReputationEntry,
     Chain, UserOperation,
 };
 use silius_uopool::{
@@ -35,7 +37,6 @@ where
     chain: Chain,
     max_verification_gas: U256,
     min_stake: U256,
-    min_unstake_delay: U256,
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
     mempool: MempoolBox<VecUo, VecCh, P, E>,
@@ -57,7 +58,6 @@ where
         chain: Chain,
         max_verification_gas: U256,
         min_stake: U256,
-        min_unstake_delay: U256,
         min_priority_fee_per_gas: U256,
         whitelist: Vec<Address>,
         mempool: P,
@@ -73,7 +73,7 @@ where
             THROTTLING_SLACK,
             BAN_SLACK,
             min_stake,
-            min_unstake_delay,
+            MIN_UNSTAKE_DELAY.into(),
         );
         for addr in whitelist.iter() {
             reputation.add_whitelist(addr);
@@ -86,7 +86,6 @@ where
             chain,
             max_verification_gas,
             min_stake,
-            min_unstake_delay,
             min_priority_fee_per_gas,
             whitelist,
             mempool,
@@ -199,8 +198,6 @@ where
                 self.chain,
                 self.max_verification_gas,
                 self.min_priority_fee_per_gas,
-                MAX_UOS_PER_UNSTAKED_SENDER,
-                GAS_INCREASE_PERC.into(),
             )
         } else {
             StandardUserOperationValidator::new_canonical(
@@ -208,8 +205,6 @@ where
                 self.chain,
                 self.max_verification_gas,
                 self.min_priority_fee_per_gas,
-                MAX_UOS_PER_UNSTAKED_SENDER,
-                GAS_INCREASE_PERC.into(),
             )
         };
 

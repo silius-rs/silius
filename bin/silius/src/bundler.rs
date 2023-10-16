@@ -162,7 +162,6 @@ where
         chain_id,
         args.max_verification_gas,
         args.min_stake,
-        args.min_unstake_delay,
         args.min_priority_fee_per_gas,
         args.whitelist,
         args.uopool_mode,

@@ -162,9 +162,8 @@ pub mod tests {
     use crate::{mempool::Mempool, Reputation};
     use ethers::types::{Address, Bytes, H256, U256};
     use silius_primitives::{
-        reputation::{
-            ReputationEntry, Status, BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
-        },
+        consts::reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
+        reputation::{ReputationEntry, Status},
         UserOperation, UserOperationHash,
     };
     use std::fmt::Debug;

@@ -20,8 +20,10 @@ use silius_contracts::{
     EntryPoint,
 };
 use silius_primitives::{
+    consts::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
     get_address,
-    reputation::{ReputationEntry, Status, THROTTLED_MAX_INCLUDE},
+    reputation::{ReputationEntry, ReputationError, StakeInfo, StakeInfoResponse, Status},
+    sanity::SanityCheckError,
     simulation::{CodeHash, SimulationCheckError},
     uopool::{AddError, ValidationError},
     Chain, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
@@ -33,8 +35,6 @@ use tracing::trace;
 
 pub type VecUo = Vec<UserOperation>;
 pub type VecCh = Vec<CodeHash>;
-
-const LATEST_SCAN_DEPTH: u64 = 1000;
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
@@ -134,6 +134,22 @@ where
         self.reputation.set_entities(reputation)
     }
 
+    /// Batch clears the [Mempool](Mempool).
+    ///
+    /// # Returns
+    /// `()` - Returns nothing
+    pub fn clear_mempool(&mut self) {
+        self.mempool.clear();
+    }
+
+    /// Batch clears the [Reputation](Reputation).
+    ///
+    /// # Returns
+    /// `()` - Returns nothing
+    pub fn clear_reputation(&mut self) {
+        self.reputation.clear();
+    }
+
     /// Batch clears the [Mempool](Mempool) and [Reputation](Reputation).
     ///
     /// # Returns
@@ -179,8 +195,21 @@ where
     pub async fn add_user_operation(
         &mut self,
         uo: UserOperation,
-        res: UserOperationValidationOutcome,
+        res: Result<UserOperationValidationOutcome, ValidationError>,
     ) -> Result<UserOperationHash, AddError> {
+        let res = match res {
+            Ok(res) => res,
+            Err(err) => {
+                if let ValidationError::Sanity(SanityCheckError::Reputation(
+                    ReputationError::EntityBanned { address, entity: _ },
+                )) = err.clone()
+                {
+                    self.remove_user_operation_by_entity(&address);
+                }
+                return Err(AddError::Verification(err));
+            }
+        };
+
         if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);
         }
@@ -297,10 +326,10 @@ where
                     })?;
                     continue;
                 }
-                (Status::THROTTLED, _) if p_c > THROTTLED_MAX_INCLUDE => {
+                (Status::THROTTLED, _) if p_c > THROTTLED_ENTITY_BUNDLE_COUNT => {
                     continue;
                 }
-                (_, Status::THROTTLED) if f_c > THROTTLED_MAX_INCLUDE => {
+                (_, Status::THROTTLED) if f_c > THROTTLED_ENTITY_BUNDLE_COUNT => {
                     continue;
                 }
                 _ => (),
@@ -598,6 +627,11 @@ where
         None
     }
 
+    pub fn remove_user_operation_by_entity(&mut self, entity: &Address) -> Option<()> {
+        self.mempool.remove_by_entity(entity).ok();
+        None
+    }
+
     /// Removes multiple [UserOperations](UserOperation) from the [UserOperationQueue](UserOperationQueue) given an array of [UserOperationHash](UserOperationHash).
     ///
     /// # Arguments
@@ -609,5 +643,25 @@ where
         for uo_hash in uo_hashes {
             self.remove_user_operation(&uo_hash);
         }
+    }
+
+    /// Gets the [StakeInfoResponse](StakeInfoResponse) for entity
+    ///
+    /// # Arguments
+    /// * `addr` - The address of the entity.
+    ///
+    /// # Returns
+    /// `Result<StakeInfoResponse, eyre::Error>` - Stake info of the entity.
+    pub async fn get_stake_info(&self, addr: &Address) -> eyre::Result<StakeInfoResponse> {
+        let info = self.entry_point.get_deposit_info(addr).await?;
+        let stake_info = StakeInfo {
+            address: *addr,
+            stake: U256::from(info.stake),
+            unstake_delay: U256::from(info.unstake_delay_sec),
+        };
+        Ok(StakeInfoResponse {
+            stake_info,
+            is_staked: self.reputation.verify_stake("", Some(stake_info)).is_ok(),
+        })
     }
 }

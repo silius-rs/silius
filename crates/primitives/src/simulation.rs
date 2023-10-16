@@ -40,7 +40,7 @@ lazy_static! {
 }
 
 /// Error object for simulation
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimulationCheckError {
     Signature {},
     Expiration {

@@ -1,7 +1,7 @@
 use super::{
     sanity::{
-        call_gas::CallGas, max_fee::MaxFee, paymaster::Paymaster, sender::SenderOrInitCode,
-        sender_uos::SenderUos, verification_gas::VerificationGas,
+        call_gas::CallGas, entities::Entities, max_fee::MaxFee, paymaster::Paymaster,
+        sender::Sender, unstaked_entities::UnstakedEntities, verification_gas::VerificationGas,
     },
     simulation::{signature::Signature, timestamp::Timestamp},
     simulation_trace::{
@@ -17,7 +17,7 @@ use crate::{
     mempool::{Mempool, MempoolBox},
     reputation::ReputationBox,
     uopool::{VecCh, VecUo},
-    Reputation,
+    Reputation as Rep,
 };
 use enumset::EnumSet;
 use ethers::{
@@ -39,7 +39,7 @@ use std::fmt::{Debug, Display};
 pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, P, R, E>
 where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
 {
     /// The [EntryPoint](EntryPoint) object.
     entry_point: EntryPoint<M>,
@@ -56,7 +56,7 @@ where
 impl<M: Middleware + Clone + 'static, P, R, E> StandardUserOperationValidator<M, P, R, E>
 where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
 {
     /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator).
@@ -85,7 +85,7 @@ where
     /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
     /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
-    /// `max_uos_per_unstaked_sender` - max user operations that bundler would accept from one sender
+    /// `max_uos_per_sender` - max user operations that bundler would accept from one sender
     /// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
     ///
     /// # Returns
@@ -95,23 +95,19 @@ where
         chain: Chain,
         max_verification_gas: U256,
         min_priority_fee_per_gas: U256,
-        max_uos_per_unstaked_sender: usize,
-        gas_increase_perc: U256,
     ) -> Self {
         Self::new(entry_point.clone(), chain)
-            .with_sanity_check(SenderOrInitCode)
+            .with_sanity_check(Sender)
             .with_sanity_check(VerificationGas {
                 max_verification_gas,
             })
-            .with_sanity_check(Paymaster)
             .with_sanity_check(CallGas)
             .with_sanity_check(MaxFee {
                 min_priority_fee_per_gas,
             })
-            .with_sanity_check(SenderUos {
-                max_uos_per_unstaked_sender,
-                gas_increase_perc,
-            })
+            .with_sanity_check(Paymaster)
+            .with_sanity_check(Entities)
+            .with_sanity_check(UnstakedEntities)
             .with_simulation_check(Signature)
             .with_simulation_check(Timestamp)
             .with_simulation_trace_check(Gas)
@@ -133,7 +129,7 @@ where
     /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
     /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
-    /// `max_uos_per_unstaked_sender` - max user operations that bundler would accept from one sender
+    /// `max_uos_per_sender` - max user operations that bundler would accept from one sender
     /// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
     ///
     /// # Returns
@@ -143,23 +139,19 @@ where
         chain: Chain,
         max_verification_gas: U256,
         min_priority_fee_per_gas: U256,
-        max_uos_per_unstaked_sender: usize,
-        gas_increase_perc: U256,
     ) -> Self {
         Self::new(entry_point.clone(), chain)
-            .with_sanity_check(SenderOrInitCode)
+            .with_sanity_check(Sender)
             .with_sanity_check(VerificationGas {
                 max_verification_gas,
             })
-            .with_sanity_check(Paymaster)
             .with_sanity_check(CallGas)
             .with_sanity_check(MaxFee {
                 min_priority_fee_per_gas,
             })
-            .with_sanity_check(SenderUos {
-                max_uos_per_unstaked_sender,
-                gas_increase_perc,
-            })
+            .with_sanity_check(Paymaster)
+            .with_sanity_check(Entities)
+            .with_sanity_check(UnstakedEntities)
     }
 
     /// Simulates validation of a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
@@ -259,7 +251,7 @@ impl<M: Middleware + Clone + 'static, P, R, E> UserOperationValidator<P, R, E>
     for StandardUserOperationValidator<M, P, R, E>
 where
     P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
     E: Debug + Display,
 {
     /// Validates a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).

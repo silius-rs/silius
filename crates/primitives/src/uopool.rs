@@ -10,7 +10,7 @@ pub enum Mode {
     Unsafe,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ValidationError {
     Sanity(SanityCheckError),
     Simulation(SimulationCheckError),

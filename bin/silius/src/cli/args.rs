@@ -77,10 +77,6 @@ pub struct UoPoolArgs {
     #[clap(long, value_parser=parse_u256, default_value = "1")]
     pub min_stake: U256,
 
-    /// Minimum unstake delay for entities.
-    #[clap(long, value_parser=parse_u256, default_value = "0")]
-    pub min_unstake_delay: U256,
-
     /// Minimum priority fee per gas.
     #[clap(long, value_parser=parse_u256, default_value = "0")]
     pub min_priority_fee_per_gas: U256,

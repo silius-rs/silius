@@ -6,10 +6,7 @@ use crate::{
 };
 use ethers::{providers::Middleware, types::U256};
 use silius_primitives::{
-    get_address,
-    reputation::{ReputationEntry, Status},
-    sanity::SanityCheckError,
-    UserOperation,
+    get_address, reputation::ReputationEntry, sanity::SanityCheckError, UserOperation,
 };
 use std::fmt::Debug;
 
@@ -49,14 +46,7 @@ where
                                 message: "Couldn't retrieve deposit info from entry point".into(),
                             })?;
 
-                    if U256::from(deposit_info.deposit) >= uo.max_fee_per_gas
-                        && Status::from(helper.reputation.get_status(&addr).map_err(|_| {
-                            SanityCheckError::UnknownError {
-                                message: "Failed to retrieve reputation status for paymaster"
-                                    .into(),
-                            }
-                        })?) != Status::BANNED
-                    {
+                    if U256::from(deposit_info.deposit) >= uo.max_fee_per_gas {
                         return Ok(());
                     }
                 }

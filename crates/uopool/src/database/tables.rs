@@ -9,9 +9,14 @@ table!(
 );
 
 table!(
-    /// Stores the user operations by sender
+    /// Stores the hashes of user operations by sender
     /// Benefit for merklization is that hashed addresses/keys are sorted.
-    ( UserOperationsBySender ) WrapAddress | WrapUserOperation
+    ( UserOperationsBySender ) WrapAddress | WrapUserOperationHash
+);
+
+table!(
+    /// Stores the hashes of user operations by involved entities
+    ( UserOperationsByEntity ) WrapAddress | WrapUserOperationHash
 );
 
 dupsort!(
@@ -25,13 +30,18 @@ table!(
 );
 
 /// Tables that should be present inside database
-pub const TABLES: [(TableType, &str); 4] = [
+pub const TABLES: [(TableType, &str); 5] = [
     (TableType::Table, UserOperations::const_name()),
     (TableType::DupSort, UserOperationsBySender::const_name()),
+    (TableType::DupSort, UserOperationsByEntity::const_name()),
     (TableType::DupSort, CodeHashes::const_name()),
     (TableType::Table, EntitiesReputation::const_name()),
 ];
 
 impl DupSort for UserOperationsBySender {
+    type SubKey = WrapAddress;
+}
+
+impl DupSort for UserOperationsByEntity {
     type SubKey = WrapAddress;
 }

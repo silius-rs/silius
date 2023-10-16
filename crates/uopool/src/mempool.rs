@@ -94,6 +94,10 @@ where
         self.inner.read().get_number_by_sender(addr)
     }
 
+    fn get_number_by_entity(&self, addr: &Address) -> usize {
+        self.inner.read().get_number_by_entity(addr)
+    }
+
     fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation> {
         self.inner.read().get_prev_by_sender(uo)
     }
@@ -108,6 +112,10 @@ where
 
     fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<(), Self::Error> {
         self.inner.write().remove(uo_hash)
+    }
+
+    fn remove_by_entity(&mut self, entity: &Address) -> Result<(), Self::Error> {
+        self.inner.write().remove_by_entity(entity)
     }
 }
 
@@ -133,6 +141,7 @@ pub trait Mempool: Debug {
     fn get(&self, uo_hash: &UserOperationHash) -> Result<Option<UserOperation>, Self::Error>;
     fn get_all_by_sender(&self, addr: &Address) -> Self::UserOperations;
     fn get_number_by_sender(&self, addr: &Address) -> usize;
+    fn get_number_by_entity(&self, addr: &Address) -> usize;
     fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation> {
         self.get_all_by_sender(&uo.sender)
             .into_iter()
@@ -147,6 +156,7 @@ pub trait Mempool: Debug {
     ) -> Result<(), Self::Error>;
     fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Self::CodeHashes;
     fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<(), Self::Error>;
+    fn remove_by_entity(&mut self, entity: &Address) -> Result<(), Self::Error>;
     // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
     fn get_sorted(&self) -> Result<Self::UserOperations, Self::Error>;
     fn get_all(&self) -> Self::UserOperations;
