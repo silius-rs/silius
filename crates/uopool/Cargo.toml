@@ -16,6 +16,7 @@ educe = { version = "0.4", features = ["Debug", "Default"] }
 enumset = "1.1.2"
 ethers = { workspace = true }
 eyre = { workspace = true }
+futures-util = { workspace = true }
 page_size = "0.5.0"
 parking_lot = { workspace = true }
 prost = "0.11"

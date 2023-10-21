@@ -1,6 +1,7 @@
 //! The UserOperation alternative mempool implementation according to the [ERC-4337 specifications](https://eips.ethereum.org/EIPS/eip-4337#Alternative%20Mempools).
 #![allow(dead_code)]
 
+mod builder;
 mod database;
 mod memory;
 mod mempool;
@@ -9,6 +10,7 @@ mod uopool;
 mod utils;
 pub mod validate;
 
+pub use builder::UoPoolBuilder;
 pub use database::{
     init_env, mempool::DatabaseMempool, reputation::DatabaseReputation, DBError, WriteMap,
 };

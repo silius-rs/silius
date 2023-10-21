@@ -2120,6 +2120,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
 
 [[package]]
+name = "examples-simple-account"
+version = "0.3.0-alpha"
+dependencies = [
+ "alloy-primitives 0.3.3",
+ "alloy-sol-types 0.3.2",
+ "ethers 2.0.8",
+ "eyre",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "silius-contracts",
+ "silius-primitives",
+ "silius-tests",
+ "tokio",
+]
+
+[[package]]
+name = "examples-storage"
+version = "0.3.0-alpha"
+dependencies = [
+ "ethers 2.0.8",
+ "eyre",
+ "silius-primitives",
+ "silius-uopool",
+ "tempdir",
+ "tokio",
+]
+
+[[package]]
+name = "examples-user-operation"
+version = "0.3.0-alpha"
+dependencies = [
+ "ethers 2.0.8",
+ "eyre",
+ "silius-primitives",
+ "tokio",
+]
+
+[[package]]
 name = "expanded-pathbuf"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5370,23 +5409,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "silius-examples"
-version = "0.3.0-alpha"
-dependencies = [
- "alloy-primitives 0.3.3",
- "alloy-sol-types 0.3.2",
- "ethers 2.0.8",
- "eyre",
- "reqwest",
- "serde",
- "serde_json",
- "silius-contracts",
- "silius-primitives",
- "silius-tests",
- "tokio",
-]
-
-[[package]]
 name = "silius-grpc"
 version = "0.3.0-alpha"
 dependencies = [
@@ -5396,7 +5418,6 @@ dependencies = [
  "ethers 2.0.8",
  "expanded-pathbuf",
  "eyre",
- "futures-util",
  "parking_lot",
  "prost",
  "prost-build",
@@ -5478,6 +5499,7 @@ dependencies = [
  "enumset",
  "ethers 2.0.8",
  "eyre",
+ "futures-util",
  "page_size 0.5.0",
  "parking_lot",
  "prost",

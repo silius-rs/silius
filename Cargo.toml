@@ -7,7 +7,7 @@ members = [
     "crates/primitives",
     "crates/rpc",
     "crates/uopool",
-    "examples",
+    "examples/*",
     "tests",
 ]
 default-members = ["bin/silius"]
