@@ -1,3 +1,7 @@
+use crate::{
+    validate::validator::StandardUserOperationValidator, Mempool, MempoolBox, Reputation,
+    ReputationBox, UoPool, VecCh, VecUo,
+};
 use ethers::{
     providers::Middleware,
     types::{Address, H256, U256},
@@ -13,10 +17,6 @@ use silius_primitives::{
     provider::BlockStream,
     reputation::ReputationEntry,
     Chain, UserOperation,
-};
-use silius_uopool::{
-    validate::validator::StandardUserOperationValidator, Mempool, MempoolBox, Reputation,
-    ReputationBox, UoPool, VecCh, VecUo,
 };
 use std::sync::Arc;
 use std::{

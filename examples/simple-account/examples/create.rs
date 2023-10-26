@@ -2,12 +2,12 @@ use ethers::{
     prelude::{MiddlewareBuilder, SignerMiddleware},
     providers::{Http, Middleware, Provider},
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
-    types::{Address, Bytes, U256},
-    utils::parse_ether,
+    types::{transaction::eip2718::TypedTransaction, Address, Bytes, U256},
+};
+use examples_simple_account::{
+    simple_account::SimpleAccountExecute, EstimateResult, Request, Response,
 };
 use reqwest;
-use silius_contracts::EntryPoint;
-use silius_examples::{simple_account::SimpleAccountExecute, EstimateResult, Request, Response};
 use silius_primitives::consts::entry_point::ADDRESS;
 use silius_primitives::UserOperation;
 use silius_primitives::Wallet as UoWallet;
@@ -16,9 +16,7 @@ use std::{env, sync::Arc, time::Duration};
 
 // stackup simple account factory
 const SIMPLE_ACCOUNT_FACTORY: &str = "0x9406Cc6185a346906296840746125a0E44976454";
-// 0.6.0 entrypoint address
 const CREATE_INDEX: u64 = 2;
-const TRANSFER_VALUE: &str = "0.01"; // ether unit
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -49,27 +47,31 @@ async fn main() -> eyre::Result<()> {
         .await?;
     println!("Smart account addresss: {:?}", address);
 
-    let nonce = EntryPoint::new(provider.clone(), ADDRESS.parse::<Address>()?)
-        .get_nonce(&address, U256::zero())
-        .await?;
-    println!("nonce: {:?}", nonce);
+    let nonce = provider.get_transaction_count(address, None).await?;
+    let call = simple_account_factory.create_account(owner_address, U256::from(CREATE_INDEX));
+    let tx: TypedTransaction = call.tx;
+    println!("tx: {:?}", tx);
+    let mut init_code = Vec::new();
+    init_code.extend_from_slice(simple_account_factory_address.as_bytes());
+    init_code.extend_from_slice(tx.data().unwrap().to_vec().as_slice());
+    println!("init_code: {:?}", init_code);
+
     let (gas_price, priority_fee) = provider.estimate_eip1559_fees(None).await?;
     println!(
         "gas_price: {:?}, priority_fee: {:?}",
         gas_price, priority_fee
     );
 
-    let execution =
-        SimpleAccountExecute::new(address, parse_ether(TRANSFER_VALUE)?, Bytes::default());
-
+    let execution = SimpleAccountExecute::new(Address::zero(), U256::from(0), Bytes::default());
+    println!("{:}", Bytes::from(execution.encode()));
     let user_op = UserOperation {
         sender: address,
         nonce,
-        init_code: Bytes::default(),
+        init_code: Bytes::from(init_code),
         call_data: Bytes::from(execution.encode()),
         call_gas_limit: U256::from(1),
         verification_gas_limit: U256::from(1000000u64),
-        pre_verification_gas: U256::from(1u64),
+        pre_verification_gas: U256::from(1),
         max_fee_per_gas: U256::from(1),
         max_priority_fee_per_gas: priority_fee,
         paymaster_and_data: Bytes::new(),
@@ -110,11 +112,8 @@ async fn main() -> eyre::Result<()> {
             .result
             .pre_verification_gas
             .saturating_add(U256::from(1000)),
-        verification_gas_limit: v
-            .result
-            .verification_gas_limit
-            .saturating_mul(U256::from(2)),
-        call_gas_limit: v.result.call_gas_limit.saturating_mul(U256::from(2)),
+        verification_gas_limit: v.result.verification_gas_limit,
+        call_gas_limit: v.result.call_gas_limit.saturating_add(U256::from(2000)),
         max_priority_fee_per_gas: priority_fee,
         max_fee_per_gas: gas_price,
         ..user_op
@@ -138,7 +137,7 @@ async fn main() -> eyre::Result<()> {
     };
     let post = reqwest::Client::builder()
         .build()?
-        .post(bundler_url)
+        .post(bundler_url.as_str())
         .json(&send_body)
         .send()
         .await?;
@@ -146,6 +145,5 @@ async fn main() -> eyre::Result<()> {
     println!("post: {:?}", post);
     let res = post.text().await?;
     println!("res: {:?}", res);
-
     Ok(())
 }

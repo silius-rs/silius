@@ -1,6 +1,5 @@
 use crate::proto::uopool::*;
 use crate::{
-    builder::UoPoolBuilder,
     proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
     utils::{parse_addr, parse_hash, parse_uo},
 };
@@ -20,7 +19,7 @@ use silius_uopool::{
 };
 use silius_uopool::{
     mempool_id, validate::validator::StandardUserOperationValidator, MempoolId, Reputation,
-    UoPool as UserOperationPool,
+    UoPool as UserOperationPool, UoPoolBuilder,
 };
 use std::fmt::{Debug, Display};
 use std::{net::SocketAddr, sync::Arc, time::Duration};

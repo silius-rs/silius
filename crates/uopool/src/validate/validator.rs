@@ -152,6 +152,8 @@ where
             .with_sanity_check(Paymaster)
             .with_sanity_check(Entities)
             .with_sanity_check(UnstakedEntities)
+            .with_simulation_check(Signature)
+            .with_simulation_check(Timestamp)
     }
 
     /// Simulates validation of a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).

@@ -1,0 +1,21 @@
+[package]
+name = "examples-user-operation"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+description = """
+AA (ERC-4337) bundler examples - user operation
+"""
+
+[dependencies]
+ethers = { workspace = true }
+eyre = { workspace = true }
+silius-primitives = { path = "../../crates/primitives" }
+tokio = { workspace = true }
+
+[[example]]
+name = "user-operation"
+path = "examples/user_operation.rs"
