@@ -35,4 +35,4 @@ EXPOSE 3000 3001
 
 ENTRYPOINT ["usr/local/bin/silius"]
 
-LABEL org.opencontainers.image.source=https://github.com/Vid201/silius
+LABEL org.opencontainers.image.source=https://github.com/silius-rs/silius
