@@ -2,7 +2,7 @@ version: "3"
 
 services:
   silius:
-    image: ghcr.io/vid201/silius:latest
+    image: ghcr.io/silius-rs/silius:latest
     network_mode: host
     volumes:
       - ./bundler-spec-tests/keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266:/data/silius/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266

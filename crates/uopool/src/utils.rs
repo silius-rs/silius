@@ -241,7 +241,7 @@ pub mod tests {
     }
 
     /// This test occurred overflow when previous `calculate_pre_verification_gas` is used.
-    /// previous `calculate_pre_verification_gas` is https://github.com/Vid201/silius/blob/bd79ea0e610adff8d77ba128f53befa8401a4d77/crates/uopool/src/utils.rs#L63-L84
+    /// previous `calculate_pre_verification_gas` is https://github.com/silius-rs/silius/blob/bd79ea0e610adff8d77ba128f53befa8401a4d77/crates/uopool/src/utils.rs#L63-L84
     #[test]
     fn pre_verification_gas_calculation_overflow() {
         let gas_oh = Overhead {
