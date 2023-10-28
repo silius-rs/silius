@@ -94,7 +94,7 @@ jobs:
 
       - run: pip install jq yq
 
-      - run: pdm install && git submodule update --init --recursive && cd @account-abstraction && git fetch --all --tags && git checkout tags/v0.6.0 -b v0.6.0 && yarn && yarn compile &&  cd ../spec && yarn && yarn build
+      - run: pdm install && git submodule update --init --recursive && cd @account-abstraction && git fetch --all --tags && git checkout v0.6.0 && yarn && yarn compile && cd ../spec && yarn && yarn build && cd ..
   
       - uses: actions/download-artifact@v3
         with:
