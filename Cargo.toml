@@ -12,13 +12,17 @@ members = [
 ]
 default-members = ["bin/silius"]
 
+# Explicitly set the resolver to version 2, which is the default for packages with edition >= 2021
+# https://doc.rust-lang.org/edition-guide/rust-2021/default-cargo-resolver.html
+resolver = "2"
+
 [workspace.package]
 authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
 version = "0.3.0-alpha"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/silius-rs/silius"
-rust-version = "1.71.1"
+rust-version = "1.73.0"
 
 [workspace.dependencies]
 async-stream = "0.3.5"

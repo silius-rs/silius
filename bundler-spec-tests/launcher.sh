@@ -10,6 +10,7 @@ case $1 in
 
  start)
 	docker-compose up -d
+    sleep 2
     silius bundler \
         --verbosity 4 \
         --eth-client-address http://127.0.0.1:8545 \
