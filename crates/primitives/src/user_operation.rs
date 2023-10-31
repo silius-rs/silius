@@ -7,13 +7,11 @@ use ethers::{
 };
 use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
-use ssz_rs::Sized;
-use std::{
-    ops::{AddAssign, Deref},
-    slice::Windows,
-    str::FromStr,
-};
-
+use ssz_rs::List;
+use std::{ops::Deref, slice::Windows, str::FromStr};
+const BYTES_PER_LENGTH_OFFSET: usize = 4;
+/// This could be increased if we found bigger bytes, the propper value is not sure right now.
+const MAXIMUM_SSZ_BYTES_LENGTH: usize = 1024;
 /// Transaction type for ERC-4337 account abstraction
 #[derive(
     Clone,
@@ -418,131 +416,29 @@ pub struct UserOperationGasEstimation {
     pub call_gas_limit: U256,
 }
 
-fn ssz_pack_u256(
-    fixed: &mut Vec<Option<Vec<u8>>>,
-    fixed_lengths_sum: &mut usize,
-    variable_lengths: &mut Vec<usize>,
-    value: U256,
-) -> Result<(), ssz_rs::SerializeError> {
-    let mut element_buffer = Vec::with_capacity(32);
-    <[u64; 4] as ssz_rs::Serialize>::serialize(&value.0, &mut element_buffer)?;
-    fixed_lengths_sum.add_assign(32);
-    fixed.push(Some(element_buffer));
-    variable_lengths.push(0);
-    Ok(())
-}
-
-fn ssz_pack_bytes(
-    fixed: &mut Vec<Option<Vec<u8>>>,
-    fixed_lengths_sum: &mut usize,
-    variable: &mut Vec<Vec<u8>>,
-    variable_lengths: &mut Vec<usize>,
-    value: Bytes,
-) {
-    let size = value.len();
-    let mut element: Vec<u8> = Vec::with_capacity(size);
-    element.extend(value.iter());
-    fixed.push(None);
-    fixed_lengths_sum.add_assign(4);
-    variable_lengths.push(size);
-    variable.push(element);
-}
-
-impl ssz_rs::Sized for UserOperation {
-    fn is_variable_size() -> bool {
-        true
-    }
-    fn size_hint() -> usize {
-        0
-    }
+fn btyes_to_list(
+    value: &Bytes,
+) -> Result<List<u8, MAXIMUM_SSZ_BYTES_LENGTH>, ssz_rs::SerializeError> {
+    let data = value.to_vec();
+    List::<u8, MAXIMUM_SSZ_BYTES_LENGTH>::try_from(data)
+        .map_err(|(data, _)| ssz_rs::SerializeError::MaximumEncodedLengthReached(data.len()))
 }
 
 impl ssz_rs::Serialize for UserOperation {
     fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
-        let mut fixed = Vec::new();
-        let mut variable = Vec::new();
-        let mut variable_lengths = Vec::new();
-        let mut fixed_lengths_sum = 0usize;
-
-        // sender
-        let mut element_buffer = Vec::with_capacity(20);
-        <[u8; 20] as ssz_rs::Serialize>::serialize(&self.sender.0, &mut element_buffer)?;
-        fixed_lengths_sum += element_buffer.len();
-        fixed.push(Some(element_buffer));
-        variable_lengths.push(0);
-
-        ssz_pack_u256(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable_lengths,
-            self.nonce,
-        )?;
-        ssz_pack_bytes(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable,
-            &mut variable_lengths,
-            self.init_code.clone(),
-        );
-        ssz_pack_bytes(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable,
-            &mut variable_lengths,
-            self.call_data.clone(),
-        );
-        ssz_pack_u256(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable_lengths,
-            self.call_gas_limit,
-        )?;
-        ssz_pack_u256(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable_lengths,
-            self.verification_gas_limit,
-        )?;
-        ssz_pack_u256(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable_lengths,
-            self.pre_verification_gas,
-        )?;
-        ssz_pack_u256(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable_lengths,
-            self.max_fee_per_gas,
-        )?;
-        ssz_pack_u256(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable_lengths,
-            self.max_priority_fee_per_gas,
-        )?;
-        ssz_pack_bytes(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable,
-            &mut variable_lengths,
-            self.paymaster_and_data.clone(),
-        );
-        ssz_pack_bytes(
-            &mut fixed,
-            &mut fixed_lengths_sum,
-            &mut variable,
-            &mut variable_lengths,
-            self.signature.clone(),
-        );
-
-        ssz_rs::__internal::serialize_composite_from_components(
-            fixed,
-            variable,
-            variable_lengths,
-            fixed_lengths_sum,
-            buffer,
-        )
+        let mut serializer = ssz_rs::__internal::Serializer::default();
+        serializer.with_element(&self.sender.0)?;
+        serializer.with_element(&self.nonce.0)?;
+        serializer.with_element(&btyes_to_list(&self.init_code)?)?;
+        serializer.with_element(&btyes_to_list(&self.call_data)?)?;
+        serializer.with_element(&self.call_gas_limit.0)?;
+        serializer.with_element(&self.verification_gas_limit.0)?;
+        serializer.with_element(&self.pre_verification_gas.0)?;
+        serializer.with_element(&self.max_fee_per_gas.0)?;
+        serializer.with_element(&self.max_priority_fee_per_gas.0)?;
+        serializer.with_element(&btyes_to_list(&self.paymaster_and_data)?)?;
+        serializer.with_element(&btyes_to_list(&self.signature)?)?;
+        serializer.serialize(buffer)
     }
 }
 
@@ -583,6 +479,7 @@ fn ssz_unpack_bytes(
     let bytes_data = Bytes::from_iter(encoding[start..end].iter());
     Ok((bytes_data, end - start))
 }
+
 impl ssz_rs::Deserialize for UserOperation {
     fn deserialize(encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
     where
@@ -593,7 +490,7 @@ impl ssz_rs::Deserialize for UserOperation {
         let mut container = Self::default();
 
         let byte_read = {
-            let encoded_length = <[u8; 20] as ssz_rs::Sized>::size_hint();
+            let encoded_length = <[u8; 20] as ssz_rs::Serializable>::size_hint();
             let end = start + encoded_length;
             let target =
                 encoding
@@ -686,6 +583,15 @@ impl ssz_rs::Deserialize for UserOperation {
     }
 }
 
+impl ssz_rs::Serializable for UserOperation {
+    fn is_variable_size() -> bool {
+        true
+    }
+
+    fn size_hint() -> usize {
+        0
+    }
+}
 #[cfg(test)]
 mod tests {
 

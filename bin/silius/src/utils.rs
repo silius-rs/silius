@@ -1,4 +1,5 @@
 use dirs::home_dir;
+use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
@@ -36,6 +37,11 @@ pub fn parse_send_bundle_mode(s: &str) -> Result<SendBundleMode, String> {
 /// Parses UoPoolMode from string
 pub fn parse_uopool_mode(s: &str) -> Result<UoPoolMode, String> {
     UoPoolMode::from_str(s).map_err(|_| format!("String {s} is not a valid UoPoolMode"))
+}
+
+/// Parse ENR record
+pub fn parse_enr(enr: &str) -> Result<Enr, String> {
+    Enr::from_str(enr).map_err(|_| format!("Enr {enr} is not a valid enr."))
 }
 
 /// Runs the future to completion or until:

@@ -3,6 +3,7 @@
 pub mod bundler;
 pub mod chain;
 pub mod consts;
+mod p2p;
 pub mod provider;
 pub mod reputation;
 pub mod sanity;
@@ -14,6 +15,7 @@ mod wallet;
 
 pub use bundler::Mode as BundlerMode;
 pub use chain::Chain;
+pub use p2p::{PooledUserOps, UserOperationsWithEntryPoint};
 pub use uopool::Mode as UoPoolMode;
 pub use user_operation::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,

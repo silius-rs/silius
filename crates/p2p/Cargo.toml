@@ -1,0 +1,41 @@
+[package]
+name = "silius-p2p"
+version = "0.1.0"
+authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Vid201/aa-bundler"
+readme = "README.md"
+description = """
+AA (ERC-4337) Bundler p2p components
+"""
+rust-version = "1.69.0"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+delay_map = "0.3.0"
+discv5 = { workspace = true }
+ethers = { workspace = true }
+eyre = "0.6.8"
+futures = "0.3.28"
+futures-bounded = "0.2.0"
+lazy_static = { workspace = true }
+libp2p-mplex = { version = "0.40.0" }
+silius-primitives = { path = "../primitives" }
+snap = "1"
+ssz_rs = { workspace = true }
+ssz_rs_derive = { workspace = true }
+thiserror = "1"
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dependencies.libp2p]
+version = "0.52.3"
+features = ["identify", "yamux", "noise", "gossipsub", "dns", "tcp", "tokio", "secp256k1", "macros", "request-response"]
+
+[dev-dependencies]
+env_logger = "*"
+ethers = { workspace = true }
+test-log = "0.2.12"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
