@@ -19,8 +19,8 @@ impl TryFrom<GethTrace> for JsTracerFrame {
     fn try_from(val: GethTrace) -> Result<Self, Self::Error> {
         match val {
             GethTrace::Known(val) => Err(format_err!("Invalid geth trace: {val:?}")),
-            GethTrace::Unknown(val) => serde_json::from_value(val)
-                .map_err(|error| format_err!("Failed to parse geth trace: {error}")),
+            GethTrace::Unknown(val) => serde_json::from_value(val.clone())
+                .map_err(|error| format_err!("Failed to parse geth trace: {error}, {val:#}")),
         }
     }
 }

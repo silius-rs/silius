@@ -34,6 +34,8 @@ pub struct UserOperationValidationOutcome {
     // Simulation trace
     pub code_hashes: Option<Vec<CodeHash>>,
     pub storage_map: Option<StorageMap>,
+    // the block which the user operation is verified on
+    pub verified_block: U256,
 }
 
 /// The mode in which the user operation validator is running.

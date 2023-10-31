@@ -19,6 +19,7 @@ use ethers::{
     providers::Middleware,
     types::{Bytes, U256},
 };
+use futures::channel::mpsc::unbounded;
 use silius_contracts::EntryPoint;
 use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
 use silius_primitives::reputation::ReputationEntry;
@@ -144,7 +145,7 @@ async fn setup() -> eyre::Result<Context> {
         .with_simulation_trace_check(StorageAccess)
         .with_simulation_trace_check(CallStack)
         .with_simulation_trace_check(CodeHashes);
-
+    let (waiting_to_pub_sd, _) = unbounded::<(UserOperation, U256)>();
     let pool = UoPool::<
         ClientType,
         StandardUserOperationValidator<
@@ -163,6 +164,7 @@ async fn setup() -> eyre::Result<Context> {
         ReputationBox::new(reputation),
         3000000_u64.into(),
         c,
+        Some(waiting_to_pub_sd),
     );
 
     Ok(Context {

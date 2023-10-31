@@ -1,5 +1,8 @@
 use ethers::types::{Address, U256};
-use silius_primitives::{consts::entry_point::ADDRESS, provider::create_http_provider, Chain};
+use futures::channel::mpsc::unbounded;
+use silius_primitives::{
+    consts::entry_point::ADDRESS, provider::create_http_provider, Chain, UserOperation,
+};
 use silius_uopool::{init_env, DatabaseMempool, DatabaseReputation, UoPoolBuilder, WriteMap};
 use std::{env, str::FromStr, sync::Arc};
 use tempdir::TempDir;
@@ -14,7 +17,7 @@ async fn main() -> eyre::Result<()> {
     let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
     env.create_tables()
         .expect("Create mdbx database tables failed");
-
+    let (waiting_to_pub_sd, _) = unbounded::<(UserOperation, U256)>();
     // creating uopool with builder
     let builder = UoPoolBuilder::new(
         false, // whether uoppol is in unsafe mode
@@ -27,6 +30,7 @@ async fn main() -> eyre::Result<()> {
         vec![], // whitelisted entities
         DatabaseMempool::new(env.clone()), // database mempool of user operations
         DatabaseReputation::new(env), // database reputation
+        Some(waiting_to_pub_sd), // waiting to publish user operations, for p2p part
     );
 
     // optional: subscription to block updates and reputation updates

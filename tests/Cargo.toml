@@ -19,5 +19,8 @@ silius-uopool = { path = "../crates/uopool" }
 tempdir = "0.3.7"
 tokio = { workspace = true }
 
+[dev-dependencies]
+futures = "0.3.28"
+
 [package.metadata.cargo-udeps.ignore]
 normal = ["silius-contracts", "silius-primitives", "silius-uopool"]

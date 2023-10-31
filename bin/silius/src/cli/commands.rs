@@ -31,8 +31,7 @@ impl BundlerCommand {
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
             let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
-            let block_streams =
-                create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+            let block_streams = create_http_block_streams(eth_client.clone(), 1).await;
             launch_bundler(
                 self.bundler,
                 self.uopool,
@@ -44,8 +43,7 @@ impl BundlerCommand {
             .await?;
         } else {
             let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
-            let block_streams =
-                create_ws_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+            let block_streams = create_ws_block_streams(eth_client.clone(), 1).await;
             launch_bundler(
                 self.bundler,
                 self.uopool,
@@ -123,8 +121,7 @@ impl UoPoolCommand {
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
             let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
-            let block_streams =
-                create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+            let block_streams = create_http_block_streams(eth_client.clone(), 1).await;
             launch_uopool(
                 self.uopool,
                 eth_client,
@@ -135,8 +132,7 @@ impl UoPoolCommand {
             .await?;
         } else {
             let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
-            let block_streams =
-                create_ws_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+            let block_streams = create_ws_block_streams(eth_client.clone(), 1).await;
             launch_uopool(
                 self.uopool,
                 eth_client,

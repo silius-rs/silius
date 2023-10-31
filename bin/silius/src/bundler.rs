@@ -165,6 +165,9 @@ where
         args.min_priority_fee_per_gas,
         args.whitelist,
         args.uopool_mode,
+        args.p2p_opts.enable_p2p,
+        args.p2p_opts.to_config(),
+        args.p2p_opts.bootnodes,
     )
     .await?;
 

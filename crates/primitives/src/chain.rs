@@ -30,6 +30,27 @@ impl Chain {
             Chain::Custom(_) => "custom".to_string(),
         }
     }
+
+    pub fn p2p_mempool_id(&self) -> String {
+        match self {
+            Chain::Named(chain) => match chain {
+                ethers::types::Chain::Goerli => {
+                    "QmTmj4cizhWpEFCCqk5dP67yws7R2PPgCtb2bd2RgVPCbF".to_string()
+                }
+                ethers::types::Chain::Sepolia => {
+                    "QmdDwVFoEEcgv5qnaTB8ncnXGMnqrhnA5nYpRr4ouWe4AT".to_string()
+                }
+                ethers::types::Chain::PolygonMumbai => {
+                    "QmQfRyE9iVTBqZ17hPSP4tuMzaez83Y5wD874ymyRtj9VE".to_string()
+                }
+                ethers::types::Chain::Dev => {
+                    "Qmf7P3CuhzSbpJa8LqXPwRzfPqsvoQ6RG7aXvthYTzGxb2".to_string()
+                }
+                _ => panic!("chain {chain:?} p2p mempool id is not supported"),
+            },
+            Chain::Custom(id) => panic!("custom chain {id:?} p2p mempool id  is not supported"),
+        }
+    }
 }
 
 impl From<u64> for Chain {
