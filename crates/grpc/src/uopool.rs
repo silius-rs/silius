@@ -5,14 +5,21 @@ use crate::{
 };
 use async_trait::async_trait;
 use dashmap::DashMap;
+use discv5::Enr;
 use ethers::{
     providers::Middleware,
     types::{Address, U256},
 };
 use expanded_pathbuf::ExpandedPathBuf;
 use eyre::Result;
+use futures::channel::mpsc::unbounded;
+use futures::StreamExt;
+use libp2p_identity::Keypair;
+use silius_p2p::config::Config;
+use silius_p2p::network::{EntrypointChannels, Network};
 use silius_primitives::provider::BlockStream;
 use silius_primitives::reputation::ReputationEntry;
+use silius_primitives::UserOperation;
 use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
 use silius_uopool::{
     init_env, DBError, DatabaseMempool, DatabaseReputation, Mempool, VecCh, VecUo, WriteMap,
@@ -24,6 +31,12 @@ use silius_uopool::{
 use std::fmt::{Debug, Display};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
+use tracing::{error, info};
+
+/// The dafault database folder name used for storing the database files
+pub const DB_FOLDER_NAME: &str = "db";
+/// The default discovery secret file name used for storing the discovery secret
+pub const DISCOVERY_SECRET_FILE_NAME: &str = "discovery-secret";
 
 type StandardUserPool<M, P, R, E> =
     UserOperationPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>;
@@ -357,6 +370,9 @@ pub async fn uopool_service_run<M>(
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
     upool_mode: UoPoolMode,
+    p2p_enabled: bool,
+    config: Config,
+    bootnodes: Vec<Enr>,
 ) -> Result<()>
 where
     M: Middleware + Clone + 'static,
@@ -369,31 +385,116 @@ where
             UoPoolBuilder<M, DatabaseMempool<WriteMap>, DatabaseReputation<WriteMap>, DBError>,
         >::new());
 
-        let env = Arc::new(init_env::<WriteMap>(datadir.join("db")).expect("Init mdbx failed"));
+        let env =
+            Arc::new(init_env::<WriteMap>(datadir.join(DB_FOLDER_NAME)).expect("Init mdbx failed"));
         env.create_tables()
             .expect("Create mdbx database tables failed");
 
-        for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
-            let id = mempool_id(&ep, &U256::from(chain.id()));
-            let builder = UoPoolBuilder::new(
-                upool_mode == UoPoolMode::Unsafe,
-                eth_client.clone(),
-                ep,
-                chain,
-                max_verification_gas,
-                min_stake,
-                min_priority_fee_per_gas,
-                whitelist.clone(),
-                DatabaseMempool::new(env.clone()),
-                DatabaseReputation::new(env.clone()),
-            );
+        let mut entrypoint_channels: EntrypointChannels = Vec::new();
 
-            builder.register_block_updates(block_stream);
-            builder.register_reputation_updates();
+        if p2p_enabled {
+            for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
+                let id = mempool_id(&ep, &U256::from(chain.id()));
+                let (waiting_to_pub_sd, waiting_to_pub_rv) = unbounded::<(UserOperation, U256)>();
+                let uo_builder = UoPoolBuilder::new(
+                    upool_mode == UoPoolMode::Unsafe,
+                    eth_client.clone(),
+                    ep,
+                    chain,
+                    max_verification_gas,
+                    min_stake,
+                    min_priority_fee_per_gas,
+                    whitelist.clone(),
+                    DatabaseMempool::new(env.clone()),
+                    DatabaseReputation::new(env.clone()),
+                    Some(waiting_to_pub_sd),
+                );
+                uo_builder.register_block_updates(block_stream);
+                uo_builder.register_reputation_updates();
 
-            m_map.insert(id, builder);
-        }
+                let (p2p_userop_sd, mut p2p_userop_rv) = unbounded::<UserOperation>();
+                let mut uo_pool = uo_builder.uopool();
+                // spawn a task which would consume the userop received from p2p network
+                tokio::spawn(async move {
+                    while let Some(user_op) = p2p_userop_rv.next().await {
+                        let res = uo_pool.validate_user_operation(&user_op).await;
+                        match uo_pool.add_user_operation(user_op, res).await {
+                            Ok(_) => {}
+                            Err(e) => error!("Failed to add user operation: {:?} from p2p", e),
+                        }
+                    }
+                });
+                m_map.insert(id, uo_builder);
+                entrypoint_channels.push((chain, ep, waiting_to_pub_rv, p2p_userop_sd))
+            }
 
+            let discovery_secret_file = datadir.join(DISCOVERY_SECRET_FILE_NAME);
+            let discovery_secret = if discovery_secret_file.exists() {
+                let content =
+                    std::fs::read(discovery_secret_file).expect("discovery secret file currupted");
+                Keypair::from_protobuf_encoding(&content).expect("discovery secret file currupted")
+            } else {
+                let keypair = Keypair::generate_secp256k1();
+                std::fs::write(
+                    discovery_secret_file,
+                    keypair
+                        .to_protobuf_encoding()
+                        .expect("discovery secret encode failed"),
+                )
+                .expect("write discoveray secret file failed");
+                keypair
+            };
+            let listen_addrs = config.listen_addr.to_multi_addr();
+            let mut p2p_network = Network::new(
+                discovery_secret,
+                config,
+                entrypoint_channels,
+                Duration::from_secs(10),
+                30,
+            )
+            .expect("p2p network init failed");
+            info!("Enr: {}", p2p_network.local_enr().to_base64());
+            for listen_addr in listen_addrs.into_iter() {
+                info!("P2P node listened on {}", listen_addr);
+                p2p_network
+                    .listen_on(listen_addr)
+                    .expect("Listen on p2p network failed");
+            }
+
+            if bootnodes.is_empty() {
+                info!("Start p2p mode without bootnodes");
+            }
+            for enr in bootnodes {
+                info!("Trying to dial p2p node {enr:}");
+                p2p_network.dial(enr).expect("Dial bootnode failed");
+            }
+
+            tokio::spawn(async move {
+                loop {
+                    p2p_network.next_event().await;
+                }
+            });
+        } else {
+            for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
+                let id = mempool_id(&ep, &U256::from(chain.id()));
+                let uo_builder = UoPoolBuilder::new(
+                    upool_mode == UoPoolMode::Unsafe,
+                    eth_client.clone(),
+                    ep,
+                    chain,
+                    max_verification_gas,
+                    min_stake,
+                    min_priority_fee_per_gas,
+                    whitelist.clone(),
+                    DatabaseMempool::new(env.clone()),
+                    DatabaseReputation::new(env.clone()),
+                    None,
+                );
+                uo_builder.register_block_updates(block_stream);
+                uo_builder.register_reputation_updates();
+                m_map.insert(id, uo_builder);
+            }
+        };
         let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
             M,
             DatabaseMempool<WriteMap>,

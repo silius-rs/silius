@@ -22,7 +22,7 @@ use crate::{
 use enumset::EnumSet;
 use ethers::{
     providers::Middleware,
-    types::{GethTrace, U256},
+    types::{BlockNumber, GethTrace, U256},
 };
 use silius_contracts::{
     entry_point::{EntryPointErr, SimulateValidationResult},
@@ -30,10 +30,11 @@ use silius_contracts::{
     EntryPoint,
 };
 use silius_primitives::{
-    reputation::ReputationEntry, simulation::SimulationCheckError, uopool::ValidationError, Chain,
-    UserOperation,
+    reputation::ReputationEntry, sanity::SanityCheckError, simulation::SimulationCheckError,
+    uopool::ValidationError, Chain, UserOperation,
 };
 use std::fmt::{Debug, Display};
+use tracing::debug;
 
 /// Standard implementation of [UserOperationValidator](UserOperationValidator).
 pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, P, R, E>
@@ -294,7 +295,7 @@ where
         if let Some(uo) = mempool.get_prev_by_sender(uo) {
             out.prev_hash = Some(uo.hash(&self.entry_point.address(), &self.chain.id().into()));
         }
-
+        debug!("Simulate user operation from {:?}", uo.sender);
         let sim_res = self.simulate_validation(uo).await?;
 
         if !self.simulation_checks.is_empty()
@@ -315,9 +316,23 @@ where
         out.pre_fund = extract_pre_fund(&sim_res);
         out.verification_gas_limit = extract_verification_gas_limit(&sim_res);
 
+        let block_number = self
+            .entry_point
+            .eth_client()
+            .get_block(BlockNumber::Latest)
+            .await
+            .map_err(|e| {
+                ValidationError::Sanity(SanityCheckError::MiddlewareError {
+                    message: e.to_string(),
+                })
+            })?
+            .expect("block should exist");
+        out.verified_block = U256::from(block_number.hash.expect("block hash should exist").0);
+
         if !self.simulation_trace_checks.is_empty()
             && mode.contains(UserOperationValidatorMode::SimulationTrace)
         {
+            debug!("Simulate user operation with trace from {:?}", uo.sender);
             let geth_trace = self.simulate_validation_trace(uo).await?;
             let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
                 SimulationCheckError::Validation {

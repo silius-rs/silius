@@ -7,6 +7,7 @@ use ethers::{
     types::{Address, H256, U256},
 };
 use eyre::format_err;
+use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
 use silius_primitives::{
@@ -41,6 +42,8 @@ where
     whitelist: Vec<Address>,
     mempool: MempoolBox<VecUo, VecCh, P, E>,
     reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
+    // It would be None if p2p is not enabled
+    publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
 impl<M, P, R, E> UoPoolBuilder<M, P, R, E>
@@ -62,6 +65,7 @@ where
         whitelist: Vec<Address>,
         mempool: P,
         reputation: R,
+        publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
         // sets mempool
         let mempool = MempoolBox::<VecUo, VecCh, P, E>::new(mempool);
@@ -90,6 +94,7 @@ where
             whitelist,
             mempool,
             reputation,
+            publish_sd,
         }
     }
 
@@ -215,6 +220,7 @@ where
             self.reputation.clone(),
             self.max_verification_gas,
             self.chain,
+            self.publish_sd.as_ref().cloned(),
         )
     }
 }

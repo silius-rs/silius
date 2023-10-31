@@ -17,13 +17,13 @@ ethers = { workspace = true }
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
 futures-util = { workspace = true }
-lazy_static = "1.4.0"
+lazy_static = { workspace = true }
 rustc-hex = "^2.0.1"
 serde = "1"
 serde-hex = "0.1.0"
 serde_json = { workspace = true }
-ssz_rs = "0.8.0"
-ssz_rs_derive = "0.8.0"
+ssz_rs = { workspace = true }
+ssz_rs_derive = { workspace = true }
 strum = "0.24"
 strum_macros = "0.24"
 tokio = { workspace = true }

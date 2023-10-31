@@ -13,6 +13,7 @@ AA (ERC-4337) bundler - Silius
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
+discv5 = { workspace = true }
 ethers = { workspace = true }
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
@@ -20,6 +21,7 @@ log = "0.4.19"
 pin-utils = "0.1"
 silius-bundler = { path = "../../crates/bundler" }
 silius-grpc = { path = "../../crates/grpc" }
+silius-p2p = { path = "../../crates/p2p" }
 silius-primitives = { path = "../../crates/primitives" }
 silius-rpc = { path = "../../crates/rpc" }
 tokio = { workspace = true }

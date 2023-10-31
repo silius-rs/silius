@@ -14,6 +14,7 @@ use ethers::{
     types::{Address, BlockNumber, U256},
 };
 use eyre::format_err;
+use futures::channel::mpsc::UnboundedSender;
 use silius_contracts::{
     entry_point::{EntryPointErr, UserOperationEventFilter},
     utils::parse_from_input_data,
@@ -58,6 +59,8 @@ where
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
+    // It would be None if p2p is not enabled
+    publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
 impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
@@ -87,6 +90,7 @@ where
         reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
         max_verification_gas: U256,
         chain: Chain,
+        publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
         Self {
             id: mempool_id(&entry_point.address(), &chain.id().into()),
@@ -96,6 +100,7 @@ where
             reputation,
             max_verification_gas,
             chain,
+            publish_sd,
         }
     }
 
@@ -213,7 +218,10 @@ where
         if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);
         }
-
+        if let Some(ref sd) = self.publish_sd {
+            sd.unbounded_send((uo.clone(), res.verified_block))
+                .expect("Failed to send user operation to publish channel")
+        };
         match self.mempool.add(
             uo.clone(),
             &self.entry_point.address(),

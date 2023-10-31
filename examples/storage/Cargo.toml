@@ -13,6 +13,7 @@ AA (ERC-4337) bundler examples - storage
 [dependencies]
 ethers = { workspace = true }
 eyre = { workspace = true }
+futures = "0.3.28"
 silius-primitives = { path = "../../crates/primitives" }
 silius-uopool = { path = "../../crates/uopool" }
 tempdir = "0.3.7"

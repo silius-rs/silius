@@ -4,6 +4,7 @@ members = [
     "crates/bundler",
     "crates/contracts",
     "crates/grpc",
+    "crates/p2p",
     "crates/primitives",
     "crates/rpc",
     "crates/uopool",
@@ -27,14 +28,18 @@ rust-version = "1.73.0"
 [workspace.dependencies]
 async-stream = "0.3.5"
 async-trait = "0.1"
+discv5 = { version = "0.3.0", features = ["libp2p"] }
 ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc", features = [
     "ws",
 ] }
 expanded-pathbuf = "0.1"
 eyre = "0.6.8"
 futures-util = "0.3.28"
+lazy_static = "1.4.0"
 parking_lot = "0.12"
 serde_json = "1"
+ssz_rs = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
+ssz_rs_derive = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
 tokio = { version = "1.18", features = ["full"] }
 tracing = "0.1"
 

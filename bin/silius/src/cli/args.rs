@@ -1,7 +1,11 @@
-use crate::utils::{parse_address, parse_send_bundle_mode, parse_u256, parse_uopool_mode};
+use crate::utils::{
+    parse_address, parse_enr, parse_send_bundle_mode, parse_u256, parse_uopool_mode,
+};
 use clap::Parser;
+use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
+use silius_p2p::config::{Config, ListenAddr};
 use silius_primitives::{
     bundler::SendBundleMode,
     chain::SUPPORTED_CHAINS,
@@ -88,6 +92,10 @@ pub struct UoPoolArgs {
     /// User operation mempool mode
     #[clap(long, default_value = "standard", value_parser=parse_uopool_mode)]
     pub uopool_mode: UoPoolMode,
+
+    /// P2P configuration
+    #[clap(flatten)]
+    pub p2p_opts: P2POpts,
 }
 
 /// Common CLI args for bundler and uopool
@@ -211,8 +219,56 @@ pub struct CreateWalletArgs {
     pub flashbots_key: bool,
 }
 
+#[derive(Clone, Debug, Parser, PartialEq)]
+pub struct P2POpts {
+    /// enable p2p
+    #[clap(long)]
+    pub enable_p2p: bool,
+
+    /// Sets the p2p listen address.
+    #[clap(long, default_value = "0.0.0.0")]
+    pub p2p_listen_address: Ipv4Addr,
+
+    /// The ipv4 address to broadcast to peers about which address we are listening on.
+    #[clap(long)]
+    pub p2p_broadcast_address: Option<Ipv4Addr>,
+
+    /// The udp4 port to broadcast to peers in order to reach back for discovery.
+    #[clap(long, default_value = "9000")]
+    pub udp4_port: u16,
+
+    /// The tcp4 port to boardcast to peers in order to reach back for discovery.
+    #[clap(long, default_value = "9000")]
+    pub tcp4_port: u16,
+
+    /// The initial bootnodes to connect to for the p2p network
+    #[clap(long, value_delimiter = ',', value_parser=parse_enr)]
+    pub bootnodes: Vec<Enr>,
+}
+
+impl P2POpts {
+    /// Convert the P2POpts to [silius_p2p::config::Config]
+    pub fn to_config(&self) -> Config {
+        // TODO: support ipv6
+        Config {
+            listen_addr: silius_p2p::config::ListenAddress::Ipv4(ListenAddr {
+                addr: self.p2p_listen_address,
+                udp_port: self.udp4_port,
+                tcp_port: self.tcp4_port,
+            }),
+            ipv4_addr: self.p2p_broadcast_address,
+            ipv6_addr: None,
+            enr_udp4_port: Some(self.udp4_port),
+            enr_tcp4_port: Some(self.tcp4_port),
+            enr_udp6_port: None,
+            enr_tcp6_port: None,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
+    use discv5::enr::{CombinedKey, EnrBuilder};
+
     use super::*;
     use std::{
         net::{IpAddr, Ipv4Addr},
@@ -511,5 +567,42 @@ mod tests {
             .is_enabled(),
             false
         );
+    }
+
+    #[test]
+    fn p2p_opts() {
+        let key = CombinedKey::secp256k1_from_bytes([1; 32].as_mut()).unwrap();
+        let enr = EnrBuilder::new("v4")
+            .ip4(Ipv4Addr::new(8, 8, 8, 8))
+            .tcp4(4337)
+            .udp4(4337)
+            .build(&key)
+            .unwrap();
+        let binding = enr.clone().to_base64();
+        let args = vec![
+            "p2popts",
+            "--enable-p2p",
+            "--p2p-listen-address",
+            "0.0.0.0",
+            "--p2p-broadcast-address",
+            "127.0.0.1",
+            "--tcp4-port",
+            "4337",
+            "--udp4-port",
+            "4337",
+            "--bootnodes",
+            &binding,
+        ];
+        assert_eq!(
+            P2POpts {
+                enable_p2p: true,
+                p2p_listen_address: Ipv4Addr::new(0, 0, 0, 0),
+                p2p_broadcast_address: Some(Ipv4Addr::new(127, 0, 0, 1)),
+                tcp4_port: 4337,
+                udp4_port: 4337,
+                bootnodes: vec![enr]
+            },
+            P2POpts::try_parse_from(args).unwrap()
+        )
     }
 }
