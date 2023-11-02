@@ -156,6 +156,7 @@ where
                             }
                         } else if *addr == stake_info_l.address
                             || self.associated_with_slot(&stake_info_l.address, &slot, &slots)?
+                            || !acc.writes.contains_key(&slot)
                         {
                             slot_staked = slot.clone();
                         } else {
