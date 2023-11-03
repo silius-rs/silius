@@ -16,9 +16,9 @@ use libp2p::{
 };
 
 use super::{
-    handler::{Handler, HandlerEvent},
+    handler::{Handler, HandlerEvent, OutboundInfo},
     models::{Request, RequestId, Response},
-    outbound::OutboundContainer,
+    BoundError,
 };
 
 #[derive(Debug)]
@@ -48,6 +48,10 @@ pub enum Event {
         peer_id: PeerId,
         request_id: RequestId,
     },
+    UpgradeFailure {
+        peer_id: PeerId,
+        request_id: RequestId,
+    },
 }
 
 #[derive(Debug)]
@@ -66,9 +70,11 @@ pub enum OutboundFailure {
     ConnectionClosed,
     /// The remote supports none of the requested protocols.
     UnsupportedProtocols,
+    /// Error happended while handleing the outbound
+    BoundError(BoundError),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum InboundFailure {
     /// The inbound request timed out, either while reading the
     /// incoming request or before a response is sent, e.g. if
@@ -84,6 +90,8 @@ pub enum InboundFailure {
     /// due to the [`ResponseChannel`] being dropped instead of
     /// being passed to [`Behaviour::send_response`].
     ResponseOmission,
+    /// Error happended while handleing the inbound
+    BoundError(BoundError),
 }
 #[derive(Debug)]
 pub struct Config {
@@ -103,10 +111,11 @@ pub struct Behaviour {
     next_request_id: RequestId,
     /// The next (inbound) request ID.
     next_inbound_id: Arc<AtomicU64>,
+    /// The next (outbound) request ID
     /// pending events to return from `Poll`
-    pending_events: VecDeque<ToSwarm<Event, OutboundContainer>>,
+    pending_events: VecDeque<ToSwarm<Event, OutboundInfo>>,
     connected: HashMap<PeerId, Vec<Connection>>,
-    pending_outbound_requests: HashMap<PeerId, Vec<OutboundContainer>>,
+    pending_outbound_requests: HashMap<PeerId, Vec<OutboundInfo>>,
 }
 
 impl Behaviour {
@@ -129,7 +138,7 @@ impl Behaviour {
 
     pub fn send_request(&mut self, peer: &PeerId, request: Request) -> RequestId {
         let request_id = self.next_request_id();
-        let request = OutboundContainer {
+        let request = OutboundInfo {
             request,
             request_id,
         };
@@ -155,11 +164,7 @@ impl Behaviour {
         sender.send(response)
     }
 
-    fn try_send_request(
-        &mut self,
-        peer: &PeerId,
-        request: OutboundContainer,
-    ) -> Option<OutboundContainer> {
+    fn try_send_request(&mut self, peer: &PeerId, request: OutboundInfo) -> Option<OutboundInfo> {
         if let Some(connections) = self.connected.get_mut(peer) {
             if connections.is_empty() {
                 return Some(request);
@@ -387,6 +392,34 @@ impl NetworkBehaviour for Behaviour {
                         response,
                     }));
             }
+            HandlerEvent::InboundTimeout(request_id) => {
+                self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
+                        peer_id,
+                        request_id,
+                        error: InboundFailure::Timeout,
+                    }))
+            }
+            HandlerEvent::InboundError { request_id, error } => {
+                self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
+                        peer_id,
+                        request_id,
+                        error: InboundFailure::BoundError(error),
+                    }))
+            }
+            HandlerEvent::OutboundError { request_id, error } => {
+                self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
+                self.pending_events
+                    .push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
+                        peer_id,
+                        request_id,
+                        error: OutboundFailure::BoundError(error),
+                    }))
+            }
+            HandlerEvent::DialUpgradeTimeout(_) => {}
             HandlerEvent::ResponseSent(request_id) => {
                 self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
 
@@ -407,7 +440,7 @@ impl NetworkBehaviour for Behaviour {
                     }));
             }
             HandlerEvent::OutboundTimeout(request_id) => {
-                self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
+                self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
 
                 self.pending_events
                     .push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {

@@ -2727,6 +2727,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures-bounded"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05bc732cbef458f0184de1c3aa7ae07c9dbbf419611b5b93ee5b0c9aacdc2e3d"
+dependencies = [
+ "futures-timer",
+ "futures-util",
+]
+
+[[package]]
 name = "futures-channel"
 version = "0.3.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4176,7 +4186,7 @@ dependencies = [
  "asynchronous-codec",
  "either",
  "futures",
- "futures-bounded",
+ "futures-bounded 0.1.0",
  "futures-timer",
  "libp2p-core",
  "libp2p-identity",
@@ -7022,6 +7032,7 @@ dependencies = [
  "ethers 2.0.8",
  "eyre",
  "futures",
+ "futures-bounded 0.2.0",
  "lazy_static",
  "libp2p",
  "libp2p-mplex",

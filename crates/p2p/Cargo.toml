@@ -19,6 +19,7 @@ discv5 = { workspace = true }
 ethers = { workspace = true }
 eyre = "0.6.8"
 futures = "0.3.28"
+futures-bounded = "0.2.0"
 lazy_static = { workspace = true }
 libp2p-mplex = { version = "0.40.0" }
 silius-primitives = { path = "../primitives" }

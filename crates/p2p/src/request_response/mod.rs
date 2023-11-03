@@ -1,9 +1,8 @@
 mod behaviour;
 mod handler;
-mod inbound;
 mod models;
-mod outbound;
 mod protocol;
+mod upgrade;
 
 pub use behaviour::{Behaviour, Event};
 pub use models::*;

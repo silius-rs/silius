@@ -31,7 +31,7 @@ use crate::{
     enr::{keypair_to_combine, EnrExt},
     gossipsub::topic,
     peer_manager::PeerManagerEvent,
-    request_response::{self, Ping, Request, RequestId, Response},
+    request_response::{self, Ping, Pong, Request, RequestId, Response},
 };
 
 struct TokioExecutor;
@@ -206,11 +206,20 @@ impl Network {
                 request,
                 response_sender,
                 ..
-            } => Some(NetworkEvent::RequestMessage {
-                peer_id,
-                request,
-                response_sender,
-            }),
+            } => match request {
+                Request::Ping(ping) => {
+                    let response = Response::Pong(Default::default());
+                    response_sender
+                        .send(response)
+                        .expect("channel should exist");
+                    None
+                }
+                _ => Some(NetworkEvent::RequestMessage {
+                    peer_id,
+                    request,
+                    response_sender,
+                }),
+            },
             request_response::Event::Response {
                 peer_id, response, ..
             } => Some(NetworkEvent::ResponseMessage { peer_id, response }),
