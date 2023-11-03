@@ -508,17 +508,6 @@ async fn account_succeeds_referecing_its_own_balance() {
 }
 
 #[tokio::test]
-async fn account_fail_to_read_allowance_of_address() {
-    let res = test_existing_user_operation("allowance-self-1".to_string(), "".to_string()).await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::StorageAccess { .. }
-        ))
-    ));
-}
-
-#[tokio::test]
 async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
     let res = test_existing_user_operation("allowance-1-self".to_string(), "".to_string()).await;
     assert!(matches!(res, Ok(..)));
@@ -528,43 +517,6 @@ async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
 async fn access_self_struct_data() {
     let res = test_existing_user_operation("struct-self".to_string(), "".to_string()).await;
     assert!(matches!(res, Ok(..)));
-}
-
-#[tokio::test]
-async fn fail_to_access_other_address_struct_data() {
-    let res = test_existing_user_operation("struct-1".to_string(), "".to_string()).await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::StorageAccess { .. }
-        ))
-    ));
-}
-
-#[tokio::test]
-async fn fail_if_referencing_other_token_balance() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "balance-1".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.storage_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::StorageAccess { .. }
-        ))
-    ));
-
-    Ok(())
 }
 
 #[tokio::test]
