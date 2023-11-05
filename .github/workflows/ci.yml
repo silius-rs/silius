@@ -11,6 +11,14 @@ jobs:
     name: Silius - ERC-4337 bundler in Rust
     runs-on: ubuntu-latest
     steps:
+      # github action worker got about 14GB available space for building which is not enough
+      # remove some unused binary in the image to get more spaces
+      - name: Make more space to compilation
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - uses: actions/checkout@v2
 
       - name: Setup Rust toolchain
@@ -21,7 +29,9 @@ jobs:
 
       - name: Install cargo tools
         run: |
-          cargo install cargo-sort cargo-udeps
+          curl -L https://github.com/DevinR528/cargo-sort/releases/download/v1.0.9/cargo-sort-x86_64-unknown-linux-gnu.tar.gz | tar -zxvf - -C ~/.cargo/bin/
+          curl -L https://github.com/est31/cargo-udeps/releases/download/v0.1.43/cargo-udeps-v0.1.43-x86_64-unknown-linux-gnu.tar.gz | tar -xzvf - -C /tmp/
+          mv /tmp/cargo-udeps-v0.1.43-x86_64-unknown-linux-gnu/cargo-udeps ~/.cargo/bin/
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -66,7 +76,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: silius
-          path: target/release/silius
+          path: target/debug/silius
 
       - name: Lint
         run: |
