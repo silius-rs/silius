@@ -38,6 +38,7 @@ where
                 .cloned();
 
             if let Some(l) = level {
+                // [OP-011] - block opcodes
                 for op in call_info.opcodes.keys() {
                     if FORBIDDEN_OPCODES.contains(op) {
                         return Err(SimulationCheckError::Opcode {
@@ -47,6 +48,7 @@ where
                     }
                 }
 
+                // [OP-031] - CREATE2 is allowed exactly once in the deployment phase and must deploy code for the "sender" address
                 if let Some(c) = call_info.opcodes.get(&*CREATE2_OPCODE) {
                     if LEVEL_TO_ENTITY[l] == FACTORY && *c == 1 {
                         continue;

@@ -122,16 +122,20 @@ where
         self.parse_call_stack(helper.js_trace, &mut calls)?;
 
         for call in calls.iter() {
+            // [OP-052] - may call depositTo(sender) with any value from either the sender or factory
+            // [OP-053] - may call the fallback function from the sender with any value
             if call.to.unwrap_or_default() == helper.entry_point.address()
                 && call.from.unwrap_or_default() != helper.entry_point.address()
                 && (call.method.is_some()
                     && call.method.clone().unwrap_or_default() != *"depositTo")
             {
+                // [OP-054] - any other access to the EntryPoint is forbidden
                 return Err(SimulationCheckError::CallStack {
                     message: format!("Illegal call into entry point during validation {call:?}"),
                 });
             }
 
+            // [OP-061] - CALL with value is forbidden. The only exception is a call to the EntryPoint described above
             if call.to.unwrap_or_default() != helper.entry_point.address()
                 && !call.value.unwrap_or_default().is_zero()
             {
@@ -156,7 +160,7 @@ where
                             })?;
                         let context = validate_paymaster_return.context;
 
-                        // [EREP-050]
+                        // [EREP-050] - an unstaked paymaster may not return a context
                         // This will be removed in the future
                         if !context.is_empty()
                             && helper

@@ -225,6 +225,7 @@ pub const JS_TRACER: &str = r#"
                 return x.opcode;
             }).join(' ');
             // only store the last EXTCODE* opcode per address - could even be a boolean for our current use-case
+            // [OP-051] - may call EXTCODESIZE ISZERO
             if (last3opcodesString.match(/^(\w+) EXTCODESIZE ISZERO$/) == null) {
                 this.currentLevel.extCodeAccessInfo[addrHex] = opcode;
                 // this.debug.push(`potentially illegal EXTCODESIZE without ISZERO for ${addrHex}`)
@@ -233,12 +234,14 @@ pub const JS_TRACER: &str = r#"
             }
         }
         // not using 'isPrecompiled' to only allow the ones defined by the ERC-4337 as stateless precompiles
+        // [OP-062] - only allowed the core 9 precompiles
         const isAllowedPrecompiled = function(address) {
             const addrHex = toHex(address);
             const addressInt = parseInt(addrHex);
             // this.debug.push(`isPrecompiled address=${addrHex} addressInt=${addressInt}`)
             return addressInt > 0 && addressInt < 10;
         };
+        // [OP-041] - access to an address without a deployed code is forbidden for EXTCODE* and *CALL opcodes
         if (opcode.match(/^(EXT.*|CALL|CALLCODE|DELEGATECALL|STATICCALL)$/) != null) {
             const idx = opcode.startsWith('EXT') ? 0 : 1;
             const addr = toAddress(log.stack.peek(idx).toString(16));
@@ -251,6 +254,7 @@ pub const JS_TRACER: &str = r#"
                 };
             }
         }
+        // [OP-012] - GAS opcode is allowed, but only if followed immediately by *CALL instructions
         if (this.lastOp === 'GAS' && !opcode.includes('CALL')) {
             // count "GAS" opcode only if not followed by "CALL"
             this.countSlot(this.currentLevel.opcodes, 'GAS');

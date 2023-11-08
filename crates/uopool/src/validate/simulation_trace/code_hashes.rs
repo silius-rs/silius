@@ -88,6 +88,8 @@ where
         uo: &UserOperation,
         helper: &mut SimulationTraceHelper<M, P, R, E>,
     ) -> Result<(), SimulationCheckError> {
+        // [COD-010] - between the first and the second validations, the EXTCODEHASH value of any visited address, entity or referenced library, may not be changed
+
         let addrs = helper
             .js_trace
             .calls_from_entry_point
