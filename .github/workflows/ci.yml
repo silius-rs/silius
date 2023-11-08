@@ -75,6 +75,10 @@ jobs:
       - name: Test
         run: |
           make test
+
+      - name: Examples
+        run: |
+          make run-examples
   
   bundler_spec_tests:
     name: Run bundler spec tests

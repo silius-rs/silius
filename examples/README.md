@@ -4,7 +4,7 @@
 
 ```bash
 cd user-operation
-cargo run --example user-operation
+cargo run --example user_operation
 ```
 
 ### Simple account - create 

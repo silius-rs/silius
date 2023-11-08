@@ -17,5 +17,5 @@ silius-primitives = { path = "../../crates/primitives" }
 tokio = { workspace = true }
 
 [[example]]
-name = "user-operation"
+name = "user_operation"
 path = "examples/user_operation.rs"
