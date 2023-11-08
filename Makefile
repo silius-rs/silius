@@ -29,6 +29,9 @@ setup-thirdparty:
 	cd crates/contracts/thirdparty/account-abstraction && yarn install --frozen-lockfile --immutable && yarn compile && cd ../../../..
 	cd tests/thirdparty/bundler && yarn install --frozen-lockfile --immutable && yarn preprocess && cd ../../..
 
+run-examples:
+	./scripts/run_examples.sh
+
 test:
 	cargo test --workspace
 
