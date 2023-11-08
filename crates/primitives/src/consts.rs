@@ -70,6 +70,7 @@ pub mod flashbots_relay_endpoints {
     pub const AGNOSTIC_RELAY: &str = "https://agnostic-relay.net/";
     pub const RELAYOOR_WTF: &str = "https://relayooor.wtf/";
     pub const RSYNC_BUILDER: &str = "https://rsync-builder.xyz/";
+    pub const LOKI_BUILDER: &str = "https://rpc.lokibuilder.xyz/";
 }
 
 /// Supported networks' IDs
