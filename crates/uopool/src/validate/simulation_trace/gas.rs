@@ -30,6 +30,7 @@ where
         _uo: &UserOperation,
         helper: &mut SimulationTraceHelper<M, P, R, E>,
     ) -> Result<(), SimulationCheckError> {
+        // [OP-020] - revert on "out of gas" is forbidden as it can "leak" the gas limit or the current call stack depth
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             if call_info.oog.unwrap_or(false) {
                 return Err(SimulationCheckError::OutOfGas {});

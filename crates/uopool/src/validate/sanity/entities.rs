@@ -37,7 +37,7 @@ impl Entities {
         )?))
     }
 
-    /// [SREP-020]: A BANNED address is not allowed into the mempool.
+    /// [SREP-020] - a BANNED address is not allowed into the mempool.
     fn check_banned(
         &self,
         entity: &str,
@@ -55,7 +55,7 @@ impl Entities {
         Ok(())
     }
 
-    /// [SREP-030]: A THROTTLED address is limited to THROTTLED_ENTITY_MEMPOOL_COUNT entries in the mempool.
+    /// [SREP-030] - THROTTLED address is limited to THROTTLED_ENTITY_MEMPOOL_COUNT entries in the mempool
     fn check_throttled<M: Middleware, P, R, E>(
         &self,
         entity: &str,
@@ -105,6 +105,8 @@ where
         helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError> {
         let (sender, factory, paymaster) = uo.get_entities();
+
+        // [SREP-040] - an OK staked entity is unlimited by the reputation rule
 
         // sender
         let status = self.get_status(&sender, helper)?;

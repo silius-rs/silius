@@ -135,6 +135,7 @@ where
                 let stake_info_l = stake_info[l];
 
                 for (addr, acc) in &call_info.access {
+                    // [STO-010] - Access to the "account" storage is always allowed
                     if *addr == uo.sender || *addr == helper.entry_point.address() {
                         continue;
                     }
@@ -148,15 +149,17 @@ where
                     .concat()
                     {
                         if self.associated_with_slot(&uo.sender, &slot, &slots)? {
+                            // [STO-021], [STO-022] - Access to associated storage of the account in an external (non-entity contract) is allowed if either The account already exists or There is an initCode and the factory contract is staked
                             if !(uo.init_code.is_empty()
                                 || uo.sender == stake_info_l.address
                                     && stake_info[FACTORY_LEVEL].is_staked())
                             {
                                 slot_staked = slot.clone();
                             }
-                        } else if *addr == stake_info_l.address
-                            || self.associated_with_slot(&stake_info_l.address, &slot, &slots)?
+                        } else if *addr == stake_info_l.address // [STO-031] - access the entity's own storage (if entity staked)
+                            || self.associated_with_slot(&stake_info_l.address, &slot, &slots)? // [STO-032] - read/write Access to storage slots that is associated with the entity, in any non-entity contract (if entity staked)
                             || !acc.writes.contains_key(&slot)
+                        // [STO-033] - read-only access to any storage in non-entity contract (if entity staked)
                         {
                             slot_staked = slot.clone();
                         } else {

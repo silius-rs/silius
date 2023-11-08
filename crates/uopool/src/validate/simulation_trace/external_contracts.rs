@@ -32,8 +32,9 @@ where
                 .cloned();
 
             if let Some(l) = level {
+                // [OP-041] - access to an address without a deployed code is forbidden for EXTCODE* and *CALL opcodes
                 for (addr, size) in call_info.contract_size.iter() {
-                    if *addr != uo.sender
+                    if *addr != uo.sender // [OP-042] - exception: access to "sender" address is allowed
                         && size.contract_size <= 2
                         && size.opcode != CREATE2_OPCODE.to_string()
                     {

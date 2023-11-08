@@ -104,8 +104,10 @@ where
     ) -> Result<(), SanityCheckError> {
         let (sender, factory, paymaster) = uo.get_entities();
 
+        // [SREP-010] - the "canonical mempool" defines a staked entity if it has MIN_STAKE_VALUE and unstake delay of MIN_UNSTAKE_DELAY
+
         // sender
-        // [STO-040]
+        // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator) that is used as an "account" in another UserOperation in the mempool
         if helper.mempool.get_number_by_entity(&sender) > 0 {
             return Err(SanityCheckError::EntityVerification {
                 entity: SENDER.to_string(),
@@ -116,26 +118,25 @@ where
             });
         }
 
+        // [UREP-010] - UserOperation with unstaked sender are only allowed up to SAME_SENDER_MEMPOOL_COUNT times in the mempool
         let sender_stake = self.get_stake(&sender, helper).await?;
         if helper
             .reputation
             .verify_stake(SENDER, Some(sender_stake))
             .is_err()
+            && helper.mempool.get_number_by_sender(&uo.sender) >= SAME_SENDER_MEMPOOL_COUNT
         {
-            // [UREP-010]
-            if helper.mempool.get_number_by_sender(&uo.sender) >= SAME_SENDER_MEMPOOL_COUNT {
-                return Err(ReputationError::UnstakedEntityVerification {
-                    entity: SENDER.to_string(),
-                    address: uo.sender,
-                    message: "has too many user operations in the mempool".into(),
-                }
-                .into());
+            return Err(ReputationError::UnstakedEntityVerification {
+                entity: SENDER.to_string(),
+                address: uo.sender,
+                message: "has too many user operations in the mempool".into(),
             }
+            .into());
         }
 
         // factory
         if let Some(factory) = factory {
-            // [STO-040]
+            // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator) that is used as an "account" in another UserOperation in the mempool
             if helper.mempool.get_number_by_sender(&factory) > 0 {
                 return Err(SanityCheckError::EntityVerification {
                     entity: FACTORY.to_string(),
@@ -152,7 +153,7 @@ where
                 .verify_stake(FACTORY, Some(factory_stake))
                 .is_err()
             {
-                // [UREP-020]
+                // [UREP-020] - for other entities
                 let entity = self.get_entity(&factory, helper)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
                 if helper.mempool.get_number_by_entity(&factory) as u64 >= uos_allowed {
@@ -168,7 +169,7 @@ where
 
         // paymaster
         if let Some(paymaster) = paymaster {
-            // [STO-040]
+            // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator) that is used as an "account" in another UserOperation in the mempool
             if helper.mempool.get_number_by_sender(&paymaster) > 0 {
                 return Err(SanityCheckError::EntityVerification {
                     entity: PAYMASTER.to_string(),
@@ -185,7 +186,7 @@ where
                 .verify_stake(PAYMASTER, Some(paymaster_stake))
                 .is_err()
             {
-                // [UREP-020]
+                // [UREP-020] - for other entities
                 let entity = self.get_entity(&paymaster, helper)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
                 if helper.mempool.get_number_by_entity(&paymaster) as u64 >= uos_allowed {
