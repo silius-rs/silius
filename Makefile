@@ -42,6 +42,12 @@ lint:
 	cargo sort --check --workspace
 	cargo udeps --workspace
 
+run-geth:
+	cd bundler-spec-tests && docker compose up -d && cd ..
+
+deploy-entrypoint:
+	cd tests/thirdparty/bundler && yarn hardhat-deploy --network localhost && cd ../../..
+
 clean:
 	cd crates/contracts/thirdparty/account-abstraction && yarn clean && cd ../..
 	cd crates/contracts/thirdparty/bundler && yarn clear && cd ../..
