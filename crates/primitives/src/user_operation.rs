@@ -9,7 +9,6 @@ use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use ssz_rs::List;
 use std::{ops::Deref, slice::Windows, str::FromStr};
-const BYTES_PER_LENGTH_OFFSET: usize = 4;
 /// This could be increased if we found bigger bytes, the propper value is not sure right now.
 const MAXIMUM_SSZ_BYTES_LENGTH: usize = 1024;
 /// Transaction type for ERC-4337 account abstraction

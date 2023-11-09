@@ -37,7 +37,7 @@ impl UserOperationsWithEntryPoint {
         }
     }
 
-    pub fn user_ops(self) -> Vec<UserOperation> {
+    pub fn user_operations(self) -> Vec<UserOperation> {
         self.user_operations.to_vec()
     }
 

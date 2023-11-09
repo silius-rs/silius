@@ -70,7 +70,7 @@ jobs:
       
       - name: Build
         run: |
-          make build
+          make build-debug-mode
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3

@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
+use silius_primitives::consts::p2p::REQREP_PROTOCOL_PREFIX;
 use std::fmt::Display;
-const PROTOCOL_PREFIX: &str = "/account_abstraction/req";
 
 lazy_static! {
     pub static ref SUPPORTED_PROTOCOL: Vec<ProtocolId> = vec![
@@ -54,7 +54,7 @@ pub struct ProtocolId {
 impl ProtocolId {
     pub fn new(message_name: Protocol) -> Self {
         let protocol_id = format!(
-            "{PROTOCOL_PREFIX}/{message_name}/{}/{}",
+            "{REQREP_PROTOCOL_PREFIX}/{message_name}/{}/{}",
             Version::V1,
             Encoding::SSZSnappy
         );

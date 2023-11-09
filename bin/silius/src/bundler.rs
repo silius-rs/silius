@@ -8,8 +8,10 @@ use silius_grpc::{
     uopool_service_run,
 };
 use silius_primitives::{
-    bundler::SendBundleMode, consts::flashbots_relay_endpoints, provider::BlockStream, Chain,
-    Wallet,
+    bundler::SendBundleMode,
+    consts::{flashbots_relay_endpoints, p2p::DISCOVERY_SECRET_FILE_NAME},
+    provider::BlockStream,
+    Chain, Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -153,6 +155,11 @@ where
 
     let datadir = unwrap_path_or_home(args.datadir)?;
 
+    let node_key_file = match args.p2p_opts.node_key.clone() {
+        Some(key_file) => key_file,
+        None => datadir.join(DISCOVERY_SECRET_FILE_NAME),
+    };
+
     uopool_service_run(
         SocketAddr::new(args.uopool_addr, args.uopool_port),
         datadir,
@@ -166,6 +173,7 @@ where
         args.whitelist,
         args.uopool_mode,
         args.p2p_opts.enable_p2p,
+        node_key_file,
         args.p2p_opts.to_config(),
         args.p2p_opts.bootnodes,
     )

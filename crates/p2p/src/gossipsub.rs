@@ -7,14 +7,12 @@ use libp2p::gossipsub::{
     Behaviour, ConfigBuilder, DataTransform, IdentTopic, Message, MessageAuthenticity, RawMessage,
     TopicHash, ValidationMode, WhitelistSubscriptionFilter,
 };
+use silius_primitives::consts::p2p::{
+    MAX_GOSSIP_SNAP_SIZE, SSZ_SNAPPY_ENCODING, TOPIC_PREFIX, USER_OPS_WITH_ENTRY_POINT_TOPIC,
+};
 use snap::raw::{decompress_len, Decoder, Encoder};
 
 pub type Gossipsub = Behaviour<SnappyTransform, WhitelistSubscriptionFilter>;
-
-const TOPIC_PREFIX: &str = "account_abstraction";
-const USER_OPS_WITH_ENTRY_POINT_TOPIC: &str = "user_ops_with_entry_point";
-const SSZ_SNAPPY_ENCODING: &str = "ssz_snappy";
-const MAX_GOSSIP_SNAP_SIZE: usize = 1048576; // bytes
 
 // Highly inspired by https://github.com/sigp/lighthouse/blob/stable/beacon_node/lighthouse_network/src/types/pubsub.rs#L45-L103
 // Implements the `DataTransform` trait of gossipsub to employ snappy compression
