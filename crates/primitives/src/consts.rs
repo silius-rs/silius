@@ -89,3 +89,21 @@ pub mod networking {
     pub const DEFAULT_UOPOOL_GRPC_PORT: u16 = 3002;
     pub const DEFAULT_BUNDLER_GRPC_PORT: u16 = 3003;
 }
+
+/// P2P related constants
+pub mod p2p {
+    /// The dafault database folder name used for storing the database files
+    pub const DB_FOLDER_NAME: &str = "db";
+    /// The default discovery secret file name used for storing the discovery secret
+    pub const DISCOVERY_SECRET_FILE_NAME: &str = "discovery-secret";
+    /// The prefix protocol id for request-response protocol
+    pub const REQREP_PROTOCOL_PREFIX: &str = "/account_abstraction/req";
+    /// The topic hash prefix for gossisub protocol
+    pub const TOPIC_PREFIX: &str = "account_abstraction";
+    /// The user operation with entrypoint topic for gossipsub protocol
+    pub const USER_OPS_WITH_ENTRY_POINT_TOPIC: &str = "user_ops_with_entry_point";
+    /// The snappy encoding for gossipsub protocol
+    pub const SSZ_SNAPPY_ENCODING: &str = "ssz_snappy";
+    /// The maximum size of a gossipsub message
+    pub const MAX_GOSSIP_SNAP_SIZE: usize = 1048576; // bytes
+}

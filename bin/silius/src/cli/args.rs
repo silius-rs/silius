@@ -95,7 +95,7 @@ pub struct UoPoolArgs {
 
     /// P2P configuration
     #[clap(flatten)]
-    pub p2p_opts: P2POpts,
+    pub p2p_opts: P2PArgs,
 }
 
 /// Common CLI args for bundler and uopool
@@ -220,7 +220,7 @@ pub struct CreateWalletArgs {
 }
 
 #[derive(Clone, Debug, Parser, PartialEq)]
-pub struct P2POpts {
+pub struct P2PArgs {
     /// enable p2p
     #[clap(long)]
     pub enable_p2p: bool,
@@ -234,19 +234,23 @@ pub struct P2POpts {
     pub p2p_broadcast_address: Option<Ipv4Addr>,
 
     /// The udp4 port to broadcast to peers in order to reach back for discovery.
-    #[clap(long, default_value = "9000")]
+    #[clap(long = "discovery.port", default_value = "9000")]
     pub udp4_port: u16,
 
     /// The tcp4 port to boardcast to peers in order to reach back for discovery.
-    #[clap(long, default_value = "9000")]
+    #[clap(long = "p2p.port", default_value = "9000")]
     pub tcp4_port: u16,
 
     /// The initial bootnodes to connect to for the p2p network
     #[clap(long, value_delimiter = ',', value_parser=parse_enr)]
     pub bootnodes: Vec<Enr>,
+
+    /// The path to the file where the p2p private key is stored.
+    #[clap(long)]
+    pub node_key: Option<PathBuf>,
 }
 
-impl P2POpts {
+impl P2PArgs {
     /// Convert the P2POpts to [silius_p2p::config::Config]
     pub fn to_config(&self) -> Config {
         // TODO: support ipv6
@@ -586,23 +590,26 @@ mod tests {
             "0.0.0.0",
             "--p2p-broadcast-address",
             "127.0.0.1",
-            "--tcp4-port",
+            "--discovery.port",
             "4337",
-            "--udp4-port",
+            "--p2p.port",
             "4337",
             "--bootnodes",
             &binding,
+            "--node-key",
+            "~/.silius/discovery-secret",
         ];
         assert_eq!(
-            P2POpts {
+            P2PArgs {
                 enable_p2p: true,
                 p2p_listen_address: Ipv4Addr::new(0, 0, 0, 0),
                 p2p_broadcast_address: Some(Ipv4Addr::new(127, 0, 0, 1)),
                 tcp4_port: 4337,
                 udp4_port: 4337,
-                bootnodes: vec![enr]
+                bootnodes: vec![enr],
+                node_key: Some(PathBuf::from("~/.silius/discovery-secret")),
             },
-            P2POpts::try_parse_from(args).unwrap()
+            P2PArgs::try_parse_from(args).unwrap()
         )
     }
 }

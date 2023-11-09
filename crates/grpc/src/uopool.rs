@@ -17,6 +17,7 @@ use futures::StreamExt;
 use libp2p_identity::Keypair;
 use silius_p2p::config::Config;
 use silius_p2p::network::{EntrypointChannels, Network};
+use silius_primitives::consts::p2p::DB_FOLDER_NAME;
 use silius_primitives::provider::BlockStream;
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::UserOperation;
@@ -29,14 +30,11 @@ use silius_uopool::{
     UoPool as UserOperationPool, UoPoolBuilder,
 };
 use std::fmt::{Debug, Display};
+use std::os::unix::prelude::PermissionsExt;
+use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{error, info};
-
-/// The dafault database folder name used for storing the database files
-pub const DB_FOLDER_NAME: &str = "db";
-/// The default discovery secret file name used for storing the discovery secret
-pub const DISCOVERY_SECRET_FILE_NAME: &str = "discovery-secret";
 
 type StandardUserPool<M, P, R, E> =
     UserOperationPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>;
@@ -371,6 +369,7 @@ pub async fn uopool_service_run<M>(
     whitelist: Vec<Address>,
     upool_mode: UoPoolMode,
     p2p_enabled: bool,
+    node_key_file: PathBuf,
     config: Config,
     bootnodes: Vec<Enr>,
 ) -> Result<()>
@@ -390,9 +389,9 @@ where
         env.create_tables()
             .expect("Create mdbx database tables failed");
 
-        let mut entrypoint_channels: EntrypointChannels = Vec::new();
-
         if p2p_enabled {
+            let mut entrypoint_channels: EntrypointChannels = Vec::new();
+
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
                 let id = mempool_id(&ep, &U256::from(chain.id()));
                 let (waiting_to_pub_sd, waiting_to_pub_rv) = unbounded::<(UserOperation, U256)>();
@@ -428,20 +427,22 @@ where
                 entrypoint_channels.push((chain, ep, waiting_to_pub_rv, p2p_userop_sd))
             }
 
-            let discovery_secret_file = datadir.join(DISCOVERY_SECRET_FILE_NAME);
-            let discovery_secret = if discovery_secret_file.exists() {
+            let discovery_secret = if node_key_file.exists() {
                 let content =
-                    std::fs::read(discovery_secret_file).expect("discovery secret file currupted");
+                    std::fs::read(node_key_file).expect("discovery secret file currupted");
                 Keypair::from_protobuf_encoding(&content).expect("discovery secret file currupted")
             } else {
+                info!("The p2p spec private key is not exist. Creating one now!");
                 let keypair = Keypair::generate_secp256k1();
                 std::fs::write(
-                    discovery_secret_file,
+                    node_key_file.clone(),
                     keypair
                         .to_protobuf_encoding()
                         .expect("discovery secret encode failed"),
                 )
                 .expect("write discoveray secret file failed");
+                std::fs::set_permissions(node_key_file, std::fs::Permissions::from_mode(0o600))
+                    .expect("Setting key file permission failed");
                 keypair
             };
             let listen_addrs = config.listen_addr.to_multi_addr();

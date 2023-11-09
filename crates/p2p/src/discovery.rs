@@ -81,13 +81,13 @@ impl Discovery {
 }
 
 #[derive(Debug)]
-pub struct DiscoverPeers {
+pub struct DiscoveredPeers {
     pub peers: Vec<Enr>,
 }
 
 impl NetworkBehaviour for Discovery {
     type ConnectionHandler = ConnectionHandler;
-    type ToSwarm = DiscoverPeers;
+    type ToSwarm = DiscoveredPeers;
 
     fn poll(
         &mut self,

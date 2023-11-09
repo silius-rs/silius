@@ -58,8 +58,8 @@ impl From<request_response::Event> for Event {
     }
 }
 
-impl From<discovery::DiscoverPeers> for Event {
-    fn from(value: discovery::DiscoverPeers) -> Self {
+impl From<discovery::DiscoveredPeers> for Event {
+    fn from(value: discovery::DiscoveredPeers) -> Self {
         Event::Discovery(value)
     }
 }
@@ -78,7 +78,7 @@ pub enum Event {
     /// Request/Response protocol event
     Reqrep(request_response::Event),
     /// Discovery protocol event
-    Discovery(discovery::DiscoverPeers),
+    Discovery(discovery::DiscoveredPeers),
     /// Peer manager event
     PeerManager(PeerManagerEvent),
 }

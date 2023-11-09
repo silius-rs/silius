@@ -60,7 +60,7 @@ where
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
     // It would be None if p2p is not enabled
-    publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
+    p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
 impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
@@ -90,7 +90,7 @@ where
         reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
         max_verification_gas: U256,
         chain: Chain,
-        publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
+        p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
         Self {
             id: mempool_id(&entry_point.address(), &chain.id().into()),
@@ -100,7 +100,7 @@ where
             reputation,
             max_verification_gas,
             chain,
-            publish_sd,
+            p2p_channel,
         }
     }
 
@@ -218,7 +218,7 @@ where
         if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);
         }
-        if let Some(ref sd) = self.publish_sd {
+        if let Some(ref sd) = self.p2p_channel {
             sd.unbounded_send((uo.clone(), res.verified_block))
                 .expect("Failed to send user operation to publish channel")
         };

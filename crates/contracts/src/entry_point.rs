@@ -391,7 +391,6 @@ mod tests {
     };
     use silius_primitives::UserOperation;
     use std::{str::FromStr, sync::Arc};
-
     #[tokio::test]
     #[ignore]
     async fn simulate_validation() {
@@ -453,10 +452,15 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_failedop() -> eyre::Result<()> {
+    fn deserialize_failed_op() -> eyre::Result<()> {
         let err_msg = Bytes::from_str("0x220266b600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000001e41413430206f76657220766572696669636174696f6e4761734c696d69740000")?;
         let res = EntryPointAPIErrors::decode(err_msg)?;
-        println!("res: {:?}", res);
+        match res {
+            EntryPointAPIErrors::FailedOp(f) => {
+                assert_eq!(f.reason, "AA40 over verificationGasLimit")
+            }
+            _ => panic!("Invalid error message"),
+        }
         Ok(())
     }
 }

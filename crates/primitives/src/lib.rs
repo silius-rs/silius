@@ -3,7 +3,7 @@
 pub mod bundler;
 pub mod chain;
 pub mod consts;
-mod p2p;
+pub mod p2p;
 pub mod provider;
 pub mod reputation;
 pub mod sanity;

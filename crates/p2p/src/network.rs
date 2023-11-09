@@ -163,7 +163,7 @@ impl Network {
                     .iter()
                     .find_map(|(_, ep, _, new_coming_uos_ch)| {
                         if *ep == userops.entrypoint_address() {
-                            for user_op in userops.clone().user_ops().into_iter() {
+                            for user_op in userops.clone().user_operations().into_iter() {
                                 new_coming_uos_ch
                                     .unbounded_send(user_op)
                                     .expect("new useop channel should be open all the time");
@@ -223,7 +223,7 @@ impl Network {
     }
 
     // TODO: discovery peer connect
-    fn handle_discovery_event(&self, _event: discovery::DiscoverPeers) -> Option<NetworkEvent> {
+    fn handle_discovery_event(&self, _event: discovery::DiscoveredPeers) -> Option<NetworkEvent> {
         None
     }
 
@@ -250,7 +250,7 @@ impl Network {
     }
 
     pub fn poll_network(&mut self, cx: &mut Context) -> Poll<NetworkEvent> {
-        let mut msg_to_publich = Vec::new();
+        let mut msg_to_publish = Vec::new();
         for (chain, ep, waiting_to_publish_ch, _) in self.entrypoint_channels.iter_mut() {
             while let Ok(Some((pub_userop, verified_block))) = waiting_to_publish_ch.try_next() {
                 info!("Got userop {pub_userop:?} from ep {ep:} verified in {verified_block:?} to publish to p2p network!");
@@ -260,11 +260,11 @@ impl Network {
                     chain.id().into(),
                     vec![pub_userop],
                 );
-                msg_to_publich.push(pub_msg);
+                msg_to_publish.push(pub_msg);
             }
         }
 
-        for pub_msg in msg_to_publich.into_iter() {
+        for pub_msg in msg_to_publish.into_iter() {
             match self.publish(pub_msg) {
                 Ok(_) => {}
                 Err(err) => match err {
