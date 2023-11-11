@@ -226,11 +226,11 @@ pub struct P2PArgs {
     pub enable_p2p: bool,
 
     /// Sets the p2p listen address.
-    #[clap(long, default_value = "0.0.0.0")]
+    #[clap(long = "p2p.addr", default_value = "0.0.0.0")]
     pub p2p_listen_address: Ipv4Addr,
 
     /// The ipv4 address to broadcast to peers about which address we are listening on.
-    #[clap(long)]
+    #[clap(long = "p2p.baddr")]
     pub p2p_broadcast_address: Option<Ipv4Addr>,
 
     /// The udp4 port to broadcast to peers in order to reach back for discovery.
@@ -586,9 +586,9 @@ mod tests {
         let args = vec![
             "p2popts",
             "--enable-p2p",
-            "--p2p-listen-address",
+            "--p2p.addr",
             "0.0.0.0",
-            "--p2p-broadcast-address",
+            "--p2p.baddr",
             "127.0.0.1",
             "--discovery.port",
             "4337",

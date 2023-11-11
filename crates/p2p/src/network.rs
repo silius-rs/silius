@@ -252,11 +252,13 @@ impl Network {
     pub fn poll_network(&mut self, cx: &mut Context) -> Poll<NetworkEvent> {
         let mut msg_to_publish = Vec::new();
         for (chain, ep, waiting_to_publish_ch, _) in self.entrypoint_channels.iter_mut() {
-            while let Ok(Some((pub_userop, verified_block))) = waiting_to_publish_ch.try_next() {
-                info!("Got userop {pub_userop:?} from ep {ep:} verified in {verified_block:?} to publish to p2p network!");
+            while let Ok(Some((pub_userop, verified_at_block_hash))) =
+                waiting_to_publish_ch.try_next()
+            {
+                info!("Got userop {pub_userop:?} from ep {ep:?} verified in {verified_at_block_hash:?} to publish to p2p network!");
                 let pub_msg = UserOperationsWithEntryPoint::new(
                     *ep,
-                    verified_block,
+                    verified_at_block_hash,
                     chain.id().into(),
                     vec![pub_userop],
                 );

@@ -14,7 +14,7 @@ use expanded_pathbuf::ExpandedPathBuf;
 use eyre::Result;
 use futures::channel::mpsc::unbounded;
 use futures::StreamExt;
-use libp2p_identity::Keypair;
+use libp2p_identity::{secp256k1, Keypair};
 use silius_p2p::config::Config;
 use silius_p2p::network::{EntrypointChannels, Network};
 use silius_primitives::consts::p2p::DB_FOLDER_NAME;
@@ -29,6 +29,7 @@ use silius_uopool::{
     mempool_id, validate::validator::StandardUserOperationValidator, MempoolId, Reputation,
     UoPool as UserOperationPool, UoPoolBuilder,
 };
+use std::env;
 use std::fmt::{Debug, Display};
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
@@ -431,8 +432,17 @@ where
                 let content =
                     std::fs::read(node_key_file).expect("discovery secret file currupted");
                 Keypair::from_protobuf_encoding(&content).expect("discovery secret file currupted")
+            } else if let Ok(p2p_private_seed) = env::var("P2P_PRIVATE_SEED") {
+                // Mostly test purpose
+                let private_bytes = p2p_private_seed.as_bytes().to_vec();
+                let keypair: secp256k1::Keypair =
+                    secp256k1::SecretKey::try_from_bytes(private_bytes)
+                        .expect("Env P2P_PRIVATE_SEED is not valid private bytes")
+                        .into();
+                keypair.into()
             } else {
                 info!("The p2p spec private key is not exist. Creating one now!");
+
                 let keypair = Keypair::generate_secp256k1();
                 std::fs::write(
                     node_key_file.clone(),
