@@ -32,7 +32,7 @@ use silius_primitives::{
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
-use tracing::trace;
+use tracing::{info, trace};
 
 pub type VecUo = Vec<UserOperation>;
 pub type VecCh = Vec<CodeHash>;
@@ -232,7 +232,7 @@ where
                 if let Some(code_hashes) = res.code_hashes {
                     let _ = self.mempool.set_code_hashes(&uo_hash, &code_hashes);
                 }
-
+                info!("{uo_hash:?} added to the mempool {:?}", self.id);
                 trace!("{uo:?} added to the mempool {:?}", self.id);
 
                 // update reputation

@@ -176,8 +176,8 @@ impl Behaviour {
             if connections.is_empty() {
                 return Some(request);
             }
-            let ix = (request.request_id.0 as usize) % connections.len();
-            let conn = &mut connections[ix];
+            let id = (request.request_id.0 as usize) % connections.len();
+            let conn = &mut connections[id];
             conn.pending_inbound_responses.insert(request.request_id);
             self.pending_events.push_back(ToSwarm::NotifyHandler {
                 peer_id: *peer,
