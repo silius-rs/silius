@@ -1,3 +1,4 @@
+use alloy_chains::Chain;
 use ethers::{
     prelude::{LocalWallet, SignerMiddleware},
     providers::Middleware,
@@ -12,8 +13,8 @@ use ethers_flashbots::{
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{
     bundler::SendBundleMode,
-    consts::{flashbots_relay_endpoints, supported_networks},
-    Chain, UserOperation, Wallet,
+    consts::{flashbots_relay_endpoints, supported_chains},
+    UserOperation, Wallet,
 };
 use std::{sync::Arc, time::Duration};
 use tracing::{info, trace};
@@ -72,9 +73,9 @@ where
         relay_endpoints: Option<Vec<String>>,
         min_balance: U256,
     ) -> eyre::Result<Self> {
-        if !(chain.id() == supported_networks::MAINNET
-            || chain.id() == supported_networks::GOERLI
-            || chain.id() == supported_networks::SEPOLIA)
+        if !(chain.id() == supported_chains::MAINNET
+            || chain.id() == supported_chains::GOERLI
+            || chain.id() == supported_chains::SEPOLIA)
             && send_bundle_mode == SendBundleMode::Flashbots
         {
             panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia");
@@ -206,7 +207,7 @@ where
 
         match self.chain.id() {
             // Mumbai
-            supported_networks::MUMBAI => {
+            supported_chains::MUMBAI => {
                 tx.set_nonce(nonce).set_chain_id(self.chain.id());
             }
             // All other surpported networks, including Mainnet, Goerli
@@ -461,6 +462,7 @@ mod test {
         mock_relay::{MockFlashbotsBlockBuilderRelay, MockFlashbotsRelayServer, INIT_BLOCK},
         Bundler,
     };
+    use alloy_chains::Chain;
     use alloy_primitives::{Address as alloy_Address, U256 as alloy_U256};
     use alloy_sol_types::{sol, SolCall};
     use ethers::{
@@ -474,9 +476,7 @@ mod test {
         utils::{parse_units, Anvil, AnvilInstance},
     };
     use jsonrpsee::server::{ServerBuilder, ServerHandle};
-    use silius_primitives::{
-        bundler::SendBundleMode, consts::flashbots_relay_endpoints, Chain, Wallet,
-    };
+    use silius_primitives::{bundler::SendBundleMode, consts::flashbots_relay_endpoints, Wallet};
     use std::sync::Arc;
 
     sol! {

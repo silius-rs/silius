@@ -14,7 +14,6 @@ mod utils;
 mod wallet;
 
 pub use bundler::Mode as BundlerMode;
-pub use chain::Chain;
 pub use p2p::{PooledUserOps, UserOperationsWithEntryPoint};
 pub use uopool::Mode as UoPoolMode;
 pub use user_operation::{

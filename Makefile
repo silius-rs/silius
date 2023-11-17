@@ -49,10 +49,10 @@ lint:
 run-geth:
 	cd bundler-spec-tests && docker compose up -d && cd ..
 
-deploy-entrypoint:
-	cd tests/thirdparty/bundler && yarn hardhat-deploy --network localhost && cd ../../..
+deploy-contracts:
+	cd crates/contracts/thirdparty/account-abstraction && yarn deploy --network localhost && cd ../../..
 
 clean:
 	cd crates/contracts/thirdparty/account-abstraction && yarn clean && cd ../..
-	cd crates/contracts/thirdparty/bundler && yarn clear && cd ../..
+	cd tests/thirdparty/bundler && yarn clear && cd ../..
 	cargo clean

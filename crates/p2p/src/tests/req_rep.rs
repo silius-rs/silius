@@ -1,10 +1,9 @@
-use std::time::Duration;
-
 use crate::{
     network::NetworkEvent,
     request_response::{GetMetaData, Request, Response, Status},
     tests::build_connnected_p2p_pair,
 };
+use std::time::Duration;
 
 async fn reqrep_case(request_case: Request, response_case: Response) -> eyre::Result<()> {
     let (mut peer1, mut peer2) = build_connnected_p2p_pair().await?;

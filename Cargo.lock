@@ -113,6 +113,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0942ffc6dcaadf03badf6e6a2d0228460359d5e34b57ccdc720b7382dfbd5ec5"
 
 [[package]]
+name = "alloy-chains"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c18b3ecf1746f0eac255374bdf899dd217dd1b301e4a3f146592234243e1bc66"
+dependencies = [
+ "num_enum",
+ "serde",
+ "strum 0.25.0",
+]
+
+[[package]]
 name = "alloy-primitives"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2539,6 +2550,7 @@ dependencies = [
 name = "examples-storage"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "ethers 2.0.8",
  "eyre",
  "futures",
@@ -6934,6 +6946,7 @@ dependencies = [
 name = "silius"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "clap",
  "dirs 4.0.0",
  "discv5",
@@ -6956,6 +6969,7 @@ dependencies = [
 name = "silius-bundler"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "alloy-primitives 0.2.0",
  "alloy-sol-types 0.2.0",
  "async-trait",
@@ -6996,6 +7010,7 @@ dependencies = [
 name = "silius-grpc"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "arrayref",
  "async-trait",
  "dashmap",
@@ -7025,6 +7040,7 @@ dependencies = [
 name = "silius-p2p"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "async-trait",
  "delay_map",
  "discv5",
@@ -7051,6 +7067,7 @@ dependencies = [
 name = "silius-primitives"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "async-stream",
  "educe",
  "ethers 2.0.8",
@@ -7095,6 +7112,7 @@ dependencies = [
 name = "silius-tests"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "ethers 2.0.8",
  "eyre",
  "futures",
@@ -7109,6 +7127,7 @@ dependencies = [
 name = "silius-uopool"
 version = "0.3.0-alpha"
 dependencies = [
+ "alloy-chains",
  "async-trait",
  "educe",
  "enumset",

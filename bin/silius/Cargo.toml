@@ -11,6 +11,7 @@ AA (ERC-4337) bundler - Silius
 """
 
 [dependencies]
+alloy-chains = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 dirs = "4.0"
 discv5 = { workspace = true }

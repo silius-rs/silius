@@ -8,10 +8,12 @@ use expanded_pathbuf::ExpandedPathBuf;
 use silius_p2p::config::{Config, ListenAddr};
 use silius_primitives::{
     bundler::SendBundleMode,
-    chain::SUPPORTED_CHAINS,
-    consts::networking::{
-        DEFAULT_BUNDLER_GRPC_PORT, DEFAULT_HTTP_RPC_PORT, DEFAULT_UOPOOL_GRPC_PORT,
-        DEFAULT_WS_RPC_PORT,
+    consts::{
+        networking::{
+            DEFAULT_BUNDLER_GRPC_PORT, DEFAULT_HTTP_RPC_PORT, DEFAULT_UOPOOL_GRPC_PORT,
+            DEFAULT_WS_RPC_PORT,
+        },
+        supported_chains::SUPPORTED_NAMED_CHAINS,
     },
     UoPoolMode,
 };
@@ -106,7 +108,7 @@ pub struct BundlerAndUoPoolArgs {
     pub eth_client_address: String,
 
     /// Chain information.
-    #[clap(long, value_parser = SUPPORTED_CHAINS)]
+    #[clap(long, value_parser = SUPPORTED_NAMED_CHAINS)]
     pub chain: Option<String>,
 
     /// Entry point addresses.
@@ -271,9 +273,8 @@ impl P2PArgs {
 }
 #[cfg(test)]
 mod tests {
-    use discv5::enr::{CombinedKey, EnrBuilder};
-
     use super::*;
+    use discv5::enr::{CombinedKey, EnrBuilder};
     use std::{
         net::{IpAddr, Ipv4Addr},
         str::FromStr,

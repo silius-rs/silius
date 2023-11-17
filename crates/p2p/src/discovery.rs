@@ -1,15 +1,13 @@
-use std::{collections::HashSet, pin::Pin, task::Poll};
-
+use crate::config::Config;
 use discv5::{
     enr::{CombinedKey, NodeId},
     Discv5, Discv5ConfigBuilder, Discv5Event, Enr,
 };
 use futures::{stream::FuturesUnordered, Future, FutureExt, StreamExt};
 use libp2p::swarm::{dummy::ConnectionHandler, NetworkBehaviour};
+use std::{collections::HashSet, pin::Pin, task::Poll};
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
-
-use crate::config::Config;
 
 type QueryResult = Result<Vec<Enr>, discv5::QueryError>;
 

@@ -73,13 +73,21 @@ pub mod flashbots_relay_endpoints {
     pub const LOKI_BUILDER: &str = "https://rpc.lokibuilder.xyz/";
 }
 
-/// Supported networks' IDs
-pub mod supported_networks {
+/// Supported chains
+pub mod supported_chains {
+    // dev
+    pub const DEV: u64 = 1337;
+
+    // ethereum
     pub const MAINNET: u64 = 1;
     pub const GOERLI: u64 = 5;
     pub const SEPOLIA: u64 = 11155111;
-    pub const DEV: u64 = 1337;
+
+    // polygon
     pub const MUMBAI: u64 = 80001;
+
+    pub const SUPPORTED_CHAINS: [u64; 5] = [MAINNET, GOERLI, SEPOLIA, DEV, MUMBAI];
+    pub const SUPPORTED_NAMED_CHAINS: [&str; 5] = ["mainnet", "goerli", "sepolia", "dev", "mumbai"];
 }
 
 /// Networking related constants

@@ -1,7 +1,6 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
-
 use discv5::ListenConfig;
 use libp2p::{multiaddr::Protocol, Multiaddr};
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 const DEFAULT_UDP_PORT: u16 = 9000;
 const DEFAULT_TCP_PORT: u16 = 9000;

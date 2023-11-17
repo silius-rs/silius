@@ -8,6 +8,7 @@ use crate::{
     },
     MempoolId, Overhead, Reputation,
 };
+use alloy_chains::Chain;
 use ethers::{
     prelude::LogMeta,
     providers::Middleware,
@@ -27,7 +28,7 @@ use silius_primitives::{
     sanity::SanityCheckError,
     simulation::{CodeHash, SimulationCheckError},
     uopool::{AddError, ValidationError},
-    Chain, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+    UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
 use std::collections::{HashMap, HashSet};

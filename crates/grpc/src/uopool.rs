@@ -3,6 +3,7 @@ use crate::{
     proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
     utils::{parse_addr, parse_hash, parse_uo},
 };
+use alloy_chains::Chain;
 use async_trait::async_trait;
 use dashmap::DashMap;
 use discv5::Enr;
@@ -21,7 +22,7 @@ use silius_primitives::consts::p2p::DB_FOLDER_NAME;
 use silius_primitives::provider::BlockStream;
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::UserOperation;
-use silius_primitives::{uopool::AddError, Chain, UoPoolMode};
+use silius_primitives::{uopool::AddError, UoPoolMode};
 use silius_uopool::{
     init_env, DBError, DatabaseMempool, DatabaseReputation, Mempool, VecCh, VecUo, WriteMap,
 };

@@ -1,12 +1,13 @@
 use crate::proto::bundler::*;
 use crate::proto::uopool::GetSortedRequest;
 use crate::uo_pool_client::UoPoolClient;
+use alloy_chains::Chain;
 use async_trait::async_trait;
 use ethers::providers::Middleware;
 use ethers::types::{Address, H256, U256};
 use parking_lot::Mutex;
 use silius_bundler::Bundler;
-use silius_primitives::{bundler::SendBundleMode, Chain, UserOperation, Wallet};
+use silius_primitives::{bundler::SendBundleMode, UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::{error, info};

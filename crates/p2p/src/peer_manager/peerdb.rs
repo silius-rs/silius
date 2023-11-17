@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use libp2p::PeerId;
+use std::collections::HashMap;
 
 pub enum ConnectionStatus {
     Connected,

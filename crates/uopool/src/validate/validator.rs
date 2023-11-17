@@ -19,6 +19,7 @@ use crate::{
     uopool::{VecCh, VecUo},
     Reputation as Rep,
 };
+use alloy_chains::Chain;
 use enumset::EnumSet;
 use ethers::{
     providers::Middleware,
@@ -31,7 +32,7 @@ use silius_contracts::{
 };
 use silius_primitives::{
     reputation::ReputationEntry, sanity::SanityCheckError, simulation::SimulationCheckError,
-    uopool::ValidationError, Chain, UserOperation,
+    uopool::ValidationError, UserOperation,
 };
 use std::fmt::{Debug, Display};
 use tracing::debug;

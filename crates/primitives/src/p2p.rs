@@ -1,8 +1,8 @@
+use crate::UserOperation;
+use alloy_chains::Chain;
 use ethers::types::{Address, U256 as EthersU256};
 use ssz_rs::{List, Vector, U256};
 use ssz_rs_derive::Serializable;
-
-use crate::{Chain, UserOperation};
 
 #[derive(Clone, Debug, Default, Serializable, PartialEq)]
 pub struct UserOperationsWithEntryPoint {
@@ -46,9 +46,7 @@ impl UserOperationsWithEntryPoint {
     }
 
     pub fn chain(&self) -> Chain {
-        Chain::from(EthersU256::from_little_endian(
-            self.chain_id.to_bytes_le().as_ref(),
-        ))
+        Chain::from(EthersU256::from_little_endian(self.chain_id.to_bytes_le().as_ref()).as_u64())
     }
 }
 

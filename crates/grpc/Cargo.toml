@@ -11,6 +11,7 @@ AA (ERC-4337) bundler gRPC interfaces
 """
 
 [dependencies]
+alloy-chains = { workspace = true }
 arrayref = "0.3"
 async-trait = { workspace = true }
 dashmap = "5.4.0"

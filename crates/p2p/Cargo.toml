@@ -12,6 +12,7 @@ AA (ERC-4337) Bundler p2p components
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+alloy-chains = { workspace = true }
 async-trait = "0.1"
 delay_map = "0.3.0"
 discv5 = { workspace = true }
