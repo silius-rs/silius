@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::config::Config;
 use crate::discovery::{self, Discovery};
 use crate::enr::build_enr;
@@ -9,6 +7,7 @@ use crate::request_response;
 use discv5::enr::CombinedKey;
 use libp2p::gossipsub;
 use libp2p::swarm::NetworkBehaviour;
+use std::time::Duration;
 
 /// The behaviour of the p2p network.
 #[derive(NetworkBehaviour)]

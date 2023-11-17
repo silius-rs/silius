@@ -1,15 +1,13 @@
-use std::{
-    net::{Ipv4Addr, TcpListener},
-    time::Duration,
-};
-
-use futures::channel::mpsc::unbounded;
-use libp2p::identity::Keypair;
-use silius_primitives::Chain;
-
 use crate::{
     config::{Config, ListenAddr},
     network::{Network, NetworkEvent},
+};
+use alloy_chains::Chain;
+use futures::channel::mpsc::unbounded;
+use libp2p::identity::Keypair;
+use std::{
+    net::{Ipv4Addr, TcpListener},
+    time::Duration,
 };
 mod enr;
 mod pubsub;

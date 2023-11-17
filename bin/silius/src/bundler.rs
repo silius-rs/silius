@@ -2,6 +2,7 @@ use crate::{
     cli::args::{BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, UoPoolArgs},
     utils::unwrap_path_or_home,
 };
+use alloy_chains::Chain;
 use ethers::{providers::Middleware, types::Address};
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
@@ -11,7 +12,7 @@ use silius_primitives::{
     bundler::SendBundleMode,
     consts::{flashbots_relay_endpoints, p2p::DISCOVERY_SECRET_FILE_NAME},
     provider::BlockStream,
-    Chain, Wallet,
+    Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -19,7 +20,7 @@ use silius_rpc::{
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
     JsonRpcServer, JsonRpcServerType,
 };
-use std::{collections::HashSet, future::pending, net::SocketAddr, sync::Arc};
+use std::{collections::HashSet, future::pending, net::SocketAddr, str::FromStr, sync::Arc};
 use tracing::info;
 
 pub async fn launch_bundler<M>(
@@ -89,7 +90,7 @@ where
     );
 
     let chain_id = eth_client.get_chainid().await?;
-    let chain_conn = Chain::from(chain_id);
+    let chain_conn = Chain::from(chain_id.as_u64());
 
     let wallet: Wallet;
     if args.send_bundle_mode == SendBundleMode::Flashbots {
@@ -151,7 +152,7 @@ where
         eth_client_version
     );
 
-    let chain_id = Chain::from(eth_client.get_chainid().await?);
+    let chain_id = Chain::from(eth_client.get_chainid().await?.as_u64());
 
     let datadir = unwrap_path_or_home(args.datadir)?;
 
@@ -313,15 +314,15 @@ async fn check_connected_chain<M>(eth_client: Arc<M>, chain: Option<String>) -> 
 where
     M: Middleware + Clone + 'static,
 {
-    let chain_id = eth_client.get_chainid().await?;
-    let chain_conn = Chain::from(chain_id);
+    if let Some(chain) = chain {
+        let chain = Chain::from_str(chain.as_str())?;
 
-    if let Some(chain_opt) = chain {
-        if chain_conn.name() != chain_opt {
+        let chain_id = eth_client.get_chainid().await?.as_u64();
+        if chain.id() != chain_id {
             return Err(eyre::format_err!(
-                "Tried to connect to the execution client of different chain: {} != {}",
-                chain_opt,
-                chain_conn.name()
+                "Tried to connect to the execution client of different chain ids: {} != {}",
+                chain.id(),
+                chain_id
             ));
         }
     }

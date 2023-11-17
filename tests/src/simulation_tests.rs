@@ -9,6 +9,7 @@ use crate::common::{
     },
     setup_geth, ClientType, DeployedContract,
 };
+use alloy_chains::Chain;
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
 use ethers::providers::{Http, Provider};
@@ -25,7 +26,7 @@ use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
 use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::simulation::SimulationCheckError;
 use silius_primitives::uopool::ValidationError;
-use silius_primitives::{Chain, UserOperation};
+use silius_primitives::UserOperation;
 use silius_uopool::validate::sanity::call_gas::CallGas;
 use silius_uopool::validate::sanity::entities::Entities;
 use silius_uopool::validate::sanity::max_fee::MaxFee;

@@ -1,7 +1,6 @@
-use std::io;
-
 use silius_primitives::UserOperation;
 use ssz_rs::{Bitvector, List, Serialize, Vector};
+use std::io;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Request {
@@ -60,6 +59,7 @@ impl From<u64> for GoodbyeReason {
         }
     }
 }
+
 impl From<GoodbyeReason> for u64 {
     fn from(value: GoodbyeReason) -> Self {
         match value {
@@ -86,6 +86,7 @@ impl Ping {
 pub struct Pong {
     data: u64,
 }
+
 impl Pong {
     pub fn new(data: u64) -> Self {
         Self { data }
@@ -166,7 +167,6 @@ impl Response {
 }
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-
 pub struct PooledUserOpHashes {
     more_flag: u64,
     hashes: List<[u8; 32], 1024>,
@@ -219,11 +219,9 @@ pub struct RequestId(pub(crate) u64);
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
-
-    use ssz_rs::Serialize;
-
     use super::Ping;
+    use ssz_rs::Serialize;
+    use std::io::Write;
 
     #[test]
     fn serilize() {

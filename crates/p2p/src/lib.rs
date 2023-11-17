@@ -6,5 +6,6 @@ pub mod gossipsub;
 pub mod network;
 pub mod peer_manager;
 pub mod request_response;
+
 #[cfg(test)]
 mod tests;

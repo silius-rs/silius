@@ -1,8 +1,3 @@
-use std::{
-    collections::HashSet,
-    io::{Error, ErrorKind},
-};
-
 use libp2p::gossipsub::{
     Behaviour, ConfigBuilder, DataTransform, IdentTopic, Message, MessageAuthenticity, RawMessage,
     TopicHash, ValidationMode, WhitelistSubscriptionFilter,
@@ -11,6 +6,10 @@ use silius_primitives::consts::p2p::{
     MAX_GOSSIP_SNAP_SIZE, SSZ_SNAPPY_ENCODING, TOPIC_PREFIX, USER_OPS_WITH_ENTRY_POINT_TOPIC,
 };
 use snap::raw::{decompress_len, Decoder, Encoder};
+use std::{
+    collections::HashSet,
+    io::{Error, ErrorKind},
+};
 
 pub type Gossipsub = Behaviour<SnappyTransform, WhitelistSubscriptionFilter>;
 

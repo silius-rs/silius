@@ -11,6 +11,7 @@ AA (ERC-4337) bundler integration tests
 """
 
 [dependencies]
+alloy-chains = { workspace = true }
 ethers = { workspace = true }
 eyre = { workspace = true }
 silius-contracts = { path = "../crates/contracts" }
@@ -23,4 +24,4 @@ tokio = { workspace = true }
 futures = "0.3.28"
 
 [package.metadata.cargo-udeps.ignore]
-normal = ["silius-contracts", "silius-primitives", "silius-uopool"]
+normal = ["alloy-chains", "silius-contracts", "silius-primitives", "silius-uopool"]

@@ -1,3 +1,11 @@
+use super::{
+    models::{Request, RequestId, Response},
+    upgrade::{InboundReqUpgrade, OutboundRepUpgrade},
+};
+use crate::request_response::{
+    protocol::Protocol, BoundError, GetMetaData, GoodbyeReason, MetaData, Ping, Pong,
+    PooledUserOpHashes, PooledUserOpHashesReq, PooledUserOpsByHash, PooledUserOpsByHashReq, Status,
+};
 use futures::{
     channel::oneshot::{self, Receiver, Sender},
     future::BoxFuture,
@@ -22,16 +30,6 @@ use std::{
     time::Duration,
 };
 use tracing::{trace, warn};
-
-use crate::request_response::{
-    protocol::Protocol, BoundError, GetMetaData, GoodbyeReason, MetaData, Ping, Pong,
-    PooledUserOpHashes, PooledUserOpHashesReq, PooledUserOpsByHash, PooledUserOpsByHashReq, Status,
-};
-
-use super::{
-    models::{Request, RequestId, Response},
-    upgrade::{InboundReqUpgrade, OutboundRepUpgrade},
-};
 
 /// Max request size in bytes
 const REQUEST_SIZE_MAXIMUM: u64 = 1024 * 1024;

@@ -1,7 +1,6 @@
+use crate::enr::EnrExt;
 use discv5::Enr;
 use std::str::FromStr;
-
-use crate::enr::EnrExt;
 
 #[test]
 fn enr_decoding() {

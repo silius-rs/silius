@@ -5,6 +5,7 @@ use crate::{
     uopool::{VecCh, VecUo},
     Reputation,
 };
+use alloy_chains::Chain;
 use enumset::{EnumSet, EnumSetType};
 use ethers::{providers::Middleware, types::U256};
 use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame, EntryPoint};
@@ -14,7 +15,7 @@ use silius_primitives::{
     sanity::SanityCheckError,
     simulation::{CodeHash, SimulationCheckError, StorageMap},
     uopool::ValidationError,
-    Chain, UserOperation, UserOperationHash,
+    UserOperation, UserOperationHash,
 };
 
 pub mod sanity;

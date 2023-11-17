@@ -1,17 +1,16 @@
-use std::time::Duration;
-
-use silius_primitives::{Chain, UserOperationsWithEntryPoint};
-
 use crate::{
     network::{NetworkEvent, PubsubMessage},
     tests::build_connnected_p2p_pair,
 };
+use alloy_chains::Chain;
+use silius_primitives::{chain::ChainExt, UserOperationsWithEntryPoint};
+use std::time::Duration;
 
 #[tokio::test]
 async fn pubsub_msg() -> eyre::Result<()> {
     let chain: Chain = 5.into();
     let (mut peer1, mut peer2) = build_connnected_p2p_pair().await?;
-    let mempool_id = chain.p2p_mempool_id();
+    let mempool_id = chain.canonical_mempool_id();
     let _ = peer1.subscribe(&mempool_id)?;
     let res = peer2.subscribe(&mempool_id)?;
     println!("{mempool_id}, {res:?}");

@@ -1,16 +1,14 @@
 pub mod peerdb;
 
-use std::{collections::VecDeque, task::Poll, time::Duration};
-
+use self::peerdb::PeerDB;
 use delay_map::HashSetDelay;
 use futures::StreamExt;
 use libp2p::{
     swarm::{dummy::ConnectionHandler, NetworkBehaviour, ToSwarm},
     PeerId,
 };
+use std::{collections::VecDeque, task::Poll, time::Duration};
 use tracing::error;
-
-use self::peerdb::PeerDB;
 
 /// The events that the `PeerManager` outputs (requests).
 #[derive(Debug)]

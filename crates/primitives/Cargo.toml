@@ -11,6 +11,7 @@ AA (ERC-4337) bundler commonly used types
 """
 
 [dependencies]
+alloy-chains = { workspace = true }
 async-stream = { workspace = true }
 educe = { version = "0.4", features = ["Debug", "Default"] }
 ethers = { workspace = true }

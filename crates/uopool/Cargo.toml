@@ -11,6 +11,7 @@ AA (ERC-4337) bundler uopool implementation
 """
 
 [dependencies]
+alloy-chains = { workspace = true }
 async-trait = { workspace = true }
 educe = { version = "0.4", features = ["Debug", "Default"] }
 enumset = "1.1.2"

@@ -1,3 +1,4 @@
+use crate::config::Config;
 use discv5::{
     enr::{
         k256::{ecdsa::VerifyingKey, CompressedPoint},
@@ -10,8 +11,6 @@ use libp2p::{
     multiaddr::Protocol,
     Multiaddr, PeerId,
 };
-
-use crate::config::Config;
 
 /// Convert a libp2p Keypair into a discv5 CombinedKey
 pub fn keypair_to_combine(keypair: Keypair) -> eyre::Result<CombinedKey> {

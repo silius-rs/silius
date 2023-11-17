@@ -1,10 +1,8 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::{atomic::AtomicU64, Arc},
-    task::Poll,
-    time::Duration,
+use super::{
+    handler::{Handler, HandlerEvent, OutboundInfo},
+    models::{Request, RequestId, Response},
+    BoundError,
 };
-
 use futures::channel::oneshot;
 use libp2p::{
     swarm::{
@@ -14,11 +12,11 @@ use libp2p::{
     },
     PeerId,
 };
-
-use super::{
-    handler::{Handler, HandlerEvent, OutboundInfo},
-    models::{Request, RequestId, Response},
-    BoundError,
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    sync::{atomic::AtomicU64, Arc},
+    task::Poll,
+    time::Duration,
 };
 
 /// The event of the request-response protocol.

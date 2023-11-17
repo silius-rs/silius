@@ -1,9 +1,13 @@
-use std::{
-    io,
-    task::{Context, Poll},
-    time::Duration,
+use crate::{
+    behaviour::Behaviour,
+    config::Config,
+    discovery,
+    enr::{keypair_to_combine, EnrExt},
+    gossipsub::topic,
+    peer_manager::PeerManagerEvent,
+    request_response::{self, Ping, Request, RequestId, Response},
 };
-
+use alloy_chains::Chain;
 use discv5::Enr;
 use ethers::types::{Address, U256};
 use futures::channel::{
@@ -20,19 +24,14 @@ use libp2p::{
     Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError,
 };
 use libp2p_mplex::{MaxBufferBehaviour, MplexConfig};
-use silius_primitives::{Chain, UserOperation, UserOperationsWithEntryPoint};
+use silius_primitives::{chain::ChainExt, UserOperation, UserOperationsWithEntryPoint};
 use ssz_rs::{Deserialize, Serialize};
-use tracing::{debug, error, info, warn};
-
-use crate::{
-    behaviour::Behaviour,
-    config::Config,
-    discovery,
-    enr::{keypair_to_combine, EnrExt},
-    gossipsub::topic,
-    peer_manager::PeerManagerEvent,
-    request_response::{self, Ping, Request, RequestId, Response},
+use std::{
+    io,
+    task::{Context, Poll},
+    time::Duration,
 };
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, PartialEq)]
 pub enum PubsubMessage {
@@ -112,7 +111,7 @@ impl Network {
             config,
             entrypoint_channels
                 .iter()
-                .map(|(c, _, _, _)| c.p2p_mempool_id())
+                .map(|(c, _, _, _)| c.canonical_mempool_id().to_string())
                 .collect(),
             ping_interval,
             target_peers,
@@ -329,7 +328,7 @@ impl Network {
         let _ = user_ops
             .serialize(&mut buf)
             .expect("ssz of user ops serialization failed");
-        let topic_hash: TopicHash = topic(user_ops.chain().p2p_mempool_id().as_str()).into();
+        let topic_hash: TopicHash = topic(user_ops.chain().canonical_mempool_id()).into();
         self.swarm
             .behaviour_mut()
             .gossipsub
