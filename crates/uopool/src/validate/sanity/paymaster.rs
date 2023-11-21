@@ -1,13 +1,10 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{
-    get_address, reputation::ReputationEntry, sanity::SanityCheckError, UserOperation,
-};
+use silius_primitives::{get_address, sanity::SanityCheckError, UserOperation};
 use std::fmt::Debug;
 
 pub struct Paymaster;
@@ -15,8 +12,8 @@ pub struct Paymaster;
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Paymaster
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the sanity check on the paymaster.

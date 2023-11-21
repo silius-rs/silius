@@ -1,21 +1,18 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
 };
 use ethers::providers::Middleware;
-use silius_primitives::{
-    reputation::ReputationEntry, simulation::SimulationCheckError, UserOperation,
-};
+use silius_primitives::{simulation::SimulationCheckError, UserOperation};
 
 pub struct Gas;
 
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for Gas
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that checks if the user operation runs out of gas
     ///

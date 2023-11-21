@@ -6,6 +6,7 @@ mod database;
 mod memory;
 mod mempool;
 mod reputation;
+// mod storage;
 mod uopool;
 mod utils;
 pub mod validate;
@@ -17,5 +18,5 @@ pub use database::{
 pub use memory::{mempool::MemoryMempool, reputation::MemoryReputation};
 pub use mempool::{mempool_id, Mempool, MempoolBox, MempoolId};
 pub use reputation::{Reputation, ReputationBox};
-pub use uopool::{UoPool, VecCh, VecUo};
+pub use uopool::UoPool;
 pub use utils::Overhead;

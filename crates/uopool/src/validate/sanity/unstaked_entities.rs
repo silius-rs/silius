@@ -1,7 +1,6 @@
 use crate::{
     mempool::Mempool,
     reputation::Reputation as Rep,
-    uopool::{VecCh, VecUo},
     validate::{SanityCheck, SanityHelper},
 };
 use ethers::{
@@ -31,8 +30,8 @@ impl UnstakedEntities {
         helper: &SanityHelper<'a, M, P, R, E>,
     ) -> Result<StakeInfo, SanityCheckError>
     where
-        P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-        R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+        P: Mempool<Error = E> + Send + Sync,
+        R: Rep<Error = E> + Send + Sync,
         E: Debug,
     {
         let info = helper
@@ -57,8 +56,8 @@ impl UnstakedEntities {
         helper: &SanityHelper<M, P, R, E>,
     ) -> Result<ReputationEntry, SanityCheckError>
     where
-        P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-        R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+        P: Mempool<Error = E> + Send + Sync,
+        R: Rep<Error = E> + Send + Sync,
         E: Debug,
     {
         helper
@@ -85,8 +84,8 @@ impl UnstakedEntities {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for UnstakedEntities
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Rep<Error = E> + Send + Sync,
     E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the sanity check for the unstaked entities.

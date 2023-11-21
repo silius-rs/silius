@@ -29,7 +29,6 @@ pub struct MemoryReputation {
 
 impl Reputation for MemoryReputation {
     /// An array of [`ReputationEntry`](silius_primitives::reputation::ReputationEntry)
-    type ReputationEntries = Vec<ReputationEntry>;
     type Error = eyre::Error;
 
     /// Initialize an instance of the [MemoryReputation](MemoryReputation)
@@ -309,7 +308,7 @@ impl Reputation for MemoryReputation {
     ///
     /// # Returns
     /// * `Ok(())` if the entries were set successfully
-    fn set_entities(&mut self, entries: Self::ReputationEntries) -> Result<(), Self::Error> {
+    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error> {
         for en in entries {
             self.entities.insert(en.address, en);
         }
@@ -321,7 +320,7 @@ impl Reputation for MemoryReputation {
     ///
     /// # Returns
     /// * All [reputation entries](ReputationEntries)
-    fn get_all(&self) -> Self::ReputationEntries {
+    fn get_all(&self) -> Vec<ReputationEntry> {
         self.entities
             .values()
             .map(|ent| ReputationEntry {

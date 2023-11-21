@@ -29,8 +29,6 @@ impl<E: EnvironmentKind> DatabaseMempool<E> {
 }
 
 impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
-    type UserOperations = Vec<UserOperation>;
-    type CodeHashes = Vec<CodeHash>;
     type Error = DBError;
 
     /// Adds a [UserOperation](UserOperation) to the mempool database.
@@ -94,7 +92,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     ///
     /// # Returns
     /// * `Vec<UserOperation>` - An array of [UserOperations](UserOperation) from the given sender.
-    fn get_all_by_sender(&self, sender: &Address) -> Self::UserOperations {
+    fn get_all_by_sender(&self, sender: &Address) -> Vec<UserOperation> {
         let sender_wrap: WrapAddress = (*sender).into();
         self.env
             .tx()
@@ -200,7 +198,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     ///
     /// # Returns
     /// * `Ok(bool)` - True if the [CodeHash](CodeHash) exists. Otherwise, false.
-    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Self::CodeHashes {
+    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Vec<CodeHash> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         self.env
@@ -234,7 +232,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Self::CodeHashes,
+        hashes: &Vec<CodeHash>,
     ) -> Result<(), Self::Error> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
@@ -318,7 +316,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     ///
     /// # Returns
     /// * `Ok(Vec<UserOperation>)` - The sorted [UserOperations](UserOperation)
-    fn get_sorted(&self) -> Result<Self::UserOperations, DBError> {
+    fn get_sorted(&self) -> Result<Vec<UserOperation>, DBError> {
         self.env
             .tx()
             .and_then(|tx| {
@@ -343,7 +341,7 @@ impl<E: EnvironmentKind> Mempool for DatabaseMempool<E> {
     ///
     /// # Returns
     /// * `Vec<UserOperation>` - All [UserOperations](UserOperation)
-    fn get_all(&self) -> Self::UserOperations {
+    fn get_all(&self) -> Vec<UserOperation> {
         self.env
             .tx()
             .and_then(|tx| {

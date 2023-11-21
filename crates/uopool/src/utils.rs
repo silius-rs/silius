@@ -322,7 +322,7 @@ pub mod tests {
 
     pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
     where
-        T: Mempool<UserOperations = Vec<UserOperation>> + Debug,
+        T: Mempool + Debug,
         T::Error: Debug + ToString,
     {
         let ep = Address::random();
@@ -407,7 +407,7 @@ pub mod tests {
 
     pub fn reputation_test_case<T>(mut reputation: T)
     where
-        T: Reputation<ReputationEntries = Vec<ReputationEntry>> + Debug,
+        T: Reputation + Debug,
         T::Error: Debug + ToString,
     {
         reputation.init(

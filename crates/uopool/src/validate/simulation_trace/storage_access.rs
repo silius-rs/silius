@@ -1,6 +1,5 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
 };
@@ -12,7 +11,7 @@ use ethers::{
 use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
     consts::entities::{FACTORY_LEVEL, LEVEL_TO_ENTITY, NUMBER_LEVELS},
-    reputation::{ReputationEntry, StakeInfo},
+    reputation::StakeInfo,
     simulation::SimulationCheckError,
     UserOperation,
 };
@@ -96,8 +95,8 @@ impl StorageAccess {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for StorageAccess
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that checks if the user operation access storage other than the one associated with itself.
     ///

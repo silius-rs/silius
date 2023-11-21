@@ -1,6 +1,5 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
@@ -8,7 +7,7 @@ use ethers::{
     providers::Middleware,
     types::{BlockNumber, U256},
 };
-use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
+use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
 pub struct MaxFee {
     pub min_priority_fee_per_gas: U256,
@@ -17,8 +16,8 @@ pub struct MaxFee {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for MaxFee
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that checks the max fee
     ///

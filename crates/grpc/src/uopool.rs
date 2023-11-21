@@ -20,12 +20,9 @@ use silius_p2p::config::Config;
 use silius_p2p::network::{EntrypointChannels, Network};
 use silius_primitives::consts::p2p::DB_FOLDER_NAME;
 use silius_primitives::provider::BlockStream;
-use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::UserOperation;
 use silius_primitives::{uopool::AddError, UoPoolMode};
-use silius_uopool::{
-    init_env, DBError, DatabaseMempool, DatabaseReputation, Mempool, VecCh, VecUo, WriteMap,
-};
+use silius_uopool::{init_env, DBError, DatabaseMempool, DatabaseReputation, Mempool, WriteMap};
 use silius_uopool::{
     mempool_id, validate::validator::StandardUserOperationValidator, MempoolId, Reputation,
     UoPool as UserOperationPool, UoPoolBuilder,
@@ -44,8 +41,8 @@ type StandardUserPool<M, P, R, E> =
 pub struct UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     pub uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>,
     pub chain: Chain,
@@ -54,8 +51,8 @@ where
 impl<M, P, R, E> UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync + 'static,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
+    P: Mempool<Error = E> + Send + Sync + 'static,
+    R: Reputation<Error = E> + Send + Sync + 'static,
     E: Debug + Display + 'static,
 {
     pub fn new(uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>, chain: Chain) -> Self {
@@ -78,8 +75,8 @@ where
 impl<M, P, R, E> uo_pool_server::UoPool for UoPoolService<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync + 'static,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
+    P: Mempool<Error = E> + Send + Sync + 'static,
+    R: Reputation<Error = E> + Send + Sync + 'static,
     E: Debug + Display + 'static,
 {
     async fn add(&self, req: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {

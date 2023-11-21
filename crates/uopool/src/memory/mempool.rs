@@ -22,10 +22,6 @@ pub struct MemoryMempool {
 }
 
 impl Mempool for MemoryMempool {
-    /// An array of [UserOperation](UserOperation)
-    type UserOperations = Vec<UserOperation>;
-    /// An array of [code_hashes](CodeHash)
-    type CodeHashes = Vec<CodeHash>;
     type Error = eyre::Error;
 
     /// Adds a [UserOperation](UserOperation) to the mempool
@@ -89,7 +85,7 @@ impl Mempool for MemoryMempool {
     /// # Returns
     /// * `Vec<UserOperation>` - An array of [UserOperations](UserOperation) if they exist.
     /// Otherwise, an empty array.
-    fn get_all_by_sender(&self, addr: &Address) -> Self::UserOperations {
+    fn get_all_by_sender(&self, addr: &Address) -> Vec<UserOperation> {
         return if let Some(uos_by_sender) = self.user_operations_by_sender.get(addr) {
             uos_by_sender
                 .iter()
@@ -153,7 +149,7 @@ impl Mempool for MemoryMempool {
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Self::CodeHashes,
+        hashes: &Vec<CodeHash>,
     ) -> eyre::Result<(), Self::Error> {
         self.code_hashes_by_user_operation
             .insert(*uo_hash, hashes.clone());
@@ -167,7 +163,7 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Vec<CodeHash>` - An array of [CodeHash](CodeHash) if they exist. Otherwise, an empty array.
-    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Self::CodeHashes {
+    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Vec<CodeHash> {
         if let Some(hashes) = self.code_hashes_by_user_operation.get(uo_hash) {
             hashes.clone()
         } else {
@@ -253,7 +249,7 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Ok(Vec<UserOperation>)` - The sorted [UserOperations](UserOperation)
-    fn get_sorted(&self) -> eyre::Result<Self::UserOperations> {
+    fn get_sorted(&self) -> eyre::Result<Vec<UserOperation>> {
         let mut uos: Vec<UserOperation> = self.user_operations.values().cloned().collect();
         uos.sort_by(|a, b| {
             if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
@@ -269,7 +265,7 @@ impl Mempool for MemoryMempool {
     ///
     /// # Returns
     /// * `Vec<UserOperation>` - All [UserOperations](UserOperation)
-    fn get_all(&self) -> Self::UserOperations {
+    fn get_all(&self) -> Vec<UserOperation> {
         self.user_operations.values().cloned().collect()
     }
 
