@@ -1,6 +1,5 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     utils::equal_code_hashes,
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
@@ -11,7 +10,6 @@ use ethers::{
     utils::keccak256,
 };
 use silius_primitives::{
-    reputation::ReputationEntry,
     simulation::{CodeHash, SimulationCheckError},
     UserOperation,
 };
@@ -71,8 +69,8 @@ impl CodeHashes {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for CodeHashes
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug + Display,
 {
     /// The [check_user_operation] method implementation that checks the code hashes

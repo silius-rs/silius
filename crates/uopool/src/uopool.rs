@@ -26,7 +26,7 @@ use silius_primitives::{
     get_address,
     reputation::{ReputationEntry, ReputationError, StakeInfo, StakeInfoResponse, Status},
     sanity::SanityCheckError,
-    simulation::{CodeHash, SimulationCheckError},
+    simulation::SimulationCheckError,
     uopool::{AddError, ValidationError},
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
@@ -35,15 +35,12 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use tracing::{info, trace};
 
-pub type VecUo = Vec<UserOperation>;
-pub type VecCh = Vec<CodeHash>;
-
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
 pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug,
 {
     /// The unique ID of the mempool
@@ -53,9 +50,9 @@ where
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
     /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    pub mempool: MempoolBox<VecUo, VecCh, P, E>,
+    pub mempool: MempoolBox<P, E>,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
-    pub reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
+    pub reputation: ReputationBox<R, E>,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
@@ -66,8 +63,8 @@ where
 
 impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug + Display,
 {
     /// Creates a new [UoPool](UoPool) object
@@ -87,8 +84,8 @@ where
     pub fn new(
         entry_point: EntryPoint<M>,
         validator: V,
-        mempool: MempoolBox<VecUo, VecCh, P, E>,
-        reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
+        mempool: MempoolBox<P, E>,
+        reputation: ReputationBox<R, E>,
         max_verification_gas: U256,
         chain: Chain,
         p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,

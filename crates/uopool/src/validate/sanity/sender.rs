@@ -1,14 +1,12 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
 use ethers::providers::Middleware;
 use silius_primitives::{
-    consts::uopool::GAS_INCREASE_PERC, reputation::ReputationEntry, sanity::SanityCheckError,
-    UserOperation,
+    consts::uopool::GAS_INCREASE_PERC, sanity::SanityCheckError, UserOperation,
 };
 use std::fmt::Debug;
 
@@ -17,8 +15,8 @@ pub struct Sender;
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Sender
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the check for the sender of the [UserOperation](UserOperation).

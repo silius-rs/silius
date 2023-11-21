@@ -1,11 +1,10 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{SanityCheck, SanityHelper},
     Overhead, Reputation,
 };
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
+use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
 pub struct VerificationGas {
     pub max_verification_gas: U256,
@@ -14,8 +13,8 @@ pub struct VerificationGas {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for VerificationGas
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that performs the check on verification gas.
     ///

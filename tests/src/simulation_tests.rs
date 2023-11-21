@@ -23,7 +23,6 @@ use ethers::{
 use futures::channel::mpsc::unbounded;
 use silius_contracts::EntryPoint;
 use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
-use silius_primitives::reputation::ReputationEntry;
 use silius_primitives::simulation::SimulationCheckError;
 use silius_primitives::uopool::ValidationError;
 use silius_primitives::UserOperation;
@@ -47,7 +46,7 @@ use silius_uopool::validate::{
 };
 use silius_uopool::{
     mempool_id, MemoryMempool, MemoryReputation, Mempool, MempoolBox, Reputation as Rep,
-    ReputationBox, UoPool, VecCh, VecUo,
+    ReputationBox, UoPool,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -58,8 +57,8 @@ struct TestContext<M, V, P, R, E>
 where
     M: Middleware + 'static,
     V: UserOperationValidator<P, R, E> + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Rep<Error = E> + Send + Sync,
     E: Debug,
 {
     pub client: Arc<M>,

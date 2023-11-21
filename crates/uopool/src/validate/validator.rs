@@ -16,7 +16,6 @@ use super::{
 use crate::{
     mempool::{Mempool, MempoolBox},
     reputation::ReputationBox,
-    uopool::{VecCh, VecUo},
     Reputation as Rep,
 };
 use alloy_chains::Chain;
@@ -31,8 +30,8 @@ use silius_contracts::{
     EntryPoint,
 };
 use silius_primitives::{
-    reputation::ReputationEntry, sanity::SanityCheckError, simulation::SimulationCheckError,
-    uopool::ValidationError, UserOperation,
+    sanity::SanityCheckError, simulation::SimulationCheckError, uopool::ValidationError,
+    UserOperation,
 };
 use std::fmt::{Debug, Display};
 use tracing::debug;
@@ -40,8 +39,8 @@ use tracing::debug;
 /// Standard implementation of [UserOperationValidator](UserOperationValidator).
 pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Rep<Error = E> + Send + Sync,
 {
     /// The [EntryPoint](EntryPoint) object.
     entry_point: EntryPoint<M>,
@@ -57,8 +56,8 @@ where
 
 impl<M: Middleware + Clone + 'static, P, R, E> StandardUserOperationValidator<M, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Rep<Error = E> + Send + Sync,
     E: Debug + Display,
 {
     /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator).
@@ -254,8 +253,8 @@ where
 impl<M: Middleware + Clone + 'static, P, R, E> UserOperationValidator<P, R, E>
     for StandardUserOperationValidator<M, P, R, E>
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Rep<Error = E> + Send + Sync,
     E: Debug + Display,
 {
     /// Validates a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
@@ -272,8 +271,8 @@ where
     async fn validate_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &MempoolBox<VecUo, VecCh, P, E>,
-        reputation: &ReputationBox<Vec<ReputationEntry>, R, E>,
+        mempool: &MempoolBox<P, E>,
+        reputation: &ReputationBox<R, E>,
         mode: EnumSet<UserOperationValidatorMode>,
     ) -> Result<UserOperationValidationOutcome, ValidationError> {
         let mut out: UserOperationValidationOutcome = Default::default();

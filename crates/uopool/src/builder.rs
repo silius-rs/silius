@@ -1,6 +1,6 @@
 use crate::{
     validate::validator::StandardUserOperationValidator, Mempool, MempoolBox, Reputation,
-    ReputationBox, UoPool, VecCh, VecUo,
+    ReputationBox, UoPool,
 };
 use alloy_chains::Chain;
 use ethers::{
@@ -17,7 +17,6 @@ use silius_primitives::{
     },
     get_address,
     provider::BlockStream,
-    reputation::ReputationEntry,
     UserOperation,
 };
 use std::sync::Arc;
@@ -30,8 +29,8 @@ use tracing::warn;
 pub struct UoPoolBuilder<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     is_unsafe: bool,
     eth_client: Arc<M>,
@@ -41,8 +40,8 @@ where
     min_stake: U256,
     min_priority_fee_per_gas: U256,
     whitelist: Vec<Address>,
-    mempool: MempoolBox<VecUo, VecCh, P, E>,
-    reputation: ReputationBox<Vec<ReputationEntry>, R, E>,
+    mempool: MempoolBox<P, E>,
+    reputation: ReputationBox<R, E>,
     // It would be None if p2p is not enabled
     publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
 }
@@ -50,8 +49,8 @@ where
 impl<M, P, R, E> UoPoolBuilder<M, P, R, E>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync + 'static,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync + 'static,
+    P: Mempool<Error = E> + Send + Sync + 'static,
+    R: Reputation<Error = E> + Send + Sync + 'static,
     E: Debug + Display + 'static,
 {
     #[allow(clippy::too_many_arguments)]
@@ -69,10 +68,10 @@ where
         publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
         // sets mempool
-        let mempool = MempoolBox::<VecUo, VecCh, P, E>::new(mempool);
+        let mempool = MempoolBox::<P, E>::new(mempool);
 
         // sets reputation
-        let mut reputation = ReputationBox::<Vec<ReputationEntry>, R, E>::new(reputation);
+        let mut reputation = ReputationBox::<R, E>::new(reputation);
         reputation.init(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,

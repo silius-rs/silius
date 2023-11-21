@@ -1,7 +1,6 @@
 use crate::{
     mempool::Mempool,
     reputation::Reputation as Rep,
-    uopool::{VecCh, VecUo},
     validate::{SanityCheck, SanityHelper},
 };
 use ethers::{providers::Middleware, types::Address};
@@ -10,7 +9,7 @@ use silius_primitives::{
         entities::{FACTORY, PAYMASTER, SENDER},
         reputation::THROTTLED_ENTITY_MEMPOOL_COUNT,
     },
-    reputation::{ReputationEntry, ReputationError, Status},
+    reputation::{ReputationError, Status},
     sanity::SanityCheckError,
     UserOperation,
 };
@@ -26,8 +25,8 @@ impl Entities {
         helper: &SanityHelper<M, P, R, E>,
     ) -> Result<Status, SanityCheckError>
     where
-        P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-        R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+        P: Mempool<Error = E> + Send + Sync,
+        R: Rep<Error = E> + Send + Sync,
         E: Debug,
     {
         Ok(Status::from(helper.reputation.get_status(addr).map_err(
@@ -64,8 +63,8 @@ impl Entities {
         helper: &SanityHelper<M, P, R, E>,
     ) -> Result<(), SanityCheckError>
     where
-        P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-        R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+        P: Mempool<Error = E> + Send + Sync,
+        R: Rep<Error = E> + Send + Sync,
         E: Debug,
     {
         if *status == Status::THROTTLED
@@ -87,8 +86,8 @@ impl Entities {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Entities
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Rep<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Rep<Error = E> + Send + Sync,
     E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the sanity check for the staked entities.

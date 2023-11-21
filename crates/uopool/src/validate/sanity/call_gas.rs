@@ -1,21 +1,20 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     utils::calculate_call_gas_limit,
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
 use ethers::{providers::Middleware, types::BlockNumber};
 use silius_contracts::entry_point::EntryPointErr;
-use silius_primitives::{reputation::ReputationEntry, sanity::SanityCheckError, UserOperation};
+use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
 pub struct CallGas;
 
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for CallGas
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     /// The `check_user_operation` method implementation for the `CallGas` sanity check.
     ///

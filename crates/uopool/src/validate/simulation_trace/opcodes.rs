@@ -1,12 +1,11 @@
 use crate::{
     validate::{SimulationTraceCheck, SimulationTraceHelper},
-    Mempool, Reputation, VecCh, VecUo,
+    Mempool, Reputation,
 };
 use ethers::providers::Middleware;
 use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
     consts::entities::{FACTORY, LEVEL_TO_ENTITY},
-    reputation::ReputationEntry,
     simulation::{SimulationCheckError, CREATE2_OPCODE, FORBIDDEN_OPCODES},
     UserOperation,
 };
@@ -16,8 +15,8 @@ pub struct Opcodes;
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for Opcodes
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
 {
     /// The [check_user_operation] method implementation that checks the use of forbidden opcodes
     ///

@@ -7,16 +7,16 @@ use silius_primitives::{
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 #[derive(Debug)]
-pub struct ReputationBox<T, R, E>
+pub struct ReputationBox<R, E>
 where
-    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync + Debug,
+    R: Reputation<Error = E> + Send + Sync + Debug,
 {
     inner: Arc<RwLock<R>>,
 }
 
-impl<T, R, E> Clone for ReputationBox<T, R, E>
+impl<R, E> Clone for ReputationBox<R, E>
 where
-    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync + Debug,
+    R: Reputation<Error = E> + Send + Sync + Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -25,9 +25,9 @@ where
     }
 }
 
-impl<T, R, E> ReputationBox<T, R, E>
+impl<R, E> ReputationBox<R, E>
 where
-    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync + Debug,
+    R: Reputation<Error = E> + Send + Sync + Debug,
 {
     pub fn new(inner: R) -> Self {
         Self {
@@ -36,13 +36,11 @@ where
     }
 }
 
-impl<T, R, E> Reputation for ReputationBox<T, R, E>
+impl<R, E> Reputation for ReputationBox<R, E>
 where
-    T: Debug + IntoIterator<Item = ReputationEntry>,
-    R: Reputation<ReputationEntries = T, Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug,
 {
-    type ReputationEntries = T;
     type Error = E;
 
     fn add_blacklist(&mut self, addr: &Address) -> bool {
@@ -53,7 +51,7 @@ where
         self.inner.write().add_whitelist(addr)
     }
 
-    fn get_all(&self) -> Self::ReputationEntries {
+    fn get_all(&self) -> Vec<ReputationEntry> {
         self.inner.read().get_all()
     }
 
@@ -115,7 +113,7 @@ where
         self.inner.write().set(addr)
     }
 
-    fn set_entities(&mut self, entries: Self::ReputationEntries) -> Result<(), Self::Error> {
+    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error> {
         self.inner.write().set_entities(entries)
     }
 
@@ -136,7 +134,6 @@ where
 /// [UserOperation’s](UserOperation) storage access rules prevent them from interfere with each other. But “global” entities - paymasters, factories and aggregators are accessed by multiple UserOperations, and thus might invalidate multiple previously-valid UserOperations.
 /// To prevent abuse, we need to throttle down (or completely ban for a period of time) an entity that causes invalidation of large number of UserOperations in the mempool. To prevent such entities from “sybil-attack”, we require them to stake with the system, and thus make such DoS attack very expensive.
 pub trait Reputation: Debug {
-    type ReputationEntries: IntoIterator<Item = ReputationEntry>;
     type Error;
 
     fn init(
@@ -174,7 +171,7 @@ pub trait Reputation: Debug {
         }
     }
 
-    fn set_entities(&mut self, entries: Self::ReputationEntries) -> Result<(), Self::Error>;
-    fn get_all(&self) -> Self::ReputationEntries;
+    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error>;
+    fn get_all(&self) -> Vec<ReputationEntry>;
     fn clear(&mut self);
 }

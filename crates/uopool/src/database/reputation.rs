@@ -53,7 +53,6 @@ impl<E: EnvironmentKind> DatabaseReputation<E> {
 }
 
 impl<E: EnvironmentKind> Reputation for DatabaseReputation<E> {
-    type ReputationEntries = Vec<ReputationEntry>;
     type Error = DBError;
 
     /// Initializes the [Reputation](Reputation) database.
@@ -391,7 +390,7 @@ impl<E: EnvironmentKind> Reputation for DatabaseReputation<E> {
     ///
     /// # Returns
     /// * `Ok(())` if the entries were set successfully
-    fn set_entities(&mut self, entries: Self::ReputationEntries) -> Result<(), Self::Error> {
+    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error> {
         let tx = self.env.tx_mut()?;
         for entry in entries {
             let addr_wrap: WrapAddress = entry.address.into();
@@ -406,7 +405,7 @@ impl<E: EnvironmentKind> Reputation for DatabaseReputation<E> {
     ///
     /// # Returns
     /// * All [reputation entries](ReputationEntries)
-    fn get_all(&self) -> Self::ReputationEntries {
+    fn get_all(&self) -> Vec<ReputationEntry> {
         self.env
             .tx()
             .and_then(|tx| {

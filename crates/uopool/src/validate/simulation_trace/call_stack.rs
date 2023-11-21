@@ -1,6 +1,5 @@
 use crate::{
     mempool::Mempool,
-    uopool::{VecCh, VecUo},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
 };
@@ -11,7 +10,6 @@ use silius_contracts::{
 };
 use silius_primitives::{
     consts::entities::{LEVEL_TO_ENTITY, PAYMASTER},
-    reputation::ReputationEntry,
     simulation::{
         SimulationCheckError, CREATE_OPCODE, RETURN_OPCODE, REVERT_OPCODE,
         VALIDATE_PAYMASTER_USER_OP_FUNCTION,
@@ -97,8 +95,8 @@ impl CallStack {
 #[async_trait::async_trait]
 impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for CallStack
 where
-    P: Mempool<UserOperations = VecUo, CodeHashes = VecCh, Error = E> + Send + Sync,
-    R: Reputation<ReputationEntries = Vec<ReputationEntry>, Error = E> + Send + Sync,
+    P: Mempool<Error = E> + Send + Sync,
+    R: Reputation<Error = E> + Send + Sync,
     E: Debug,
 {
     /// The [check_user_operation] method implementation that performs the call stack trace check.
