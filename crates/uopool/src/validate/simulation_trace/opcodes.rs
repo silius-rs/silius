@@ -1,4 +1,6 @@
 use crate::{
+    mempool::{UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Mempool, Reputation,
 };
@@ -10,14 +12,11 @@ use silius_primitives::{
     UserOperation,
 };
 
+#[derive(Clone)]
 pub struct Opcodes;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for Opcodes
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
+impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
     /// The [check_user_operation] method implementation that checks the use of forbidden opcodes
     ///
     /// # Arguments
@@ -26,11 +25,21 @@ where
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationCheckError] error.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         _uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R, E>,
-    ) -> Result<(), SimulationCheckError> {
+        _mempool: &Mempool<T, Y, X, Z>,
+        _reputation: &Reputation<H, R>,
+        helper: &mut SimulationTraceHelper<M>,
+    ) -> Result<(), SimulationCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             let level = SELECTORS_INDICES
                 .get(call_info.top_level_method_sig.as_ref())

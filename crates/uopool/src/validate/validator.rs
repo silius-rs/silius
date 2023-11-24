@@ -14,9 +14,9 @@ use super::{
     UserOperationValidatorMode,
 };
 use crate::{
-    mempool::{Mempool, MempoolBox},
-    reputation::ReputationBox,
-    Reputation as Rep,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
+    Reputation,
 };
 use alloy_chains::Chain;
 use enumset::EnumSet;
@@ -33,128 +33,173 @@ use silius_primitives::{
     sanity::SanityCheckError, simulation::SimulationCheckError, uopool::ValidationError,
     UserOperation,
 };
-use std::fmt::{Debug, Display};
 use tracing::debug;
 
 /// Standard implementation of [UserOperationValidator](UserOperationValidator).
-pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, P, R, E>
+pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk>
 where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Rep<Error = E> + Send + Sync,
+    SanCk: SanityCheck<M>,
+    SimCk: SimulationCheck,
+    SimTrCk: SimulationTraceCheck<M>,
 {
     /// The [EntryPoint](EntryPoint) object.
     entry_point: EntryPoint<M>,
     /// A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
     chain: Chain,
     /// An array of [SanityChecks](SanityCheck).
-    sanity_checks: Vec<Box<dyn SanityCheck<M, P, R, E>>>,
+    sanity_checks: SanCk,
     /// An array of [SimulationCheck](SimulationCheck).
-    simulation_checks: Vec<Box<dyn SimulationCheck>>,
+    simulation_checks: SimCk,
     /// An array of [SimulationTraceChecks](SimulationTraceCheck).
-    simulation_trace_checks: Vec<Box<dyn SimulationTraceCheck<M, P, R, E>>>,
+    simulation_trace_checks: SimTrCk,
 }
 
-impl<M: Middleware + Clone + 'static, P, R, E> StandardUserOperationValidator<M, P, R, E>
+impl<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk> Clone
+    for StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>
 where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Rep<Error = E> + Send + Sync,
-    E: Debug + Display,
+    SanCk: SanityCheck<M> + Clone,
+    SimCk: SimulationCheck + Clone,
+    SimTrCk: SimulationTraceCheck<M> + Clone,
 {
-    /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator).
-    ///
-    /// # Arguments
-    /// `entry_point` - [EntryPoint](EntryPoint) object.
-    /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
-    ///
-    /// # Returns
-    /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
-    pub fn new(entry_point: EntryPoint<M>, chain: Chain) -> Self {
+    fn clone(&self) -> Self {
+        Self {
+            entry_point: self.entry_point.clone(),
+            chain: self.chain.clone(),
+            sanity_checks: self.sanity_checks.clone(),
+            simulation_checks: self.simulation_checks.clone(),
+            simulation_trace_checks: self.simulation_trace_checks.clone(),
+        }
+    }
+}
+
+/// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator)
+/// with the default sanity checks and simulation checks for canonical mempool.
+///
+/// # Arguments
+/// `entry_point` - [EntryPoint](EntryPoint) object.
+/// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
+/// `max_verification_gas` - max verification gas that bundler would accept for one user operation
+/// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
+/// `max_uos_per_sender` - max user operations that bundler would accept from one sender
+/// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
+///
+/// # Returns
+/// A new [StandardUserOperationValidator](StandardUserOperationValidator).
+pub fn new_canonical<M: Middleware + Clone + 'static>(
+    entry_point: EntryPoint<M>,
+    chain: Chain,
+    max_verification_gas: U256,
+    min_priority_fee_per_gas: U256,
+) -> StandardUserOperationValidator<
+    M,
+    (
+        Sender,
+        VerificationGas,
+        CallGas,
+        MaxFee,
+        Paymaster,
+        Entities,
+        UnstakedEntities,
+    ),
+    (Signature, Timestamp),
+    (
+        Gas,
+        Opcodes,
+        ExternalContracts,
+        StorageAccess,
+        CallStack,
+        CodeHashes,
+    ),
+> {
+    StandardUserOperationValidator::new(
+        entry_point.clone(),
+        chain,
+        (
+            Sender,
+            VerificationGas {
+                max_verification_gas,
+            },
+            CallGas,
+            MaxFee {
+                min_priority_fee_per_gas,
+            },
+            Paymaster,
+            Entities,
+            UnstakedEntities,
+        ),
+        (Signature, Timestamp),
+        (
+            Gas,
+            Opcodes,
+            ExternalContracts,
+            StorageAccess,
+            CallStack,
+            CodeHashes,
+        ),
+    )
+}
+
+pub fn new_canonical_unsafe<M: Middleware + Clone + 'static>(
+    entry_point: EntryPoint<M>,
+    chain: Chain,
+    max_verification_gas: U256,
+    min_priority_fee_per_gas: U256,
+) -> StandardUserOperationValidator<
+    M,
+    (
+        Sender,
+        VerificationGas,
+        CallGas,
+        MaxFee,
+        Paymaster,
+        Entities,
+        UnstakedEntities,
+    ),
+    (Signature, Timestamp),
+    (),
+> {
+    StandardUserOperationValidator::new(
+        entry_point.clone(),
+        chain,
+        (
+            Sender,
+            VerificationGas {
+                max_verification_gas,
+            },
+            CallGas,
+            MaxFee {
+                min_priority_fee_per_gas,
+            },
+            Paymaster,
+            Entities,
+            UnstakedEntities,
+        ),
+        (Signature, Timestamp),
+        (),
+    )
+}
+
+impl<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk>
+    StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>
+where
+    SanCk: SanityCheck<M>,
+    SimCk: SimulationCheck,
+    SimTrCk: SimulationTraceCheck<M>,
+{
+    pub fn new(
+        entry_point: EntryPoint<M>,
+        chain: Chain,
+        sanity_checks: SanCk,
+        simulation_checks: SimCk,
+        simulation_trace_check: SimTrCk,
+    ) -> Self {
         Self {
             entry_point,
             chain,
-            sanity_checks: vec![],
-            simulation_checks: vec![],
-            simulation_trace_checks: vec![],
+            sanity_checks: sanity_checks,
+            simulation_checks: simulation_checks,
+            simulation_trace_checks: simulation_trace_check,
         }
-    }
-
-    /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator)
-    /// with the default sanity checks and simulation checks for canonical mempool.
-    ///
-    /// # Arguments
-    /// `entry_point` - [EntryPoint](EntryPoint) object.
-    /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
-    /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
-    /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
-    /// `max_uos_per_sender` - max user operations that bundler would accept from one sender
-    /// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
-    ///
-    /// # Returns
-    /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
-    pub fn new_canonical(
-        entry_point: EntryPoint<M>,
-        chain: Chain,
-        max_verification_gas: U256,
-        min_priority_fee_per_gas: U256,
-    ) -> Self {
-        Self::new(entry_point.clone(), chain)
-            .with_sanity_check(Sender)
-            .with_sanity_check(VerificationGas {
-                max_verification_gas,
-            })
-            .with_sanity_check(CallGas)
-            .with_sanity_check(MaxFee {
-                min_priority_fee_per_gas,
-            })
-            .with_sanity_check(Paymaster)
-            .with_sanity_check(Entities)
-            .with_sanity_check(UnstakedEntities)
-            .with_simulation_check(Signature)
-            .with_simulation_check(Timestamp)
-            .with_simulation_trace_check(Gas)
-            .with_simulation_trace_check(Opcodes)
-            .with_simulation_trace_check(ExternalContracts)
-            .with_simulation_trace_check(StorageAccess)
-            .with_simulation_trace_check(CallStack)
-            .with_simulation_trace_check(CodeHashes)
-            .with_simulation_trace_check(ExternalContracts)
-    }
-
-    /// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator)
-    /// with the default sanity checks
-    /// Simulation checks are not included in this method.
-    /// The unsafe model could be useful for L2 bundler.
-    ///
-    /// # Arguments
-    /// `entry_point` - [EntryPoint](EntryPoint) object.
-    /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
-    /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
-    /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user operation
-    /// `max_uos_per_sender` - max user operations that bundler would accept from one sender
-    /// `gas_increase_perc` - gas increase percentage that bundler would accept for overwriting one user operation
-    ///
-    /// # Returns
-    /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
-    pub fn new_canonical_unsafe(
-        entry_point: EntryPoint<M>,
-        chain: Chain,
-        max_verification_gas: U256,
-        min_priority_fee_per_gas: U256,
-    ) -> Self {
-        Self::new(entry_point.clone(), chain)
-            .with_sanity_check(Sender)
-            .with_sanity_check(VerificationGas {
-                max_verification_gas,
-            })
-            .with_sanity_check(CallGas)
-            .with_sanity_check(MaxFee {
-                min_priority_fee_per_gas,
-            })
-            .with_sanity_check(Paymaster)
-            .with_sanity_check(Entities)
-            .with_sanity_check(UnstakedEntities)
-            .with_simulation_check(Signature)
-            .with_simulation_check(Timestamp)
     }
 
     /// Simulates validation of a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
@@ -208,54 +253,15 @@ where
             },
         }
     }
-
-    /// Pushes a [SanityCheck](SanityCheck) to the sanity_checks array.
-    ///
-    /// # Arguments
-    /// `sanity_check` - [SanityCheck](SanityCheck) to push.
-    ///
-    /// # Returns
-    /// A reference to [self](StandardUserOperationValidator).
-    pub fn with_sanity_check(
-        mut self,
-        sanity_check: impl SanityCheck<M, P, R, E> + 'static,
-    ) -> Self {
-        self.sanity_checks.push(Box::new(sanity_check));
-        self
-    }
-
-    /// Pushes a [SimulationCheck](SimulationCheck) to the simulation_checks array.
-    ///
-    /// # Arguments
-    /// `simulation_check` - [SimulationCheck](SimulationCheck) to push.
-    ///
-    /// # Returns
-    /// A reference to [self](StandardUserOperationValidator).
-    pub fn with_simulation_check(
-        mut self,
-        simulation_check: impl SimulationCheck + 'static,
-    ) -> Self {
-        self.simulation_checks.push(Box::new(simulation_check));
-        self
-    }
-
-    pub fn with_simulation_trace_check(
-        mut self,
-        simulation_trace_check: impl SimulationTraceCheck<M, P, R, E> + 'static,
-    ) -> Self {
-        self.simulation_trace_checks
-            .push(Box::new(simulation_trace_check));
-        self
-    }
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware + Clone + 'static, P, R, E> UserOperationValidator<P, R, E>
-    for StandardUserOperationValidator<M, P, R, E>
+impl<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk> UserOperationValidator
+    for StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>
 where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Rep<Error = E> + Send + Sync,
-    E: Debug + Display,
+    SanCk: SanityCheck<M>,
+    SimCk: SimulationCheck,
+    SimTrCk: SimulationTraceCheck<M>,
 {
     /// Validates a [UserOperation](UserOperation) via the [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the [entry_point](crate::entry_point::EntryPoint).
     /// The function also optionally performs sanity checks and simulation checks if the [UserOperationValidatorMode](UserOperationValidatorMode) contains the respective flags.
@@ -268,28 +274,32 @@ where
     ///
     /// # Returns
     /// A [UserOperationValidationOutcome](UserOperationValidationOutcome) if the validation was successful, otherwise a [ValidationError](ValidationError).
-    async fn validate_user_operation(
+    async fn validate_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        mempool: &MempoolBox<P, E>,
-        reputation: &ReputationBox<R, E>,
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
         mode: EnumSet<UserOperationValidatorMode>,
-    ) -> Result<UserOperationValidationOutcome, ValidationError> {
+    ) -> Result<UserOperationValidationOutcome, ValidationError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         let mut out: UserOperationValidationOutcome = Default::default();
 
-        if !self.sanity_checks.is_empty() && mode.contains(UserOperationValidatorMode::Sanity) {
+        if mode.contains(UserOperationValidatorMode::Sanity) {
             let sanity_helper = SanityHelper {
-                mempool,
-                reputation,
                 entry_point: self.entry_point.clone(),
                 chain: self.chain,
             };
 
-            for sanity_check in self.sanity_checks.iter() {
-                sanity_check
-                    .check_user_operation(uo, &sanity_helper)
-                    .await?;
-            }
+            self.sanity_checks
+                .check_user_operation(uo, mempool, reputation, &sanity_helper)
+                .await?;
         }
 
         if let Some(uo) = mempool.get_prev_by_sender(uo) {
@@ -298,17 +308,14 @@ where
         debug!("Simulate user operation from {:?}", uo.sender);
         let sim_res = self.simulate_validation(uo).await?;
 
-        if !self.simulation_checks.is_empty()
-            && mode.contains(UserOperationValidatorMode::Simulation)
-        {
+        if mode.contains(UserOperationValidatorMode::Simulation) {
             let mut sim_helper = SimulationHelper {
                 simulate_validation_result: &sim_res,
                 valid_after: None,
             };
 
-            for sim_check in self.simulation_checks.iter() {
-                sim_check.check_user_operation(uo, &mut sim_helper)?;
-            }
+            self.simulation_checks
+                .check_user_operation(uo, &mut sim_helper)?;
 
             out.valid_after = sim_helper.valid_after;
         }
@@ -329,9 +336,7 @@ where
             .expect("block should exist");
         out.verified_block = U256::from(block_number.hash.expect("block hash should exist").0);
 
-        if !self.simulation_trace_checks.is_empty()
-            && mode.contains(UserOperationValidatorMode::SimulationTrace)
-        {
+        if mode.contains(UserOperationValidatorMode::SimulationTrace) {
             debug!("Simulate user operation with trace from {:?}", uo.sender);
             let geth_trace = self.simulate_validation_trace(uo).await?;
             let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace).map_err(|error| {
@@ -341,8 +346,6 @@ where
             })?;
 
             let mut sim_helper = SimulationTraceHelper {
-                mempool,
-                reputation,
                 entry_point: self.entry_point.clone(),
                 chain: self.chain,
                 simulate_validation_result: &sim_res,
@@ -351,9 +354,9 @@ where
                 code_hashes: None,
             };
 
-            for sim_check in self.simulation_trace_checks.iter() {
-                sim_check.check_user_operation(uo, &mut sim_helper).await?;
-            }
+            self.simulation_trace_checks
+                .check_user_operation(uo, mempool, reputation, &mut sim_helper)
+                .await?;
 
             out.code_hashes = sim_helper.code_hashes;
             out.storage_map = Some(extract_storage_map(&js_trace));

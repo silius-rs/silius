@@ -1,7 +1,7 @@
 //! User operation validator module provides all the necessary traits and types for validations.
 use crate::{
-    mempool::{Mempool, MempoolBox},
-    reputation::ReputationBox,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     Reputation,
 };
 use alloy_chains::Chain;
@@ -50,46 +50,104 @@ pub enum UserOperationValidatorMode {
 /// The [UserOperation](UserOperation) validator trait.
 /// The [UserOperationValidator](UserOperationValidator) is a composable trait that allows bundler to choose validation rules(sanity, simultation, simulation trace) to apply.
 #[async_trait::async_trait]
-pub trait UserOperationValidator<P, R, E>: Send + Sync
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
-    async fn validate_user_operation(
+pub trait UserOperationValidator: Send + Sync {
+    async fn validate_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        mempool: &MempoolBox<P, E>,
-        reputation: &ReputationBox<R, E>,
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
         mode: EnumSet<UserOperationValidatorMode>,
     ) -> Result<UserOperationValidationOutcome, ValidationError>
     where
-        P: Mempool<Error = E> + Send + Sync;
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp;
 }
 
 /// The [UserOperation](UserOperation) sanity check helper trait.
-pub struct SanityHelper<'a, M: Middleware + 'static, P, R, E>
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
-    mempool: &'a MempoolBox<P, E>,
-    reputation: &'a ReputationBox<R, E>,
+pub struct SanityHelper<M: Middleware + 'static> {
     entry_point: EntryPoint<M>,
     chain: Chain,
 }
 
 #[async_trait::async_trait]
-pub trait SanityCheck<M: Middleware, P, R, E>: Send + Sync
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
-    async fn check_user_operation(
+pub trait SanityCheck<M: Middleware>: Send + Sync {
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError>;
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp;
 }
+
+macro_rules! sanity_check_impls {
+    ( $( $name:ident )+ ) => {
+        #[async_trait::async_trait]
+        impl<M: Middleware,  $($name : SanityCheck<M>,)+ > SanityCheck<M> for ($($name,)+)
+        {
+            async fn check_user_operation<T, Y, X, Z, H, R>(
+                &self,
+                uo: &UserOperation,
+                mempool: &Mempool<T, Y, X, Z>,
+                reputation: &Reputation<H, R>,
+                helper: &SanityHelper<M>,
+            ) -> Result<(), SanityCheckError>
+            where
+                T: UserOperationAct,
+                Y: UserOperationAddrAct,
+                X: UserOperationAddrAct,
+                Z: UserOperationCodeHashAct,
+                H: HashSetOp,
+                R: ReputationEntryOp,
+                {
+                    let ($($name,)+) = self;
+                    ($($name.check_user_operation(uo, mempool, reputation, helper).await?,)+);
+                    Ok(())
+                }
+        }
+    };
+}
+#[async_trait::async_trait]
+impl<M: Middleware> SanityCheck<M> for () {
+    async fn check_user_operation<T, Y, X, Z, H, R>(
+        &self,
+        uo: &UserOperation,
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
+        Ok(())
+    }
+}
+sanity_check_impls! { A }
+sanity_check_impls! { A B }
+sanity_check_impls! { A B C }
+sanity_check_impls! { A B C D }
+sanity_check_impls! { A B C D F }
+sanity_check_impls! { A B C D F G }
+sanity_check_impls! { A B C D F G I }
+sanity_check_impls! { A B C D F G I J }
+sanity_check_impls! { A B C D F G I J K }
+sanity_check_impls! { A B C D F G I J K L }
 
 /// The [UserOperation](UserOperation) simulation check helper trait.
 pub struct SimulationHelper<'a> {
@@ -104,15 +162,33 @@ pub trait SimulationCheck: Send + Sync {
         helper: &mut SimulationHelper,
     ) -> Result<(), SimulationCheckError>;
 }
+macro_rules! simulation_check_impls {
+    ( $( $name:ident )+ ) => {
+        #[async_trait::async_trait]
+        impl<$($name : SimulationCheck,)+ > SimulationCheck for ($($name,)+)
+        {
+            fn check_user_operation(
+                &self,
+                uo: &UserOperation,
+                helper: &mut SimulationHelper,
+            ) -> Result<(), SimulationCheckError>
+                {
+                    let ($($name,)+) = self;
+                    ($($name.check_user_operation(uo, helper),)+);
+                    Ok(())
+                }
+        }
+    };
+}
+simulation_check_impls! {A}
+simulation_check_impls! {A B}
+simulation_check_impls! {A B C}
+simulation_check_impls! {A B C D}
+simulation_check_impls! {A B C D E}
+simulation_check_impls! {A B C D E F}
 
 /// The [UserOperation](UserOperation) simulation trace check helper trait.
-pub struct SimulationTraceHelper<'a, M: Middleware + 'static, P, R, E>
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
-    mempool: &'a MempoolBox<P, E>,
-    reputation: &'a ReputationBox<R, E>,
+pub struct SimulationTraceHelper<'a, M: Middleware + Send + Sync + 'static> {
     entry_point: EntryPoint<M>,
     chain: Chain,
     simulate_validation_result: &'a SimulateValidationResult,
@@ -122,14 +198,76 @@ where
 }
 
 #[async_trait::async_trait]
-pub trait SimulationTraceCheck<M: Middleware, P, R, E>: Send + Sync
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
-    async fn check_user_operation(
+pub trait SimulationTraceCheck<M: Middleware>: Send + Sync {
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R, E>,
-    ) -> Result<(), SimulationCheckError>;
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &mut SimulationTraceHelper<M>,
+    ) -> Result<(), SimulationCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp;
 }
+macro_rules! simulation_trace_check_impls {
+    ( $( $name:ident )+ ) => {
+        #[async_trait::async_trait]
+        impl<M: Middleware, $($name : SimulationTraceCheck<M>,)+> SimulationTraceCheck<M> for ($($name,)+)
+        {
+            async fn check_user_operation<T, Y, X, Z, H, R>(
+                &self,
+                uo: &UserOperation,
+                mempool: &Mempool<T, Y, X, Z>,
+                reputation: &Reputation<H, R>,
+                helper: &mut SimulationTraceHelper<M>,
+            ) -> Result<(), SimulationCheckError>
+            where
+                T: UserOperationAct,
+                Y: UserOperationAddrAct,
+                X: UserOperationAddrAct,
+                Z: UserOperationCodeHashAct,
+                H: HashSetOp,
+                R: ReputationEntryOp,
+                {
+                    let ($($name,)+) = self;
+                    ($($name.check_user_operation(uo, mempool, reputation, helper).await?,)+);
+                    Ok(())
+                }
+        }
+    };
+}
+#[async_trait::async_trait]
+impl<M: Middleware> SimulationTraceCheck<M> for () {
+    async fn check_user_operation<T, Y, X, Z, H, R>(
+        &self,
+        uo: &UserOperation,
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &mut SimulationTraceHelper<M>,
+    ) -> Result<(), SimulationCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
+        Ok(())
+    }
+}
+simulation_trace_check_impls! { A }
+simulation_trace_check_impls! { A B }
+simulation_trace_check_impls! { A B C }
+simulation_trace_check_impls! { A B C D }
+simulation_trace_check_impls! { A B C D F }
+simulation_trace_check_impls! { A B C D F G }
+simulation_trace_check_impls! { A B C D F G I }
+simulation_trace_check_impls! { A B C D F G I J }
+simulation_trace_check_impls! { A B C D F G I J K }
+simulation_trace_check_impls! { A B C D F G I J K L }

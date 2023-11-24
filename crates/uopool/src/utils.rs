@@ -159,7 +159,11 @@ fn div_ceil(numerator: U256, denominator: U256) -> U256 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{mempool::Mempool, Reputation};
+    use crate::{
+        mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+        reputation::{HashSetOp, ReputationEntryOp},
+        Reputation,
+    };
     use ethers::types::{Address, Bytes, H256, U256};
     use silius_primitives::{
         consts::reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
@@ -320,10 +324,14 @@ pub mod tests {
         assert_eq!(div_ceil(U256::from(10), U256::from(3)), 4.into());
     }
 
-    pub fn mempool_test_case<T>(mut mempool: T, not_found_error_message: &str)
-    where
-        T: Mempool + Debug,
-        T::Error: Debug + ToString,
+    pub fn mempool_test_case<T, Y, X, Z>(
+        mut mempool: Mempool<T, Y, X, Z>,
+        not_found_error_message: &str,
+    ) where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
     {
         let ep = Address::random();
         let chain_id = U256::from(5);
@@ -369,14 +377,8 @@ pub mod tests {
         assert_eq!(mempool.get_all_by_sender(&senders[1]).len(), 2);
         assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 3);
 
-        assert_eq!(mempool.remove(&uo_hash).unwrap(), ());
-        assert_eq!(
-            mempool
-                .remove(&H256::random().into())
-                .unwrap_err()
-                .to_string(),
-            not_found_error_message
-        );
+        assert_eq!(mempool.get(&uo_hash).unwrap(), None);
+        assert_eq!(mempool.remove(&H256::random().into()).unwrap(), false);
 
         assert_eq!(mempool.get_all().len(), 6);
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
@@ -405,19 +407,11 @@ pub mod tests {
         assert_eq!(sorted.len(), 3);
     }
 
-    pub fn reputation_test_case<T>(mut reputation: T)
+    pub fn reputation_test_case<H, R>(mut reputation: Reputation<H, R>)
     where
-        T: Reputation + Debug,
-        T::Error: Debug + ToString,
+        H: HashSetOp,
+        R: ReputationEntryOp,
     {
-        reputation.init(
-            MIN_INCLUSION_RATE_DENOMINATOR,
-            THROTTLING_SLACK,
-            BAN_SLACK,
-            U256::from(1),
-            U256::from(0),
-        );
-
         let mut addrs: Vec<Address> = vec![];
 
         for _ in 0..5 {
