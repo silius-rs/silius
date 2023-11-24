@@ -1,21 +1,19 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
     Overhead, Reputation,
 };
 use ethers::{providers::Middleware, types::U256};
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Clone)]
 pub struct VerificationGas {
     pub max_verification_gas: U256,
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for VerificationGas
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
+impl<M: Middleware> SanityCheck<M> for VerificationGas {
     /// The [check_user_operation] method implementation that performs the check on verification gas.
     ///
     /// # Arguments
@@ -24,11 +22,21 @@ where
     ///
     /// # Returns
     /// Nothing if the sanity check is successful, otherwise a [SanityCheckError](SanityCheckError) is returned.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        _helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        _helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         if uo.verification_gas_limit > self.max_verification_gas {
             return Err(SanityCheckError::HighVerificationGasLimit {
                 verification_gas_limit: uo.verification_gas_limit,

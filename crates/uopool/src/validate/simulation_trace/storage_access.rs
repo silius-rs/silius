@@ -1,5 +1,6 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
 };
@@ -17,6 +18,7 @@ use silius_primitives::{
 };
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone)]
 pub struct StorageAccess;
 
 impl StorageAccess {
@@ -93,11 +95,7 @@ impl StorageAccess {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for StorageAccess
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
+impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
     /// The [check_user_operation] method implementation that checks if the user operation access storage other than the one associated with itself.
     ///
     /// # Arguments
@@ -106,11 +104,21 @@ where
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationCheckError] error.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R, E>,
-    ) -> Result<(), SimulationCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &mut SimulationTraceHelper<M>,
+    ) -> Result<(), SimulationCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         if helper.stake_info.is_none() {
             helper.stake_info = Some(extract_stake_info(uo, helper.simulate_validation_result));
         }

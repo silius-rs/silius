@@ -1,8 +1,8 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
-    Reputation,
+    Reputation, reputation::{HashSetOp, ReputationEntryOp},
 };
 use ethers::providers::Middleware;
 use silius_primitives::{
@@ -10,15 +10,11 @@ use silius_primitives::{
 };
 use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct Sender;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Sender
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug,
-{
+impl<M: Middleware> SanityCheck<M> for Sender {
     /// The [check_user_operation] method implementation that performs the check for the sender of the [UserOperation](UserOperation).
     ///
     /// # Arguments
@@ -27,11 +23,21 @@ where
     ///
     /// # Returns
     /// Nothing if the sanity check is successful, otherwise a [SanityCheckError](SanityCheckError) is returned.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         let code = helper
             .entry_point
             .eth_client()
@@ -49,12 +55,11 @@ where
         }
 
         // check if prev user operation exists
-        if helper.mempool.get_number_by_sender(&uo.sender) == 0 {
+        if mempool.get_number_by_sender(&uo.sender) == 0 {
             return Ok(());
         }
 
-        let uo_prev = helper
-            .mempool
+        let uo_prev = mempool
             .get_all_by_sender(&uo.sender)
             .iter()
             .find(|uo_prev| uo_prev.nonce == uo.nonce)

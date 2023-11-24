@@ -6,163 +6,442 @@ use silius_primitives::{
 };
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
+use crate::{mempool::ClearOp, DBError};
+
 #[derive(Debug)]
-pub struct ReputationBox<R, E>
-where
-    R: Reputation<Error = E> + Send + Sync + Debug,
-{
-    inner: Arc<RwLock<R>>,
+pub enum ReputationOpError {
+    DBError(DBError),
+    ReputationError(ReputationError),
 }
 
-impl<R, E> Clone for ReputationBox<R, E>
-where
-    R: Reputation<Error = E> + Send + Sync + Debug,
-{
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-        }
+impl From<ReputationError> for ReputationOpError {
+    fn from(value: ReputationError) -> Self {
+        Self::ReputationError(value)
     }
 }
 
-impl<R, E> ReputationBox<R, E>
-where
-    R: Reputation<Error = E> + Send + Sync + Debug,
-{
-    pub fn new(inner: R) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(inner)),
-        }
+impl From<DBError> for ReputationOpError {
+    fn from(value: DBError) -> Self {
+        Self::DBError(value)
     }
 }
 
-impl<R, E> Reputation for ReputationBox<R, E>
-where
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug,
-{
-    type Error = E;
+impl From<reth_db::Error> for ReputationOpError {
+    fn from(value: reth_db::Error) -> Self {
+        Self::DBError(DBError::DBInternalError(value))
+    }
+}
 
-    fn add_blacklist(&mut self, addr: &Address) -> bool {
-        self.inner.write().add_blacklist(addr)
+pub trait HashSetOp: Default + Sync + Send {
+    fn add_into_list(&mut self, addr: &Address) -> bool;
+    fn remove_from_list(&mut self, addr: &Address) -> bool;
+    fn is_in_list(&self, addr: &Address) -> bool;
+}
+
+impl<T: HashSetOp> HashSetOp for Arc<RwLock<T>> {
+    fn add_into_list(&mut self, addr: &Address) -> bool {
+        self.write().add_into_list(addr)
     }
 
-    fn add_whitelist(&mut self, addr: &Address) -> bool {
-        self.inner.write().add_whitelist(addr)
+    fn remove_from_list(&mut self, addr: &Address) -> bool {
+        self.write().remove_from_list(addr)
+    }
+
+    fn is_in_list(&self, addr: &Address) -> bool {
+        self.read().is_in_list(addr)
+    }
+}
+pub trait ReputationEntryOp: ClearOp + Sync + Send {
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError>;
+    fn set_entry(
+        &mut self,
+        addr: &Address,
+        entry: ReputationEntry,
+    ) -> Result<Option<ReputationEntry>, ReputationOpError>;
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError>;
+    fn update(&mut self) -> Result<(), ReputationOpError>;
+    fn get_all(&self) -> Vec<ReputationEntry>;
+}
+
+impl<T: ReputationEntryOp> ReputationEntryOp for Arc<RwLock<T>> {
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError> {
+        self.read().get_entry(addr)
+    }
+
+    fn set_entry(
+        &mut self,
+        addr: &Address,
+        entry: ReputationEntry,
+    ) -> Result<Option<ReputationEntry>, ReputationOpError> {
+        self.write().set_entry(addr, entry)
+    }
+
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError> {
+        self.read().contains_entry(addr)
+    }
+
+    fn update(&mut self) -> Result<(), ReputationOpError> {
+        self.write().update()
     }
 
     fn get_all(&self) -> Vec<ReputationEntry> {
-        self.inner.read().get_all()
+        self.read().get_all()
     }
+}
 
-    fn clear(&mut self) {
-        self.inner.write().clear()
-    }
+#[derive(Debug)]
+pub struct Reputation<H, R>
+where
+    H: HashSetOp,
+    R: ReputationEntryOp,
+{
+    /// Minimum denominator for calculating the minimum expected inclusions
+    min_inclusion_denominator: u64,
+    /// Constant for calculating the throttling thrshold
+    throttling_slack: u64,
+    /// Constant for calculating the ban thrshold
+    ban_slack: u64,
+    /// Minimum stake amount
+    min_stake: U256,
+    /// Minimum time requuired to unstake
+    min_unstake_delay: U256,
+    /// Whitelisted addresses
+    whitelist: H,
+    /// Blacklisted addreses
+    blacklist: H,
+    /// Entities' repuation registry
+    entities: R,
+}
 
-    fn get(&self, addr: &Address) -> Result<ReputationEntry, Self::Error> {
-        self.inner.read().get(addr)
+impl<H, R> Clone for Reputation<H, R>
+where
+    H: HashSetOp + Clone,
+    R: ReputationEntryOp + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            min_inclusion_denominator: self.min_inclusion_denominator.clone(),
+            throttling_slack: self.throttling_slack.clone(),
+            ban_slack: self.ban_slack.clone(),
+            min_stake: self.min_stake.clone(),
+            min_unstake_delay: self.min_unstake_delay.clone(),
+            whitelist: self.whitelist.clone(),
+            blacklist: self.blacklist.clone(),
+            entities: self.entities.clone(),
+        }
     }
+}
 
-    fn get_status(&self, addr: &Address) -> Result<ReputationStatus, Self::Error> {
-        self.inner.read().get_status(addr)
-    }
-
-    fn get_status_from_bytes(&self, bytes: &Bytes) -> Result<ReputationStatus, Self::Error> {
-        self.inner.read().get_status_from_bytes(bytes)
-    }
-
-    fn increment_included(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.inner.write().increment_included(addr)
-    }
-    fn increment_seen(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.inner.write().increment_seen(addr)
-    }
-
-    fn init(
-        &mut self,
+impl<H, R> Reputation<H, R>
+where
+    H: HashSetOp,
+    R: ReputationEntryOp,
+{
+    pub fn new(
         min_inclusion_denominator: u64,
         throttling_slack: u64,
         ban_slack: u64,
         min_stake: U256,
         min_unstake_delay: U256,
-    ) {
-        self.inner.write().init(
+        whitelist: H,
+        blacklist: H,
+        entities: R,
+    ) -> Self {
+        Self {
             min_inclusion_denominator,
             throttling_slack,
             ban_slack,
             min_stake,
             min_unstake_delay,
-        )
-    }
-    fn is_blacklist(&self, addr: &Address) -> bool {
-        self.inner.read().is_blacklist(addr)
-    }
-
-    fn is_whitelist(&self, addr: &Address) -> bool {
-        self.inner.read().is_whitelist(addr)
+            whitelist,
+            blacklist,
+            entities,
+        }
     }
 
-    fn remove_blacklist(&mut self, addr: &Address) -> bool {
-        self.inner.write().remove_blacklist(addr)
-    }
-    fn remove_whitelist(&mut self, addr: &Address) -> bool {
-        self.inner.write().remove_whitelist(addr)
-    }
+    /// Set the default reputation entry for an address.
+    /// It would do nothing if the address already exists.
+    ///
+    /// # Arguments
+    /// * `addr` - The address to add
+    ///
+    /// #Returns
+    /// * `Ok(())` if the address was added successfully
+    /// * `Err(ReputationError::AlreadyExists)` if the address already exists
+    fn set_default(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+        if !self.entities.contains_entry(addr)? {
+            let ent = ReputationEntry::default_with_addr(*addr);
 
-    fn set(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.inner.write().set(addr)
-    }
+            self.entities.set_entry(addr, ent)?;
+        }
 
-    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error> {
-        self.inner.write().set_entities(entries)
-    }
-
-    fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.inner.write().update_handle_ops_reverted(addr)
-    }
-
-    fn update_hourly(&mut self) -> Result<(), Self::Error> {
-        self.inner.write().update_hourly()
+        Ok(())
     }
 
-    fn verify_stake(&self, entity: &str, info: Option<StakeInfo>) -> Result<(), ReputationError> {
-        self.inner.read().verify_stake(entity, info)
+    /// Get an entity's [ReputationEntry](ReputationEntry) by address
+    ///
+    /// # Arguments
+    /// * `addr` - The address to get
+    ///
+    /// # Returns
+    /// * `Ok(ReputationEntry)` if the address exists
+    /// * `Err(ReputationError::NotFound)` if the address does not exist
+    pub fn get(&self, addr: &Address) -> Result<ReputationEntry, ReputationOpError> {
+        if let Some(ent) = self.entities.get_entry(addr)? {
+            Ok(ReputationEntry {
+                status: self.get_status(addr)?,
+                ..ent.clone()
+            })
+        } else {
+            Ok(ReputationEntry::default_with_addr(*addr))
+        }
     }
-}
 
-/// Reputation trait is imeplemented by [DatabaseMempool](DatabaseMempool) and [MemoryMempool](MemoryMempool) according to [Reputation scoring and throttling/banning for global entities](https://eips.ethereum.org/EIPS/eip-4337#reputation-scoring-and-throttlingbanning-for-global-entities) requirements.
-/// [UserOperation’s](UserOperation) storage access rules prevent them from interfere with each other. But “global” entities - paymasters, factories and aggregators are accessed by multiple UserOperations, and thus might invalidate multiple previously-valid UserOperations.
-/// To prevent abuse, we need to throttle down (or completely ban for a period of time) an entity that causes invalidation of large number of UserOperations in the mempool. To prevent such entities from “sybil-attack”, we require them to stake with the system, and thus make such DoS attack very expensive.
-pub trait Reputation: Debug {
-    type Error;
+    /// Increase the number of times an entity's address has been seen
+    ///
+    /// # Arguments
+    /// * `addr` - The address to increment
+    ///
+    /// # Returns
+    /// * `Ok(())` if the address was incremented successfully
+    /// * `Err(ReputationError::NotFound)` if the address does not exist
+    pub fn increment_seen(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+        self.set_default(addr)?;
+        if let Some(mut ent) = self.entities.get_entry(addr)? {
+            ent.uo_seen += 1;
+            self.entities.set_entry(addr, ent)?;
+        }
+        Ok(())
+    }
 
-    fn init(
-        &mut self,
-        min_inclusion_denominator: u64,
-        throttling_slack: u64,
-        ban_slack: u64,
-        min_stake: U256,
-        min_unstake_delay: U256,
-    );
-    fn set(&mut self, addr: &Address) -> Result<(), Self::Error>;
-    fn get(&self, addr: &Address) -> Result<ReputationEntry, Self::Error>;
-    fn increment_seen(&mut self, addr: &Address) -> Result<(), Self::Error>;
-    fn increment_included(&mut self, addr: &Address) -> Result<(), Self::Error>;
-    fn update_hourly(&mut self) -> Result<(), Self::Error>;
-    fn add_whitelist(&mut self, addr: &Address) -> bool;
-    fn remove_whitelist(&mut self, addr: &Address) -> bool;
-    fn is_whitelist(&self, addr: &Address) -> bool;
-    fn add_blacklist(&mut self, addr: &Address) -> bool;
-    fn remove_blacklist(&mut self, addr: &Address) -> bool;
-    fn is_blacklist(&self, addr: &Address) -> bool;
-    fn get_status(&self, addr: &Address) -> Result<ReputationStatus, Self::Error>;
-    fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), Self::Error>;
-    fn verify_stake(&self, entity: &str, info: Option<StakeInfo>) -> Result<(), ReputationError>;
+    /// Increases the number of times an entity successfully inlucdes a [UserOperation](UserOperation) in a block
+    ///
+    /// # Arguments
+    /// * `addr` - The address to increment
+    ///
+    /// # Returns
+    /// * `Ok(())` if the address was incremented successfully
+    /// * `Err(ReputationError::NotFound)` if the address does not exist
+    pub fn increment_included(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+        self.set_default(addr)?;
+        if let Some(mut ent) = self.entities.get_entry(addr)? {
+            ent.uo_included += 1;
+            self.entities.set_entry(addr, ent)?;
+        }
+        Ok(())
+    }
+
+    /// Update an entity's status by hours
+    ///
+    /// # Returns
+    /// * `Ok(())` if the address was updated successfully
+    /// * `Err(ReputationError::NotFound)` if the address does not exist
+    pub fn update_hourly(&mut self) -> Result<(), ReputationOpError> {
+        self.entities.update()
+    }
+
+    /// Add an address to the whitelist
+    ///
+    /// # Arguments
+    /// * `addr` - The address to add
+    ///
+    /// * `true` if the address was added successfully. Otherwise, `false`
+    pub fn add_whitelist(&mut self, addr: &Address) -> bool {
+        self.whitelist.add_into_list(addr)
+    }
+
+    /// Remove an address from the whitelist
+    ///
+    /// # Arguments
+    /// * `addr` - The address to remove
+    ///
+    /// * `true` if the address was removed successfully. Otherwise, `false
+    pub fn remove_whitelist(&mut self, addr: &Address) -> bool {
+        self.whitelist.remove_from_list(addr)
+    }
+
+    /// Check if an address is in the whitelist
+    ///
+    /// # Arguments
+    /// * `addr` - The address to check
+    ///
+    /// # Returns
+    /// * `true` if the address is in the whitelist. Otherwise, `false
+    pub fn is_whitelist(&self, addr: &Address) -> bool {
+        self.whitelist.is_in_list(addr)
+    }
+
+    /// Add an address to the blacklist
+    ///
+    /// # Arguments
+    /// * `addr` - The address to add
+    ///
+    /// # Returns
+    /// * `true` if the address was added successfully. Otherwise, `false
+    pub fn add_blacklist(&mut self, addr: &Address) -> bool {
+        self.blacklist.add_into_list(addr)
+    }
+
+    /// Remove an address from the blacklist
+    ///
+    /// # Arguments
+    /// * `addr` - The address to remove
+    ///
+    /// # Returns
+    /// * `true` if the address was removed successfully. Otherwise, `false
+    pub fn remove_blacklist(&mut self, addr: &Address) -> bool {
+        self.blacklist.remove_from_list(addr)
+    }
+
+    /// Check if an address is in the blacklist
+    ///
+    /// # Arguments
+    /// * `addr` - The address to check
+    ///
+    /// # Returns
+    /// * `true` if the address is in the blacklist. Otherwise, `false
+    pub fn is_blacklist(&self, addr: &Address) -> bool {
+        self.blacklist.is_in_list(addr)
+    }
+
+    /// Get an entity's reputation status
+    ///
+    /// # Arguments
+    /// * `addr` - The address to get the status of
+    ///
+    /// # Returns
+    /// * `Ok(ReputationStatus)` if the address exists
+    pub fn get_status(&self, addr: &Address) -> Result<ReputationStatus, ReputationOpError> {
+        if self.whitelist.is_in_list(addr) {
+            return Ok(Status::OK.into());
+        }
+
+        if self.blacklist.is_in_list(addr) {
+            return Ok(Status::BANNED.into());
+        }
+
+        Ok(match self.entities.get_entry(addr)? {
+            Some(ent) => {
+                let max_seen = ent.uo_seen / self.min_inclusion_denominator;
+                if max_seen > ent.uo_included + self.ban_slack {
+                    Status::BANNED.into()
+                } else if max_seen > ent.uo_included + self.throttling_slack {
+                    Status::THROTTLED.into()
+                } else {
+                    Status::OK.into()
+                }
+            }
+            _ => Status::OK.into(),
+        })
+    }
+
+    /// Update an entity's status when the [UserOperation](UserOperation) is reverted
+    ///
+    /// # Arguments
+    /// * `addr` - The address to update
+    ///
+    /// # Returns
+    /// * `Ok(())` if the address was updated successfully
+    /// * `Err(ReputationError::NotFound)` if the address does not exist
+    pub fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+        self.set_default(addr)?;
+        if let Some(mut ent) = self.entities.get_entry(addr)? {
+            ent.uo_seen = 100;
+            ent.uo_included = 0;
+            self.entities.set_entry(addr, ent)?;
+        }
+
+        Ok(())
+    }
+
+    /// Verify the stake information of an entity
+    ///
+    /// # Arguments
+    /// * `entity` - The entity type
+    /// * `info` - The entity's [stake information](StakeInfo)
+    ///
+    /// # Returns
+    /// * `Ok(())` if the entity's stake is valid
+    /// * `Err(ReputationError::EntityBanned)` if the entity is banned
+    /// * `Err(ReputationError::StakeTooLow)` if the entity's stake is too low
+    /// * `Err(ReputationError::UnstakeDelayTooLow)` if unstakes too early
+    pub fn verify_stake(
+        &self,
+        entity: &str,
+        info: Option<StakeInfo>,
+    ) -> Result<(), ReputationError> {
+        if let Some(info) = info {
+            if self.whitelist.is_in_list(&info.address) {
+                return Ok(());
+            }
+
+            let err = if info.stake < self.min_stake {
+                ReputationError::StakeTooLow {
+                    address: info.address,
+                    entity: entity.to_string(),
+                    min_stake: self.min_stake,
+                    min_unstake_delay: self.min_unstake_delay,
+                }
+            } else if info.unstake_delay < U256::from(2)
+            // TODO: remove this when spec tests are updated!!!!
+            /* self.min_unstake_delay */
+            {
+                ReputationError::UnstakeDelayTooLow {
+                    address: info.address,
+                    entity: entity.to_string(),
+                    min_stake: self.min_stake,
+                    min_unstake_delay: self.min_unstake_delay,
+                }
+            } else {
+                return Ok(());
+            };
+
+            return Err(err);
+        }
+
+        Ok(())
+    }
+    /// Set the [reputation](ReputationEntries) of an entity
+    ///
+    /// # Arguments
+    /// * `entries` - The [reputation entries](ReputationEntries) to set
+    ///
+    /// # Returns
+    /// * `Ok(())` if the entries were set successfully
+    pub fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), ReputationOpError> {
+        for en in entries {
+            self.entities.set_entry(&en.address.clone(), en);
+        }
+
+        Ok(())
+    }
+
+    /// Get all [reputation entries](ReputationEntries)
+    ///
+    /// # Returns
+    /// * All [reputation entries](ReputationEntries)
+    pub fn get_all(&self) -> Result<Vec<ReputationEntry>, ReputationOpError> {
+        Ok(self
+            .entities
+            .get_all()
+            .into_iter()
+            .flat_map(|entry| {
+                let status = self.get_status(&entry.address)?;
+                Ok::<ReputationEntry, ReputationOpError>(ReputationEntry {
+                    status: status,
+                    ..entry
+                })
+            })
+            .collect())
+    }
 
     // Try to get the reputation status from a sequence of bytes which the first 20 bytes should be the address
     // This is useful in getting the reputation directly from paymaster_and_data field and init_code field in user operation.
     // If the address is not found in the first 20 bytes, it would return ReputationStatus::OK directly.
-    fn get_status_from_bytes(&self, bytes: &Bytes) -> Result<ReputationStatus, Self::Error> {
+    pub fn get_status_from_bytes(
+        &self,
+        bytes: &Bytes,
+    ) -> Result<ReputationStatus, ReputationOpError> {
         let addr_opt = get_address(bytes.deref());
         if let Some(addr) = addr_opt {
             self.get_status(&addr)
@@ -171,7 +450,33 @@ pub trait Reputation: Debug {
         }
     }
 
-    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error>;
-    fn get_all(&self) -> Vec<ReputationEntry>;
-    fn clear(&mut self);
+    /// Clear all [reputation entries](ReputationEntries)
+    pub fn clear(&mut self) {
+        self.entities.clear();
+    }
+}
+
+impl<H, R> Reputation<H, R>
+where
+    H: HashSetOp + Default,
+    R: ReputationEntryOp + Default,
+{
+    pub fn new_default(
+        min_inclusion_denominator: u64,
+        throttling_slack: u64,
+        ban_slack: u64,
+        min_stake: U256,
+        min_unstake_delay: U256,
+    ) -> Self {
+        Self {
+            min_inclusion_denominator,
+            throttling_slack,
+            ban_slack,
+            min_stake,
+            min_unstake_delay,
+            whitelist: H::default(),
+            blacklist: H::default(),
+            entities: R::default(),
+        }
+    }
 }

@@ -1,5 +1,6 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     utils::equal_code_hashes,
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
@@ -17,6 +18,8 @@ use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::task::JoinSet;
 
+
+#[derive(Clone)]
 pub struct CodeHashes;
 
 impl CodeHashes {
@@ -67,12 +70,7 @@ impl CodeHashes {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for CodeHashes
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug + Display,
-{
+impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
     /// The [check_user_operation] method implementation that checks the code hashes
     ///
     /// # Arguments
@@ -81,11 +79,21 @@ where
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationCheckError] error.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R, E>,
-    ) -> Result<(), SimulationCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &mut SimulationTraceHelper<M>,
+    ) -> Result<(), SimulationCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         // [COD-010] - between the first and the second validations, the EXTCODEHASH value of any visited address, entity or referenced library, may not be changed
 
         let addrs = helper
@@ -101,10 +109,14 @@ where
 
         let uo_hash = uo.hash(&helper.entry_point.address(), &helper.chain.id().into());
 
-        match helper.mempool.has_code_hashes(&uo_hash) {
+        match mempool.has_code_hashes(&uo_hash) {
             Ok(true) => {
                 // 2nd simulation
-                let hashes_prev = helper.mempool.get_code_hashes(&uo_hash);
+                let hashes_prev = mempool.get_code_hashes(&uo_hash).map_err(|err| {
+                    SimulationCheckError::UnknownError {
+                        message: format!("{err:?}"),
+                    }
+                })?;
                 if !equal_code_hashes(hashes, &hashes_prev) {
                     return Err(SimulationCheckError::CodeHashes {
                         message: "Modified code hashes after 1st simulation".to_string(),
@@ -119,7 +131,7 @@ where
             }
             Err(err) => {
                 return Err(SimulationCheckError::UnknownError {
-                    message: err.to_string(),
+                    message: format!("{err:?}"),
                 })
             }
         }

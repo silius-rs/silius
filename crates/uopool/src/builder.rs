@@ -1,6 +1,11 @@
 use crate::{
-    validate::validator::StandardUserOperationValidator, Mempool, MempoolBox, Reputation,
-    ReputationBox, UoPool,
+    mempool::{UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
+    validate::{
+        validator::StandardUserOperationValidator, SanityCheck, SimulationCheck,
+        SimulationTraceCheck,
+    },
+    Mempool, Reputation, UoPool,
 };
 use alloy_chains::Chain;
 use ethers::{
@@ -11,96 +16,84 @@ use eyre::format_err;
 use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
-use silius_primitives::{
-    consts::reputation::{
-        BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
-    },
-    get_address,
-    provider::BlockStream,
-    UserOperation,
-};
+use silius_primitives::{get_address, provider::BlockStream, UserOperation};
 use std::sync::Arc;
-use std::{
-    fmt::{Debug, Display},
-    time::Duration,
-};
+use std::time::Duration;
 use tracing::warn;
 
-pub struct UoPoolBuilder<M, P, R, E>
+pub struct UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
+    SanCk: SanityCheck<M>,
+    SimCk: SimulationCheck,
+    SimTrCk: SimulationTraceCheck<M>,
 {
-    is_unsafe: bool,
     eth_client: Arc<M>,
     entrypoint_addr: Address,
     chain: Chain,
     max_verification_gas: U256,
-    min_stake: U256,
-    min_priority_fee_per_gas: U256,
-    whitelist: Vec<Address>,
-    mempool: MempoolBox<P, E>,
-    reputation: ReputationBox<R, E>,
+    mempool: Mempool<T, Y, X, Z>,
+    reputation: Reputation<H, R>,
+    validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
     // It would be None if p2p is not enabled
     publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
-impl<M, P, R, E> UoPoolBuilder<M, P, R, E>
+impl<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+    UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<Error = E> + Send + Sync + 'static,
-    R: Reputation<Error = E> + Send + Sync + 'static,
-    E: Debug + Display + 'static,
+    T: UserOperationAct + Clone + 'static,
+    Y: UserOperationAddrAct + Clone + 'static,
+    X: UserOperationAddrAct + Clone + 'static,
+    Z: UserOperationCodeHashAct + Clone + 'static,
+    H: HashSetOp + Clone + 'static,
+    R: ReputationEntryOp + Clone + 'static,
+    SanCk: SanityCheck<M> + Clone + 'static,
+    SimCk: SimulationCheck + Clone + 'static,
+    SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        is_unsafe: bool,
         eth_client: Arc<M>,
         entrypoint_addr: Address,
         chain: Chain,
         max_verification_gas: U256,
-        min_stake: U256,
-        min_priority_fee_per_gas: U256,
-        whitelist: Vec<Address>,
-        mempool: P,
-        reputation: R,
+        mempool: Mempool<T, Y, X, Z>,
+        reputation: Reputation<H, R>,
+        validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
         publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
-        // sets mempool
-        let mempool = MempoolBox::<P, E>::new(mempool);
-
-        // sets reputation
-        let mut reputation = ReputationBox::<R, E>::new(reputation);
-        reputation.init(
-            MIN_INCLUSION_RATE_DENOMINATOR,
-            THROTTLING_SLACK,
-            BAN_SLACK,
-            min_stake,
-            MIN_UNSTAKE_DELAY.into(),
-        );
-        for addr in whitelist.iter() {
-            reputation.add_whitelist(addr);
-        }
-
         Self {
-            is_unsafe,
             eth_client,
             entrypoint_addr,
             chain,
             max_verification_gas,
-            min_stake,
-            min_priority_fee_per_gas,
-            whitelist,
             mempool,
             reputation,
+            validator,
             publish_sd,
         }
     }
 
     async fn handle_block_update(
         hash: H256,
-        uopool: &mut UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>,
+        uopool: &mut UoPool<
+            M,
+            StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
+            T,
+            Y,
+            X,
+            Z,
+            H,
+            R,
+        >,
     ) -> eyre::Result<()> {
         let txs = uopool
             .entry_point
@@ -111,7 +104,7 @@ where
 
         if let Some(txs) = txs {
             for tx in txs {
-                if tx.to == Some(uopool.entry_point_address()) {
+                if tx.to == Some(uopool.entry_point.address()) {
                     let dec: Result<(Vec<UserOperation>, Address), _> = uopool
                         .entry_point
                         .entry_point_api()
@@ -122,7 +115,7 @@ where
                             uos.iter()
                                 .map(|uo| {
                                     uo.hash(
-                                        &uopool.entry_point_address(),
+                                        &uopool.entry_point.address(),
                                         &uopool.chain.id().into(),
                                     )
                                 })
@@ -135,27 +128,18 @@ where
                                 .reputation
                                 .increment_included(&uo.sender)
                                 .map_err(|e| {
-                                    format_err!(
-                                        "Failed to increment sender reputation: {:?}",
-                                        e.to_string()
-                                    )
+                                    format_err!("Failed to increment sender reputation: {:?}", e)
                                 })?;
 
                             if let Some(addr) = get_address(&uo.paymaster_and_data) {
                                 uopool.reputation.increment_included(&addr).map_err(|e| {
-                                    format_err!(
-                                        "Failed to increment paymaster reputation: {:?}",
-                                        e.to_string()
-                                    )
+                                    format_err!("Failed to increment paymaster reputation: {:?}", e)
                                 })?;
                             }
 
                             if let Some(addr) = get_address(&uo.init_code) {
                                 uopool.reputation.increment_included(&addr).map_err(|e| {
-                                    format_err!(
-                                        "Failed to increment factory reputation: {:?}",
-                                        e.to_string()
-                                    )
+                                    format_err!("Failed to increment factory reputation: {:?}", e)
                                 })?;
                             }
                         }
@@ -194,28 +178,14 @@ where
         });
     }
 
-    pub fn uopool(&self) -> UoPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E> {
+    pub fn uopool(
+        &self,
+    ) -> UoPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R> {
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
-        let validator = if self.is_unsafe {
-            StandardUserOperationValidator::new_canonical_unsafe(
-                entry_point.clone(),
-                self.chain,
-                self.max_verification_gas,
-                self.min_priority_fee_per_gas,
-            )
-        } else {
-            StandardUserOperationValidator::new_canonical(
-                entry_point.clone(),
-                self.chain,
-                self.max_verification_gas,
-                self.min_priority_fee_per_gas,
-            )
-        };
-
-        UoPool::<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>::new(
+        UoPool::<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R>::new(
             entry_point,
-            validator,
+            self.validator.clone(),
             self.mempool.clone(),
             self.reputation.clone(),
             self.max_verification_gas,

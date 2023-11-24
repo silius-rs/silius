@@ -1,7 +1,9 @@
 use crate::{
-    mempool::{Mempool, MempoolBox},
+    mempool::{
+        Mempool, MempoolError, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
+    },
     mempool_id,
-    reputation::ReputationBox,
+    reputation::{HashSetOp, ReputationEntryOp, ReputationOpError},
     utils::calculate_call_gas_limit,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
@@ -32,16 +34,18 @@ use silius_primitives::{
     UserOperationReceipt,
 };
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Display};
 use tracing::{info, trace};
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
-pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E>
+pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator, T, Y, X, Z, H, R>
 where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
 {
     /// The unique ID of the mempool
     pub id: MempoolId,
@@ -50,9 +54,9 @@ where
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
     /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    pub mempool: MempoolBox<P, E>,
+    pub mempool: Mempool<T, Y, X, Z>,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
-    pub reputation: ReputationBox<R, E>,
+    pub reputation: Reputation<H, R>,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
@@ -61,11 +65,15 @@ where
     p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
-impl<M: Middleware + 'static, V: UserOperationValidator<P, R, E>, P, R, E> UoPool<M, V, P, R, E>
+impl<M: Middleware + 'static, V: UserOperationValidator, T, Y, X, Z, H, R>
+    UoPool<M, V, T, Y, X, Z, H, R>
 where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug + Display,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
 {
     /// Creates a new [UoPool](UoPool) object
     ///
@@ -84,8 +92,8 @@ where
     pub fn new(
         entry_point: EntryPoint<M>,
         validator: V,
-        mempool: MempoolBox<P, E>,
-        reputation: ReputationBox<R, E>,
+        mempool: Mempool<T, Y, X, Z>,
+        reputation: Reputation<H, R>,
         max_verification_gas: U256,
         chain: Chain,
         p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
@@ -102,14 +110,6 @@ where
         }
     }
 
-    /// Returns the [EntryPoint](EntryPoint) contract address
-    ///
-    /// # Returns
-    /// `Address` - The [EntryPoint](EntryPoint) contract address
-    pub fn entry_point_address(&self) -> Address {
-        self.entry_point.address()
-    }
-
     /// Returns all of the [UserOperations](UserOperation) in the mempool
     ///
     /// # Returns
@@ -123,7 +123,7 @@ where
     /// # Returns
     /// `Vec<ReputationEntry>` - An array of [ReputationEntry](ReputationEntry)
     pub fn get_reputation(&self) -> Vec<ReputationEntry> {
-        self.reputation.get_all()
+        self.reputation.get_all().unwrap_or(vec![])
     }
 
     /// Sets the [ReputationEntry](ReputationEntry) for entities
@@ -133,7 +133,10 @@ where
     ///
     /// # Returns
     /// `()` - Returns nothing
-    pub fn set_reputation(&mut self, reputation: Vec<ReputationEntry>) -> Result<(), E> {
+    pub fn set_reputation(
+        &mut self,
+        reputation: Vec<ReputationEntry>,
+    ) -> Result<(), ReputationOpError> {
         self.reputation.set_entities(reputation)
     }
 
@@ -237,19 +240,19 @@ where
                 self.reputation
                     .increment_seen(&uo.sender)
                     .map_err(|e| AddError::MempoolError {
-                        message: e.to_string(),
+                        message: format!("{e:?}"),
                     })?;
                 if let Some(f_addr) = get_address(&uo.init_code) {
                     self.reputation.increment_seen(&f_addr).map_err(|e| {
                         AddError::MempoolError {
-                            message: e.to_string(),
+                            message: format!("{e:?}"),
                         }
                     })?;
                 }
                 if let Some(p_addr) = get_address(&uo.paymaster_and_data) {
                     self.reputation.increment_seen(&p_addr).map_err(|e| {
                         AddError::MempoolError {
-                            message: e.to_string(),
+                            message: format!("{e:?}"),
                         }
                     })?;
                 }
@@ -257,7 +260,7 @@ where
                 Ok(uo_hash)
             }
             Err(e) => Err(AddError::MempoolError {
-                message: e.to_string(),
+                message: format!("{e:?}"),
             }),
         }
     }
@@ -266,7 +269,7 @@ where
     ///
     /// # Returns
     /// `Result<Vec<UserOperation>, eyre::Error>` - The sorted [UserOperations](UserOperation)
-    pub fn get_sorted_user_operations(&self) -> Result<Vec<UserOperation>, E> {
+    pub fn get_sorted_user_operations(&self) -> Result<Vec<UserOperation>, MempoolError> {
         self.mempool.get_sorted()
     }
 

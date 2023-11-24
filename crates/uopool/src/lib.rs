@@ -12,11 +12,16 @@ mod utils;
 pub mod validate;
 
 pub use builder::UoPoolBuilder;
-pub use database::{
-    init_env, mempool::DatabaseMempool, reputation::DatabaseReputation, DBError, WriteMap,
+pub use database::tables::{
+    CodeHashes, EntitiesReputation, UserOperations, UserOperationsByEntity, UserOperationsBySender,
 };
-pub use memory::{mempool::MemoryMempool, reputation::MemoryReputation};
-pub use mempool::{mempool_id, Mempool, MempoolBox, MempoolId};
-pub use reputation::{Reputation, ReputationBox};
+pub use database::{init_env, DBError, DatabaseTable, WriteMap};
+pub use mempool::{
+    mempool_id, AddRemoveUserOp, AddRemoveUserOpHash, Mempool, MempoolId, UserOperationAct,
+    UserOperationAddrAct, UserOperationAddrOp, UserOperationCodeHashAct, UserOperationCodeHashOp,
+    UserOperationOp,
+};
+pub use reputation::{HashSetOp, Reputation, ReputationEntryOp};
 pub use uopool::UoPool;
 pub use utils::Overhead;
+pub use validate::{SanityCheck, SimulationCheck, SimulationTraceCheck};

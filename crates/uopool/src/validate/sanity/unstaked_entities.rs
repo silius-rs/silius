@@ -1,6 +1,6 @@
 use crate::{
-    mempool::Mempool,
-    reputation::Reputation as Rep,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, Reputation, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
 };
 use ethers::{
@@ -18,22 +18,18 @@ use silius_primitives::{
     sanity::SanityCheckError,
     UserOperation,
 };
-use std::{cmp, fmt::Debug};
+use std::cmp;
 
+#[derive(Clone)]
 pub struct UnstakedEntities;
 
 impl UnstakedEntities {
     /// Gets the deposit info for entity.
-    async fn get_stake<'a, M: Middleware, P, R, E>(
+    async fn get_stake<M: Middleware>(
         &self,
         addr: &Address,
-        helper: &SanityHelper<'a, M, P, R, E>,
-    ) -> Result<StakeInfo, SanityCheckError>
-    where
-        P: Mempool<Error = E> + Send + Sync,
-        R: Rep<Error = E> + Send + Sync,
-        E: Debug,
-    {
+        helper: &SanityHelper<M>,
+    ) -> Result<StakeInfo, SanityCheckError> {
         let info = helper
             .entry_point
             .get_deposit_info(addr)
@@ -50,18 +46,17 @@ impl UnstakedEntities {
     }
 
     /// Gets the reputation entry for entity.
-    fn get_entity<M: Middleware, P, R, E>(
+    fn get_entity<M: Middleware, H, R>(
         &self,
         addr: &Address,
-        helper: &SanityHelper<M, P, R, E>,
+        helper: &SanityHelper<M>,
+        reputation: &Reputation<H, R>,
     ) -> Result<ReputationEntry, SanityCheckError>
     where
-        P: Mempool<Error = E> + Send + Sync,
-        R: Rep<Error = E> + Send + Sync,
-        E: Debug,
+        H: HashSetOp,
+        R: ReputationEntryOp,
     {
-        helper
-            .reputation
+        reputation
             .get(addr)
             .map_err(|_| SanityCheckError::UnknownError {
                 message: "Failed to retrieve reputation entry".into(),
@@ -82,12 +77,7 @@ impl UnstakedEntities {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for UnstakedEntities
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Rep<Error = E> + Send + Sync,
-    E: Debug,
-{
+impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
     /// The [check_user_operation] method implementation that performs the sanity check for the unstaked entities.
     ///
     /// # Arguments
@@ -96,18 +86,28 @@ where
     ///
     /// # Returns
     /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         let (sender, factory, paymaster) = uo.get_entities();
 
         // [SREP-010] - the "canonical mempool" defines a staked entity if it has MIN_STAKE_VALUE and unstake delay of MIN_UNSTAKE_DELAY
 
         // sender
         // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator) that is used as an "account" in another UserOperation in the mempool
-        if helper.mempool.get_number_by_entity(&sender) > 0 {
+        if mempool.get_number_by_entity(&sender) > 0 {
             return Err(SanityCheckError::EntityVerification {
                 entity: SENDER.to_string(),
                 address: sender,
@@ -119,11 +119,8 @@ where
 
         // [UREP-010] - UserOperation with unstaked sender are only allowed up to SAME_SENDER_MEMPOOL_COUNT times in the mempool
         let sender_stake = self.get_stake(&sender, helper).await?;
-        if helper
-            .reputation
-            .verify_stake(SENDER, Some(sender_stake))
-            .is_err()
-            && helper.mempool.get_number_by_sender(&uo.sender) >= SAME_SENDER_MEMPOOL_COUNT
+        if reputation.verify_stake(SENDER, Some(sender_stake)).is_err()
+            && mempool.get_number_by_sender(&uo.sender) >= SAME_SENDER_MEMPOOL_COUNT
         {
             return Err(ReputationError::UnstakedEntityVerification {
                 entity: SENDER.to_string(),
@@ -136,7 +133,7 @@ where
         // factory
         if let Some(factory) = factory {
             // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator) that is used as an "account" in another UserOperation in the mempool
-            if helper.mempool.get_number_by_sender(&factory) > 0 {
+            if mempool.get_number_by_sender(&factory) > 0 {
                 return Err(SanityCheckError::EntityVerification {
                     entity: FACTORY.to_string(),
                     address: factory,
@@ -147,15 +144,14 @@ where
             }
 
             let factory_stake = self.get_stake(&factory, helper).await?;
-            if helper
-                .reputation
+            if reputation
                 .verify_stake(FACTORY, Some(factory_stake))
                 .is_err()
             {
                 // [UREP-020] - for other entities
-                let entity = self.get_entity(&factory, helper)?;
+                let entity = self.get_entity(&factory, helper, reputation)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
-                if helper.mempool.get_number_by_entity(&factory) as u64 >= uos_allowed {
+                if mempool.get_number_by_entity(&factory) as u64 >= uos_allowed {
                     return Err(ReputationError::UnstakedEntityVerification {
                         entity: FACTORY.to_string(),
                         address: factory,
@@ -169,7 +165,7 @@ where
         // paymaster
         if let Some(paymaster) = paymaster {
             // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator) that is used as an "account" in another UserOperation in the mempool
-            if helper.mempool.get_number_by_sender(&paymaster) > 0 {
+            if mempool.get_number_by_sender(&paymaster) > 0 {
                 return Err(SanityCheckError::EntityVerification {
                     entity: PAYMASTER.to_string(),
                     address: paymaster,
@@ -180,15 +176,14 @@ where
             }
 
             let paymaster_stake = self.get_stake(&paymaster, helper).await?;
-            if helper
-                .reputation
+            if reputation
                 .verify_stake(PAYMASTER, Some(paymaster_stake))
                 .is_err()
             {
                 // [UREP-020] - for other entities
-                let entity = self.get_entity(&paymaster, helper)?;
+                let entity = self.get_entity(&paymaster, helper, reputation)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
-                if helper.mempool.get_number_by_entity(&paymaster) as u64 >= uos_allowed {
+                if mempool.get_number_by_entity(&paymaster) as u64 >= uos_allowed {
                     return Err(ReputationError::UnstakedEntityVerification {
                         entity: PAYMASTER.to_string(),
                         address: paymaster,

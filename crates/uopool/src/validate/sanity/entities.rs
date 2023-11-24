@@ -1,6 +1,6 @@
 use crate::{
-    mempool::Mempool,
-    reputation::Reputation as Rep,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, Reputation, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
 };
 use ethers::{providers::Middleware, types::Address};
@@ -13,27 +13,27 @@ use silius_primitives::{
     sanity::SanityCheckError,
     UserOperation,
 };
-use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct Entities;
 
 impl Entities {
     /// Gets the status for entity.
-    fn get_status<M: Middleware, P, R, E>(
+    fn get_status<M: Middleware, H, R>(
         &self,
         addr: &Address,
-        helper: &SanityHelper<M, P, R, E>,
+        helper: &SanityHelper<M>,
+        reputation: &Reputation<H, R>,
     ) -> Result<Status, SanityCheckError>
     where
-        P: Mempool<Error = E> + Send + Sync,
-        R: Rep<Error = E> + Send + Sync,
-        E: Debug,
+        H: HashSetOp,
+        R: ReputationEntryOp,
     {
-        Ok(Status::from(helper.reputation.get_status(addr).map_err(
-            |_| SanityCheckError::UnknownError {
+        Ok(Status::from(reputation.get_status(addr).map_err(|_| {
+            SanityCheckError::UnknownError {
                 message: "Failed to retrieve reputation status".into(),
-            },
-        )?))
+            }
+        })?))
     }
 
     /// [SREP-020] - a BANNED address is not allowed into the mempool.
@@ -55,21 +55,25 @@ impl Entities {
     }
 
     /// [SREP-030] - THROTTLED address is limited to THROTTLED_ENTITY_MEMPOOL_COUNT entries in the mempool
-    fn check_throttled<M: Middleware, P, R, E>(
+    fn check_throttled<M: Middleware, T, Y, X, Z, H, R>(
         &self,
         entity: &str,
         addr: &Address,
         status: &Status,
-        helper: &SanityHelper<M, P, R, E>,
+        helper: &SanityHelper<M>,
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
     ) -> Result<(), SanityCheckError>
     where
-        P: Mempool<Error = E> + Send + Sync,
-        R: Rep<Error = E> + Send + Sync,
-        E: Debug,
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
     {
         if *status == Status::THROTTLED
-            && (helper.mempool.get_number_by_sender(addr)
-                + helper.mempool.get_number_by_entity(addr))
+            && (mempool.get_number_by_sender(addr) + mempool.get_number_by_entity(addr))
                 >= THROTTLED_ENTITY_MEMPOOL_COUNT
         {
             return Err(ReputationError::ThrottledLimit {
@@ -84,12 +88,7 @@ impl Entities {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Entities
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Rep<Error = E> + Send + Sync,
-    E: Debug,
-{
+impl<M: Middleware> SanityCheck<M> for Entities {
     /// The [check_user_operation] method implementation that performs the sanity check for the staked entities.
     ///
     /// # Arguments
@@ -98,32 +97,42 @@ where
     ///
     /// # Returns
     /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         let (sender, factory, paymaster) = uo.get_entities();
 
         // [SREP-040] - an OK staked entity is unlimited by the reputation rule
 
         // sender
-        let status = self.get_status(&sender, helper)?;
+        let status = self.get_status(&sender, helper, reputation)?;
         self.check_banned(SENDER, &sender, &status)?;
-        self.check_throttled(SENDER, &sender, &status, helper)?;
+        self.check_throttled(SENDER, &sender, &status, helper, mempool, reputation)?;
 
         // factory
         if let Some(factory) = factory {
-            let status = self.get_status(&factory, helper)?;
+            let status = self.get_status(&factory, helper, reputation)?;
             self.check_banned(FACTORY, &factory, &status)?;
-            self.check_throttled(FACTORY, &factory, &status, helper)?;
+            self.check_throttled(FACTORY, &factory, &status, helper, mempool, reputation)?;
         }
 
         // paymaster
         if let Some(paymaster) = paymaster {
-            let status = self.get_status(&paymaster, helper)?;
+            let status = self.get_status(&paymaster, helper, reputation)?;
             self.check_banned(PAYMASTER, &paymaster, &status)?;
-            self.check_throttled(PAYMASTER, &paymaster, &status, helper)?;
+            self.check_throttled(PAYMASTER, &paymaster, &status, helper, mempool, reputation)?;
         }
 
         Ok(())

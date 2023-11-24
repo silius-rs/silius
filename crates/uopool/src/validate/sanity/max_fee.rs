@@ -1,5 +1,6 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
@@ -9,16 +10,13 @@ use ethers::{
 };
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Clone)]
 pub struct MaxFee {
     pub min_priority_fee_per_gas: U256,
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for MaxFee
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
+impl<M: Middleware> SanityCheck<M> for MaxFee {
     /// The [check_user_operation] method implementation that checks the max fee
     ///
     /// # Arguments
@@ -27,11 +25,21 @@ where
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SanityCheckError]
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         if uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
             return Err(SanityCheckError::HighMaxPriorityFeePerGas {
                 max_priority_fee_per_gas: uo.max_priority_fee_per_gas,

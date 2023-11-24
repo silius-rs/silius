@@ -6,6 +6,7 @@ use silius_primitives::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Clone)]
 pub struct Timestamp;
 
 impl SimulationCheck for Timestamp {

@@ -1,5 +1,6 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
@@ -7,15 +8,11 @@ use ethers::{providers::Middleware, types::U256};
 use silius_primitives::{get_address, sanity::SanityCheckError, UserOperation};
 use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct Paymaster;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for Paymaster
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug,
-{
+impl<M: Middleware> SanityCheck<M> for Paymaster {
     /// The [check_user_operation] method implementation that performs the sanity check on the paymaster.
     ///
     /// # Arguments
@@ -24,11 +21,21 @@ where
     ///
     /// # Returns
     /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
                 let code = helper.entry_point.eth_client().get_code(addr, None).await?;

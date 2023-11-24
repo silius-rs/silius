@@ -1,5 +1,6 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
     Reputation,
 };
@@ -18,6 +19,7 @@ use silius_primitives::{
 };
 use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct CallStack;
 
 impl CallStack {
@@ -93,12 +95,7 @@ impl CallStack {
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SimulationTraceCheck<M, P, R, E> for CallStack
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-    E: Debug,
-{
+impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
     /// The [check_user_operation] method implementation that performs the call stack trace check.
     ///
     /// # Arguments
@@ -107,11 +104,21 @@ where
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationCheckError] error.
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &mut SimulationTraceHelper<M, P, R, E>,
-    ) -> Result<(), SimulationCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &mut SimulationTraceHelper<M>,
+    ) -> Result<(), SimulationCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         if helper.stake_info.is_none() {
             helper.stake_info = Some(extract_stake_info(uo, helper.simulate_validation_result));
         }
@@ -161,8 +168,7 @@ where
                         // [EREP-050] - an unstaked paymaster may not return a context
                         // This will be removed in the future
                         if !context.is_empty()
-                            && helper
-                                .reputation
+                            && reputation
                                 .verify_stake(PAYMASTER, Some(*stake_info))
                                 .is_err()
                         {

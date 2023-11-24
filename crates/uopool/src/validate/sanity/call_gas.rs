@@ -1,5 +1,6 @@
 use crate::{
-    mempool::Mempool,
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     utils::calculate_call_gas_limit,
     validate::{SanityCheck, SanityHelper},
     Reputation,
@@ -8,14 +9,11 @@ use ethers::{providers::Middleware, types::BlockNumber};
 use silius_contracts::entry_point::EntryPointErr;
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
+#[derive(Clone)]
 pub struct CallGas;
 
 #[async_trait::async_trait]
-impl<M: Middleware, P, R, E> SanityCheck<M, P, R, E> for CallGas
-where
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
-{
+impl<M: Middleware> SanityCheck<M> for CallGas {
     /// The `check_user_operation` method implementation for the `CallGas` sanity check.
     ///
     /// # Arguments
@@ -24,11 +22,21 @@ where
     ///
     /// # Returns
     /// None if the sanity check passes, otherwise [SanityCheckError].
-    async fn check_user_operation(
+    async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        helper: &SanityHelper<M, P, R, E>,
-    ) -> Result<(), SanityCheckError> {
+        mempool: &Mempool<T, Y, X, Z>,
+        reputation: &Reputation<H, R>,
+        helper: &SanityHelper<M>,
+    ) -> Result<(), SanityCheckError>
+    where
+        T: UserOperationAct,
+        Y: UserOperationAddrAct,
+        X: UserOperationAddrAct,
+        Z: UserOperationCodeHashAct,
+        H: HashSetOp,
+        R: ReputationEntryOp,
+    {
         let exec_res = match helper.entry_point.simulate_handle_op(uo.clone()).await {
             Ok(res) => res,
             Err(err) => {

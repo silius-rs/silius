@@ -1,195 +1,52 @@
-use super::{
-    env::{DBError, Env},
-    tables::EntitiesReputation,
-    utils::WrapAddress,
+use super::{tables::EntitiesReputation, utils::WrapAddress, DatabaseTable};
+use crate::{
+    mempool::ClearOp,
+    reputation::{ReputationEntryOp, ReputationOpError},
 };
-use crate::Reputation;
-use ethers::types::{Address, U256};
+use ethers::types::Address;
 use reth_db::{
     cursor::{DbCursorRO, DbCursorRW},
     database::Database,
     mdbx::EnvironmentKind,
     transaction::{DbTx, DbTxMut},
 };
-use silius_primitives::reputation::{
-    ReputationEntry, ReputationError, ReputationStatus, StakeInfo, Status,
-};
-use std::{collections::HashSet, sync::Arc};
+use silius_primitives::reputation::ReputationEntry;
 
-#[derive(Debug)]
-pub struct DatabaseReputation<E: EnvironmentKind> {
-    /// Minimum denominator for calculating the minimum expected inclusions
-    min_inclusion_denominator: u64,
-    /// Constant for calculating the throttling thrshold
-    throttling_slack: u64,
-    /// Constant for calculating the ban thrshold
-    ban_slack: u64,
-    /// Minimum stake amount
-    min_stake: U256,
-    /// Minimum time requuired to unstake
-    min_unstake_delay: U256,
-    /// Whitelisted addresses
-    whitelist: HashSet<Address>,
-    /// Blacklisted addreses
-    blacklist: HashSet<Address>,
-    /// Libmdbx-sys environment.
-    env: Arc<Env<E>>,
-}
-
-impl<E: EnvironmentKind> DatabaseReputation<E> {
-    /// Spawns a new [DatabaseReputation](DatabaseReputation) instance.
-    pub fn new(env: Arc<Env<E>>) -> Self {
-        Self {
-            min_inclusion_denominator: 0,
-            throttling_slack: 0,
-            ban_slack: 0,
-            min_stake: U256::default(),
-            min_unstake_delay: U256::default(),
-            whitelist: HashSet::default(),
-            blacklist: HashSet::default(),
-            env,
-        }
+impl<E: EnvironmentKind> ClearOp for DatabaseTable<E, EntitiesReputation> {
+    fn clear(&mut self) {
+        let tx = self.env.tx_mut().unwrap();
+        tx.clear::<EntitiesReputation>().unwrap();
+        tx.commit().unwrap();
     }
 }
 
-impl<E: EnvironmentKind> Reputation for DatabaseReputation<E> {
-    type Error = DBError;
+impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputation> {
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError> {
+        let addr_wrap: WrapAddress = (*addr).into();
 
-    /// Initializes the [Reputation](Reputation) database.
-    fn init(
+        let tx = self.env.tx()?;
+        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
+        tx.commit()?;
+        Ok(res.map(|o| o.into()))
+    }
+
+    fn set_entry(
         &mut self,
-        min_inclusion_denominator: u64,
-        throttling_slack: u64,
-        ban_slack: u64,
-        min_stake: U256,
-        min_unstake_delay: U256,
-    ) {
-        self.min_inclusion_denominator = min_inclusion_denominator;
-        self.throttling_slack = throttling_slack;
-        self.ban_slack = ban_slack;
-        self.min_stake = min_stake;
-        self.min_unstake_delay = min_unstake_delay;
-    }
-
-    /// Sets the [ReputationEntry](ReputationEntry) for a given address in the database
-    ///
-    /// # Arguments
-    /// * `addr` - Address of the entity
-    ///
-    /// #Returns
-    /// * `Ok(())` if the operation was successful
-    /// * `Err(Self::Error)` if the operation failed
-    fn set(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        let addr_wrap: WrapAddress = (*addr).into();
-
-        let tx = self.env.tx()?;
-        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
-        tx.commit()?;
-
-        if res.is_none() {
-            let ent = ReputationEntry {
-                address: *addr,
-                uo_seen: 0,
-                uo_included: 0,
-                status: Status::OK.into(),
-            };
-
-            let tx = self.env.tx_mut()?;
-            tx.put::<EntitiesReputation>((*addr).into(), ent.into())?;
-            tx.commit()?;
-        }
-
-        Ok(())
-    }
-
-    /// Gets the [ReputationEntry](ReputationEntry) for a given address from the database
-    ///
-    /// # Arguments
-    /// * `addr` - Address of the entity
-    ///
-    /// #Returns
-    /// * `Ok(ReputationEntry)` if the operation was successful
-    /// * `Err(Self::Error)` if the operation failed
-    fn get(&self, addr: &Address) -> Result<ReputationEntry, DBError> {
-        let addr_wrap: WrapAddress = (*addr).into();
-
-        let tx = self.env.tx()?;
-        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
-        tx.commit()?;
-
-        if let Some(ent) = res {
-            Ok(ReputationEntry {
-                status: self.get_status(addr)?,
-                ..ent.into()
-            })
-        } else {
-            let ent = ReputationEntry {
-                address: *addr,
-                uo_seen: 0,
-                uo_included: 0,
-                status: Status::OK.into(),
-            };
-
-            Ok(ent)
-        }
-    }
-
-    /// Increase the number of times an entity's address has been seen in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to increment
-    ///
-    /// #Returns
-    /// * `Ok(())` if the address was incremented successfully
-    /// * `Err(ReputationError::NotFound)` if the address does not exist
-    fn increment_seen(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.set(addr)?;
-
-        let addr_wrap: WrapAddress = (*addr).into();
-
+        addr: &Address,
+        entry: ReputationEntry,
+    ) -> Result<Option<ReputationEntry>, ReputationOpError> {
         let tx = self.env.tx_mut()?;
-        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
-        if let Some(ent) = res {
-            let mut ent: ReputationEntry = ent.into();
-            ent.uo_seen += 1;
-            tx.put::<EntitiesReputation>((*addr).into(), ent.into())?;
-        }
+        let original = tx.get::<EntitiesReputation>((*addr).into())?;
+        tx.put::<EntitiesReputation>((*addr).into(), entry.into())?;
         tx.commit()?;
-
-        Ok(())
+        Ok(original.map(|o| o.into()))
     }
 
-    /// Increases the number of times an entity's address successfully inlucde a [UserOperation](UserOperation) in a block in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to increment
-    ///
-    /// # Returns
-    /// * `Ok(())` if the address was incremented successfully
-    /// * `Err(ReputationError::NotFound)` if the address does not exist
-    fn increment_included(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.set(addr)?;
-
-        let addr_wrap: WrapAddress = (*addr).into();
-
-        let tx = self.env.tx_mut()?;
-        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
-        if let Some(ent) = res {
-            let mut ent: ReputationEntry = ent.into();
-            ent.uo_included += 1;
-            tx.put::<EntitiesReputation>((*addr).into(), ent.into())?;
-        }
-        tx.commit()?;
-
-        Ok(())
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError> {
+        Ok(self.get_entry(addr)?.is_some())
     }
 
-    /// Update an entity's status by hours
-    ///
-    /// # Returns
-    /// * `Ok(())` if the address was updated successfully
-    /// * `Err(ReputationError::NotFound)` if the address does not exist
-    fn update_hourly(&mut self) -> Result<(), Self::Error> {
+    fn update(&mut self) -> Result<(), ReputationOpError> {
         let tx = self.env.tx_mut()?;
         let mut cursor = tx.cursor_write::<EntitiesReputation>()?;
 
@@ -210,201 +67,6 @@ impl<E: EnvironmentKind> Reputation for DatabaseReputation<E> {
         Ok(())
     }
 
-    /// Add an address to the whitelist in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to add
-    ///
-    /// * `true` if the address was added successfully. Otherwise, `false`
-    fn add_whitelist(&mut self, addr: &Address) -> bool {
-        self.whitelist.insert(*addr)
-    }
-
-    /// Remove an address from the whitelist in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to remove
-    ///
-    /// * `true` if the address was removed successfully. Otherwise, `false
-    fn remove_whitelist(&mut self, addr: &Address) -> bool {
-        self.whitelist.remove(addr)
-    }
-
-    /// Check if an address is in the whitelist in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to check
-    ///
-    /// # Returns
-    /// * `true` if the address is in the whitelist. Otherwise, `false
-    fn is_whitelist(&self, addr: &Address) -> bool {
-        self.whitelist.contains(addr)
-    }
-
-    /// Add an address to the blacklist in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to add
-    ///
-    /// # Returns
-    /// * `true` if the address was added successfully. Otherwise, `false
-    fn add_blacklist(&mut self, addr: &Address) -> bool {
-        self.blacklist.insert(*addr)
-    }
-
-    /// Remove an address from the blacklist in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to remove
-    ///
-    /// # Returns
-    /// * `true` if the address was removed successfully. Otherwise, `false
-    fn remove_blacklist(&mut self, addr: &Address) -> bool {
-        self.blacklist.remove(addr)
-    }
-
-    /// Check if an address is in the blacklist in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to check
-    ///
-    /// # Returns
-    /// * `true` if the address is in the blacklist. Otherwise, `false
-    fn is_blacklist(&self, addr: &Address) -> bool {
-        self.blacklist.contains(addr)
-    }
-
-    /// Get an entity's reputation status
-    ///
-    /// # Arguments
-    /// * `addr` - The address to get the status of
-    ///
-    /// # Returns
-    /// * `Ok(ReputationStatus)` if the address exists
-    fn get_status(&self, addr: &Address) -> Result<ReputationStatus, Self::Error> {
-        if self.is_whitelist(addr) {
-            return Ok(Status::OK.into());
-        }
-
-        if self.is_blacklist(addr) {
-            return Ok(Status::BANNED.into());
-        }
-
-        let addr_wrap: WrapAddress = (*addr).into();
-
-        let tx = self.env.tx()?;
-        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
-
-        Ok(match res {
-            Some(ent) => {
-                let ent: ReputationEntry = ent.into();
-
-                let max_seen = ent.uo_seen / self.min_inclusion_denominator;
-                if max_seen > ent.uo_included + self.ban_slack {
-                    Status::BANNED.into()
-                } else if max_seen > ent.uo_included + self.throttling_slack {
-                    Status::THROTTLED.into()
-                } else {
-                    Status::OK.into()
-                }
-            }
-            None => Status::OK.into(),
-        })
-    }
-
-    /// Update an entity's status when the [UserOperation](UserOperation) is reverted in the database
-    ///
-    /// # Arguments
-    /// * `addr` - The address to update
-    ///
-    /// # Returns
-    /// * `Ok(())` if the address was updated successfully
-    /// * `Err(ReputationError::NotFound)` if the address does not exist
-    fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), Self::Error> {
-        self.set(addr)?;
-
-        let addr_wrap: WrapAddress = (*addr).into();
-
-        let tx = self.env.tx_mut()?;
-        let res = tx.get::<EntitiesReputation>(addr_wrap)?;
-        if let Some(ent) = res {
-            let mut ent: ReputationEntry = ent.into();
-            ent.uo_seen = 100;
-            ent.uo_included = 0;
-            tx.put::<EntitiesReputation>((*addr).into(), ent.into())?;
-        }
-        tx.commit()?;
-
-        Ok(())
-    }
-
-    /// Verify the stake information of an entity
-    ///
-    /// # Arguments
-    /// * `entity` - The entity type
-    /// * `info` - The entity's [stake information](StakeInfo)
-    ///
-    /// # Returns
-    /// * `Ok(())` if the entity's stake is valid
-    /// *`Err(ReputationError::EntityBanned)` if the entity is banned
-    /// * `Err(ReputationError::InvalidStake)` if the entity's stake is invalid
-    /// * `Err(ReputationError::UnknownError)` if an unknown error occurred
-    /// * `Err(ReputationError::StakeTooLow)` if the entity's stake is too low
-    /// * `Err(ReputationError::UnstakeDelayTooLow)` if unstakes too early
-    fn verify_stake(&self, entity: &str, info: Option<StakeInfo>) -> Result<(), ReputationError> {
-        if let Some(info) = info {
-            if self.is_whitelist(&info.address) {
-                return Ok(());
-            }
-
-            let err = if info.stake < self.min_stake {
-                ReputationError::StakeTooLow {
-                    address: info.address,
-                    entity: entity.to_string(),
-                    min_stake: self.min_stake,
-                    min_unstake_delay: self.min_unstake_delay,
-                }
-            } else if info.unstake_delay < U256::from(2)
-            // TODO: remove this when spec tests are updated!!!!
-            /* self.min_unstake_delay */
-            {
-                ReputationError::UnstakeDelayTooLow {
-                    address: info.address,
-                    entity: entity.to_string(),
-                    min_stake: self.min_stake,
-                    min_unstake_delay: self.min_unstake_delay,
-                }
-            } else {
-                return Ok(());
-            };
-
-            return Err(err);
-        }
-        Ok(())
-    }
-
-    /// Set the [reputation](ReputationEntries) of an entity in the database
-    ///
-    /// # Arguments
-    /// * `entries` - The [reputation entries](ReputationEntries) to set
-    ///
-    /// # Returns
-    /// * `Ok(())` if the entries were set successfully
-    fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), Self::Error> {
-        let tx = self.env.tx_mut()?;
-        for entry in entries {
-            let addr_wrap: WrapAddress = entry.address.into();
-            tx.put::<EntitiesReputation>(addr_wrap, entry.into())?;
-        }
-        tx.commit()?;
-
-        Ok(())
-    }
-
-    /// Get all [reputation entries](ReputationEntries)
-    ///
-    /// # Returns
-    /// * All [reputation entries](ReputationEntries)
     fn get_all(&self) -> Vec<ReputationEntry> {
         self.env
             .tx()
@@ -412,42 +74,28 @@ impl<E: EnvironmentKind> Reputation for DatabaseReputation<E> {
                 let mut c = tx.cursor_read::<EntitiesReputation>()?;
                 let res: Vec<ReputationEntry> = c
                     .walk(Some(WrapAddress::default()))?
-                    .map(|a| {
-                        a.map(|(_, v)| ReputationEntry {
-                            status: self.get_status(&v.0.address).unwrap_or_default(),
-                            ..v.into()
-                        })
-                    })
+                    .map(|a| a.map(|(_, v)| v.into()))
                     .collect::<Result<Vec<_>, _>>()?;
                 tx.commit()?;
                 Ok(res)
             })
             .unwrap_or_else(|_| vec![])
     }
-
-    /// Clear all [reputation entries](ReputationEntries)
-    fn clear(&mut self) {
-        self.env
-            .tx_mut()
-            .and_then(|tx| {
-                tx.clear::<EntitiesReputation>()?;
-                tx.commit()
-            })
-            .expect("Clear database failed");
-
-        self.whitelist.clear();
-        self.blacklist.clear();
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        database::{init_env, reputation::DatabaseReputation},
+        database::{init_env, tables::EntitiesReputation, DatabaseTable},
         utils::tests::reputation_test_case,
+        Reputation,
     };
+    use ethers::types::{Address, U256};
     use reth_libmdbx::WriteMap;
-    use std::sync::Arc;
+    use silius_primitives::consts::reputation::{
+        BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
+    };
+    use std::{collections::HashSet, sync::Arc};
     use tempdir::TempDir;
 
     #[tokio::test]
@@ -457,8 +105,18 @@ mod tests {
         let env = init_env::<WriteMap>(dir.into_path()).unwrap();
         env.create_tables()
             .expect("Create mdbx database tables failed");
-        let mempool: DatabaseReputation<WriteMap> = DatabaseReputation::new(Arc::new(env));
-
-        reputation_test_case(mempool);
+        let env = Arc::new(env);
+        let entry: DatabaseTable<WriteMap, EntitiesReputation> = DatabaseTable::new(env.clone());
+        let reputation = Reputation::new(
+            MIN_INCLUSION_RATE_DENOMINATOR,
+            THROTTLING_SLACK,
+            BAN_SLACK,
+            U256::from(1),
+            U256::from(0),
+            HashSet::<Address>::default(),
+            HashSet::<Address>::default(),
+            entry,
+        );
+        reputation_test_case(reputation);
     }
 }
