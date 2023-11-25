@@ -5,14 +5,13 @@ use crate::common::{
     deploy_test_storage_account_factory,
     gen::{
         EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRulesAccount,
-        TestRulesAccountFactory, TestStorageAccountFactory,
+        TestStorageAccountFactory,
     },
     setup_geth, ClientType, DeployedContract,
 };
 use alloy_chains::Chain;
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
-use ethers::providers::{Http, Provider};
 use ethers::types::transaction::eip2718::TypedTransaction;
 use ethers::types::Address;
 use ethers::utils::{parse_units, GethInstance};
@@ -20,46 +19,36 @@ use ethers::{
     providers::Middleware,
     types::{Bytes, U256},
 };
-use futures::channel::mpsc::unbounded;
 use silius_contracts::EntryPoint;
 use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
 use silius_primitives::simulation::SimulationCheckError;
 use silius_primitives::uopool::ValidationError;
 use silius_primitives::UserOperation;
-use silius_uopool::validate::sanity::call_gas::CallGas;
-use silius_uopool::validate::sanity::entities::Entities;
-use silius_uopool::validate::sanity::max_fee::MaxFee;
-use silius_uopool::validate::sanity::paymaster::Paymaster;
-use silius_uopool::validate::sanity::sender::Sender;
-use silius_uopool::validate::sanity::unstaked_entities::UnstakedEntities;
-use silius_uopool::validate::sanity::verification_gas::VerificationGas;
-use silius_uopool::validate::simulation::signature::Signature;
-use silius_uopool::validate::simulation::timestamp::Timestamp;
-use silius_uopool::validate::simulation_trace::call_stack::CallStack;
-use silius_uopool::validate::simulation_trace::code_hashes::CodeHashes;
-use silius_uopool::validate::simulation_trace::gas::Gas;
-use silius_uopool::validate::simulation_trace::opcodes::Opcodes;
-use silius_uopool::validate::simulation_trace::storage_access::StorageAccess;
-use silius_uopool::validate::validator::StandardUserOperationValidator;
+
+use silius_uopool::validate::validator::{new_canonical, StandardValidator};
 use silius_uopool::validate::{
     UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
 };
 use silius_uopool::{
-    mempool_id, MemoryMempool, MemoryReputation, Mempool, MempoolBox, Reputation as Rep,
-    ReputationBox, UoPool,
+    init_env, mempool_id, CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool,
+    Reputation, ReputationEntryOp, UserOperationAct, UserOperationAddrAct,
+    UserOperationCodeHashAct, UserOperations, UserOperationsByEntity, UserOperationsBySender,
+    WriteMap,
 };
-use std::collections::HashMap;
-use std::fmt::Debug;
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
+use tempdir::TempDir;
 
-struct TestContext<M, V, P, R, E>
+struct TestContext<M, T, Y, X, Z, H, R>
 where
     M: Middleware + 'static,
-    V: UserOperationValidator<P, R, E> + 'static,
-    P: Mempool<Error = E> + Send + Sync,
-    R: Rep<Error = E> + Send + Sync,
-    E: Debug,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
 {
     pub client: Arc<M>,
     pub _geth: GethInstance,
@@ -67,22 +56,25 @@ where
     pub paymaster: DeployedContract<TestOpcodesAccount<M>>,
     pub opcodes_factory: DeployedContract<TestOpcodesAccountFactory<M>>,
     pub storage_factory: DeployedContract<TestStorageAccountFactory<M>>,
-    pub _rules_factory: DeployedContract<TestRulesAccountFactory<M>>,
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
-    pub uopool: UoPool<M, V, P, R, E>,
+    pub validator: StandardValidator<M>,
+    pub mempool: Mempool<T, Y, X, Z>,
+    pub reputation: Reputation<H, R>,
 }
 
 type Context = TestContext<
     ClientType,
-    StandardUserOperationValidator<Provider<Http>, MemoryMempool, MemoryReputation, eyre::Error>,
-    MemoryMempool,
-    MemoryReputation,
-    eyre::Error,
+    DatabaseTable<WriteMap, UserOperations>,
+    DatabaseTable<WriteMap, UserOperationsBySender>,
+    DatabaseTable<WriteMap, UserOperationsByEntity>,
+    DatabaseTable<WriteMap, CodeHashes>,
+    HashSet<Address>,
+    DatabaseTable<WriteMap, EntitiesReputation>,
 >;
 
 async fn setup() -> eyre::Result<Context> {
     let chain_id = 1337u64;
-    let (_geth, _client, provider) = setup_geth().await?;
+    let (_geth, _client, _) = setup_geth().await?;
     let client = Arc::new(_client);
     let ep = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
@@ -118,53 +110,35 @@ async fn setup() -> eyre::Result<Context> {
     let m_id = mempool_id(&ep.address, &U256::from(chain_id));
     let mut ep_map = HashMap::new();
     ep_map.insert(m_id, EntryPoint::new(client.clone(), ep.address));
-    let mempools = MemoryMempool::default();
-    let mut reputation = MemoryReputation::default();
-    reputation.init(10, 10, 10, 1u64.into(), 1u64.into());
+    let dir = TempDir::new("test-silius-db").unwrap();
+    let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
+    env.create_tables()
+        .expect("Create mdbx database tables failed");
+    let mempool = Mempool::new(
+        DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
+        DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
+        DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
+        DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
+    );
+    let reputation = Reputation::new(
+        10,
+        10,
+        10,
+        1u64.into(),
+        1u64.into(),
+        HashSet::<Address>::default(),
+        HashSet::<Address>::default(),
+        DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+    );
 
     let entry_point = EntryPoint::new(client.clone(), ep.address);
-    let entry_point2 = EntryPoint::new(Arc::new(provider.clone()), ep.address);
     let c = Chain::from(chain_id);
 
-    let validator = StandardUserOperationValidator::new(entry_point2, c.clone())
-        .with_sanity_check(Sender)
-        .with_sanity_check(VerificationGas {
-            max_verification_gas: U256::from(3000000_u64),
-        })
-        .with_sanity_check(CallGas)
-        .with_sanity_check(MaxFee {
-            min_priority_fee_per_gas: U256::from(1u64),
-        })
-        .with_sanity_check(Paymaster)
-        .with_sanity_check(Entities)
-        .with_sanity_check(UnstakedEntities)
-        .with_simulation_check(Signature)
-        .with_simulation_check(Timestamp)
-        .with_simulation_trace_check(Gas)
-        .with_simulation_trace_check(Opcodes)
-        .with_simulation_trace_check(StorageAccess)
-        .with_simulation_trace_check(CallStack)
-        .with_simulation_trace_check(CodeHashes);
-    let (waiting_to_pub_sd, _) = unbounded::<(UserOperation, U256)>();
-    let pool = UoPool::<
-        ClientType,
-        StandardUserOperationValidator<
-            Provider<Http>,
-            MemoryMempool,
-            MemoryReputation,
-            eyre::Error,
-        >,
-        MemoryMempool,
-        MemoryReputation,
-        eyre::Error,
-    >::new(
+    let validator = new_canonical(
         entry_point,
-        validator,
-        MempoolBox::new(mempools),
-        ReputationBox::new(reputation),
-        3000000_u64.into(),
-        c,
-        Some(waiting_to_pub_sd),
+        c.clone(),
+        U256::from(3000000_u64),
+        U256::from(1u64),
     );
 
     Ok(Context {
@@ -174,12 +148,13 @@ async fn setup() -> eyre::Result<Context> {
         paymaster,
         opcodes_factory,
         storage_factory,
-        _rules_factory: rules_factory,
         storage_account: DeployedContract::new(
             TestRulesAccount::new(storage_account_address, client.clone()),
             storage_account_address,
         ),
-        uopool: pool,
+        validator,
+        mempool,
+        reputation,
     })
 }
 
@@ -295,12 +270,11 @@ async fn validate(
     uo: UserOperation,
 ) -> Result<UserOperationValidationOutcome, ValidationError> {
     context
-        .uopool
         .validator
         .validate_user_operation(
             &uo,
-            &context.uopool.mempool,
-            &context.uopool.reputation,
+            &context.mempool,
+            &context.reputation,
             UserOperationValidatorMode::Simulation | UserOperationValidatorMode::SimulationTrace,
         )
         .await

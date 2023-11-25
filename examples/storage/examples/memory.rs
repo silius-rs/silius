@@ -1,32 +1,11 @@
-use alloy_chains::Chain;
-use ethers::types::{Address, U256};
-use futures::channel::mpsc::unbounded;
-use silius_primitives::{
-    consts::entry_point::ADDRESS, provider::create_http_provider, UserOperation,
-};
-use silius_uopool::{MemoryMempool, MemoryReputation, UoPoolBuilder};
-use std::{env, str::FromStr, sync::Arc};
+use silius_uopool::UserOperationOp;
+use std::{collections::HashMap, env};
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     //  uopool needs connection to the execution client
-    if let Ok(provider_url) = env::var("PROVIDER_URL") {
-        let (waiting_to_pub_sd, _) = unbounded::<(UserOperation, U256)>();
-        // creating uopool with builder
-        let builder = UoPoolBuilder::new(
-            false, // whether uoppol is in unsafe mode
-            Arc::new(create_http_provider(provider_url.as_str()).await?), // provider
-            Address::from_str(ADDRESS)?, // entry point address
-            Chain::dev(), // chain information
-            U256::from(5000000), // max verification gas
-            U256::from(1), // min stake
-            U256::from(0), // min priority fee per gas
-            vec![], // whitelisted entities
-            MemoryMempool::default(), // in-memory mempool of user operations
-            MemoryReputation::default(), // in-memory reputation
-            Some(waiting_to_pub_sd), // waiting to publish user operations, for p2p part
-        );
-
+    if let Ok(_) = env::var("PROVIDER_URL") {
+        let hashmap: HashMap<_, _> = HashMap::new();
         // optional: subscription to block updates and reputation updates
         // builder.register_block_updates(block_stream);
         // builder.register_reputation_updates();
@@ -34,10 +13,7 @@ async fn main() -> eyre::Result<()> {
         println!("In-memory uopool created!");
 
         // size of mempool
-        println!(
-            "Mempool size: {size}",
-            size = builder.uopool().get_all().len()
-        );
+        println!("Mempool size: {size}", size = hashmap.get_all().len());
     };
 
     Ok(())

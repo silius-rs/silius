@@ -35,8 +35,45 @@ use silius_primitives::{
 };
 use tracing::debug;
 
+pub type StandardValidator<M> = StandardUserOperationValidator<
+    M,
+    (
+        Sender,
+        VerificationGas,
+        CallGas,
+        MaxFee,
+        Paymaster,
+        Entities,
+        UnstakedEntities,
+    ),
+    (Signature, Timestamp),
+    (
+        Gas,
+        Opcodes,
+        ExternalContracts,
+        StorageAccess,
+        CallStack,
+        CodeHashes,
+    ),
+>;
+
+type UnsafeValidator<M> = StandardUserOperationValidator<
+    M,
+    (
+        Sender,
+        VerificationGas,
+        CallGas,
+        MaxFee,
+        Paymaster,
+        Entities,
+        UnstakedEntities,
+    ),
+    (Signature, Timestamp),
+    (),
+>;
+
 /// Standard implementation of [UserOperationValidator](UserOperationValidator).
-pub struct StandardUserOperationValidator<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk>
+pub struct StandardUserOperationValidator<M: Middleware + 'static, SanCk, SimCk, SimTrCk>
 where
     SanCk: SanityCheck<M>,
     SimCk: SimulationCheck,
@@ -64,7 +101,7 @@ where
     fn clone(&self) -> Self {
         Self {
             entry_point: self.entry_point.clone(),
-            chain: self.chain.clone(),
+            chain: self.chain,
             sanity_checks: self.sanity_checks.clone(),
             simulation_checks: self.simulation_checks.clone(),
             simulation_trace_checks: self.simulation_trace_checks.clone(),
@@ -85,34 +122,14 @@ where
 ///
 /// # Returns
 /// A new [StandardUserOperationValidator](StandardUserOperationValidator).
-pub fn new_canonical<M: Middleware + Clone + 'static>(
+pub fn new_canonical<M: Middleware + 'static>(
     entry_point: EntryPoint<M>,
     chain: Chain,
     max_verification_gas: U256,
     min_priority_fee_per_gas: U256,
-) -> StandardUserOperationValidator<
-    M,
-    (
-        Sender,
-        VerificationGas,
-        CallGas,
-        MaxFee,
-        Paymaster,
-        Entities,
-        UnstakedEntities,
-    ),
-    (Signature, Timestamp),
-    (
-        Gas,
-        Opcodes,
-        ExternalContracts,
-        StorageAccess,
-        CallStack,
-        CodeHashes,
-    ),
-> {
+) -> StandardValidator<M> {
     StandardUserOperationValidator::new(
-        entry_point.clone(),
+        entry_point,
         chain,
         (
             Sender,
@@ -144,20 +161,7 @@ pub fn new_canonical_unsafe<M: Middleware + Clone + 'static>(
     chain: Chain,
     max_verification_gas: U256,
     min_priority_fee_per_gas: U256,
-) -> StandardUserOperationValidator<
-    M,
-    (
-        Sender,
-        VerificationGas,
-        CallGas,
-        MaxFee,
-        Paymaster,
-        Entities,
-        UnstakedEntities,
-    ),
-    (Signature, Timestamp),
-    (),
-> {
+) -> UnsafeValidator<M> {
     StandardUserOperationValidator::new(
         entry_point.clone(),
         chain,
@@ -179,7 +183,7 @@ pub fn new_canonical_unsafe<M: Middleware + Clone + 'static>(
     )
 }
 
-impl<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk>
+impl<M: Middleware + 'static, SanCk, SimCk, SimTrCk>
     StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>
 where
     SanCk: SanityCheck<M>,
@@ -191,14 +195,14 @@ where
         chain: Chain,
         sanity_checks: SanCk,
         simulation_checks: SimCk,
-        simulation_trace_check: SimTrCk,
+        simulation_trace_checks: SimTrCk,
     ) -> Self {
         Self {
             entry_point,
             chain,
-            sanity_checks: sanity_checks,
-            simulation_checks: simulation_checks,
-            simulation_trace_checks: simulation_trace_check,
+            sanity_checks,
+            simulation_checks,
+            simulation_trace_checks,
         }
     }
 
@@ -256,7 +260,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<M: Middleware + Clone + 'static, SanCk, SimCk, SimTrCk> UserOperationValidator
+impl<M: Middleware + 'static, SanCk, SimCk, SimTrCk> UserOperationValidator
     for StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>
 where
     SanCk: SanityCheck<M>,
@@ -293,7 +297,7 @@ where
 
         if mode.contains(UserOperationValidatorMode::Sanity) {
             let sanity_helper = SanityHelper {
-                entry_point: self.entry_point.clone(),
+                entry_point: &self.entry_point,
                 chain: self.chain,
             };
 
@@ -346,7 +350,7 @@ where
             })?;
 
             let mut sim_helper = SimulationTraceHelper {
-                entry_point: self.entry_point.clone(),
+                entry_point: &self.entry_point,
                 chain: self.chain,
                 simulate_validation_result: &sim_res,
                 js_trace: &js_trace,

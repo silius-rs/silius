@@ -6,7 +6,6 @@ mod database;
 mod memory;
 mod mempool;
 mod reputation;
-// mod storage;
 mod uopool;
 mod utils;
 pub mod validate;

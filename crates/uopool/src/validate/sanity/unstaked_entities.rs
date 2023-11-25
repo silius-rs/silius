@@ -25,10 +25,10 @@ pub struct UnstakedEntities;
 
 impl UnstakedEntities {
     /// Gets the deposit info for entity.
-    async fn get_stake<M: Middleware>(
+    async fn get_stake<'a, M: Middleware>(
         &self,
         addr: &Address,
-        helper: &SanityHelper<M>,
+        helper: &SanityHelper<'a, M>,
     ) -> Result<StakeInfo, SanityCheckError> {
         let info = helper
             .entry_point
@@ -49,7 +49,7 @@ impl UnstakedEntities {
     fn get_entity<M: Middleware, H, R>(
         &self,
         addr: &Address,
-        helper: &SanityHelper<M>,
+        _helper: &SanityHelper<M>,
         reputation: &Reputation<H, R>,
     ) -> Result<ReputationEntry, SanityCheckError>
     where

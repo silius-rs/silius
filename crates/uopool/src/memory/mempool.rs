@@ -20,7 +20,7 @@ impl AddRemoveUserOp for HashMap<UserOperationHash, UserOperation> {
     }
 
     fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
-        let uo = if let Some(user_op) = self.get(uo_hash) {
+        if let Some(user_op) = self.get(uo_hash) {
             user_op.clone()
         } else {
             return Ok(false);
@@ -67,7 +67,7 @@ impl UserOperationAddrOp for HashMap<Address, HashSet<UserOperationHash>> {
 
 impl AddRemoveUserOpHash for HashMap<Address, HashSet<UserOperationHash>> {
     fn add(&mut self, address: &Address, uo_hash: UserOperationHash) -> Result<(), MempoolError> {
-        self.entry(address.clone()).or_default().insert(uo_hash);
+        self.entry(*address).or_default().insert(uo_hash);
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl AddRemoveUserOpHash for HashMap<Address, HashSet<UserOperationHash>> {
             uos.remove(uo_hash);
 
             if uos.is_empty() {
-                self.remove(&address);
+                self.remove(address);
             };
             Ok(true)
         } else {
@@ -97,7 +97,7 @@ impl UserOperationCodeHashOp for HashMap<UserOperationHash, Vec<CodeHash>> {
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Vec<CodeHash>,
+        hashes: Vec<CodeHash>,
     ) -> Result<(), MempoolError> {
         self.insert(*uo_hash, hashes.clone());
         Ok(())
@@ -149,6 +149,6 @@ mod tests {
             HashMap::<Address, HashSet<UserOperationHash>>::default(),
             HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
         );
-        mempool_test_case(mempool, "User operation not found");
+        mempool_test_case(mempool);
     }
 }

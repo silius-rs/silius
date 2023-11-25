@@ -21,6 +21,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::warn;
 
+type StandardUoPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> =
+    UoPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R>;
 pub struct UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
@@ -84,16 +86,7 @@ where
 
     async fn handle_block_update(
         hash: H256,
-        uopool: &mut UoPool<
-            M,
-            StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
-            T,
-            Y,
-            X,
-            Z,
-            H,
-            R,
-        >,
+        uopool: &mut StandardUoPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>,
     ) -> eyre::Result<()> {
         let txs = uopool
             .entry_point
@@ -178,9 +171,7 @@ where
         });
     }
 
-    pub fn uopool(
-        &self,
-    ) -> UoPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R> {
+    pub fn uopool(&self) -> StandardUoPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> {
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
         UoPool::<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R>::new(

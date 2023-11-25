@@ -68,8 +68,8 @@ pub trait UserOperationValidator: Send + Sync {
 }
 
 /// The [UserOperation](UserOperation) sanity check helper trait.
-pub struct SanityHelper<M: Middleware + 'static> {
-    entry_point: EntryPoint<M>,
+pub struct SanityHelper<'a, M: Middleware + 'static> {
+    entry_point: &'a EntryPoint<M>,
     chain: Chain,
 }
 
@@ -93,6 +93,7 @@ pub trait SanityCheck<M: Middleware>: Send + Sync {
 
 macro_rules! sanity_check_impls {
     ( $( $name:ident )+ ) => {
+        #[allow(non_snake_case)]
         #[async_trait::async_trait]
         impl<M: Middleware,  $($name : SanityCheck<M>,)+ > SanityCheck<M> for ($($name,)+)
         {
@@ -122,10 +123,10 @@ macro_rules! sanity_check_impls {
 impl<M: Middleware> SanityCheck<M> for () {
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
-        uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
-        helper: &SanityHelper<M>,
+        _uo: &UserOperation,
+        _mempool: &Mempool<T, Y, X, Z>,
+        _reputation: &Reputation<H, R>,
+        _helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError>
     where
         T: UserOperationAct,
@@ -138,6 +139,7 @@ impl<M: Middleware> SanityCheck<M> for () {
         Ok(())
     }
 }
+
 sanity_check_impls! { A }
 sanity_check_impls! { A B }
 sanity_check_impls! { A B C }
@@ -164,6 +166,7 @@ pub trait SimulationCheck: Send + Sync {
 }
 macro_rules! simulation_check_impls {
     ( $( $name:ident )+ ) => {
+        #[allow(non_snake_case)]
         #[async_trait::async_trait]
         impl<$($name : SimulationCheck,)+ > SimulationCheck for ($($name,)+)
         {
@@ -174,7 +177,7 @@ macro_rules! simulation_check_impls {
             ) -> Result<(), SimulationCheckError>
                 {
                     let ($($name,)+) = self;
-                    ($($name.check_user_operation(uo, helper),)+);
+                    ($($name.check_user_operation(uo, helper)?,)+);
                     Ok(())
                 }
         }
@@ -189,7 +192,7 @@ simulation_check_impls! {A B C D E F}
 
 /// The [UserOperation](UserOperation) simulation trace check helper trait.
 pub struct SimulationTraceHelper<'a, M: Middleware + Send + Sync + 'static> {
-    entry_point: EntryPoint<M>,
+    entry_point: &'a EntryPoint<M>,
     chain: Chain,
     simulate_validation_result: &'a SimulateValidationResult,
     js_trace: &'a JsTracerFrame,
@@ -216,6 +219,7 @@ pub trait SimulationTraceCheck<M: Middleware>: Send + Sync {
 }
 macro_rules! simulation_trace_check_impls {
     ( $( $name:ident )+ ) => {
+        #[allow(non_snake_case)]
         #[async_trait::async_trait]
         impl<M: Middleware, $($name : SimulationTraceCheck<M>,)+> SimulationTraceCheck<M> for ($($name,)+)
         {
@@ -245,10 +249,10 @@ macro_rules! simulation_trace_check_impls {
 impl<M: Middleware> SimulationTraceCheck<M> for () {
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
-        uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
-        helper: &mut SimulationTraceHelper<M>,
+        _uo: &UserOperation,
+        _mempool: &Mempool<T, Y, X, Z>,
+        _reputation: &Reputation<H, R>,
+        _helper: &mut SimulationTraceHelper<M>,
     ) -> Result<(), SimulationCheckError>
     where
         T: UserOperationAct,

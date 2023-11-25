@@ -19,12 +19,15 @@ ethers = { workspace = true }
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
 log = "0.4.19"
+parking_lot = { workspace = true }
 pin-utils = "0.1"
 silius-bundler = { path = "../../crates/bundler" }
+silius-contracts = { path = "../../crates/contracts" }
 silius-grpc = { path = "../../crates/grpc" }
 silius-p2p = { path = "../../crates/p2p" }
 silius-primitives = { path = "../../crates/primitives" }
 silius-rpc = { path = "../../crates/rpc" }
+silius-uopool = { path = "../../crates/uopool" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -1,14 +1,14 @@
 use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    reputation::{HashSetOp, ReputationEntryOp},
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
-    Reputation, reputation::{HashSetOp, ReputationEntryOp},
+    Reputation,
 };
 use ethers::providers::Middleware;
 use silius_primitives::{
     consts::uopool::GAS_INCREASE_PERC, sanity::SanityCheckError, UserOperation,
 };
-use std::fmt::Debug;
 
 #[derive(Clone)]
 pub struct Sender;
@@ -27,7 +27,7 @@ impl<M: Middleware> SanityCheck<M> for Sender {
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        _reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError>
     where

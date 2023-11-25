@@ -113,24 +113,26 @@ construct_wrap_struct!(ReputationEntry, WrapReputationEntry);
 
 impl<'de> Decoder<'de> for WrapUserOperationHash {
     fn decoder(data: &mut &'de [u8]) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(WrapUserOperationHash(UserOperationHash::from_slice(data)))
+        let data: [u8; 32] = <[u8; 32]>::decoder(data)?;
+        Ok(WrapUserOperationHash(UserOperationHash::from_slice(&data)))
     }
 }
 
 impl Encoder for WrapUserOperationHash {
     fn encoder(&self, write: &mut impl std::io::prelude::Write) -> std::io::Result<()> {
-        write.write_all(self.0.as_fixed_bytes())
+        self.0.as_fixed_bytes().encoder(write)
     }
 }
 impl<'de> Decoder<'de> for WrapCodeHash {
     fn decoder(data: &mut &'de [u8]) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(WrapCodeHash(<CodeHash as AbiDecode>::decode(data)?))
+        let abi_data = <Vec<u8>>::decoder(data)?;
+        Ok(WrapCodeHash(<CodeHash as AbiDecode>::decode(abi_data)?))
     }
 }
 
 impl Encoder for WrapCodeHash {
     fn encoder(&self, write: &mut impl std::io::prelude::Write) -> std::io::Result<()> {
-        write.write_all(<Self as AbiEncode>::encode(self.clone()).as_ref())
+        <Self as AbiEncode>::encode(self.clone()).encoder(write)
     }
 }
 
@@ -161,16 +163,16 @@ impl From<HashSet<WrapUserOperationHash>> for WrapUserOpSet {
     }
 }
 
-impl Into<HashSet<WrapUserOperationHash>> for WrapUserOpSet {
-    fn into(self) -> HashSet<WrapUserOperationHash> {
-        self.0
+impl From<WrapUserOpSet> for HashSet<WrapUserOperationHash> {
+    fn from(value: WrapUserOpSet) -> Self {
+        value.0
     }
 }
 
 impl Compress for WrapUserOpSet {
     type Compressed = Vec<u8>;
     fn compress(self) -> Self::Compressed {
-        self.0.encode()
+        self.encode()
     }
 }
 

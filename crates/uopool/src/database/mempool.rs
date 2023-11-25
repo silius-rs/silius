@@ -179,7 +179,7 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Vec<CodeHash>,
+        hashes: Vec<CodeHash>,
     ) -> Result<(), MempoolError> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
@@ -213,7 +213,7 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
     fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
         let tx = self.env.tx_mut()?;
-        if let Some(_) = tx.get::<CodeHashes>(uo_hash_wrap.clone())? {
+        if tx.get::<CodeHashes>(uo_hash_wrap.clone())?.is_some() {
             tx.delete::<CodeHashes>(uo_hash_wrap, None)?;
             Ok(true)
         } else {
@@ -275,6 +275,6 @@ mod tests {
             DatabaseTable::new(env.clone());
         let mempool = Mempool::new(uo_ops, uo_ops_sender, uo_ops_entity, uo_ops_codehashes);
 
-        mempool_test_case(mempool, "NotFound");
+        mempool_test_case(mempool);
     }
 }

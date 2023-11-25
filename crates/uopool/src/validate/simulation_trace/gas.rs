@@ -23,8 +23,8 @@ impl<M: Middleware> SimulationTraceCheck<M> for Gas {
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         _uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        _mempool: &Mempool<T, Y, X, Z>,
+        _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
     ) -> Result<(), SimulationCheckError>
     where

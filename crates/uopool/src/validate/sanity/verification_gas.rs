@@ -25,8 +25,8 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        _mempool: &Mempool<T, Y, X, Z>,
+        _reputation: &Reputation<H, R>,
         _helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError>
     where

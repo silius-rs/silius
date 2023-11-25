@@ -120,11 +120,11 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            min_inclusion_denominator: self.min_inclusion_denominator.clone(),
-            throttling_slack: self.throttling_slack.clone(),
-            ban_slack: self.ban_slack.clone(),
-            min_stake: self.min_stake.clone(),
-            min_unstake_delay: self.min_unstake_delay.clone(),
+            min_inclusion_denominator: self.min_inclusion_denominator,
+            throttling_slack: self.throttling_slack,
+            ban_slack: self.ban_slack,
+            min_stake: self.min_stake,
+            min_unstake_delay: self.min_unstake_delay,
             whitelist: self.whitelist.clone(),
             blacklist: self.blacklist.clone(),
             entities: self.entities.clone(),
@@ -137,6 +137,7 @@ where
     H: HashSetOp,
     R: ReputationEntryOp,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         min_inclusion_denominator: u64,
         throttling_slack: u64,
@@ -410,7 +411,7 @@ where
     /// * `Ok(())` if the entries were set successfully
     pub fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), ReputationOpError> {
         for en in entries {
-            self.entities.set_entry(&en.address.clone(), en);
+            self.entities.set_entry(&en.address.clone(), en)?;
         }
 
         Ok(())
@@ -427,10 +428,7 @@ where
             .into_iter()
             .flat_map(|entry| {
                 let status = self.get_status(&entry.address)?;
-                Ok::<ReputationEntry, ReputationOpError>(ReputationEntry {
-                    status: status,
-                    ..entry
-                })
+                Ok::<ReputationEntry, ReputationOpError>(ReputationEntry { status, ..entry })
             })
             .collect())
     }

@@ -750,6 +750,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bin-layout"
+version = "7.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a284436556a709b7a60883905959cd1c575c6e1cc6b504dc1857791757582cb6"
+dependencies = [
+ "bin-layout-derive",
+]
+
+[[package]]
+name = "bin-layout-derive"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4c5cbfced02f7dbf40b17abffd3f10c2ce4636e515e7aa2a7ea6319543fb34b"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1426,19 +1445,6 @@ dependencies = [
  "darling_core",
  "quote",
  "syn 2.0.38",
-]
-
-[[package]]
-name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.2",
- "lock_api",
- "once_cell",
- "parking_lot_core 0.9.9",
 ]
 
 [[package]]
@@ -6954,12 +6960,15 @@ dependencies = [
  "expanded-pathbuf",
  "eyre",
  "log",
+ "parking_lot 0.12.1",
  "pin-utils",
  "silius-bundler",
+ "silius-contracts",
  "silius-grpc",
  "silius-p2p",
  "silius-primitives",
  "silius-rpc",
+ "silius-uopool",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -7013,7 +7022,6 @@ dependencies = [
  "alloy-chains",
  "arrayref",
  "async-trait",
- "dashmap",
  "discv5",
  "ethers 2.0.8",
  "expanded-pathbuf",
@@ -7129,6 +7137,7 @@ version = "0.3.0-alpha"
 dependencies = [
  "alloy-chains",
  "async-trait",
+ "bin-layout",
  "educe",
  "enumset",
  "ethers 2.0.8",

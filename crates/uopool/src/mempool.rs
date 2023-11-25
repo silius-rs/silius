@@ -1,4 +1,4 @@
-use std::{ops::DerefMut, sync::Arc};
+use std::sync::Arc;
 
 use ethers::{
     abi::AbiEncode,
@@ -135,7 +135,7 @@ pub trait UserOperationCodeHashOp {
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Vec<CodeHash>,
+        hashes: Vec<CodeHash>,
     ) -> Result<(), MempoolError>;
     fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<Vec<CodeHash>, MempoolError>;
     fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError>;
@@ -149,7 +149,7 @@ impl<T: UserOperationCodeHashOp> UserOperationCodeHashOp for Arc<RwLock<T>> {
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Vec<CodeHash>,
+        hashes: Vec<CodeHash>,
     ) -> Result<(), MempoolError> {
         self.write().set_code_hashes(uo_hash, hashes)
     }
@@ -288,7 +288,7 @@ where
     pub fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
-        hashes: &Vec<CodeHash>,
+        hashes: Vec<CodeHash>,
     ) -> Result<(), MempoolError> {
         self.user_operations_code_hashes
             .set_code_hashes(uo_hash, hashes)
@@ -323,7 +323,8 @@ where
                 .remove_uo_hash(&paymaster, uo_hash)?;
         }
 
-        self.user_operations_code_hashes.remove_code_hashes(uo_hash);
+        self.user_operations_code_hashes
+            .remove_code_hashes(uo_hash)?;
 
         Ok(true)
     }
