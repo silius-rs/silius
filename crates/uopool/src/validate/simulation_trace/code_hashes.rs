@@ -14,10 +14,8 @@ use silius_primitives::{
     simulation::{CodeHash, SimulationCheckError},
     UserOperation,
 };
-use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::task::JoinSet;
-
 
 #[derive(Clone)]
 pub struct CodeHashes;
@@ -83,7 +81,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
     ) -> Result<(), SimulationCheckError>
     where

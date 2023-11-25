@@ -123,7 +123,7 @@ where
     /// # Returns
     /// `Vec<ReputationEntry>` - An array of [ReputationEntry](ReputationEntry)
     pub fn get_reputation(&self) -> Vec<ReputationEntry> {
-        self.reputation.get_all().unwrap_or(vec![])
+        self.reputation.get_all().unwrap_or_default()
     }
 
     /// Sets the [ReputationEntry](ReputationEntry) for entities
@@ -231,7 +231,7 @@ where
             Ok(uo_hash) => {
                 // TODO: find better way to do it atomically
                 if let Some(code_hashes) = res.code_hashes {
-                    let _ = self.mempool.set_code_hashes(&uo_hash, &code_hashes);
+                    let _ = self.mempool.set_code_hashes(&uo_hash, code_hashes);
                 }
                 info!("{uo_hash:?} added to the mempool {:?}", self.id);
                 trace!("{uo:?} added to the mempool {:?}", self.id);

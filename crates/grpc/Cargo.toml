@@ -14,7 +14,6 @@ AA (ERC-4337) bundler gRPC interfaces
 alloy-chains = { workspace = true }
 arrayref = "0.3"
 async-trait = { workspace = true }
-dashmap = "5.4.0"
 discv5 = { workspace = true }
 ethers = { workspace = true }
 expanded-pathbuf = { workspace = true }

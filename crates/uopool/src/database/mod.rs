@@ -8,7 +8,6 @@ use std::{path::PathBuf, sync::Arc};
 mod env;
 pub mod mempool;
 pub mod reputation;
-// mod storage;
 pub mod tables;
 mod utils;
 

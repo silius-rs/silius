@@ -22,7 +22,7 @@ impl Entities {
     fn get_status<M: Middleware, H, R>(
         &self,
         addr: &Address,
-        helper: &SanityHelper<M>,
+        _helper: &SanityHelper<M>,
         reputation: &Reputation<H, R>,
     ) -> Result<Status, SanityCheckError>
     where
@@ -60,9 +60,9 @@ impl Entities {
         entity: &str,
         addr: &Address,
         status: &Status,
-        helper: &SanityHelper<M>,
+        _helper: &SanityHelper<M>,
         mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        _reputation: &Reputation<H, R>,
     ) -> Result<(), SanityCheckError>
     where
         T: UserOperationAct,

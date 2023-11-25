@@ -4,15 +4,25 @@ use crate::{
 };
 use alloy_chains::Chain;
 use ethers::{providers::Middleware, types::Address};
+use parking_lot::RwLock;
+use silius_contracts::EntryPoint;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
 use silius_primitives::{
     bundler::SendBundleMode,
-    consts::{flashbots_relay_endpoints, p2p::DISCOVERY_SECRET_FILE_NAME},
+    consts::{entry_point, flashbots_relay_endpoints, p2p::DISCOVERY_SECRET_FILE_NAME},
+    consts::{
+        p2p::DB_FOLDER_NAME,
+        reputation::{
+            BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
+        },
+    },
     provider::BlockStream,
-    Wallet,
+    reputation::ReputationEntry,
+    simulation::CodeHash,
+    UserOperation, UserOperationHash, Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -20,7 +30,19 @@ use silius_rpc::{
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
     JsonRpcServer, JsonRpcServerType,
 };
-use std::{collections::HashSet, future::pending, net::SocketAddr, str::FromStr, sync::Arc};
+use silius_uopool::{
+    init_env,
+    validate::validator::{new_canonical, new_canonical_unsafe},
+    CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
+    UserOperationsByEntity, UserOperationsBySender, WriteMap,
+};
+use std::{
+    collections::{HashMap, HashSet},
+    future::pending,
+    net::SocketAddr,
+    str::FromStr,
+    sync::Arc,
+};
 use tracing::info;
 
 pub async fn launch_bundler<M>(
@@ -161,29 +183,226 @@ where
         None => datadir.join(DISCOVERY_SECRET_FILE_NAME),
     };
 
-    uopool_service_run(
-        SocketAddr::new(args.uopool_addr, args.uopool_port),
-        datadir,
-        entry_points,
-        eth_client,
-        block_streams,
-        chain_id,
-        args.max_verification_gas,
-        args.min_stake,
-        args.min_priority_fee_per_gas,
-        args.whitelist,
-        args.uopool_mode,
-        args.p2p_opts.enable_p2p,
-        node_key_file,
-        args.p2p_opts.to_config(),
-        args.p2p_opts.bootnodes,
-    )
-    .await?;
-
-    info!(
-        "Started uopool gRPC service at {:?}:{:?}",
-        args.uopool_addr, args.uopool_port
+    let entrypoint_api = EntryPoint::new(
+        eth_client.clone(),
+        Address::from_str(entry_point::ADDRESS).expect("address should be valid"),
     );
+    match (args.uopool_mode, args.use_memory) {
+        (silius_primitives::UoPoolMode::Standard, true) => {
+            let validator = new_canonical(
+                entrypoint_api,
+                chain_id,
+                args.max_verification_gas,
+                args.min_priority_fee_per_gas,
+            );
+            let mempool = Mempool::new(
+                Arc::new(RwLock::new(
+                    HashMap::<UserOperationHash, UserOperation>::default(),
+                )),
+                Arc::new(RwLock::new(
+                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
+                )),
+                Arc::new(RwLock::new(
+                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
+                )),
+                Arc::new(RwLock::new(
+                    HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
+                )),
+            );
+            let mut reputation = Reputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                args.min_stake,
+                MIN_UNSTAKE_DELAY.into(),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+            );
+            for whiteaddr in args.whitelist.iter() {
+                reputation.add_whitelist(whiteaddr);
+            }
+            uopool_service_run(
+                SocketAddr::new(args.uopool_addr, args.uopool_port),
+                entry_points,
+                eth_client,
+                block_streams,
+                chain_id,
+                args.max_verification_gas,
+                mempool,
+                reputation,
+                validator,
+                args.p2p_opts.enable_p2p,
+                node_key_file,
+                args.p2p_opts.to_config(),
+                args.p2p_opts.bootnodes,
+            )
+            .await?;
+            info!(
+                "Started uopool gRPC service at {:?}:{:?}",
+                args.uopool_addr, args.uopool_port
+            );
+        }
+        (silius_primitives::UoPoolMode::Standard, false) => {
+            let validator = new_canonical(
+                entrypoint_api,
+                chain_id,
+                args.max_verification_gas,
+                args.min_priority_fee_per_gas,
+            );
+            let env = Arc::new(
+                init_env::<WriteMap>(datadir.join(DB_FOLDER_NAME)).expect("Init mdbx failed"),
+            );
+            env.create_tables()
+                .expect("Create mdbx database tables failed");
+            let mempool = Mempool::new(
+                DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
+                DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
+                DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
+                DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
+            );
+            let mut reputation = Reputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                args.min_stake,
+                MIN_UNSTAKE_DELAY.into(),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+            );
+            for whiteaddr in args.whitelist.iter() {
+                reputation.add_whitelist(whiteaddr);
+            }
+            uopool_service_run(
+                SocketAddr::new(args.uopool_addr, args.uopool_port),
+                entry_points,
+                eth_client,
+                block_streams,
+                chain_id,
+                args.max_verification_gas,
+                mempool,
+                reputation,
+                validator,
+                args.p2p_opts.enable_p2p,
+                node_key_file,
+                args.p2p_opts.to_config(),
+                args.p2p_opts.bootnodes,
+            )
+            .await?;
+            info!(
+                "Started uopool gRPC service at {:?}:{:?}",
+                args.uopool_addr, args.uopool_port
+            );
+        }
+        (silius_primitives::UoPoolMode::Unsafe, true) => {
+            let validator = new_canonical_unsafe(
+                entrypoint_api,
+                chain_id,
+                args.max_verification_gas,
+                args.min_priority_fee_per_gas,
+            );
+            let mempool = Mempool::new(
+                Arc::new(RwLock::new(
+                    HashMap::<UserOperationHash, UserOperation>::default(),
+                )),
+                Arc::new(RwLock::new(
+                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
+                )),
+                Arc::new(RwLock::new(
+                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
+                )),
+                Arc::new(RwLock::new(
+                    HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
+                )),
+            );
+            let mut reputation = Reputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                args.min_stake,
+                MIN_UNSTAKE_DELAY.into(),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+            );
+            for whiteaddr in args.whitelist.iter() {
+                reputation.add_whitelist(whiteaddr);
+            }
+            uopool_service_run(
+                SocketAddr::new(args.uopool_addr, args.uopool_port),
+                entry_points,
+                eth_client,
+                block_streams,
+                chain_id,
+                args.max_verification_gas,
+                mempool,
+                reputation,
+                validator,
+                args.p2p_opts.enable_p2p,
+                node_key_file,
+                args.p2p_opts.to_config(),
+                args.p2p_opts.bootnodes,
+            )
+            .await?;
+            info!(
+                "Started uopool gRPC service at {:?}:{:?}",
+                args.uopool_addr, args.uopool_port
+            );
+        }
+        (silius_primitives::UoPoolMode::Unsafe, false) => {
+            let validator = new_canonical_unsafe(
+                entrypoint_api,
+                chain_id,
+                args.max_verification_gas,
+                args.min_priority_fee_per_gas,
+            );
+            let env = Arc::new(
+                init_env::<WriteMap>(datadir.join(DB_FOLDER_NAME)).expect("Init mdbx failed"),
+            );
+            env.create_tables()
+                .expect("Create mdbx database tables failed");
+            let mempool = Mempool::new(
+                DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
+                DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
+                DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
+                DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
+            );
+            let mut reputation = Reputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                args.min_stake,
+                MIN_UNSTAKE_DELAY.into(),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+            );
+            for whiteaddr in args.whitelist.iter() {
+                reputation.add_whitelist(whiteaddr);
+            }
+            uopool_service_run(
+                SocketAddr::new(args.uopool_addr, args.uopool_port),
+                entry_points,
+                eth_client,
+                block_streams,
+                chain_id,
+                args.max_verification_gas,
+                mempool,
+                reputation,
+                validator,
+                args.p2p_opts.enable_p2p,
+                node_key_file,
+                args.p2p_opts.to_config(),
+                args.p2p_opts.bootnodes,
+            )
+            .await?;
+            info!(
+                "Started uopool gRPC service at {:?}:{:?}",
+                args.uopool_addr, args.uopool_port
+            );
+        }
+    };
 
     Ok(())
 }

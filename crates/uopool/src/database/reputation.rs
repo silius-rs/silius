@@ -14,9 +14,9 @@ use silius_primitives::reputation::ReputationEntry;
 
 impl<E: EnvironmentKind> ClearOp for DatabaseTable<E, EntitiesReputation> {
     fn clear(&mut self) {
-        let tx = self.env.tx_mut().unwrap();
-        tx.clear::<EntitiesReputation>().unwrap();
-        tx.commit().unwrap();
+        let tx = self.env.tx_mut().expect("clear database tx should work");
+        tx.clear::<EntitiesReputation>().expect("clear succeed");
+        tx.commit().expect("clear commit succeed");
     }
 }
 

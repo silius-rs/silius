@@ -75,6 +75,11 @@ pub struct UoPoolArgs {
     #[clap(long)]
     pub datadir: Option<ExpandedPathBuf>,
 
+    /// If true, the uopool will use an in-memory database.
+    /// `datadir` config would be ignored.
+    #[clap(long)]
+    pub use_memory: bool,
+
     /// Max allowed verification gas.
     #[clap(long, default_value="5000000", value_parser=parse_u256)]
     pub max_verification_gas: U256,

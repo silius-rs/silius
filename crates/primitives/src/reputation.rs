@@ -65,6 +65,17 @@ pub struct ReputationEntry {
     pub status: ReputationStatus,
 }
 
+impl ReputationEntry {
+    pub fn default_with_addr(addr: Address) -> Self {
+        Self {
+            address: addr,
+            uo_seen: 0,
+            uo_included: 0,
+            status: Status::OK.into(),
+        }
+    }
+}
+
 /// Stake info
 #[derive(Clone, Copy, Default, Educe, Eq, PartialEq, Serialize, Deserialize)]
 #[educe(Debug)]

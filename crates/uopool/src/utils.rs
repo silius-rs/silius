@@ -166,11 +166,9 @@ pub mod tests {
     };
     use ethers::types::{Address, Bytes, H256, U256};
     use silius_primitives::{
-        consts::reputation::{BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK},
         reputation::{ReputationEntry, Status},
         UserOperation, UserOperationHash,
     };
-    use std::fmt::Debug;
 
     #[test]
     fn pre_verification_gas_calculation() {
@@ -324,10 +322,8 @@ pub mod tests {
         assert_eq!(div_ceil(U256::from(10), U256::from(3)), 4.into());
     }
 
-    pub fn mempool_test_case<T, Y, X, Z>(
-        mut mempool: Mempool<T, Y, X, Z>,
-        not_found_error_message: &str,
-    ) where
+    pub fn mempool_test_case<T, Y, X, Z>(mut mempool: Mempool<T, Y, X, Z>)
+    where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
         X: UserOperationAddrAct,
@@ -377,7 +373,7 @@ pub mod tests {
         assert_eq!(mempool.get_all_by_sender(&senders[1]).len(), 2);
         assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 3);
 
-        assert_eq!(mempool.get(&uo_hash).unwrap(), None);
+        assert_eq!(mempool.remove(&uo_hash).unwrap(), true);
         assert_eq!(mempool.remove(&H256::random().into()).unwrap(), false);
 
         assert_eq!(mempool.get_all().len(), 6);

@@ -5,63 +5,97 @@ use crate::{
 };
 use alloy_chains::Chain;
 use async_trait::async_trait;
-use dashmap::DashMap;
 use discv5::Enr;
 use ethers::{
     providers::Middleware,
     types::{Address, U256},
 };
-use expanded_pathbuf::ExpandedPathBuf;
 use eyre::Result;
 use futures::channel::mpsc::unbounded;
 use futures::StreamExt;
 use libp2p_identity::{secp256k1, Keypair};
+use parking_lot::RwLock;
 use silius_p2p::config::Config;
 use silius_p2p::network::{EntrypointChannels, Network};
-use silius_primitives::consts::p2p::DB_FOLDER_NAME;
 use silius_primitives::provider::BlockStream;
+use silius_primitives::uopool::AddError;
 use silius_primitives::UserOperation;
-use silius_primitives::{uopool::AddError, UoPoolMode};
-use silius_uopool::{init_env, DBError, DatabaseMempool, DatabaseReputation, Mempool, WriteMap};
 use silius_uopool::{
-    mempool_id, validate::validator::StandardUserOperationValidator, MempoolId, Reputation,
+    mempool_id, validate::validator::StandardUserOperationValidator, MempoolId,
     UoPool as UserOperationPool, UoPoolBuilder,
 };
+use silius_uopool::{
+    HashSetOp, Mempool, Reputation, ReputationEntryOp, SanityCheck, SimulationCheck,
+    SimulationTraceCheck, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
+};
+use std::collections::HashMap;
 use std::env;
-use std::fmt::{Debug, Display};
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{error, info};
 
-type StandardUserPool<M, P, R, E> =
-    UserOperationPool<M, StandardUserOperationValidator<M, P, R, E>, P, R, E>;
+type StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> = UserOperationPool<
+    M,
+    StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
+    T,
+    Y,
+    X,
+    Z,
+    H,
+    R,
+>;
 
-pub struct UoPoolService<M, P, R, E>
+type UoPoolMaps<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> =
+    Arc<RwLock<HashMap<MempoolId, UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>>>>;
+
+pub struct UoPoolService<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<Error = E> + Send + Sync,
-    R: Reputation<Error = E> + Send + Sync,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
+    SanCk: SanityCheck<M>,
+    SimCk: SimulationCheck,
+    SimTrCk: SimulationTraceCheck<M>,
 {
-    pub uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>,
+    pub uopools: UoPoolMaps<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>,
     pub chain: Chain,
 }
 
-impl<M, P, R, E> UoPoolService<M, P, R, E>
+impl<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+    UoPoolService<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<Error = E> + Send + Sync + 'static,
-    R: Reputation<Error = E> + Send + Sync + 'static,
-    E: Debug + Display + 'static,
+    T: UserOperationAct + Clone + 'static,
+    Y: UserOperationAddrAct + Clone + 'static,
+    X: UserOperationAddrAct + Clone + 'static,
+    Z: UserOperationCodeHashAct + Clone + 'static,
+    H: HashSetOp + Clone + 'static,
+    R: ReputationEntryOp + Clone + 'static,
+    SanCk: SanityCheck<M> + Clone + 'static,
+    SimCk: SimulationCheck + Clone + 'static,
+    SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
 {
-    pub fn new(uopools: Arc<DashMap<MempoolId, UoPoolBuilder<M, P, R, E>>>, chain: Chain) -> Self {
+    pub fn new(
+        uopools: UoPoolMaps<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>,
+        chain: Chain,
+    ) -> Self {
         Self { uopools, chain }
     }
 
-    fn get_uopool(&self, ep: &Address) -> tonic::Result<StandardUserPool<M, P, R, E>> {
+    #[allow(clippy::type_complexity)]
+    fn get_uopool(
+        &self,
+        ep: &Address,
+    ) -> tonic::Result<StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>> {
         let m_id = mempool_id(ep, &U256::from(self.chain.id()));
         self.uopools
+            .read()
             .get(&m_id)
             .map(|b| b.uopool())
             .ok_or(Status::new(
@@ -72,12 +106,19 @@ where
 }
 
 #[async_trait]
-impl<M, P, R, E> uo_pool_server::UoPool for UoPoolService<M, P, R, E>
+impl<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> uo_pool_server::UoPool
+    for UoPoolService<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    P: Mempool<Error = E> + Send + Sync + 'static,
-    R: Reputation<Error = E> + Send + Sync + 'static,
-    E: Debug + Display + 'static,
+    T: UserOperationAct + Clone + 'static,
+    Y: UserOperationAddrAct + Clone + 'static,
+    X: UserOperationAddrAct + Clone + 'static,
+    Z: UserOperationCodeHashAct + Clone + 'static,
+    H: HashSetOp + Clone + 'static,
+    R: ReputationEntryOp + Clone + 'static,
+    SanCk: SanityCheck<M> + Clone + 'static,
+    SimCk: SimulationCheck + Clone + 'static,
+    SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
 {
     async fn add(&self, req: Request<AddRequest>) -> Result<Response<AddResponse>, Status> {
         let req = req.into_inner();
@@ -139,8 +180,9 @@ where
         Ok(Response::new(GetSupportedEntryPointsResponse {
             eps: self
                 .uopools
-                .iter()
-                .map(|mempool| mempool.uopool().entry_point_address().into())
+                .read()
+                .values()
+                .map(|mempool| mempool.uopool().entry_point.address().into())
                 .collect(),
         }))
     }
@@ -185,7 +227,7 @@ where
         let uos = {
             let uopool = self.get_uopool(&ep)?;
             uopool.get_sorted_user_operations().map_err(|e| {
-                tonic::Status::internal(format!("Get sorted uos internal error: {e}"))
+                tonic::Status::internal(format!("Get sorted uos internal error: {e:?}"))
             })?
         };
 
@@ -210,12 +252,14 @@ where
 
         let uo_hash = parse_hash(req.hash)?;
 
-        for uopool in self.uopools.iter() {
-            if let Ok(uo_by_hash) = uopool
-                .uopool()
-                .get_user_operation_by_hash(&uo_hash.into())
-                .await
-            {
+        let keys: Vec<MempoolId> = self.uopools.read().keys().cloned().collect();
+        for key in keys {
+            let uopool = {
+                let uopools_ref = self.uopools.read();
+                let uopool_builder = uopools_ref.get(&key).expect("key must exist");
+                uopool_builder.uopool()
+            };
+            if let Ok(uo_by_hash) = uopool.get_user_operation_by_hash(&uo_hash.into()).await {
                 return Ok(Response::new(GetUserOperationByHashResponse {
                     user_operation: Some(uo_by_hash.user_operation.into()),
                     entry_point: Some(uo_by_hash.entry_point.into()),
@@ -236,13 +280,14 @@ where
         let req = req.into_inner();
 
         let uo_hash = parse_hash(req.hash)?;
-
-        for uopool in self.uopools.iter() {
-            if let Ok(uo_receipt) = uopool
-                .uopool()
-                .get_user_operation_receipt(&uo_hash.into())
-                .await
-            {
+        let keys: Vec<MempoolId> = self.uopools.read().keys().cloned().collect();
+        for key in keys {
+            let uopool = {
+                let uopools_ref = self.uopools.read();
+                let uopool_builder = uopools_ref.get(&key).expect("key must exist");
+                uopool_builder.uopool()
+            };
+            if let Ok(uo_receipt) = uopool.get_user_operation_receipt(&uo_hash.into()).await {
                 return Ok(Response::new(GetUserOperationReceiptResponse {
                     user_operation_hash: Some(uo_receipt.user_operation_hash.into()),
                     sender: Some(uo_receipt.sender.into()),
@@ -276,21 +321,21 @@ where
     }
 
     async fn clear_mempool(&self, _req: Request<()>) -> Result<Response<()>, Status> {
-        self.uopools.iter_mut().for_each(|uopool| {
+        self.uopools.read().values().for_each(|uopool| {
             uopool.uopool().clear_mempool();
         });
         Ok(Response::new(()))
     }
 
     async fn clear_reputation(&self, _req: Request<()>) -> Result<Response<()>, Status> {
-        self.uopools.iter_mut().for_each(|uopool| {
+        self.uopools.read().values().for_each(|uopool| {
             uopool.uopool().clear_reputation();
         });
         Ok(Response::new(()))
     }
 
     async fn clear(&self, _req: Request<()>) -> Result<Response<()>, Status> {
-        self.uopools.iter_mut().for_each(|uopool| {
+        self.uopools.read().values().for_each(|uopool| {
             uopool.uopool().clear();
         });
         Ok(Response::new(()))
@@ -355,18 +400,16 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn uopool_service_run<M>(
+pub async fn uopool_service_run<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>(
     addr: SocketAddr,
-    datadir: ExpandedPathBuf,
     eps: Vec<Address>,
     eth_client: Arc<M>,
     block_streams: Vec<BlockStream>,
     chain: Chain,
     max_verification_gas: U256,
-    min_stake: U256,
-    min_priority_fee_per_gas: U256,
-    whitelist: Vec<Address>,
-    upool_mode: UoPoolMode,
+    mempool: Mempool<T, Y, X, Z>,
+    reputation: Reputation<H, R>,
+    validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
     p2p_enabled: bool,
     node_key_file: PathBuf,
     config: Config,
@@ -374,19 +417,21 @@ pub async fn uopool_service_run<M>(
 ) -> Result<()>
 where
     M: Middleware + Clone + 'static,
+    T: UserOperationAct + Clone + 'static,
+    Y: UserOperationAddrAct + Clone + 'static,
+    X: UserOperationAddrAct + Clone + 'static,
+    Z: UserOperationCodeHashAct + Clone + 'static,
+    H: HashSetOp + Clone + 'static,
+    R: ReputationEntryOp + Clone + 'static,
+    SanCk: SanityCheck<M> + Clone + 'static,
+    SimCk: SimulationCheck + Clone + 'static,
+    SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
 {
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
-        let m_map = Arc::new(DashMap::<
-            MempoolId,
-            UoPoolBuilder<M, DatabaseMempool<WriteMap>, DatabaseReputation<WriteMap>, DBError>,
-        >::new());
-
-        let env =
-            Arc::new(init_env::<WriteMap>(datadir.join(DB_FOLDER_NAME)).expect("Init mdbx failed"));
-        env.create_tables()
-            .expect("Create mdbx database tables failed");
+        let mut m_map =
+            HashMap::<MempoolId, UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>>::new();
 
         if p2p_enabled {
             let mut entrypoint_channels: EntrypointChannels = Vec::new();
@@ -395,16 +440,13 @@ where
                 let id = mempool_id(&ep, &U256::from(chain.id()));
                 let (waiting_to_pub_sd, waiting_to_pub_rv) = unbounded::<(UserOperation, U256)>();
                 let uo_builder = UoPoolBuilder::new(
-                    upool_mode == UoPoolMode::Unsafe,
                     eth_client.clone(),
                     ep,
                     chain,
                     max_verification_gas,
-                    min_stake,
-                    min_priority_fee_per_gas,
-                    whitelist.clone(),
-                    DatabaseMempool::new(env.clone()),
-                    DatabaseReputation::new(env.clone()),
+                    mempool.clone(),
+                    reputation.clone(),
+                    validator.clone(),
                     Some(waiting_to_pub_sd),
                 );
                 uo_builder.register_block_updates(block_stream);
@@ -487,16 +529,13 @@ where
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
                 let id = mempool_id(&ep, &U256::from(chain.id()));
                 let uo_builder = UoPoolBuilder::new(
-                    upool_mode == UoPoolMode::Unsafe,
                     eth_client.clone(),
                     ep,
                     chain,
                     max_verification_gas,
-                    min_stake,
-                    min_priority_fee_per_gas,
-                    whitelist.clone(),
-                    DatabaseMempool::new(env.clone()),
-                    DatabaseReputation::new(env.clone()),
+                    mempool.clone(),
+                    reputation.clone(),
+                    validator.clone(),
                     None,
                 );
                 uo_builder.register_block_updates(block_stream);
@@ -504,12 +543,19 @@ where
                 m_map.insert(id, uo_builder);
             }
         };
+        let uopool_map = Arc::new(RwLock::new(m_map));
         let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
             M,
-            DatabaseMempool<WriteMap>,
-            DatabaseReputation<WriteMap>,
-            DBError,
-        >::new(m_map.clone(), chain));
+            T,
+            Y,
+            X,
+            Z,
+            H,
+            R,
+            SanCk,
+            SimCk,
+            SimTrCk,
+        >::new(uopool_map, chain));
 
         builder.add_service(svc).serve(addr).await
     });
