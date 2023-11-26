@@ -125,14 +125,16 @@ impl Encoder for WrapUserOperationHash {
 }
 impl<'de> Decoder<'de> for WrapCodeHash {
     fn decoder(data: &mut &'de [u8]) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let abi_data = <Vec<u8>>::decoder(data)?;
-        Ok(WrapCodeHash(<CodeHash as AbiDecode>::decode(abi_data)?))
+        let address = <[u8; 20]>::decoder(data)?.into();
+        let hash = <[u8; 32]>::decoder(data)?.into();
+        Ok(WrapCodeHash(CodeHash { address, hash }))
     }
 }
 
 impl Encoder for WrapCodeHash {
     fn encoder(&self, write: &mut impl std::io::prelude::Write) -> std::io::Result<()> {
-        <Self as AbiEncode>::encode(self.clone()).encoder(write)
+        self.0.address.as_fixed_bytes().encoder(write)?;
+        self.0.hash.as_fixed_bytes().encoder(write)
     }
 }
 
@@ -199,12 +201,15 @@ impl From<WrapCodeHashVec> for Vec<WrapCodeHash> {
 impl Compress for WrapCodeHashVec {
     type Compressed = Vec<u8>;
     fn compress(self) -> Self::Compressed {
-        self.0.encode()
+        <Vec<WrapCodeHash> as Encoder>::encode(&self.0)
     }
 }
 
 impl Decompress for WrapCodeHashVec {
     fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-        Self::decode(value.into().as_ref()).map_err(|_| reth_db::Error::DecodeError)
+        let v = value.into();
+        let decoded = <Vec<WrapCodeHash> as Decoder>::decode(v.as_ref())
+            .map_err(|_| reth_db::Error::DecodeError)?;
+        Ok(decoded.into())
     }
 }

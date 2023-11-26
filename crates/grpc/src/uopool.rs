@@ -34,7 +34,7 @@ use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 type StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> = UserOperationPool<
     M,
@@ -230,7 +230,7 @@ where
                 tonic::Status::internal(format!("Get sorted uos internal error: {e:?}"))
             })?
         };
-
+        debug!("get sorted user operation {uos:?}");
         let uos_valid = {
             let mut uopool = self.get_uopool(&ep)?;
             uopool
@@ -238,6 +238,7 @@ where
                 .await
                 .map_err(|e| tonic::Status::internal(format!("Bundle uos internal error: {e}")))?
         };
+        debug!("get sorted valid user operation {uos_valid:?}");
 
         Ok(Response::new(GetSortedResponse {
             uos: uos_valid.into_iter().map(Into::into).collect(),

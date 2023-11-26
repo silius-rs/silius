@@ -401,6 +401,27 @@ pub mod tests {
         assert_eq!(sorted[1].max_priority_fee_per_gas, U256::from(2));
         assert_eq!(sorted[2].max_priority_fee_per_gas, U256::from(1));
         assert_eq!(sorted.len(), 3);
+        assert_eq!(mempool.clear(), ());
+
+        let uo = UserOperation {
+            sender: Address::random(),
+            nonce: U256::from(0),
+            max_priority_fee_per_gas: U256::from(1),
+            ..UserOperation::random()
+        };
+        let uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
+        let code_hashes = vec![CodeHash {
+            address: Address::random(),
+            hash: H256::random(),
+        }];
+        mempool
+            .set_code_hashes(&uo_hash, code_hashes.clone())
+            .unwrap();
+
+        assert!(mempool.has_code_hashes(&uo_hash).unwrap());
+
+        let code_hashes_get = mempool.get_code_hashes(&uo_hash).unwrap();
+        assert_eq!(code_hashes, code_hashes_get);
     }
 
     pub fn reputation_test_case<H, R>(mut reputation: Reputation<H, R>)
