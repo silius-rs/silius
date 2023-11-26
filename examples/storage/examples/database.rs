@@ -16,7 +16,10 @@ async fn main() -> eyre::Result<()> {
         println!("Database uopool created!");
 
         // size of mempool
-        println!("Mempool size: {size}", size = database.get_all().len());
+        println!(
+            "Mempool size: {size}",
+            size = database.get_all().unwrap().len()
+        );
     }
 
     Ok(())

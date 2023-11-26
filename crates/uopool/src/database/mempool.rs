@@ -129,19 +129,14 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
             .map_err(|e| MempoolError::DBError(DBError::DBInternalError(e)))
     }
 
-    fn get_all(&self) -> Vec<UserOperation> {
-        self.env
-            .tx()
-            .and_then(|tx| {
-                let mut c = tx.cursor_read::<UserOperations>()?;
-                let res: Vec<UserOperation> = c
-                    .walk(Some(WrapUserOperationHash::default()))?
-                    .map(|a| a.map(|(_, v)| v.into()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                tx.commit()?;
-                Ok(res)
-            })
-            .unwrap_or_else(|_| vec![])
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
+        let tx = self.env.tx()?;
+        let mut c = tx.cursor_read::<UserOperations>()?;
+        let res: Vec<UserOperation> = c
+            .walk(Some(WrapUserOperationHash::default()))?
+            .map(|a| a.map(|(_, v)| v.into()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(res)
     }
 }
 macro_rules! impl_user_op_addr_op {
