@@ -13,7 +13,10 @@ async fn main() -> eyre::Result<()> {
         println!("In-memory uopool created!");
 
         // size of mempool
-        println!("Mempool size: {size}", size = hashmap.get_all().len());
+        println!(
+            "Mempool size: {size}",
+            size = hashmap.get_all().unwrap().len()
+        );
     };
 
     Ok(())

@@ -19,21 +19,22 @@ use ethers::{
     providers::Middleware,
     types::{Bytes, U256},
 };
+use parking_lot::RwLock;
 use silius_contracts::EntryPoint;
 use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
-use silius_primitives::simulation::SimulationCheckError;
+use silius_primitives::reputation::ReputationEntry;
+use silius_primitives::simulation::{CodeHash, SimulationCheckError};
 use silius_primitives::uopool::ValidationError;
-use silius_primitives::UserOperation;
+use silius_primitives::{UserOperation, UserOperationHash};
 
 use silius_uopool::validate::validator::{new_canonical, StandardValidator};
 use silius_uopool::validate::{
     UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
 };
 use silius_uopool::{
-    init_env, mempool_id, CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool,
-    Reputation, ReputationEntryOp, UserOperationAct, UserOperationAddrAct,
-    UserOperationCodeHashAct, UserOperations, UserOperationsByEntity, UserOperationsBySender,
-    WriteMap,
+    init_env, CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool, Reputation,
+    ReputationEntryOp, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
+    UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
@@ -62,7 +63,7 @@ where
     pub reputation: Reputation<H, R>,
 }
 
-type Context = TestContext<
+type DatabaseContext = TestContext<
     ClientType,
     DatabaseTable<WriteMap, UserOperations>,
     DatabaseTable<WriteMap, UserOperationsBySender>,
@@ -72,9 +73,28 @@ type Context = TestContext<
     DatabaseTable<WriteMap, EntitiesReputation>,
 >;
 
-async fn setup() -> eyre::Result<Context> {
+type MemoryContext = TestContext<
+    ClientType,
+    Arc<RwLock<HashMap<UserOperationHash, UserOperation>>>,
+    Arc<RwLock<HashMap<Address, HashSet<UserOperationHash>>>>,
+    Arc<RwLock<HashMap<Address, HashSet<UserOperationHash>>>>,
+    Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
+    Arc<RwLock<HashSet<Address>>>,
+    Arc<RwLock<HashMap<Address, ReputationEntry>>>,
+>;
+
+async fn setup_basic() -> eyre::Result<(
+    Arc<ClientType>,
+    DeployedContract<EntryPointContract<ClientType>>,
+    u64,
+    GethInstance,
+    DeployedContract<TestOpcodesAccount<ClientType>>,
+    DeployedContract<TestOpcodesAccountFactory<ClientType>>,
+    DeployedContract<TestStorageAccountFactory<ClientType>>,
+    DeployedContract<TestRulesAccount<ClientType>>,
+)> {
     let chain_id = 1337u64;
-    let (_geth, _client, _) = setup_geth().await?;
+    let (geth, _client, _) = setup_geth().await?;
     let client = Arc::new(_client);
     let ep = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
@@ -106,10 +126,24 @@ async fn setup() -> eyre::Result<Context> {
         .value(parse_units("1", "ether").unwrap())
         .send()
         .await?;
+    Ok((
+        client.clone(),
+        ep,
+        chain_id,
+        geth,
+        paymaster,
+        opcodes_factory,
+        storage_factory,
+        DeployedContract::new(
+            TestRulesAccount::new(storage_account_address, client.clone()),
+            storage_account_address,
+        ),
+    ))
+}
 
-    let m_id = mempool_id(&ep.address, &U256::from(chain_id));
-    let mut ep_map = HashMap::new();
-    ep_map.insert(m_id, EntryPoint::new(client.clone(), ep.address));
+async fn setup_database() -> eyre::Result<DatabaseContext> {
+    let (client, ep, chain_id, _geth, paymaster, opcodes_factory, storage_factory, storage_account) =
+        setup_basic().await?;
     let dir = TempDir::new("test-silius-db").unwrap();
     let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
     env.create_tables()
@@ -141,28 +175,74 @@ async fn setup() -> eyre::Result<Context> {
         U256::from(1u64),
     );
 
-    Ok(Context {
+    Ok(DatabaseContext {
         client: client.clone(),
         _geth,
         entry_point: ep,
         paymaster,
         opcodes_factory,
         storage_factory,
-        storage_account: DeployedContract::new(
-            TestRulesAccount::new(storage_account_address, client.clone()),
-            storage_account_address,
-        ),
+        storage_account,
         validator,
         mempool,
         reputation,
     })
 }
 
+async fn setup_memory() -> eyre::Result<MemoryContext> {
+    let (client, ep, chain_id, _geth, paymaster, opcodes_factory, storage_factory, storage_account) =
+        setup_basic().await?;
+    let mempool = Mempool::new(
+        Arc::new(RwLock::new(
+            HashMap::<UserOperationHash, UserOperation>::default(),
+        )),
+        Arc::new(RwLock::new(
+            HashMap::<Address, HashSet<UserOperationHash>>::default(),
+        )),
+        Arc::new(RwLock::new(
+            HashMap::<Address, HashSet<UserOperationHash>>::default(),
+        )),
+        Arc::new(RwLock::new(
+            HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
+        )),
+    );
+    let reputation = Reputation::new(
+        10,
+        10,
+        10,
+        1u64.into(),
+        1u64.into(),
+        Arc::new(RwLock::new(HashSet::<Address>::default())),
+        Arc::new(RwLock::new(HashSet::<Address>::default())),
+        Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+    );
+    let entry_point = EntryPoint::new(client.clone(), ep.address);
+    let c = Chain::from(chain_id);
+
+    let validator = new_canonical(
+        entry_point,
+        c.clone(),
+        U256::from(3000000_u64),
+        U256::from(1u64),
+    );
+    Ok(MemoryContext {
+        client: client.clone(),
+        _geth,
+        entry_point: ep,
+        paymaster,
+        opcodes_factory,
+        storage_factory,
+        storage_account,
+        validator,
+        mempool,
+        reputation,
+    })
+}
 async fn create_storage_factory_init_code(
     salt: u64,
     init_func: String,
 ) -> eyre::Result<(Bytes, Bytes)> {
-    let c = setup().await?;
+    let c = setup_database().await?;
     let contract: &BaseContract = c.storage_factory.contract().deref().deref();
     let func = contract.abi().function("create")?;
     let init_func =
@@ -176,7 +256,7 @@ async fn create_storage_factory_init_code(
 }
 
 async fn create_opcode_factory_init_code(init_func: String) -> eyre::Result<(Bytes, Bytes)> {
-    let c = setup().await?;
+    let c = setup_database().await?;
     let contract: &BaseContract = c.opcodes_factory.contract().deref().deref();
     let token = vec![Token::String(init_func)];
     let func = contract.abi().function("create")?;
@@ -189,14 +269,23 @@ async fn create_opcode_factory_init_code(init_func: String) -> eyre::Result<(Byt
     Ok((init_code.into(), init_func.into()))
 }
 
-async fn create_test_user_operation(
-    context: &Context,
+async fn create_test_user_operation<M, T, Y, X, Z, H, R>(
+    context: &TestContext<M, T, Y, X, Z, H, R>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> eyre::Result<UserOperation> {
+) -> eyre::Result<UserOperation>
+where
+    M: Middleware + 'static,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
+{
     let paymaster_and_data = if let Some(rule) = pm_rule {
         let mut data = vec![];
         data.extend_from_slice(context.paymaster.address.as_bytes());
@@ -240,11 +329,20 @@ async fn create_test_user_operation(
     })
 }
 
-fn existing_storage_account_user_operation(
-    context: &Context,
+fn existing_storage_account_user_operation<M, T, Y, X, Z, H, R>(
+    context: &TestContext<M, T, Y, X, Z, H, R>,
     validate_rule: String,
     pm_rule: String,
-) -> UserOperation {
+) -> UserOperation
+where
+    M: Middleware + 'static,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
+{
     let mut paymaster_and_data = vec![];
     paymaster_and_data.extend_from_slice(context.paymaster.address.as_bytes());
     paymaster_and_data.extend_from_slice(pm_rule.as_bytes());
@@ -265,10 +363,19 @@ fn existing_storage_account_user_operation(
     }
 }
 
-async fn validate(
-    context: &Context,
+async fn validate<M, T, Y, X, Z, H, R>(
+    context: &TestContext<M, T, Y, X, Z, H, R>,
     uo: UserOperation,
-) -> Result<UserOperationValidationOutcome, ValidationError> {
+) -> Result<UserOperationValidationOutcome, ValidationError>
+where
+    M: Middleware + 'static,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
+{
     context
         .validator
         .validate_user_operation(
@@ -280,14 +387,23 @@ async fn validate(
         .await
 }
 
-async fn test_user_operation(
-    context: &Context,
+async fn test_user_operation<M, T, Y, X, Z, H, R>(
+    context: &TestContext<M, T, Y, X, Z, H, R>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> Result<UserOperationValidationOutcome, ValidationError> {
+) -> Result<UserOperationValidationOutcome, ValidationError>
+where
+    M: Middleware + 'static,
+    T: UserOperationAct,
+    Y: UserOperationAddrAct,
+    X: UserOperationAddrAct,
+    Z: UserOperationCodeHashAct,
+    H: HashSetOp,
+    R: ReputationEntryOp,
+{
     let uo = create_test_user_operation(
         &context,
         validate_rule,
@@ -305,314 +421,450 @@ async fn test_existing_user_operation(
     validate_rule: String,
     pm_rule: String,
 ) -> Result<UserOperationValidationOutcome, ValidationError> {
-    let c = setup().await.expect("Setup context failed");
+    let c = setup_database().await.expect("Setup context failed");
     let uo = existing_storage_account_user_operation(&c, validate_rule, pm_rule);
     validate(&c, uo).await
 }
 
-#[tokio::test]
-async fn accept_plain_request() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
-        .await
-        .unwrap();
+macro_rules! accept_plain_request {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+                .await
+                .unwrap();
 
-    test_user_operation(
-        &c,
-        "".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.opcodes_factory.address,
-    )
-    .await
-    .expect("succeed");
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn reject_unkown_rule() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "<unknown-rule>".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.opcodes_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(SimulationCheckError::Validation { message })) if message.contains("unknown-rule")
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn fail_with_bad_opcode_in_ctr() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_opcode_factory_init_code("coinbase".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.opcodes_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn fail_with_bad_opcode_in_paymaster() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "".to_string(),
-        Some("coinbase".to_string()),
-        init_code,
-        init_func,
-        c.opcodes_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn fail_with_bad_opcode_in_validation() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "blockhash".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.opcodes_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "BLOCKHASH"
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn fail_if_create_too_many() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "create2".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.opcodes_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "CREATE2"
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn fail_referencing_self_token() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-        .await
-        .unwrap();
-
-    let res = test_user_operation(
-        &c,
-        "balance-self".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.storage_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::Unstaked { .. }
-        ))
-    ));
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn account_succeeds_referecing_its_own_balance() {
-    let res = test_existing_user_operation("balance-self".to_string(), "".to_string()).await;
-    assert!(matches!(res, Ok(..)));
-}
-
-#[tokio::test]
-async fn account_can_reference_its_own_allowance_on_other_contract_balance() {
-    let res = test_existing_user_operation("allowance-1-self".to_string(), "".to_string()).await;
-    assert!(matches!(res, Ok(..)));
-}
-
-#[tokio::test]
-async fn access_self_struct_data() {
-    let res = test_existing_user_operation("struct-self".to_string(), "".to_string()).await;
-    assert!(matches!(res, Ok(..)));
-}
-
-#[tokio::test]
-async fn fail_if_referencing_self_token_balance_after_wallet_creation() {
-    let res = test_existing_user_operation("balance-self".to_string(), "".to_string()).await;
-    assert!(matches!(res, Ok(..)));
-}
-
-#[tokio::test]
-async fn fail_with_unstaked_paymaster_returning_context() -> eyre::Result<()> {
-    let c = setup().await?;
-    let pm = deploy_test_storage_account(c.client.clone())
-        .await
-        .expect("deploy succeed");
-    let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
-        .await
-        .expect("deploy succeed");
-
-    let mut paymaster_and_data = vec![];
-    paymaster_and_data.extend_from_slice(pm.address.as_bytes());
-    paymaster_and_data.extend_from_slice("postOp-context".as_bytes());
-
-    let uo = UserOperation {
-        sender: acct.address,
-        nonce: U256::zero(),
-        init_code: Bytes::default(),
-        call_data: Bytes::default(),
-        call_gas_limit: U256::zero(),
-        verification_gas_limit: 50000.into(),
-        pre_verification_gas: U256::zero(),
-        max_fee_per_gas: U256::zero(),
-        max_priority_fee_per_gas: U256::zero(),
-        paymaster_and_data: Bytes::from(paymaster_and_data),
-        signature: Bytes::default(),
+            let c = $setup;
+            test_user_operation(
+                &c,
+                "".to_string(),
+                None,
+                init_code,
+                init_func,
+                c.opcodes_factory.address,
+            )
+            .await
+            .expect("succeed");
+            Ok(())
+        }
     };
-
-    let res = validate(&c, uo).await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::Unstaked { .. }
-        ))
-    ));
-
-    Ok(())
 }
+accept_plain_request!(setup_database().await?, accept_plain_request_database);
+accept_plain_request!(setup_memory().await?, accept_plain_request_memory);
 
-#[tokio::test]
-async fn fail_with_validation_recursively_calls_handle_ops() -> eyre::Result<()> {
-    let c = setup().await?;
-    let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
-        .await
-        .expect("deploy succeed");
-    let uo = UserOperation {
-        sender: acct.address,
-        nonce: U256::zero(),
-        init_code: Bytes::default(),
-        call_data: Bytes::default(),
-        call_gas_limit: U256::zero(),
-        verification_gas_limit: 50000.into(),
-        pre_verification_gas: 50000.into(),
-        max_fee_per_gas: U256::zero(),
-        max_priority_fee_per_gas: U256::zero(),
-        paymaster_and_data: Bytes::default(),
-        signature: Bytes::from("handleOps".as_bytes().to_vec()),
+macro_rules! reject_unkown_rule {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+                .await
+                .unwrap();
+            let c = $setup;
+            let res = test_user_operation(
+                &c,
+                "<unknown-rule>".to_string(),
+                None,
+                init_code.clone(),
+                init_func.clone(),
+                c.opcodes_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(SimulationCheckError::Validation { message })) if message.contains("unknown-rule")
+            ));
+
+            Ok(())
+        }
     };
+}
+reject_unkown_rule!(setup_database().await?, reject_unkown_rule_database);
+reject_unkown_rule!(setup_memory().await?, reject_unkown_rule_memory);
 
-    let res = validate(&c, uo).await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::CallStack { .. }
-        ))
-    ));
+macro_rules! fail_with_bad_opcode_in_ctr {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let (init_code, init_func) = create_opcode_factory_init_code("coinbase".to_string())
+                .await
+                .unwrap();
+            let c = $setup;
+            let res = test_user_operation(
+                &c,
+                "".to_string(),
+                None,
+                init_code.clone(),
+                init_func.clone(),
+                c.opcodes_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
+            ));
 
-    Ok(())
+            Ok(())
+        }
+    };
+}
+fail_with_bad_opcode_in_ctr!(
+    setup_database().await?,
+    fail_with_bad_opcode_in_ctr_database
+);
+fail_with_bad_opcode_in_ctr!(setup_memory().await?, fail_with_bad_opcode_in_ctr_memory);
+
+macro_rules! fail_with_bad_opcode_in_paymaster {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+                .await
+                .unwrap();
+            let c = $setup;
+            let res = test_user_operation(
+                &c,
+                "".to_string(),
+                Some("coinbase".to_string()),
+                init_code,
+                init_func,
+                c.opcodes_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
+            ));
+
+            Ok(())
+        }
+    };
+}
+fail_with_bad_opcode_in_paymaster!(
+    setup_database().await?,
+    fail_with_bad_opcode_in_paymaster_database
+);
+fail_with_bad_opcode_in_paymaster!(
+    setup_memory().await?,
+    fail_with_bad_opcode_in_paymaster_memory
+);
+
+macro_rules! fail_with_bad_opcode_in_validation {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+                .await
+                .unwrap();
+
+            let res = test_user_operation(
+                &c,
+                "blockhash".to_string(),
+                None,
+                init_code,
+                init_func,
+                c.opcodes_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "BLOCKHASH"
+            ));
+
+            Ok(())
+        }
+    };
+}
+fail_with_bad_opcode_in_validation!(
+    setup_database().await?,
+    fail_with_bad_opcode_in_validation_database
+);
+fail_with_bad_opcode_in_validation!(
+    setup_memory().await?,
+    fail_with_bad_opcode_in_validation_memory
+);
+
+macro_rules!fail_if_create_too_many {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+                .await
+                .unwrap();
+
+            let res = test_user_operation(
+                &c,
+                "create2".to_string(),
+                None,
+                init_code,
+                init_func,
+                c.opcodes_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "CREATE2"
+            ));
+
+            Ok(())
+        }
+    };
+}
+fail_if_create_too_many!(setup_database().await?, fail_if_create_too_many_database);
+fail_if_create_too_many!(setup_memory().await?, fail_if_create_too_many_memory);
+
+macro_rules! fail_referencing_self_token {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
+                .await
+                .unwrap();
+
+            let res = test_user_operation(
+                &c,
+                "balance-self".to_string(),
+                None,
+                init_code,
+                init_func,
+                c.storage_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(
+                    SimulationCheckError::Unstaked { .. }
+                ))
+            ));
+
+            Ok(())
+        }
+    };
 }
 
-#[tokio::test]
-async fn succeed_with_inner_revert() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-        .await
-        .unwrap();
-    test_user_operation(
-        &c,
-        "inner-revert".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.storage_factory.address,
-    )
-    .await
-    .expect("succeed");
+fail_referencing_self_token!(
+    setup_database().await?,
+    fail_referencing_self_token_database
+);
+fail_referencing_self_token!(setup_memory().await?, fail_referencing_self_token_memory);
 
-    Ok(())
+macro_rules! test_existing_user_operation {
+    ($setup:expr, $func_name: ident, $validate_rule: expr, $pm_rul:expr) => {
+        #[tokio::test]
+        async fn $func_name() -> eyre::Result<()> {
+            let c = $setup;
+            let uo = existing_storage_account_user_operation(&c, $validate_rule, $pm_rul);
+            let res = validate(&c, uo).await;
+            assert!(matches!(res, Ok(..)));
+            Ok(())
+        }
+    };
 }
 
-#[tokio::test]
-async fn fail_with_inner_oog_revert() -> eyre::Result<()> {
-    let c = setup().await?;
-    let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-        .await
-        .unwrap();
+test_existing_user_operation!(
+    setup_database().await?,
+    account_succeeds_referecing_its_own_balance_database,
+    "balance-self".to_string(),
+    "".to_string()
+);
+test_existing_user_operation!(
+    setup_memory().await?,
+    account_succeeds_referecing_its_own_balance_memory,
+    "balance-self".to_string(),
+    "".to_string()
+);
 
-    let res = test_user_operation(
-        &c,
-        "oog".to_string(),
-        None,
-        init_code,
-        init_func,
-        c.storage_factory.address,
-    )
-    .await;
-    assert!(matches!(
-        res,
-        Err(ValidationError::Simulation(
-            SimulationCheckError::OutOfGas { .. }
-        ))
-    ));
+test_existing_user_operation!(
+    setup_database().await?,
+    account_can_reference_its_own_allowance_on_other_contract_balance_database,
+    "allowance-1-self".to_string(),
+    "".to_string()
+);
+test_existing_user_operation!(
+    setup_memory().await?,
+    account_can_reference_its_own_allowance_on_other_contract_balance_memory,
+    "allowance-1-self".to_string(),
+    "".to_string()
+);
 
-    Ok(())
+test_existing_user_operation!(
+    setup_database().await?,
+    access_self_struct_data_database,
+    "struct-self".to_string(),
+    "".to_string()
+);
+test_existing_user_operation!(
+    setup_memory().await?,
+    access_self_struct_data_memory,
+    "struct-self".to_string(),
+    "".to_string()
+);
+
+test_existing_user_operation!(
+    setup_database().await?,
+    fail_if_referencing_self_token_balance_after_wallet_creation_database,
+    "balance-self".to_string(),
+    "".to_string()
+);
+test_existing_user_operation!(
+    setup_memory().await?,
+    fail_if_referencing_self_token_balance_after_wallet_creation_memory,
+    "balance-self".to_string(),
+    "".to_string()
+);
+
+macro_rules! fail_with_unstaked_paymaster_returning_context {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let pm = deploy_test_storage_account(c.client.clone())
+                .await
+                .expect("deploy succeed");
+            let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
+                .await
+                .expect("deploy succeed");
+
+            let mut paymaster_and_data = vec![];
+            paymaster_and_data.extend_from_slice(pm.address.as_bytes());
+            paymaster_and_data.extend_from_slice("postOp-context".as_bytes());
+
+            let uo = UserOperation {
+                sender: acct.address,
+                nonce: U256::zero(),
+                init_code: Bytes::default(),
+                call_data: Bytes::default(),
+                call_gas_limit: U256::zero(),
+                verification_gas_limit: 50000.into(),
+                pre_verification_gas: U256::zero(),
+                max_fee_per_gas: U256::zero(),
+                max_priority_fee_per_gas: U256::zero(),
+                paymaster_and_data: Bytes::from(paymaster_and_data),
+                signature: Bytes::default(),
+            };
+
+            let res = validate(&c, uo).await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(
+                    SimulationCheckError::Unstaked { .. }
+                ))
+            ));
+
+            Ok(())
+        }
+    };
 }
+fail_with_unstaked_paymaster_returning_context!(
+    setup_database().await?,
+    fail_with_unstaked_paymaster_returning_context_database
+);
+
+fail_with_unstaked_paymaster_returning_context!(
+    setup_memory().await?,
+    fail_with_unstaked_paymaster_returning_context_memory
+);
+
+macro_rules! fail_with_validation_recursively_calls_handle_ops {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
+                .await
+                .expect("deploy succeed");
+            let uo = UserOperation {
+                sender: acct.address,
+                nonce: U256::zero(),
+                init_code: Bytes::default(),
+                call_data: Bytes::default(),
+                call_gas_limit: U256::zero(),
+                verification_gas_limit: 50000.into(),
+                pre_verification_gas: 50000.into(),
+                max_fee_per_gas: U256::zero(),
+                max_priority_fee_per_gas: U256::zero(),
+                paymaster_and_data: Bytes::default(),
+                signature: Bytes::from("handleOps".as_bytes().to_vec()),
+            };
+
+            let res = validate(&c, uo).await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(
+                    SimulationCheckError::CallStack { .. }
+                ))
+            ));
+
+            Ok(())
+        }
+    };
+}
+fail_with_validation_recursively_calls_handle_ops!(
+    setup_database().await?,
+    fail_with_validation_recursively_calls_handle_ops_database
+);
+fail_with_validation_recursively_calls_handle_ops!(
+    setup_memory().await?,
+    fail_with_validation_recursively_calls_handle_ops_memory
+);
+
+macro_rules! succeed_with_inner_revert {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
+                .await
+                .unwrap();
+            test_user_operation(
+                &c,
+                "inner-revert".to_string(),
+                None,
+                init_code,
+                init_func,
+                c.storage_factory.address,
+            )
+            .await
+            .expect("succeed");
+
+            Ok(())
+        }
+    };
+}
+succeed_with_inner_revert!(setup_database().await?, succeed_with_inner_revert_database);
+succeed_with_inner_revert!(setup_memory().await?, succeed_with_inner_revert_memory);
+
+macro_rules! fail_with_inner_oog_revert {
+    ($setup:expr, $name: ident) => {
+        #[tokio::test]
+        async fn $name() -> eyre::Result<()> {
+            let c = $setup;
+            let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
+                .await
+                .unwrap();
+
+            let res = test_user_operation(
+                &c,
+                "oog".to_string(),
+                None,
+                init_code,
+                init_func,
+                c.storage_factory.address,
+            )
+            .await;
+            assert!(matches!(
+                res,
+                Err(ValidationError::Simulation(
+                    SimulationCheckError::OutOfGas { .. }
+                ))
+            ));
+
+            Ok(())
+        }
+    };
+}
+
+fail_with_inner_oog_revert!(setup_database().await?, fail_with_inner_oog_revert_database);
+fail_with_inner_oog_revert!(setup_memory().await?, fail_with_inner_oog_revert_memory);

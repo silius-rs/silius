@@ -314,10 +314,12 @@ where
 
         let ep = parse_addr(req.ep)?;
         let uopool = self.get_uopool(&ep)?;
-
-        Ok(Response::new(GetAllResponse {
-            uos: uopool.get_all().into_iter().map(Into::into).collect(),
-        }))
+        match uopool.get_all() {
+            Ok(uos) => Ok(Response::new(GetAllResponse {
+                uos: uos.into_iter().map(Into::into).collect(),
+            })),
+            Err(err) => Err(Status::unknown(format!("Internal error: {err:?}"))),
+        }
     }
 
     async fn clear_mempool(&self, _req: Request<()>) -> Result<Response<()>, Status> {

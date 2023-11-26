@@ -368,7 +368,7 @@ pub mod tests {
             assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
         }
 
-        assert_eq!(mempool.get_all().len(), 7);
+        assert_eq!(mempool.get_all().unwrap().len(), 7);
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
         assert_eq!(mempool.get_all_by_sender(&senders[1]).len(), 2);
         assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 3);
@@ -376,13 +376,13 @@ pub mod tests {
         assert_eq!(mempool.remove(&uo_hash).unwrap(), true);
         assert_eq!(mempool.remove(&H256::random().into()).unwrap(), false);
 
-        assert_eq!(mempool.get_all().len(), 6);
+        assert_eq!(mempool.get_all().unwrap().len(), 6);
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 2);
         assert_eq!(mempool.get_all_by_sender(&senders[2]).len(), 2);
 
         assert_eq!(mempool.clear(), ());
 
-        assert_eq!(mempool.get_all().len(), 0);
+        assert_eq!(mempool.get_all().unwrap().len(), 0);
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 0);
 
         for i in 0..3 {

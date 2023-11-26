@@ -14,6 +14,7 @@ AA (ERC-4337) bundler integration tests
 alloy-chains = { workspace = true }
 ethers = { workspace = true }
 eyre = { workspace = true }
+parking_lot = { workspace = true }
 silius-contracts = { path = "../crates/contracts" }
 silius-primitives = { path = "../crates/primitives" }
 silius-uopool = { path = "../crates/uopool" }

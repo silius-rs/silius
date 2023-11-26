@@ -97,7 +97,7 @@ pub trait UserOperationOp {
         uo_hash: &UserOperationHash,
     ) -> Result<Option<UserOperation>, MempoolError>;
     fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError>;
-    fn get_all(&self) -> Vec<UserOperation>;
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError>;
 }
 
 impl<T: UserOperationOp> UserOperationOp for Arc<RwLock<T>> {
@@ -112,7 +112,7 @@ impl<T: UserOperationOp> UserOperationOp for Arc<RwLock<T>> {
         self.read().get_sorted()
     }
 
-    fn get_all(&self) -> Vec<UserOperation> {
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
         self.read().get_all()
     }
 }
@@ -341,7 +341,7 @@ where
     pub fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError> {
         self.user_operations.get_sorted()
     }
-    pub fn get_all(&self) -> Vec<UserOperation> {
+    pub fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
         self.user_operations.get_all()
     }
     pub fn clear(&mut self) {

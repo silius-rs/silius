@@ -50,8 +50,8 @@ impl UserOperationOp for HashMap<UserOperationHash, UserOperation> {
         Ok(uos)
     }
 
-    fn get_all(&self) -> Vec<UserOperation> {
-        self.values().cloned().collect()
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
+        Ok(self.values().cloned().collect())
     }
 }
 

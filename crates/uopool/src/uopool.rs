@@ -114,7 +114,7 @@ where
     ///
     /// # Returns
     /// `Vec<UserOperation>` - An array of [UserOperations](UserOperation)
-    pub fn get_all(&self) -> Vec<UserOperation> {
+    pub fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
         self.mempool.get_all()
     }
 
