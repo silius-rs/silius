@@ -16,6 +16,7 @@ use silius_primitives::{
 };
 use std::sync::Arc;
 use tokio::task::JoinSet;
+use tracing::debug;
 
 #[derive(Clone)]
 pub struct CodeHashes;
@@ -115,6 +116,10 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
                         message: format!("{err:?}"),
                     }
                 })?;
+                debug!(
+                    "Veryfing {:?} code hashes in 2nd simulation: {:?} vs {:?}",
+                    uo_hash, hashes, hashes_prev
+                );
                 if !equal_code_hashes(hashes, &hashes_prev) {
                     return Err(SimulationCheckError::CodeHashes {
                         message: "Modified code hashes after 1st simulation".to_string(),
@@ -125,6 +130,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
             }
             Ok(false) => {
                 // 1st simulation
+                debug!("Setting code hashes in 1st simulation: {:?}", hashes);
                 helper.code_hashes = Some(hashes.to_vec());
             }
             Err(err) => {

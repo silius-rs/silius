@@ -34,7 +34,7 @@ use silius_primitives::{
     UserOperationReceipt,
 };
 use std::collections::{HashMap, HashSet};
-use tracing::{info, trace};
+use tracing::{debug, error, info, trace};
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove, validate, and serves data requests from the [RPC API](EthApiServer).
 /// Architecturally, the [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves requests from the [RPC API](EthApiServer).
@@ -231,7 +231,10 @@ where
             Ok(uo_hash) => {
                 // TODO: find better way to do it atomically
                 if let Some(code_hashes) = res.code_hashes {
-                    let _ = self.mempool.set_code_hashes(&uo_hash, code_hashes);
+                    match self.mempool.set_code_hashes(&uo_hash, code_hashes){
+                        Ok(_) => (),
+                        Err(e) => error!("Failed to set code hashes for user operation {uo_hash:?} with error: {e:?}"),
+                    }
                 }
                 info!("{uo_hash:?} added to the mempool {:?}", self.id);
                 trace!("{uo:?} added to the mempool {:?}", self.id);
@@ -354,6 +357,10 @@ where
                         | UserOperationValidatorMode::SimulationTrace,
                 )
                 .await;
+            debug!(
+                "Second validation for userop {:?} result: {:?}",
+                uo_hash, val_out
+            );
 
             match val_out {
                 Ok(val_out) => {

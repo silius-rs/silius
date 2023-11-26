@@ -132,10 +132,11 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
     fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
         let tx = self.env.tx()?;
         let mut c = tx.cursor_read::<UserOperations>()?;
-        let res: Vec<UserOperation> = c
-            .walk(Some(WrapUserOperationHash::default()))?
-            .map(|a| a.map(|(_, v)| v.into()))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut res = Vec::new();
+        while let Some((_, uo)) = c.next()? {
+            res.push(uo.into())
+        }
+
         Ok(res)
     }
 }
@@ -167,7 +168,6 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
 
         let tx = self.env.tx()?;
         let res = tx.get::<CodeHashes>(uo_hash_wrap)?;
-        tx.commit()?;
         Ok(res.is_some())
     }
 
@@ -180,7 +180,6 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
 
         let tx = self.env.tx_mut()?;
         let wrap_hashes: WrapCodeHashVec = hashes
-            .clone()
             .into_iter()
             .map(Into::into)
             .collect::<Vec<WrapCodeHash>>()
