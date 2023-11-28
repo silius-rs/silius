@@ -1,7 +1,7 @@
 use crate::utils::{
     parse_address, parse_enr, parse_send_bundle_mode, parse_u256, parse_uopool_mode,
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
@@ -21,6 +21,12 @@ use std::{
     net::{IpAddr, Ipv4Addr},
     path::PathBuf,
 };
+
+#[derive(ValueEnum, Debug, Clone)]
+pub enum StorageType {
+    MDBX,
+    Memory,
+}
 
 /// Bundler CLI args
 #[derive(Debug, Clone, Parser, PartialEq)]
@@ -77,8 +83,8 @@ pub struct UoPoolArgs {
 
     /// If true, the uopool will use an in-memory database.
     /// `datadir` config would be ignored.
-    #[clap(long)]
-    pub use_memory: bool,
+    #[clap(value_enum, default_value_t = StorageType::MDBX)]
+    pub storage_type: StorageType,
 
     /// Max allowed verification gas.
     #[clap(long, default_value="5000000", value_parser=parse_u256)]
