@@ -1,5 +1,7 @@
 use crate::{
-    cli::args::{BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, UoPoolArgs},
+    cli::args::{
+        BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, StorageType, UoPoolArgs,
+    },
     utils::unwrap_path_or_home,
 };
 use alloy_chains::Chain;
@@ -187,8 +189,8 @@ where
         eth_client.clone(),
         Address::from_str(entry_point::ADDRESS).expect("address should be valid"),
     );
-    match (args.uopool_mode, args.use_memory) {
-        (silius_primitives::UoPoolMode::Standard, true) => {
+    match (args.uopool_mode, args.storage_type) {
+        (silius_primitives::UoPoolMode::Standard, StorageType::Memory) => {
             let validator = new_canonical(
                 entrypoint_api,
                 chain_id,
@@ -243,7 +245,7 @@ where
                 args.uopool_addr, args.uopool_port
             );
         }
-        (silius_primitives::UoPoolMode::Standard, false) => {
+        (silius_primitives::UoPoolMode::Standard, StorageType::MDBX) => {
             let validator = new_canonical(
                 entrypoint_api,
                 chain_id,
@@ -295,7 +297,7 @@ where
                 args.uopool_addr, args.uopool_port
             );
         }
-        (silius_primitives::UoPoolMode::Unsafe, true) => {
+        (silius_primitives::UoPoolMode::Unsafe, StorageType::Memory) => {
             let validator = new_canonical_unsafe(
                 entrypoint_api,
                 chain_id,
@@ -350,7 +352,7 @@ where
                 args.uopool_addr, args.uopool_port
             );
         }
-        (silius_primitives::UoPoolMode::Unsafe, false) => {
+        (silius_primitives::UoPoolMode::Unsafe, StorageType::MDBX) => {
             let validator = new_canonical_unsafe(
                 entrypoint_api,
                 chain_id,
