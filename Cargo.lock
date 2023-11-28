@@ -2560,6 +2560,8 @@ dependencies = [
  "ethers 2.0.8",
  "eyre",
  "futures",
+ "parking_lot 0.12.1",
+ "silius-contracts",
  "silius-primitives",
  "silius-uopool",
  "tempdir",

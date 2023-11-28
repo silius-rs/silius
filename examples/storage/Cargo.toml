@@ -15,6 +15,8 @@ alloy-chains = { workspace = true }
 ethers = { workspace = true }
 eyre = { workspace = true }
 futures = "0.3.28"
+parking_lot = { workspace = true }
+silius-contracts = { path = "../../crates/contracts" }
 silius-primitives = { path = "../../crates/primitives" }
 silius-uopool = { path = "../../crates/uopool" }
 tempdir = "0.3.7"

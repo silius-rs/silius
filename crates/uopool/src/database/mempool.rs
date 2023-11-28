@@ -38,10 +38,10 @@ impl<E: EnvironmentKind> AddRemoveUserOp for DatabaseTable<E, UserOperations> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx_mut()?;
-        let ori = tx.get::<UserOperations>(uo_hash_wrap.clone())?;
+        let original_value = tx.get::<UserOperations>(uo_hash_wrap.clone())?;
         tx.delete::<UserOperations>(uo_hash_wrap.clone(), None)?;
         tx.commit()?;
-        Ok(ori.is_some())
+        Ok(original_value.is_some())
     }
 }
 

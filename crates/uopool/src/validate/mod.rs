@@ -75,6 +75,31 @@ pub struct SanityHelper<'a, M: Middleware + 'static> {
 
 #[async_trait::async_trait]
 pub trait SanityCheck<M: Middleware>: Send + Sync {
+    /// Performs a sanity check on a user operation.
+    ///
+    /// This method checks the validity of a user operation by verifying it against the mempool,
+    /// reputation system, and other sanity checks provided by the `SanityHelper`.
+    ///
+    /// # Arguments
+    ///
+    /// * `uo` - The user operation to be checked.
+    /// * `mempool` - The mempool to verify the user operation against.
+    /// * `reputation` - The reputation system to consider during the sanity check.
+    /// * `helper` - The `SanityHelper` instance that provides additional sanity checks.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the user operation passes all sanity checks, otherwise returns a
+    /// `SanityCheckError` indicating the reason for failure.
+    ///
+    /// # Generic Parameters
+    ///
+    /// * `T` - The type implementing the `UserOperationAct` trait.
+    /// * `Y` - The type implementing the `UserOperationAddrAct` trait.
+    /// * `X` - The type implementing the `UserOperationAddrAct` trait.
+    /// * `Z` - The type implementing the `UserOperationCodeHashAct` trait.
+    /// * `H` - The type implementing the `HashSetOp` trait.
+    /// * `R` - The type implementing the `ReputationEntryOp` trait.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
@@ -140,6 +165,9 @@ impl<M: Middleware> SanityCheck<M> for () {
     }
 }
 
+// These macro enable people to chain sanity check implementations.:
+// `(SanityCheck1, SanityCheck2, SanityCheck3, ...).check_user_operation(uo, mempool, reputation, helper)``
+// SanityCheck1,2,3 could be any data type which implement SanityCheck trait.
 sanity_check_impls! { A }
 sanity_check_impls! { A B }
 sanity_check_impls! { A B C }
@@ -157,7 +185,19 @@ pub struct SimulationHelper<'a> {
     valid_after: Option<U256>,
 }
 
+/// Trait for performing simulation checks on user operations.
 pub trait SimulationCheck: Send + Sync {
+    /// Checks a user operation against a simulation helper.
+    ///
+    /// # Arguments
+    ///
+    /// * `uo` - The user operation to be checked.
+    /// * `helper` - The simulation helper to assist in the check.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the user operation passes the simulation check,
+    /// otherwise returns a `SimulationCheckError`.
     fn check_user_operation(
         &self,
         uo: &UserOperation,
@@ -183,6 +223,10 @@ macro_rules! simulation_check_impls {
         }
     };
 }
+
+// These macro enable people to chain simulation check implementations.:
+// `(SimulationCheck1, SimulationCheck2, SimulationCheck3, ...).check_user_operation(uo, helper)``
+// SimulationChekc1,2,3 could be any data type which implement SimulationCheck trait.
 simulation_check_impls! {A}
 simulation_check_impls! {A B}
 simulation_check_impls! {A B C}
@@ -202,6 +246,27 @@ pub struct SimulationTraceHelper<'a, M: Middleware + Send + Sync + 'static> {
 
 #[async_trait::async_trait]
 pub trait SimulationTraceCheck<M: Middleware>: Send + Sync {
+    /// Asynchronously checks a user operation against the mempool, reputation, and simulation trace.
+    ///
+    /// # Arguments
+    ///
+    /// * `uo` - The user operation to be checked.
+    /// * `mempool` - The mempool containing user operations.
+    /// * `reputation` - The reputation data structure.
+    /// * `helper` - The simulation trace helper.
+    ///
+    /// # Generic Parameters
+    ///
+    /// * `T` - Type implementing the `UserOperationAct` trait.
+    /// * `Y` - Type implementing the `UserOperationAddrAct` trait.
+    /// * `X` - Type implementing the `UserOperationAddrAct` trait.
+    /// * `Z` - Type implementing the `UserOperationCodeHashAct` trait.
+    /// * `H` - Type implementing the `HashSetOp` trait.
+    /// * `R` - Type implementing the `ReputationEntryOp` trait.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the user operation passes the simulation check, or an error of type `SimulationCheckError` otherwise.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
@@ -265,6 +330,10 @@ impl<M: Middleware> SimulationTraceCheck<M> for () {
         Ok(())
     }
 }
+
+// These macro enable people to chain simulation check implementations.:
+// `(SimulationTraceCheck1, SimulationTraceCheck2, SimulationTraceCheck3, ...).check_user_operation(uo, mempool, reputeation helper)``
+// SimulationTraceCheck1,2,3 could be any data type which implement SimulationTraceCheck trait.
 simulation_trace_check_impls! { A }
 simulation_trace_check_impls! { A B }
 simulation_trace_check_impls! { A B C }
