@@ -32,9 +32,39 @@ impl From<reth_db::Error> for ReputationOpError {
     }
 }
 
+/// Trait representing operations on a HashSet.
 pub trait HashSetOp: Default + Sync + Send {
+    /// Adds the given address into the list.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address to be added.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the address was added successfully, `false` otherwise.
     fn add_into_list(&mut self, addr: &Address) -> bool;
+
+    /// Removes the given address from the list.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address to be removed.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the address was removed successfully, `false` otherwise.
     fn remove_from_list(&mut self, addr: &Address) -> bool;
+
+    /// Checks if the given address is in the list.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address to be checked.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the address is in the list, `false` otherwise.
     fn is_in_list(&self, addr: &Address) -> bool;
 }
 
@@ -51,15 +81,61 @@ impl<T: HashSetOp> HashSetOp for Arc<RwLock<T>> {
         self.read().is_in_list(addr)
     }
 }
+/// Trait representing operations on a reputation entry.
 pub trait ReputationEntryOp: ClearOp + Sync + Send {
+    /// Retrieves the reputation entry associated with the given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address to retrieve the reputation entry for.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Some(entry))` if the entry exists, `Ok(None)` if the entry does not exist,
+    /// or an `Err` if an error occurred during the retrieval.
     fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError>;
+
+    /// Sets the reputation entry for the given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address to set the reputation entry for.
+    /// * `entry` - The reputation entry to set.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Some(previous_entry))` if there was a previous entry for the address,
+    /// `Ok(None)` if there was no previous entry, or an `Err` if an error occurred during the operation.
     fn set_entry(
         &mut self,
         addr: &Address,
         entry: ReputationEntry,
     ) -> Result<Option<ReputationEntry>, ReputationOpError>;
+
+    /// Checks if a reputation entry exists for the given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address to check for a reputation entry.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(true)` if the entry exists, `Ok(false)` if the entry does not exist,
+    /// or an `Err` if an error occurred during the check.
     fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError>;
+
+    /// Updates the reputation entries.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the update was successful, or an `Err` if an error occurred during the update.
     fn update(&mut self) -> Result<(), ReputationOpError>;
+
+    /// Retrieves all reputation entries.
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector containing all reputation entries.
     fn get_all(&self) -> Vec<ReputationEntry>;
 }
 
