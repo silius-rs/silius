@@ -245,7 +245,7 @@ where
                 args.uopool_addr, args.uopool_port
             );
         }
-        (silius_primitives::UoPoolMode::Standard, StorageType::MDBX) => {
+        (silius_primitives::UoPoolMode::Standard, StorageType::Database) => {
             let validator = new_canonical(
                 entrypoint_api,
                 chain_id,
@@ -352,7 +352,7 @@ where
                 args.uopool_addr, args.uopool_port
             );
         }
-        (silius_primitives::UoPoolMode::Unsafe, StorageType::MDBX) => {
+        (silius_primitives::UoPoolMode::Unsafe, StorageType::Database) => {
             let validator = new_canonical_unsafe(
                 entrypoint_api,
                 chain_id,
