@@ -13,7 +13,7 @@ use libp2p::{
 };
 
 /// Convert a libp2p Keypair into a discv5 CombinedKey
-pub fn keypair_to_combine(keypair: Keypair) -> eyre::Result<CombinedKey> {
+pub fn keypair_to_combined(keypair: Keypair) -> eyre::Result<CombinedKey> {
     match keypair.try_into_secp256k1() {
         Ok(key) => {
             let secret =
@@ -28,6 +28,7 @@ pub fn keypair_to_combine(keypair: Keypair) -> eyre::Result<CombinedKey> {
 /// Build an ENR from a libp2p Keypair and config
 pub fn build_enr(enr_key: &CombinedKey, config: &Config) -> eyre::Result<Enr> {
     let mut enr_builder = EnrBuilder::new("v4");
+
     if let Some(ip) = config.ipv4_addr {
         enr_builder.ip4(ip);
     }
@@ -48,6 +49,7 @@ pub fn build_enr(enr_key: &CombinedKey, config: &Config) -> eyre::Result<Enr> {
     }
 
     let enr = enr_builder.build(enr_key)?;
+
     Ok(enr)
 }
 

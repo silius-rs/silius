@@ -16,6 +16,7 @@ use futures::StreamExt;
 use libp2p_identity::{secp256k1, Keypair};
 use parking_lot::RwLock;
 use silius_p2p::config::Config;
+use silius_p2p::enr::{build_enr, keypair_to_combined};
 use silius_p2p::network::{EntrypointChannels, Network};
 use silius_primitives::provider::BlockStream;
 use silius_primitives::uopool::AddError;
@@ -32,6 +33,7 @@ use std::collections::HashMap;
 use std::env;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{debug, error, info};
@@ -415,6 +417,7 @@ pub async fn uopool_service_run<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>(
     validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
     p2p_enabled: bool,
     node_key_file: PathBuf,
+    node_enr_file: PathBuf,
     config: Config,
     bootnodes: Vec<Enr>,
 ) -> Result<()>
@@ -484,22 +487,41 @@ where
                         .into();
                 keypair.into()
             } else {
-                info!("The p2p spec private key is not exist. Creating one now!");
+                info!("The p2p spec private key doesn't exist. Creating one now!");
 
                 let keypair = Keypair::generate_secp256k1();
+                std::fs::create_dir_all(node_key_file.parent().expect("Key file path error"))
+                    .expect("Creating key file directory failed");
                 std::fs::write(
                     node_key_file.clone(),
                     keypair
                         .to_protobuf_encoding()
-                        .expect("discovery secret encode failed"),
+                        .expect("Discovery secret encoding failed"),
                 )
-                .expect("write discoveray secret file failed");
+                .expect("Discovery secret writing failed");
                 std::fs::set_permissions(node_key_file, std::fs::Permissions::from_mode(0o600))
                     .expect("Setting key file permission failed");
+
                 keypair
             };
+
+            let enr = if node_enr_file.exists() {
+                let content = std::fs::read_to_string(node_enr_file).expect("enr file currupted");
+                Enr::from_str(&content).expect("enr file currupted")
+            } else {
+                let combined_key =
+                    keypair_to_combined(discovery_secret.clone()).expect("key error");
+                let enr = build_enr(&combined_key, &config).expect("enr building failed");
+                std::fs::create_dir_all(node_enr_file.parent().expect("Key file path error"))
+                    .expect("Creating key file directory failed");
+                std::fs::write(node_enr_file, enr.to_base64()).expect("enr writing failed");
+                enr
+            };
+            info!("Enr: {}", enr);
+
             let listen_addrs = config.listen_addr.to_multi_addr();
             let mut p2p_network = Network::new(
+                enr,
                 discovery_secret,
                 config,
                 entrypoint_channels,
@@ -507,7 +529,7 @@ where
                 30,
             )
             .expect("p2p network init failed");
-            info!("Enr: {}", p2p_network.local_enr().to_base64());
+
             for listen_addr in listen_addrs.into_iter() {
                 info!("P2P node listened on {}", listen_addr);
                 p2p_network
@@ -518,6 +540,7 @@ where
             if bootnodes.is_empty() {
                 info!("Start p2p mode without bootnodes");
             }
+
             for enr in bootnodes {
                 info!("Trying to dial p2p node {enr:}");
                 p2p_network.dial(enr).expect("Dial bootnode failed");

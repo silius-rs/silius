@@ -102,8 +102,10 @@ pub mod networking {
 pub mod p2p {
     /// The dafault database folder name used for storing the database files
     pub const DB_FOLDER_NAME: &str = "db";
-    /// The default discovery secret file name used for storing the discovery secret
-    pub const DISCOVERY_SECRET_FILE_NAME: &str = "discovery-secret";
+    /// The default node key file name used for storing the node p2p key
+    pub const NODE_KEY_FILE_NAME: &str = "p2p/node-key";
+    /// The default node enr file name used for storing enr
+    pub const NODE_ENR_FILE_NAME: &str = "p2p/node-enr";
     /// The prefix protocol id for request-response protocol
     pub const REQREP_PROTOCOL_PREFIX: &str = "/account_abstraction/req";
     /// The topic hash prefix for gossisub protocol

@@ -11,7 +11,7 @@ case $1 in
  start)
 	docker-compose up -d
     sleep 2
-    silius bundler \
+    silius node \
         --verbosity 4 \
         --eth-client-address http://127.0.0.1:8545 \
         --mnemonic-file keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \

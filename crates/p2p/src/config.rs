@@ -15,6 +15,7 @@ pub struct ListenAddr<Ip> {
 }
 
 /// Variant of ListenAddr that can be ipv4, ipv6 or dual.
+#[derive(Clone, Debug)]
 pub enum ListenAddress {
     Ipv4(ListenAddr<Ipv4Addr>),
     Ipv6(ListenAddr<Ipv6Addr>),
@@ -46,6 +47,7 @@ impl Default for ListenAddress {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Config {
     pub listen_addr: ListenAddress,
 

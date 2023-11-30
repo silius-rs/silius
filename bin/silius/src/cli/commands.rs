@@ -8,7 +8,7 @@ use std::{future::pending, sync::Arc};
 
 /// Start the bundler with all components (bundling component, user operation mempool, RPC server)
 #[derive(Debug, Parser)]
-pub struct BundlerCommand {
+pub struct NodeCommand {
     /// All Bundler specific args
     #[clap(flatten)]
     bundler: BundlerArgs,
@@ -26,7 +26,7 @@ pub struct BundlerCommand {
     rpc: RpcArgs,
 }
 
-impl BundlerCommand {
+impl NodeCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
@@ -63,7 +63,7 @@ impl BundlerCommand {
 
 /// Start the bundling component
 #[derive(Debug, Parser)]
-pub struct BundlingCommand {
+pub struct BundlerCommand {
     /// All Bundler specific args
     #[clap(flatten)]
     bundler: BundlerArgs,
@@ -77,7 +77,7 @@ pub struct BundlingCommand {
     pub uopool_grpc_listen_address: String,
 }
 
-impl BundlingCommand {
+impl BundlerCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {

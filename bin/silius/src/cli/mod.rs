@@ -36,12 +36,12 @@ impl Cli {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Start the bundler with all components (bundling component, user operation mempool, RPC server)
-    #[command(name = "bundler")]
-    Bundler(Box<commands::BundlerCommand>),
+    #[command(name = "node")]
+    Node(Box<commands::NodeCommand>),
 
     /// Start the bundling component
-    #[command(name = "bundling")]
-    Bundling(commands::BundlingCommand),
+    #[command(name = "bundler")]
+    Bundler(commands::BundlerCommand),
 
     /// Start the user operation mempool
     #[command(name = "uopool")]
@@ -76,8 +76,8 @@ pub fn run() -> eyre::Result<()> {
 
             let task = async move {
                 match cli.command {
+                    Commands::Node(command) => command.execute().await,
                     Commands::Bundler(command) => command.execute().await,
-                    Commands::Bundling(command) => command.execute().await,
                     Commands::UoPool(command) => command.execute().await,
                     Commands::Rpc(command) => command.execute().await,
                     Commands::CreateWallet(command) => command.execute(),

@@ -2,7 +2,7 @@ use crate::{
     behaviour::Behaviour,
     config::Config,
     discovery,
-    enr::{keypair_to_combine, EnrExt},
+    enr::{keypair_to_combined, EnrExt},
     gossipsub::topic,
     peer_manager::PeerManagerEvent,
     request_response::{self, Ping, Request, RequestId, Response},
@@ -99,15 +99,18 @@ impl From<Network> for Swarm<Behaviour> {
 impl Network {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        enr: Enr,
         key: Keypair,
         config: Config,
         entrypoint_channels: EntrypointChannels,
         ping_interval: Duration,
         target_peers: usize,
     ) -> eyre::Result<Self> {
-        let combine_key = keypair_to_combine(key.clone())?;
+        let combined_key = keypair_to_combined(key.clone())?;
+
         let behaviour = Behaviour::new(
-            combine_key,
+            enr,
+            combined_key,
             config,
             entrypoint_channels
                 .iter()

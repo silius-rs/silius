@@ -14,7 +14,10 @@ use silius_grpc::{
 };
 use silius_primitives::{
     bundler::SendBundleMode,
-    consts::{entry_point, flashbots_relay_endpoints, p2p::DISCOVERY_SECRET_FILE_NAME},
+    consts::{
+        entry_point, flashbots_relay_endpoints,
+        p2p::{NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME},
+    },
     consts::{
         p2p::DB_FOLDER_NAME,
         reputation::{
@@ -182,7 +185,11 @@ where
 
     let node_key_file = match args.p2p_opts.node_key.clone() {
         Some(key_file) => key_file,
-        None => datadir.join(DISCOVERY_SECRET_FILE_NAME),
+        None => datadir.join(NODE_KEY_FILE_NAME),
+    };
+    let node_enr_file = match args.p2p_opts.node_enr.clone() {
+        Some(enr_file) => enr_file,
+        None => datadir.join(NODE_ENR_FILE_NAME),
     };
 
     let entrypoint_api = EntryPoint::new(
@@ -236,6 +243,7 @@ where
                 validator,
                 args.p2p_opts.enable_p2p,
                 node_key_file,
+                node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
             )
@@ -288,6 +296,7 @@ where
                 validator,
                 args.p2p_opts.enable_p2p,
                 node_key_file,
+                node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
             )
@@ -343,6 +352,7 @@ where
                 validator,
                 args.p2p_opts.enable_p2p,
                 node_key_file,
+                node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
             )
@@ -395,6 +405,7 @@ where
                 validator,
                 args.p2p_opts.enable_p2p,
                 node_key_file,
+                node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
             )
