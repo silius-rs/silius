@@ -259,8 +259,12 @@ pub struct P2PArgs {
     pub bootnodes: Vec<Enr>,
 
     /// The path to the file where the p2p private key is stored.
-    #[clap(long)]
+    #[clap(long = "nodekey")]
     pub node_key: Option<PathBuf>,
+
+    /// The path to the file where the p2p enr is stored.
+    #[clap(long = "nodeenr")]
+    pub node_enr: Option<PathBuf>,
 }
 
 impl P2PArgs {
@@ -608,8 +612,10 @@ mod tests {
             "4337",
             "--bootnodes",
             &binding,
-            "--node-key",
-            "~/.silius/discovery-secret",
+            "--nodekey",
+            "~/.silius/p2p/node-key",
+            "--nodeenr",
+            "~/.silius/p2p/node-enr",
         ];
         assert_eq!(
             P2PArgs {
@@ -619,7 +625,8 @@ mod tests {
                 tcp4_port: 4337,
                 udp4_port: 4337,
                 bootnodes: vec![enr],
-                node_key: Some(PathBuf::from("~/.silius/discovery-secret")),
+                node_key: Some(PathBuf::from("~/.silius/p2p/node-key")),
+                node_enr: Some(PathBuf::from("~/.silius/p2p/node-enr"))
             },
             P2PArgs::try_parse_from(args).unwrap()
         )

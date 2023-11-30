@@ -1,5 +1,6 @@
 use crate::{
     config::{Config, ListenAddr},
+    enr::{build_enr, keypair_to_combined},
     network::{Network, NetworkEvent},
 };
 use alloy_chains::Chain;
@@ -50,7 +51,9 @@ fn build_p2p_instance() -> eyre::Result<Network> {
     let listen_addrs = config.listen_addr.to_multi_addr();
     let (_, rv) = unbounded();
     let (sd, _) = unbounded();
+    let enr = build_enr(&keypair_to_combined(key.clone())?, &config).unwrap();
     let mut network = Network::new(
+        enr,
         key,
         config,
         vec![(Chain::from(5), Default::default(), rv, sd)],

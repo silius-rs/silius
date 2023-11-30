@@ -29,7 +29,7 @@ rust-version = "1.73.0"
 alloy-chains = "0.1.2"
 async-stream = "0.3.5"
 async-trait = "0.1"
-discv5 = { version = "0.3.0", features = ["libp2p"] }
+discv5 = { version = "0.3.1", features = ["libp2p"] }
 ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc", features = [
     "ws",
 ] }

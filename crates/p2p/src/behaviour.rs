@@ -1,10 +1,10 @@
 use crate::config::Config;
 use crate::discovery::{self, Discovery};
-use crate::enr::build_enr;
 use crate::gossipsub::{create_gossisub, Gossipsub};
 use crate::peer_manager::{PeerManager, PeerManagerEvent};
 use crate::request_response;
 use discv5::enr::CombinedKey;
+use discv5::Enr;
 use libp2p::gossipsub;
 use libp2p::swarm::NetworkBehaviour;
 use std::time::Duration;
@@ -25,13 +25,13 @@ pub struct Behaviour {
 
 impl Behaviour {
     pub fn new(
+        enr: Enr,
         key: CombinedKey,
         config: Config,
         p2p_mempool_id: Vec<String>,
         ping_interval: Duration,
         target_peers: usize,
     ) -> eyre::Result<Self> {
-        let enr = build_enr(&key, &config)?;
         let gossipsub = create_gossisub(p2p_mempool_id).map_err(|e| eyre::anyhow!(e))?;
         let reqrep = request_response::Behaviour::new(Default::default());
         let discovery = Discovery::new(enr, key, config)?;
