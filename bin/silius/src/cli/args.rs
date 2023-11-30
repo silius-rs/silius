@@ -24,7 +24,7 @@ use std::{
 
 #[derive(ValueEnum, Debug, Clone)]
 pub enum StorageType {
-    MDBX,
+    Database,
     Memory,
 }
 
@@ -81,9 +81,9 @@ pub struct UoPoolArgs {
     #[clap(long)]
     pub datadir: Option<ExpandedPathBuf>,
 
-    /// If true, the uopool will use an in-memory database.
-    /// `datadir` config would be ignored.
-    #[clap(value_enum, default_value_t = StorageType::MDBX)]
+    /// The storage type which is used for mempool and repution
+    /// Currently, silius support `databse` and `memory` type
+    #[clap(value_enum, default_value_t = StorageType::Database)]
     pub storage_type: StorageType,
 
     /// Max allowed verification gas.
