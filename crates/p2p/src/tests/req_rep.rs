@@ -1,6 +1,6 @@
 use crate::{
     network::NetworkEvent,
-    request_response::{GetMetaData, Request, Response, Status},
+    request_response::{GetMetadata, Request, Response, Status},
     tests::build_connnected_p2p_pair,
 };
 use std::time::Duration;
@@ -98,8 +98,8 @@ async fn reqrep_ping_pong() -> eyre::Result<()> {
 #[tokio::test]
 async fn reqrep_metadata() -> eyre::Result<()> {
     reqrep_case(
-        Request::GetMetaData(GetMetaData),
-        Response::MetaData(Default::default()),
+        Request::GetMetadata(GetMetadata),
+        Response::Metadata(Default::default()),
     )
     .await?;
     Ok(())

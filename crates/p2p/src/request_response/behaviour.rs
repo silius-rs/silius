@@ -89,7 +89,7 @@ pub enum InboundFailure {
     /// due to the [`ResponseChannel`] being dropped instead of
     /// being passed to [`Behaviour::send_response`].
     ResponseOmission,
-    /// Error happended while handleing the inbound
+    /// Error happended while handling the inbound
     BoundError(BoundError),
 }
 #[derive(Debug)]

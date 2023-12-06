@@ -1,9 +1,16 @@
 use discv5::ListenConfig;
 use libp2p::{multiaddr::Protocol, Multiaddr};
+use ssz_rs::Bitvector;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 const DEFAULT_UDP_PORT: u16 = 9000;
 const DEFAULT_TCP_PORT: u16 = 9000;
+
+#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
+pub struct Metadata {
+    pub seq_number: u64,
+    pub mempool_nets: Bitvector<64>,
+}
 
 /// The address to listen on for incoming connections.
 /// Ip could be ipv4 or ipv6

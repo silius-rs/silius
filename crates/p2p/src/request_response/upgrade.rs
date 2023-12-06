@@ -35,7 +35,7 @@ impl UpgradeInfo for OutboundRepUpgrade {
             Request::Status(_) => vec![ProtocolId::new(Protocol::Status)],
             Request::GoodbyeReason(_) => vec![ProtocolId::new(Protocol::Goodbye)],
             Request::Ping(_) => vec![ProtocolId::new(Protocol::Ping)],
-            Request::GetMetaData(_) => vec![ProtocolId::new(Protocol::MetaData)],
+            Request::GetMetadata(_) => vec![ProtocolId::new(Protocol::MetaData)],
             Request::PooledUserOpHashesReq(_) => {
                 vec![ProtocolId::new(Protocol::PooledUserOpHashes)]
             }

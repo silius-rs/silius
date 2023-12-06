@@ -1,3 +1,4 @@
+use crate::config::Metadata;
 use libp2p::PeerId;
 use std::collections::HashMap;
 
@@ -5,8 +6,10 @@ pub enum ConnectionStatus {
     Connected,
     Disconnected,
 }
+
 pub struct PeerInfo {
     connection_status: ConnectionStatus,
+    _metadata: Option<Metadata>, // TODO: need to handle metadata updates
 }
 
 #[derive(Default)]
@@ -27,6 +30,7 @@ impl PeerDB {
             .and_modify(|info| info.connection_status = ConnectionStatus::Connected)
             .or_insert(PeerInfo {
                 connection_status: ConnectionStatus::Connected,
+                _metadata: None,
             });
     }
 

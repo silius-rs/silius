@@ -28,7 +28,9 @@ ssz_rs = { workspace = true }
 ssz_rs_derive = { workspace = true }
 thiserror = "1"
 tokio = { workspace = true }
+tokio-util = { version = "0.7.10", features = ["codec"] }
 tracing = { workspace = true }
+unsigned-varint = { version = "0.8.0", features = ["codec"] }
 
 [dependencies.libp2p]
 version = "0.52.3"

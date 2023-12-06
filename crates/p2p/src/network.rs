@@ -1,11 +1,11 @@
 use crate::{
     behaviour::Behaviour,
-    config::Config,
+    config::{Config, Metadata},
     discovery,
     enr::{keypair_to_combined, EnrExt},
     gossipsub::topic,
     peer_manager::PeerManagerEvent,
-    request_response::{self, Ping, Request, RequestId, Response},
+    request_response::{self, Ping, Pong, Request, RequestId, Response},
 };
 use alloy_chains::Chain;
 use discv5::Enr;
@@ -83,11 +83,13 @@ pub type EntrypointChannels = Vec<(
     UnboundedReceiver<(UserOperation, U256)>,
     UnboundedSender<UserOperation>,
 )>;
+
 /// P2P network struct that holds the libp2p Swarm
 /// Other components should interact with Network directly instead of behaviour
 pub struct Network {
     swarm: Swarm<Behaviour>,
     entrypoint_channels: EntrypointChannels,
+    metadata: Metadata,
 }
 
 impl From<Network> for Swarm<Behaviour> {
@@ -139,9 +141,17 @@ impl Network {
             .with_behaviour(|_| behaviour)
             .expect("building p2p behaviour failed")
             .build();
+
+        // metadata
+        let metadata = Metadata {
+            seq_number: 0,
+            ..Default::default() // FIXME: when mempool id of canonical will be known
+        };
+
         Ok(Self {
             swarm,
             entrypoint_channels,
+            metadata,
         })
     }
 
@@ -205,7 +215,15 @@ impl Network {
                 ..
             } => match request {
                 Request::Ping(_ping) => {
-                    let response = Response::Pong(Default::default());
+                    // TODO: need to update metadata of peer (based on ping value)
+                    let response = Response::Pong(Pong::new(self.metadata.seq_number));
+                    response_sender
+                        .send(response)
+                        .expect("channel should exist");
+                    None
+                }
+                Request::GetMetadata(_) => {
+                    let response = Response::Metadata(self.metadata.clone());
                     response_sender
                         .send(response)
                         .expect("channel should exist");
@@ -233,8 +251,7 @@ impl Network {
     fn handler_peer_manager_event(&mut self, event: PeerManagerEvent) -> Option<NetworkEvent> {
         match event {
             PeerManagerEvent::Ping(peer) => {
-                // FIXME: seq number should be a counter
-                self.send_request(&peer, Request::Ping(Ping::new(1)));
+                self.send_request(&peer, Request::Ping(Ping::new(self.metadata.seq_number)));
                 None
             }
             PeerManagerEvent::PeerConnectedIncoming(peer)
@@ -282,7 +299,7 @@ impl Network {
         }
 
         while let Poll::Ready(Some(swarm_event)) = self.swarm.poll_next_unpin(cx) {
-            info!("Swarm get event {swarm_event:?}");
+            info!("Swarm event {swarm_event:?}");
             let event_opt = match swarm_event {
                 SwarmEvent::Behaviour(e) => match e {
                     crate::behaviour::Event::GossipSub(event) => self.handle_gossipsub_event(event),
