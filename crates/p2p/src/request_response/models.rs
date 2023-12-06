@@ -1,5 +1,6 @@
+use crate::config::Metadata;
 use silius_primitives::UserOperation;
-use ssz_rs::{Bitvector, List, Serialize, Vector};
+use ssz_rs::{List, Serialize, Vector};
 use std::io;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -7,7 +8,7 @@ pub enum Request {
     Status(Status),
     GoodbyeReason(GoodbyeReason),
     Ping(Ping),
-    GetMetaData(GetMetaData),
+    GetMetadata(GetMetadata),
     PooledUserOpHashesReq(PooledUserOpHashesReq),
     PooledUserOpsByHashReq(PooledUserOpsByHashReq),
 }
@@ -104,16 +105,10 @@ pub struct PooledUserOpsByHashReq {
     hashes: List<Vector<u8, 32>, 1024>,
 }
 
-#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct MetaData {
-    seq_number: u64,
-    mempool_nets: Bitvector<32>,
-}
-
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct GetMetaData;
+pub struct GetMetadata;
 
-impl ssz_rs::Serializable for GetMetaData {
+impl ssz_rs::Serializable for GetMetadata {
     fn is_variable_size() -> bool {
         false
     }
@@ -122,18 +117,18 @@ impl ssz_rs::Serializable for GetMetaData {
     }
 }
 
-impl ssz_rs::Serialize for GetMetaData {
+impl ssz_rs::Serialize for GetMetadata {
     fn serialize(&self, _buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
         Ok(0)
     }
 }
 
-impl ssz_rs::Deserialize for GetMetaData {
+impl ssz_rs::Deserialize for GetMetadata {
     fn deserialize(_encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
     where
         Self: Sized,
     {
-        Ok(GetMetaData)
+        Ok(GetMetadata)
     }
 }
 
@@ -142,7 +137,7 @@ pub enum Response {
     Status(Status),
     GoodbyeReason(GoodbyeReason),
     Pong(Pong),
-    MetaData(MetaData),
+    Metadata(Metadata),
     PooledUserOpHashes(PooledUserOpHashes),
     PooledUserOpsByHash(PooledUserOpsByHash),
 }
@@ -154,7 +149,7 @@ impl Response {
             Response::Status(status) => status.serialize(&mut buffer),
             Response::GoodbyeReason(reason) => reason.serialize(&mut buffer),
             Response::Pong(pong) => pong.serialize(&mut buffer),
-            Response::MetaData(metadata) => metadata.serialize(&mut buffer),
+            Response::Metadata(metadata) => metadata.serialize(&mut buffer),
             Response::PooledUserOpHashes(pooled_user_op_hashes) => {
                 pooled_user_op_hashes.serialize(&mut buffer)
             }

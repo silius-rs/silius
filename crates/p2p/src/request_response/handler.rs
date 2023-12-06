@@ -2,9 +2,12 @@ use super::{
     models::{Request, RequestId, Response},
     upgrade::{InboundReqUpgrade, OutboundRepUpgrade},
 };
-use crate::request_response::{
-    protocol::Protocol, BoundError, GetMetaData, GoodbyeReason, MetaData, Ping, Pong,
-    PooledUserOpHashes, PooledUserOpHashesReq, PooledUserOpsByHash, PooledUserOpsByHashReq, Status,
+use crate::{
+    config::Metadata,
+    request_response::{
+        protocol::Protocol, BoundError, GetMetadata, GoodbyeReason, Ping, Pong, PooledUserOpHashes,
+        PooledUserOpHashesReq, PooledUserOpsByHash, PooledUserOpsByHashReq, Status,
+    },
 };
 use futures::{
     channel::oneshot::{self, Receiver, Sender},
@@ -13,10 +16,13 @@ use futures::{
     FutureExt, StreamExt, TryFutureExt,
 };
 use futures::{AsyncReadExt, AsyncWriteExt};
-use libp2p::swarm::ConnectionHandlerEvent;
-use libp2p::swarm::{
-    handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound},
-    ConnectionHandler, ConnectionId, KeepAlive, StreamUpgradeError, SubstreamProtocol,
+use libp2p::{
+    bytes::BytesMut,
+    swarm::{
+        handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound},
+        ConnectionHandler, ConnectionHandlerEvent, ConnectionId, KeepAlive, StreamUpgradeError,
+        SubstreamProtocol,
+    },
 };
 use ssz_rs::{Deserialize, Serialize};
 use std::{
@@ -29,7 +35,9 @@ use std::{
     task::Poll,
     time::Duration,
 };
+use tokio_util::codec::{Decoder, Encoder};
 use tracing::{trace, warn};
+use unsigned_varint::codec::Uvi;
 
 /// Max request size in bytes
 const REQUEST_SIZE_MAXIMUM: u64 = 1024 * 1024;
@@ -146,7 +154,10 @@ impl Handler {
                 .take(REQUEST_SIZE_MAXIMUM)
                 .read_to_end(&mut data)
                 .await?;
-            trace!("Inbound Received {} bytes", data.len());
+
+            trace!("Inbound bytes: {:?}", data);
+            trace!("Received {:?} bytes", data.len());
+
             // MetaData request would send empty content.
             // https://github.com/eth-infinitism/bundler-spec/blob/main/p2p-specs/p2p-interface.md#getmetadata
             if data.is_empty() && !matches!(protocol_id.message_name, Protocol::MetaData) {
@@ -155,26 +166,36 @@ impl Handler {
                     "No data received",
                 )))
             } else {
-                let mut decompressed_data = vec![];
-                snap::read::FrameDecoder::new(data.as_slice())
-                    .read_to_end(&mut decompressed_data)
-                    .map_err(BoundError::IoError)?;
+                let mut bytes = BytesMut::new();
+                bytes.extend_from_slice(&data);
+
+                // decode header
+                let mut codec: Uvi<usize> = Uvi::default();
+                let _ = codec.decode(&mut bytes)?; // TODO: use length to verify size
+
+                // decode payload
+                let mut buffer = vec![];
+                snap::read::FrameDecoder::<&[u8]>::new(&bytes).read_to_end(&mut buffer)?;
+
+                trace!("Inbound buffer {:?}", buffer);
+
                 let request = match protocol_id.message_name {
-                    Protocol::Status => Request::Status(Status::deserialize(&decompressed_data)?),
+                    Protocol::Status => Request::Status(Status::deserialize(&buffer)?),
                     Protocol::Goodbye => {
-                        Request::GoodbyeReason(GoodbyeReason::deserialize(&decompressed_data)?)
+                        Request::GoodbyeReason(GoodbyeReason::deserialize(&buffer)?)
                     }
-                    Protocol::Ping => Request::Ping(Ping::deserialize(&decompressed_data)?),
-                    Protocol::MetaData => {
-                        Request::GetMetaData(GetMetaData::deserialize(&decompressed_data)?)
+                    Protocol::Ping => Request::Ping(Ping::deserialize(&buffer)?),
+                    Protocol::MetaData => Request::GetMetadata(GetMetadata::deserialize(&buffer)?),
+                    Protocol::PooledUserOpHashes => {
+                        Request::PooledUserOpHashesReq(PooledUserOpHashesReq::deserialize(&buffer)?)
                     }
-                    Protocol::PooledUserOpHashes => Request::PooledUserOpHashesReq(
-                        PooledUserOpHashesReq::deserialize(&decompressed_data)?,
-                    ),
                     Protocol::PooledUserOpsByHash => Request::PooledUserOpsByHashReq(
-                        PooledUserOpsByHashReq::deserialize(&decompressed_data)?,
+                        PooledUserOpsByHashReq::deserialize(&buffer)?,
                     ),
                 };
+
+                trace!("Inbound {:?}", request);
+
                 match request_sender.send(request) {
                     Ok(()) => {}
                     // It should not happen. There must be something wrong with the codes.
@@ -182,20 +203,40 @@ impl Handler {
                         "Expect request receiver to be alive i.e. protocol handler to be alive.",
                     ),
                 }
+
                 if let Ok(response) = response_receiver.await {
-                    let ssz_encoded = response.serialize()?;
-                    let mut wtr = snap::write::FrameEncoder::new(vec![]);
-                    wtr.write_all(&ssz_encoded)?;
-                    let compressed_data = wtr
+                    bytes.clear();
+
+                    // response_chunk ::= <result> | <encoding-dependent-header> | <encoded-payload>
+
+                    // encode <result>
+                    // TODO: for now let's add 0, but we should handle other cases
+                    bytes.extend_from_slice(&[0]);
+
+                    let ssz_bytes = response.serialize()?;
+
+                    // encode <encoding-dependent-header>
+                    let mut codec = Uvi::default();
+                    codec.encode(ssz_bytes.len(), &mut bytes)?;
+
+                    // encode <encoded-payload>
+                    let mut writer = snap::write::FrameEncoder::new(vec![]);
+                    writer.write_all(&ssz_bytes)?;
+                    let compressed_data = writer
                         .into_inner()
                         .map_err(|e| BoundError::IoError(e.into_error()))?;
-                    socket_mut.write_all(&compressed_data).await?;
+                    bytes.extend_from_slice(&compressed_data);
 
+                    trace!("Inbound sending {:?}", bytes.to_vec());
+
+                    socket_mut.write_all(&bytes).await?;
                     socket_mut.close().await?;
+
                     // Response was sent. Indicate to handler to emit a `ResponseSent` event.
                     Ok(HandlerEvent::ResponseSent(request_id))
                 } else {
                     socket_mut.close().await?;
+
                     Ok(HandlerEvent::ResponseOmission(request_id))
                 }
             }
@@ -224,14 +265,15 @@ impl Handler {
             request_id,
         } = info;
         let send = async move {
-            trace!("Outbound {:?}!!!", request);
+            trace!("Outbound {:?}", request);
             let mut buffer = Vec::new();
             let socket_mut = &mut socket;
+
             match request {
                 Request::Status(status) => status.serialize(&mut buffer)?,
                 Request::GoodbyeReason(reason) => reason.serialize(&mut buffer)?,
                 Request::Ping(ping) => ping.serialize(&mut buffer)?,
-                Request::GetMetaData(meta_data) => meta_data.serialize(&mut buffer)?,
+                Request::GetMetadata(meta_data) => meta_data.serialize(&mut buffer)?,
                 Request::PooledUserOpHashesReq(pooled_user_op_hashes_req) => {
                     pooled_user_op_hashes_req.serialize(&mut buffer)?
                 }
@@ -240,31 +282,61 @@ impl Handler {
                     pooled_user_ops_by_hash_req.serialize(&mut buffer)?
                 }
             };
+
             trace!("Outbound buffer {:?}", buffer);
-            let mut wtr = snap::write::FrameEncoder::new(vec![]);
-            wtr.write_all(&buffer)?;
-            let compressed = wtr
+
+            let mut bytes = BytesMut::new();
+
+            // encode header
+            let mut codec = Uvi::default();
+            codec.encode(buffer.len(), &mut bytes)?;
+
+            // encode payload
+            let mut writer = snap::write::FrameEncoder::new(vec![]);
+            writer.write_all(&buffer)?;
+            let compressed_data = writer
                 .into_inner()
                 .map_err(|e| BoundError::IoError(e.into_error()))?;
-            trace!("Sending {:?} bytes", compressed.len());
-            socket_mut.write_all(compressed.as_ref()).await?;
+            bytes.extend_from_slice(&compressed_data);
+
+            trace!("Outbound bytes {:?}", bytes.to_vec());
+            trace!("Sending {:?} bytes", bytes.len());
+            socket_mut.write_all(&bytes).await?;
             socket_mut.close().await?;
-            let mut comressed_response = Vec::new();
+
+            let mut compressed_response = Vec::new();
             socket_mut
                 .take(RESPONSE_SIZE_MAXIMUM)
-                .read_to_end(&mut comressed_response)
+                .read_to_end(&mut compressed_response)
                 .await?;
-            trace!("Outbound received {:?}!!!", comressed_response);
+
+            trace!("Outbound received {:?}", compressed_response);
+
+            bytes = BytesMut::new();
+            bytes.extend_from_slice(&compressed_response);
+
+            // response_chunk ::= <result> | <encoding-dependent-header> | <encoded-payload>
+
+            // TODO: response chunks
+
+            // decode <result>
+            let _ = bytes.split_to(1); // TODO: handle result
+
+            // decode <encoding-dependent-header>
+            let mut codec: Uvi<usize> = Uvi::default();
+            let _ = codec.decode(&mut bytes)?; // TODO: use length to verify size
+
+            // decode <encoded-payload>
             let mut decompressed = vec![];
-            snap::read::FrameDecoder::<&[u8]>::new(comressed_response.as_ref())
-                .read_to_end(&mut decompressed)?;
+            snap::read::FrameDecoder::<&[u8]>::new(&bytes).read_to_end(&mut decompressed)?;
+
             let response = match protocol_id.message_name {
                 Protocol::Status => Response::Status(Status::deserialize(&decompressed)?),
                 Protocol::Goodbye => {
                     Response::GoodbyeReason(GoodbyeReason::deserialize(&decompressed)?)
                 }
                 Protocol::Ping => Response::Pong(Pong::deserialize(&decompressed)?),
-                Protocol::MetaData => Response::MetaData(MetaData::deserialize(&decompressed)?),
+                Protocol::MetaData => Response::Metadata(Metadata::deserialize(&decompressed)?),
                 Protocol::PooledUserOpHashes => {
                     Response::PooledUserOpHashes(PooledUserOpHashes::deserialize(&decompressed)?)
                 }
