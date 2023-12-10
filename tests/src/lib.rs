@@ -5,3 +5,6 @@ pub mod common;
 mod simulation_tests;
 #[cfg(test)]
 mod tracer_tests;
+
+#[cfg(test)]
+mod estimate_gas_tests;

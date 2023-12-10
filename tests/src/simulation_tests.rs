@@ -1,4 +1,3 @@
-use crate::common::deploy_test_coin;
 use crate::common::{
     deploy_entry_point, deploy_test_opcode_account, deploy_test_opcode_account_factory,
     deploy_test_recursion_account, deploy_test_rules_account_factory, deploy_test_storage_account,
@@ -7,8 +6,9 @@ use crate::common::{
         EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRulesAccount,
         TestStorageAccountFactory,
     },
-    setup_geth, ClientType, DeployedContract,
+    setup_database_mempool_reputation, setup_geth, ClientType, DeployedContract,
 };
+use crate::common::{deploy_test_coin, setup_memory_mempool_reputation};
 use alloy_chains::Chain;
 use ethers::abi::Token;
 use ethers::prelude::BaseContract;
@@ -32,14 +32,13 @@ use silius_uopool::validate::{
     UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
 };
 use silius_uopool::{
-    init_env, CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool, Reputation,
+    CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool, Reputation,
     ReputationEntryOp, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
     UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
-use tempdir::TempDir;
 
 struct TestContext<M, T, Y, X, Z, H, R>
 where
@@ -144,26 +143,7 @@ async fn setup_basic() -> eyre::Result<(
 async fn setup_database() -> eyre::Result<DatabaseContext> {
     let (client, ep, chain_id, _geth, paymaster, opcodes_factory, storage_factory, storage_account) =
         setup_basic().await?;
-    let dir = TempDir::new("test-silius-db").unwrap();
-    let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
-    env.create_tables()
-        .expect("Create mdbx database tables failed");
-    let mempool = Mempool::new(
-        DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
-        DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
-        DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
-        DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
-    );
-    let reputation = Reputation::new(
-        10,
-        10,
-        10,
-        1u64.into(),
-        1u64.into(),
-        HashSet::<Address>::default(),
-        HashSet::<Address>::default(),
-        DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
-    );
+    let (mempool, reputation) = setup_database_mempool_reputation();
 
     let entry_point = EntryPoint::new(client.clone(), ep.address);
     let c = Chain::from(chain_id);
@@ -192,30 +172,7 @@ async fn setup_database() -> eyre::Result<DatabaseContext> {
 async fn setup_memory() -> eyre::Result<MemoryContext> {
     let (client, ep, chain_id, _geth, paymaster, opcodes_factory, storage_factory, storage_account) =
         setup_basic().await?;
-    let mempool = Mempool::new(
-        Arc::new(RwLock::new(
-            HashMap::<UserOperationHash, UserOperation>::default(),
-        )),
-        Arc::new(RwLock::new(
-            HashMap::<Address, HashSet<UserOperationHash>>::default(),
-        )),
-        Arc::new(RwLock::new(
-            HashMap::<Address, HashSet<UserOperationHash>>::default(),
-        )),
-        Arc::new(RwLock::new(
-            HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
-        )),
-    );
-    let reputation = Reputation::new(
-        10,
-        10,
-        10,
-        1u64.into(),
-        1u64.into(),
-        Arc::new(RwLock::new(HashSet::<Address>::default())),
-        Arc::new(RwLock::new(HashSet::<Address>::default())),
-        Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
-    );
+    let (mempool, reputation) = setup_memory_mempool_reputation();
     let entry_point = EntryPoint::new(client.clone(), ep.address);
     let c = Chain::from(chain_id);
 

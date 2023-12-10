@@ -1,18 +1,30 @@
 use self::gen::{
-    EntryPointContract, TestCoin, TestOpcodesAccount, TestOpcodesAccountFactory,
-    TestRecursionAccount, TestRulesAccountFactory, TestStorageAccount, TestStorageAccountFactory,
-    TracerTest,
+    EntryPointContract, SimpleAccountFactory, TestCoin, TestOpcodesAccount,
+    TestOpcodesAccountFactory, TestRecursionAccount, TestRulesAccountFactory, TestStorageAccount,
+    TestStorageAccountFactory, TracerTest,
 };
 use ethers::{
     prelude::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
     providers::{Http, Middleware, Provider},
     signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer},
-    types::{Address, TransactionRequest, U256},
+    types::{Address, TransactionRequest, H160, U256},
     utils::{Geth, GethInstance},
 };
-use std::{ops::Mul, sync::Arc, time::Duration};
+use parking_lot::RwLock;
+use silius_primitives::{
+    reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
+};
+use silius_uopool::{
+    init_env, CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
+    UserOperationsByEntity, UserOperationsBySender, WriteMap,
+};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Mul,
+    sync::Arc,
+    time::Duration,
+};
 use tempdir::TempDir;
-
 pub mod gen;
 
 pub const SEED_PHRASE: &str = "test test test test test test test test test test test junk";
@@ -39,6 +51,17 @@ pub async fn deploy_entry_point<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> eyre::Result<DeployedContract<EntryPointContract<M>>> {
     let (ep, receipt) = EntryPointContract::deploy(client, ())?
+        .send_with_receipt()
+        .await?;
+    let addr = receipt.contract_address.unwrap_or(Address::zero());
+    Ok(DeployedContract::new(ep, addr))
+}
+
+pub async fn deploy_simple_account_factory<M: Middleware + 'static>(
+    client: Arc<M>,
+    entry_point_address: Address,
+) -> eyre::Result<DeployedContract<SimpleAccountFactory<M>>> {
+    let (ep, receipt) = SimpleAccountFactory::deploy(client, entry_point_address)?
         .send_with_receipt()
         .await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
@@ -145,4 +168,77 @@ pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Ht
     provider.send_transaction(tx, None).await?.await?;
 
     Ok((geth, client, provider))
+}
+
+#[allow(clippy::type_complexity)]
+pub fn setup_database_mempool_reputation() -> (
+    Mempool<
+        DatabaseTable<WriteMap, UserOperations>,
+        DatabaseTable<WriteMap, UserOperationsBySender>,
+        DatabaseTable<WriteMap, UserOperationsByEntity>,
+        DatabaseTable<WriteMap, silius_uopool::CodeHashes>,
+    >,
+    Reputation<HashSet<H160>, DatabaseTable<WriteMap, EntitiesReputation>>,
+) {
+    let dir = TempDir::new("test-silius-db").expect("create tmp");
+    let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
+    env.create_tables()
+        .expect("Create mdbx database tables failed");
+    let mempool = Mempool::new(
+        DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
+        DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
+        DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
+        DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
+    );
+    let reputation = Reputation::new(
+        10,
+        10,
+        10,
+        1u64.into(),
+        1u64.into(),
+        HashSet::<Address>::default(),
+        HashSet::<Address>::default(),
+        DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+    );
+    (mempool, reputation)
+}
+
+#[allow(clippy::type_complexity)]
+pub fn setup_memory_mempool_reputation() -> (
+    Mempool<
+        Arc<RwLock<HashMap<UserOperationHash, silius_primitives::UserOperation>>>,
+        Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
+        Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
+        Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
+    >,
+    silius_uopool::Reputation<
+        Arc<RwLock<HashSet<H160>>>,
+        Arc<RwLock<HashMap<H160, ReputationEntry>>>,
+    >,
+) {
+    let mempool = Mempool::new(
+        Arc::new(RwLock::new(
+            HashMap::<UserOperationHash, UserOperation>::default(),
+        )),
+        Arc::new(RwLock::new(
+            HashMap::<Address, HashSet<UserOperationHash>>::default(),
+        )),
+        Arc::new(RwLock::new(
+            HashMap::<Address, HashSet<UserOperationHash>>::default(),
+        )),
+        Arc::new(RwLock::new(
+            HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
+        )),
+    );
+    let reputation = Reputation::new(
+        10,
+        10,
+        10,
+        1u64.into(),
+        1u64.into(),
+        Arc::new(RwLock::new(HashSet::<Address>::default())),
+        Arc::new(RwLock::new(HashSet::<Address>::default())),
+        Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+    );
+    (mempool, reputation)
 }
