@@ -407,7 +407,7 @@ impl From<UserOperationPartial> for UserOperation {
 }
 
 /// Gas estimations for user operation (returned from the RPC endpoint eth_estimateUserOperationGas)
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationGasEstimation {
     pub pre_verification_gas: U256,
