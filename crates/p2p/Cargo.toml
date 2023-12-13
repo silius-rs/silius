@@ -22,6 +22,7 @@ futures = "0.3.28"
 futures-bounded = "0.2.0"
 lazy_static = { workspace = true }
 libp2p-mplex = { version = "0.40.0" }
+sha2 = "0.10.8"
 silius-primitives = { path = "../primitives" }
 snap = "1"
 ssz_rs = { workspace = true }

@@ -1,9 +1,11 @@
 use libp2p::gossipsub::{
-    Behaviour, ConfigBuilder, DataTransform, IdentTopic, Message, MessageAuthenticity, RawMessage,
-    TopicHash, ValidationMode, WhitelistSubscriptionFilter,
+    Behaviour, ConfigBuilder, DataTransform, IdentTopic, Message, MessageAuthenticity, MessageId,
+    RawMessage, TopicHash, ValidationMode, WhitelistSubscriptionFilter,
 };
+use sha2::{Digest, Sha256};
 use silius_primitives::consts::p2p::{
-    MAX_GOSSIP_SNAP_SIZE, SSZ_SNAPPY_ENCODING, TOPIC_PREFIX, USER_OPS_WITH_ENTRY_POINT_TOPIC,
+    MAX_GOSSIP_SNAP_SIZE, MESSAGE_DOMAIN_VALID_SNAPPY, SSZ_SNAPPY_ENCODING, TOPIC_PREFIX,
+    USER_OPS_WITH_ENTRY_POINT_TOPIC,
 };
 use snap::raw::{decompress_len, Decoder, Encoder};
 use std::{
@@ -27,6 +29,7 @@ impl SnappyTransform {
         }
     }
 }
+
 impl Default for SnappyTransform {
     fn default() -> Self {
         SnappyTransform {
@@ -93,11 +96,31 @@ pub fn topic(mempool_id: &str) -> IdentTopic {
     ))
 }
 
+pub fn message_id_fn(message: &Message) -> MessageId {
+    let topic_bytes = message.topic.as_str().as_bytes();
+    let topic_len_bytes = topic_bytes.len().to_le_bytes();
+
+    let mut vec: Vec<u8> = Vec::with_capacity(
+        MESSAGE_DOMAIN_VALID_SNAPPY.len()
+            + topic_len_bytes.len()
+            + topic_bytes.len()
+            + message.data.len(),
+    );
+    vec.extend_from_slice(&MESSAGE_DOMAIN_VALID_SNAPPY);
+    vec.extend_from_slice(&topic_len_bytes);
+    vec.extend_from_slice(topic_bytes);
+    vec.extend_from_slice(&message.data);
+
+    Sha256::digest(vec)[..20].into()
+}
+
 /// Creates a gossipsub instance with the given mempool ids
 pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, &'static str> {
     let filter = create_whitelist_filter(mempool_ids.clone());
     let gs_config = ConfigBuilder::default()
+        .validate_messages()
         .validation_mode(ValidationMode::Anonymous)
+        .message_id_fn(message_id_fn)
         .build()?;
     let snappy_transform = SnappyTransform::new(MAX_GOSSIP_SNAP_SIZE);
     let mut gossipsub = Gossipsub::new_with_subscription_filter_and_transform(
@@ -112,5 +135,6 @@ pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, &'static s
             .subscribe(&topic(&mempool_id))
             .map_err(|_| "subscribe error")?;
     }
+
     Ok(gossipsub)
 }

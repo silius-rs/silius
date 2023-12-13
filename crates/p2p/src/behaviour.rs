@@ -36,6 +36,7 @@ impl Behaviour {
         let reqrep = request_response::Behaviour::new(Default::default());
         let discovery = Discovery::new(enr, key, config)?;
         let peer_manager = PeerManager::new(ping_interval, target_peers);
+        
         Ok(Self {
             gossipsub,
             reqrep,

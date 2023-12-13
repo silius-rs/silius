@@ -7,7 +7,7 @@ use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use silius_p2p::config::{Config, ListenAddr};
 use silius_primitives::{
-    bundler::SendBundleMode,
+    bundler::{SendBundleMode, DEFAULT_BUNDLE_INTERVAL},
     consts::{
         networking::{
             DEFAULT_BUNDLER_GRPC_PORT, DEFAULT_HTTP_RPC_PORT, DEFAULT_UOPOOL_GRPC_PORT,
@@ -56,7 +56,7 @@ pub struct BundlerArgs {
     /// The bundle interval in seconds.
     ///
     /// By default the interval time is set to 10
-    #[clap(long, default_value_t = 10)]
+    #[clap(long, default_value_t = DEFAULT_BUNDLE_INTERVAL)]
     pub bundle_interval: u64,
 
     /// Sets the send bundle mode.

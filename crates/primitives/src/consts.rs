@@ -116,4 +116,8 @@ pub mod p2p {
     pub const SSZ_SNAPPY_ENCODING: &str = "ssz_snappy";
     /// The maximum size of a gossipsub message
     pub const MAX_GOSSIP_SNAP_SIZE: usize = 1048576; // bytes
+    /// 4-byte domain for gossip message-id isolation of *invalid* snappy messages
+    pub const MESSAGE_DOMAIN_INVALID_SNAPPY: [u8; 4] = [0, 0, 0, 0];
+    /// 4-byte domain for gossip message-id isolation of *valid* snappy messages
+    pub const MESSAGE_DOMAIN_VALID_SNAPPY: [u8; 4] = [1, 0, 0, 0];
 }

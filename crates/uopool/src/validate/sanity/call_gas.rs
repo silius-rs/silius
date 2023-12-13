@@ -1,12 +1,10 @@
 use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
-    utils::calculate_call_gas_limit,
     validate::{SanityCheck, SanityHelper},
     Reputation,
 };
-use ethers::{providers::Middleware, types::BlockNumber};
-use silius_contracts::entry_point::EntryPointErr;
+use ethers::{providers::Middleware, types::U256};
 use silius_primitives::{sanity::SanityCheckError, UserOperation};
 
 #[derive(Clone)]
@@ -27,7 +25,7 @@ impl<M: Middleware> SanityCheck<M> for CallGas {
         uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
-        helper: &SanityHelper<M>,
+        _helper: &SanityHelper<M>,
     ) -> Result<(), SanityCheckError>
     where
         T: UserOperationAct,
@@ -37,43 +35,10 @@ impl<M: Middleware> SanityCheck<M> for CallGas {
         H: HashSetOp,
         R: ReputationEntryOp,
     {
-        let exec_res = match helper.entry_point.simulate_handle_op(uo.clone()).await {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(match err {
-                    EntryPointErr::FailedOp(f) => {
-                        SanityCheckError::Validation { message: f.reason }
-                    }
-                    _ => SanityCheckError::UnknownError {
-                        message: format!("{err:?}"),
-                    },
-                })
-            }
-        };
-
-        let block = helper
-            .entry_point
-            .eth_client()
-            .get_block(BlockNumber::Latest)
-            .await
-            .map_err(|err| SanityCheckError::UnknownError {
-                message: err.to_string(),
-            })?
-            .ok_or(SanityCheckError::UnknownError {
-                message: "No block found".to_string(),
-            })?;
-        let base_fee_per_gas = block
-            .base_fee_per_gas
-            .ok_or(SanityCheckError::UnknownError {
-                message: "No base fee".to_string(),
-            })?;
-
-        let call_gas_limit = calculate_call_gas_limit(
-            exec_res.paid,
-            exec_res.pre_op_gas,
-            uo.max_fee_per_gas
-                .min(uo.max_priority_fee_per_gas + base_fee_per_gas),
-        );
+        // call gas limit is at least the cost of a CALL with non-zero value
+        // https://github.com/wolflo/evm-opcodes/blob/main/gas.md#aa-1-call
+        // gas_cost = 100 + 9000
+        let call_gas_limit = U256::from(9100);
 
         if uo.call_gas_limit >= call_gas_limit {
             return Ok(());
