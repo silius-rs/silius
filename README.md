@@ -87,6 +87,10 @@ The address of the entry point smart contract is the same on all EVM networks.
 | :--------: | :-------: | :-------: | :-------: |
 | [0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789](https://blockscan.com/address/0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789) | 0.6.0 | [9b5f2e4](https://github.com/eth-infinitism/account-abstraction/commit/9b5f2e4bb30a81aa30761749d9e2e43fee64c768) | [April 2023](https://blog.openzeppelin.com/eip-4337-ethereum-account-abstraction-incremental-audit)
 
+## Paymasters and account factories
+
+You can find a list of many paymasters and account factories [here](https://docs.google.com/spreadsheets/d/1QJEYDOr-AMD2bNAoupfjQJYJabFgdb2TRSyekdIfquM/edit#gid=0).
+
 ## Examples
 
 To get started, check the examples [here](./examples/). More examples will be added in the future.
