@@ -1,6 +1,8 @@
-use crate::proto::uopool::*;
 use crate::{
-    proto::types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
+    proto::{
+        types::{GetChainIdResponse, GetSupportedEntryPointsResponse},
+        uopool::*,
+    },
     utils::{parse_addr, parse_hash, parse_uo},
 };
 use alloy_chains::Chain;
@@ -11,30 +13,25 @@ use ethers::{
     types::{Address, U256},
 };
 use eyre::Result;
-use futures::channel::mpsc::unbounded;
-use futures::StreamExt;
+use futures::{channel::mpsc::unbounded, StreamExt};
 use libp2p_identity::{secp256k1, Keypair};
 use parking_lot::RwLock;
-use silius_p2p::config::Config;
-use silius_p2p::enr::{build_enr, keypair_to_combined};
-use silius_p2p::network::{EntrypointChannels, Network};
-use silius_primitives::provider::BlockStream;
-use silius_primitives::uopool::AddError;
-use silius_primitives::UserOperation;
-use silius_uopool::{
-    mempool_id, validate::validator::StandardUserOperationValidator, MempoolId,
-    UoPool as UserOperationPool, UoPoolBuilder,
+use silius_mempool::{
+    mempool_id, validate::validator::StandardUserOperationValidator, HashSetOp, Mempool, MempoolId,
+    Reputation, ReputationEntryOp, SanityCheck, SimulationCheck, SimulationTraceCheck,
+    UoPool as UserOperationPool, UoPoolBuilder, UserOperationAct, UserOperationAddrAct,
+    UserOperationCodeHashAct,
 };
-use silius_uopool::{
-    HashSetOp, Mempool, Reputation, ReputationEntryOp, SanityCheck, SimulationCheck,
-    SimulationTraceCheck, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
+use silius_p2p::{
+    config::Config,
+    enr::{build_enr, keypair_to_combined},
+    network::{EntrypointChannels, Network},
 };
-use std::collections::HashMap;
-use std::env;
-use std::os::unix::prelude::PermissionsExt;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use silius_primitives::{mempool::AddError, provider::BlockStream, UserOperation};
+use std::{
+    collections::HashMap, env, net::SocketAddr, os::unix::prelude::PermissionsExt, path::PathBuf,
+    str::FromStr, sync::Arc, time::Duration,
+};
 use tonic::{Code, Request, Response, Status};
 use tracing::{debug, error, info};
 
@@ -100,10 +97,7 @@ where
             .read()
             .get(&m_id)
             .map(|b| b.uopool())
-            .ok_or(Status::new(
-                Code::Unavailable,
-                "User operation pool is not available",
-            ))
+            .ok_or(Status::new(Code::Unavailable, "User operation pool is not available"))
     }
 }
 
@@ -170,9 +164,7 @@ where
         &self,
         _req: Request<()>,
     ) -> Result<Response<GetChainIdResponse>, Status> {
-        Ok(Response::new(GetChainIdResponse {
-            chain_id: self.chain.id(),
-        }))
+        Ok(Response::new(GetChainIdResponse { chain_id: self.chain.id() }))
     }
 
     async fn get_supported_entry_points(
@@ -200,22 +192,18 @@ where
 
         let uopool = self.get_uopool(&ep)?;
 
-        Ok(Response::new(
-            match uopool.estimate_user_operation_gas(&uo).await {
-                Ok(gas) => EstimateUserOperationGasResponse {
-                    res: EstimateUserOperationGasResult::Estimated as i32,
-                    data: serde_json::to_string(&gas).map_err(|err| {
-                        Status::internal(format!("Failed to serialize gas: {err}"))
-                    })?,
-                },
-                Err(err) => EstimateUserOperationGasResponse {
-                    res: EstimateUserOperationGasResult::NotEstimated as i32,
-                    data: serde_json::to_string(&err).map_err(|err| {
-                        Status::internal(format!("Failed to serialize error: {err}"))
-                    })?,
-                },
+        Ok(Response::new(match uopool.estimate_user_operation_gas(&uo).await {
+            Ok(gas) => EstimateUserOperationGasResponse {
+                res: EstimateUserOperationGasResult::Estimated as i32,
+                data: serde_json::to_string(&gas)
+                    .map_err(|err| Status::internal(format!("Failed to serialize gas: {err}")))?,
             },
-        ))
+            Err(err) => EstimateUserOperationGasResponse {
+                res: EstimateUserOperationGasResult::NotEstimated as i32,
+                data: serde_json::to_string(&err)
+                    .map_err(|err| Status::internal(format!("Failed to serialize error: {err}")))?,
+            },
+        }))
     }
 
     async fn get_sorted_user_operations(
@@ -318,9 +306,9 @@ where
         let ep = parse_addr(req.ep)?;
         let uopool = self.get_uopool(&ep)?;
         match uopool.get_all() {
-            Ok(uos) => Ok(Response::new(GetAllResponse {
-                uos: uos.into_iter().map(Into::into).collect(),
-            })),
+            Ok(uos) => {
+                Ok(Response::new(GetAllResponse { uos: uos.into_iter().map(Into::into).collect() }))
+            }
             Err(err) => Err(Status::unknown(format!("Internal error: {err:?}"))),
         }
     }
@@ -356,11 +344,7 @@ where
         let uopool = self.get_uopool(&ep)?;
 
         Ok(Response::new(GetAllReputationResponse {
-            rep: uopool
-                .get_reputation()
-                .into_iter()
-                .map(Into::into)
-                .collect(),
+            rep: uopool.get_reputation().into_iter().map(Into::into).collect(),
         }))
     }
 
@@ -494,9 +478,7 @@ where
                     .expect("Creating key file directory failed");
                 std::fs::write(
                     node_key_file.clone(),
-                    keypair
-                        .to_protobuf_encoding()
-                        .expect("Discovery secret encoding failed"),
+                    keypair.to_protobuf_encoding().expect("Discovery secret encoding failed"),
                 )
                 .expect("Discovery secret writing failed");
                 std::fs::set_permissions(node_key_file, std::fs::Permissions::from_mode(0o600))
@@ -532,9 +514,7 @@ where
 
             for listen_addr in listen_addrs.into_iter() {
                 info!("P2P node listened on {}", listen_addr);
-                p2p_network
-                    .listen_on(listen_addr)
-                    .expect("Listen on p2p network failed");
+                p2p_network.listen_on(listen_addr).expect("Listen on p2p network failed");
             }
 
             if bootnodes.is_empty() {

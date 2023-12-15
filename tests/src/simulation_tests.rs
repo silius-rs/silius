@@ -1,44 +1,46 @@
 use crate::common::{
-    deploy_entry_point, deploy_test_opcode_account, deploy_test_opcode_account_factory,
-    deploy_test_recursion_account, deploy_test_rules_account_factory, deploy_test_storage_account,
+    deploy_entry_point, deploy_test_coin, deploy_test_opcode_account,
+    deploy_test_opcode_account_factory, deploy_test_recursion_account,
+    deploy_test_rules_account_factory, deploy_test_storage_account,
     deploy_test_storage_account_factory,
     gen::{
         EntryPointContract, TestOpcodesAccount, TestOpcodesAccountFactory, TestRulesAccount,
         TestStorageAccountFactory,
     },
-    setup_database_mempool_reputation, setup_geth, ClientType, DeployedContract,
+    setup_database_mempool_reputation, setup_geth, setup_memory_mempool_reputation, ClientType,
+    DeployedContract,
 };
-use crate::common::{deploy_test_coin, setup_memory_mempool_reputation};
 use alloy_chains::Chain;
-use ethers::abi::Token;
-use ethers::prelude::BaseContract;
-use ethers::types::transaction::eip2718::TypedTransaction;
-use ethers::types::Address;
-use ethers::utils::{parse_units, GethInstance};
 use ethers::{
+    abi::Token,
+    prelude::BaseContract,
     providers::Middleware,
-    types::{Bytes, U256},
+    types::{transaction::eip2718::TypedTransaction, Address, Bytes, U256},
+    utils::{parse_units, GethInstance},
 };
 use parking_lot::RwLock;
 use silius_contracts::EntryPoint;
-use silius_primitives::consts::entities::{FACTORY, PAYMASTER, SENDER};
-use silius_primitives::reputation::ReputationEntry;
-use silius_primitives::simulation::{CodeHash, SimulationCheckError};
-use silius_primitives::uopool::ValidationError;
-use silius_primitives::{UserOperation, UserOperationHash};
-
-use silius_uopool::validate::validator::{new_canonical, StandardValidator};
-use silius_uopool::validate::{
-    UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
-};
-use silius_uopool::{
+use silius_mempool::{
+    validate::{
+        validator::{new_canonical, StandardValidator},
+        UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
+    },
     CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool, Reputation,
     ReputationEntryOp, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
     UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
-use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
-use std::sync::Arc;
+use silius_primitives::{
+    constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
+    mempool::ValidationError,
+    reputation::ReputationEntry,
+    simulation::{CodeHash, SimulationCheckError},
+    UserOperation, UserOperationHash,
+};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+    sync::Arc,
+};
 
 struct TestContext<M, T, Y, X, Z, H, R>
 where
@@ -148,12 +150,8 @@ async fn setup_database() -> eyre::Result<DatabaseContext> {
     let entry_point = EntryPoint::new(client.clone(), ep.address);
     let c = Chain::from(chain_id);
 
-    let validator = new_canonical(
-        entry_point,
-        c.clone(),
-        U256::from(3000000_u64),
-        U256::from(1u64),
-    );
+    let validator =
+        new_canonical(entry_point, c.clone(), U256::from(3000000_u64), U256::from(1u64));
 
     Ok(DatabaseContext {
         client: client.clone(),
@@ -176,12 +174,8 @@ async fn setup_memory() -> eyre::Result<MemoryContext> {
     let entry_point = EntryPoint::new(client.clone(), ep.address);
     let c = Chain::from(chain_id);
 
-    let validator = new_canonical(
-        entry_point,
-        c.clone(),
-        U256::from(3000000_u64),
-        U256::from(1u64),
-    );
+    let validator =
+        new_canonical(entry_point, c.clone(), U256::from(3000000_u64), U256::from(1u64));
     Ok(MemoryContext {
         client: client.clone(),
         _geth,
@@ -263,10 +257,7 @@ where
     let (head, address) = call_init_code_for_addr.split_at(12);
     eyre::ensure!(
         !head.iter().any(|i| *i != 0),
-        format!(
-            "call init code returns non address data : {:?}",
-            call_init_code_for_addr
-        )
+        format!("call init code returns non address data : {:?}", call_init_code_for_addr)
     );
 
     let sender = Address::from_slice(address);
@@ -387,9 +378,8 @@ macro_rules! accept_plain_request {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
-                .await
-                .unwrap();
+            let (init_code, init_func) =
+                create_opcode_factory_init_code("".to_string()).await.unwrap();
 
             let c = $setup;
             test_user_operation(
@@ -464,10 +454,7 @@ macro_rules! fail_with_bad_opcode_in_ctr {
         }
     };
 }
-fail_with_bad_opcode_in_ctr!(
-    setup_database().await?,
-    fail_with_bad_opcode_in_ctr_database
-);
+fail_with_bad_opcode_in_ctr!(setup_database().await?, fail_with_bad_opcode_in_ctr_database);
 fail_with_bad_opcode_in_ctr!(setup_memory().await?, fail_with_bad_opcode_in_ctr_memory);
 
 macro_rules! fail_with_bad_opcode_in_paymaster {
@@ -500,10 +487,7 @@ fail_with_bad_opcode_in_paymaster!(
     setup_database().await?,
     fail_with_bad_opcode_in_paymaster_database
 );
-fail_with_bad_opcode_in_paymaster!(
-    setup_memory().await?,
-    fail_with_bad_opcode_in_paymaster_memory
-);
+fail_with_bad_opcode_in_paymaster!(setup_memory().await?, fail_with_bad_opcode_in_paymaster_memory);
 
 macro_rules! fail_with_bad_opcode_in_validation {
     ($setup:expr, $name: ident) => {
@@ -576,9 +560,8 @@ macro_rules! fail_referencing_self_token {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-                .await
-                .unwrap();
+            let (init_code, init_func) =
+                create_storage_factory_init_code(0, "".to_string()).await.unwrap();
 
             let res = test_user_operation(
                 &c,
@@ -591,9 +574,7 @@ macro_rules! fail_referencing_self_token {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(
-                    SimulationCheckError::Unstaked { .. }
-                ))
+                Err(ValidationError::Simulation(SimulationCheckError::Unstaked { .. }))
             ));
 
             Ok(())
@@ -601,10 +582,7 @@ macro_rules! fail_referencing_self_token {
     };
 }
 
-fail_referencing_self_token!(
-    setup_database().await?,
-    fail_referencing_self_token_database
-);
+fail_referencing_self_token!(setup_database().await?, fail_referencing_self_token_database);
 fail_referencing_self_token!(setup_memory().await?, fail_referencing_self_token_memory);
 
 macro_rules! test_existing_user_operation {
@@ -677,9 +655,7 @@ macro_rules! fail_with_unstaked_paymaster_returning_context {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let pm = deploy_test_storage_account(c.client.clone())
-                .await
-                .expect("deploy succeed");
+            let pm = deploy_test_storage_account(c.client.clone()).await.expect("deploy succeed");
             let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
                 .await
                 .expect("deploy succeed");
@@ -705,9 +681,7 @@ macro_rules! fail_with_unstaked_paymaster_returning_context {
             let res = validate(&c, uo).await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(
-                    SimulationCheckError::Unstaked { .. }
-                ))
+                Err(ValidationError::Simulation(SimulationCheckError::Unstaked { .. }))
             ));
 
             Ok(())
@@ -749,9 +723,7 @@ macro_rules! fail_with_validation_recursively_calls_handle_ops {
             let res = validate(&c, uo).await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(
-                    SimulationCheckError::CallStack { .. }
-                ))
+                Err(ValidationError::Simulation(SimulationCheckError::CallStack { .. }))
             ));
 
             Ok(())
@@ -772,9 +744,8 @@ macro_rules! succeed_with_inner_revert {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-                .await
-                .unwrap();
+            let (init_code, init_func) =
+                create_storage_factory_init_code(0, "".to_string()).await.unwrap();
             test_user_operation(
                 &c,
                 "inner-revert".to_string(),
@@ -798,9 +769,8 @@ macro_rules! fail_with_inner_oog_revert {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_storage_factory_init_code(0, "".to_string())
-                .await
-                .unwrap();
+            let (init_code, init_func) =
+                create_storage_factory_init_code(0, "".to_string()).await.unwrap();
 
             let res = test_user_operation(
                 &c,
@@ -813,9 +783,7 @@ macro_rules! fail_with_inner_oog_revert {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(
-                    SimulationCheckError::OutOfGas { .. }
-                ))
+                Err(ValidationError::Simulation(SimulationCheckError::OutOfGas { .. }))
             ));
 
             Ok(())

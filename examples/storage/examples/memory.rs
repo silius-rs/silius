@@ -2,10 +2,11 @@ use alloy_chains::Chain;
 use ethers::types::{Address, U256};
 use parking_lot::RwLock;
 use silius_contracts::EntryPoint;
+use silius_mempool::{validate::validator::new_canonical, Mempool, Reputation, UoPoolBuilder};
 use silius_primitives::{
-    consts::{
+    constants::{
         entry_point::ADDRESS,
-        reputation::{
+        validation::reputation::{
             BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
         },
     },
@@ -14,7 +15,6 @@ use silius_primitives::{
     simulation::CodeHash,
     UserOperation, UserOperationHash,
 };
-use silius_uopool::{validate::validator::new_canonical, Mempool, Reputation, UoPoolBuilder};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -31,18 +31,10 @@ async fn main() -> eyre::Result<()> {
         let chain = Chain::dev();
         let entry_point = EntryPoint::new(provider.clone(), ep);
         let mempool = Mempool::new(
-            Arc::new(RwLock::new(
-                HashMap::<UserOperationHash, UserOperation>::default(),
-            )),
-            Arc::new(RwLock::new(
-                HashMap::<Address, HashSet<UserOperationHash>>::default(),
-            )),
-            Arc::new(RwLock::new(
-                HashMap::<Address, HashSet<UserOperationHash>>::default(),
-            )),
-            Arc::new(RwLock::new(
-                HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
-            )),
+            Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+            Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+            Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+            Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
         );
         let reputation = Reputation::new(
             MIN_INCLUSION_RATE_DENOMINATOR,
@@ -72,10 +64,7 @@ async fn main() -> eyre::Result<()> {
         println!("In-memory uopool created!");
 
         // size of mempool
-        println!(
-            "Mempool size: {size}",
-            size = builder.uopool().get_all().expect("work").len()
-        );
+        println!("Mempool size: {size}", size = builder.uopool().get_all().expect("work").len());
     };
 
     Ok(())

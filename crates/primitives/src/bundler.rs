@@ -1,24 +1,25 @@
+//! Bundler-related primitives
+
 use serde::Deserialize;
 use strum_macros::{EnumString, EnumVariantNames};
 
-/// Default time interval for auto bundling mode (in seconds)
-pub const DEFAULT_BUNDLE_INTERVAL: u64 = 10;
-
-/// Bundling modes
+/// Bundler modes
 #[derive(Debug, Deserialize)]
 pub enum Mode {
+    /// Sends bundles automatically every x seconds
     #[serde(rename = "auto")]
-    Auto,
+    Auto(u64),
+    /// Sends bundles upon request
     #[serde(rename = "manual")]
     Manual,
 }
 
-/// The `SendBundleMode` determines whether to send the bundle to a Ethereum execution client or to Flashbots relay
+/// Determines the mode how bundler sends the bundle
 #[derive(Clone, Copy, Debug, EnumString, EnumVariantNames, PartialEq, Eq)]
 #[strum(serialize_all = "kebab_case")]
-pub enum SendBundleMode {
-    /// Send the bundle to a Ethereum execution client
+pub enum SendStrategy {
+    /// Sends the bundle to the Ethereum execution client
     EthClient,
-    /// Send the bundle to Flashbots relay
+    /// Sends the bundle to the Flashbots relay
     Flashbots,
 }

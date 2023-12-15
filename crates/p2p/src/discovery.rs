@@ -70,9 +70,7 @@ impl Discovery {
             Box::new(move |enr: &Enr| enr.tcp4().is_some() || enr.tcp6().is_some());
 
         // Build the future
-        let query_future = self
-            .discovery
-            .find_node_predicate(random_node, predicate, target_peers);
+        let query_future = self.discovery.find_node_predicate(random_node, predicate, target_peers);
 
         self.active_queries.push(Box::pin(query_future));
     }
@@ -119,11 +117,11 @@ impl NetworkBehaviour for Discovery {
                 while let Poll::Ready(Some(event)) = stream.poll_recv(cx) {
                     match event {
                         Discv5Event::Discovered(_) => {}
-                        Discv5Event::EnrAdded { .. }
-                        | Discv5Event::NodeInserted { .. }
-                        | Discv5Event::SessionEstablished(_, _)
-                        | Discv5Event::SocketUpdated(_)
-                        | Discv5Event::TalkRequest(_) => {}
+                        Discv5Event::EnrAdded { .. } |
+                        Discv5Event::NodeInserted { .. } |
+                        Discv5Event::SessionEstablished(_, _) |
+                        Discv5Event::SocketUpdated(_) |
+                        Discv5Event::TalkRequest(_) => {}
                     }
                 }
             }

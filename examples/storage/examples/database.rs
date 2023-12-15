@@ -2,19 +2,19 @@ use alloy_chains::Chain;
 use ethers::types::{Address, U256};
 use parking_lot::RwLock;
 use silius_contracts::EntryPoint;
+use silius_mempool::{
+    init_env, validate::validator::new_canonical, CodeHashes, DatabaseTable, Mempool, Reputation,
+    UoPoolBuilder, UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
+};
 use silius_primitives::{
-    consts::{
+    constants::{
         entry_point::ADDRESS,
-        reputation::{
+        validation::reputation::{
             BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
         },
     },
     provider::create_http_provider,
     reputation::ReputationEntry,
-};
-use silius_uopool::{
-    init_env, validate::validator::new_canonical, CodeHashes, DatabaseTable, Mempool, Reputation,
-    UoPoolBuilder, UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -31,8 +31,7 @@ async fn main() -> eyre::Result<()> {
         // initialize database env
         let dir = TempDir::new("silius-db").unwrap();
         let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
-        env.create_tables()
-            .expect("Create mdbx database tables failed");
+        env.create_tables().expect("Create mdbx database tables failed");
         println!("Database uopool created!");
 
         let provider = Arc::new(create_http_provider(provider_url.as_str()).await?);

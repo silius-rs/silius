@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use silius_primitives::consts::p2p::REQREP_PROTOCOL_PREFIX;
+use silius_primitives::constants::p2p::REQREP_PROTOCOL_PREFIX;
 use std::fmt::Display;
 
 lazy_static! {
@@ -58,12 +58,7 @@ impl ProtocolId {
             Version::V1,
             Encoding::SSZSnappy
         );
-        Self {
-            message_name,
-            version: Version::V1,
-            encoding: Encoding::SSZSnappy,
-            protocol_id,
-        }
+        Self { message_name, version: Version::V1, encoding: Encoding::SSZSnappy, protocol_id }
     }
 }
 

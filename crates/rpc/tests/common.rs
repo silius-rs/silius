@@ -1,13 +1,15 @@
 use async_trait::async_trait;
 use ethers::types::U64;
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use jsonrpsee::ws_client::{WsClient, WsClientBuilder};
 use jsonrpsee::{
     core::{Error as RpcError, RpcResult},
+    http_client::{HttpClient, HttpClientBuilder},
     proc_macros::rpc,
+    ws_client::{WsClient, WsClientBuilder},
 };
-use std::net::{IpAddr, Ipv4Addr};
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    sync::atomic::{AtomicU16, Ordering},
+};
 
 pub static ADDRESS: Ipv4Addr = Ipv4Addr::UNSPECIFIED;
 static PORT: AtomicU16 = AtomicU16::new(8000);
@@ -45,7 +47,5 @@ pub fn build_http_client(addr: IpAddr, port: u16) -> Result<HttpClient, RpcError
 }
 
 pub async fn build_ws_client(addr: IpAddr, port: u16) -> Result<WsClient, RpcError> {
-    WsClientBuilder::default()
-        .build(format!("ws://{}:{}", addr, port))
-        .await
+    WsClientBuilder::default().build(format!("ws://{}:{}", addr, port)).await
 }

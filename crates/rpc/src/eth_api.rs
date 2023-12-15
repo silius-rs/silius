@@ -44,11 +44,13 @@ pub trait EthApi {
     /// See [How ERC-4337 Gas Estimation Works](https://www.alchemy.com/blog/erc-4337-gas-estimation).
     ///
     /// # Arguments
-    /// * `user_operation: [UserOperationPartial](UserOperationPartial)` - A [partial user operation](UserOperationPartial) for which to estimate the gas.
+    /// * `user_operation: [UserOperationPartial](UserOperationPartial)` - A [partial user
+    ///   operation](UserOperationPartial) for which to estimate the gas.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<UserOperationGasEstimation>` - The estimated gas for the [UserOperation](UserOperation)
+    /// * `RpcResult<UserOperationGasEstimation>` - The estimated gas for the
+    ///   [UserOperation](UserOperation)
     #[method(name = "estimateUserOperationGas")]
     async fn estimate_user_operation_gas(
         &self,
@@ -63,7 +65,8 @@ pub trait EthApi {
     /// * `user_operation_hash: String` - The hash of a [UserOperation](UserOperation).
     ///
     /// # Returns
-    /// * `RpcResult<Option<UserOperationReceipt>>` - The receipt of the [UserOperation](UserOperation), or None if it does not exist.
+    /// * `RpcResult<Option<UserOperationReceipt>>` - The receipt of the
+    ///   [UserOperation](UserOperation), or None if it does not exist.
     #[method(name = "getUserOperationReceipt")]
     async fn get_user_operation_receipt(
         &self,
@@ -77,7 +80,8 @@ pub trait EthApi {
     /// * `user_operation_hash: String` - The hash of the user operation.
     ///
     /// # Returns
-    /// * `RpcResult<Option<UserOperationByHash>>` - The [UserOperation](UserOperation) associated with the hash, or None if it does not exist.
+    /// * `RpcResult<Option<UserOperationByHash>>` - The [UserOperation](UserOperation) associated
+    ///   with the hash, or None if it does not exist.
     #[method(name = "getUserOperationByHash")]
     async fn get_user_operation_by_hash(
         &self,

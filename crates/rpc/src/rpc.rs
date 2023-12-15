@@ -90,10 +90,7 @@ impl JsonRpcServer {
     /// * `Self` - A new [JsonRpcServer](JsonRpcServer) instance.
     pub fn with_cors(mut self, cors_domain: &[String], typ: JsonRpcServerType) -> Self {
         let cors_layer = if cors_domain.iter().any(|d| d == "*") {
-            CorsLayer::new()
-                .allow_headers(Any)
-                .allow_methods([Method::POST])
-                .allow_origin(Any)
+            CorsLayer::new().allow_headers(Any).allow_methods([Method::POST]).allow_origin(Any)
         } else {
             let mut origins: Vec<HeaderValue> = vec![];
 
@@ -161,7 +158,8 @@ impl JsonRpcServer {
     /// Start the [json RPC server](JsonRpcServer)
     ///
     /// # Returns
-    /// * `Result<(Option<ServerHandle>, Option<ServerHandle>), Error>` - The [handle]((Option<ServerHandle>, Option<ServerHandle>)) of the HTTP and WS servers.
+    /// * `Result<(Option<ServerHandle>, Option<ServerHandle>), Error>` - The
+    ///   [handle]((Option<ServerHandle>, Option<ServerHandle>)) of the HTTP and WS servers.
     pub async fn start(&self) -> eyre::Result<(Option<ServerHandle>, Option<ServerHandle>)> {
         let http_handle = if self.http {
             let service = ServiceBuilder::new()

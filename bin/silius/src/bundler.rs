@@ -12,15 +12,19 @@ use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
     uopool_service_run,
 };
+use silius_mempool::{
+    init_env,
+    validate::validator::{new_canonical, new_canonical_unsafe},
+    CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
+    UserOperationsByEntity, UserOperationsBySender, WriteMap,
+};
 use silius_primitives::{
-    bundler::SendBundleMode,
-    consts::{
+    bundler::SendStrategy,
+    constants::{
         entry_point, flashbots_relay_endpoints,
         p2p::{NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME},
-    },
-    consts::{
-        p2p::DB_FOLDER_NAME,
-        reputation::{
+        storage::DATABASE_FOLDER_NAME,
+        validation::reputation::{
             BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
         },
     },
@@ -34,12 +38,6 @@ use silius_rpc::{
     eth_api::{EthApiServer, EthApiServerImpl},
     web3_api::{Web3ApiServer, Web3ApiServerImpl},
     JsonRpcServer, JsonRpcServerType,
-};
-use silius_uopool::{
-    init_env,
-    validate::validator::{new_canonical, new_canonical_unsafe},
-    CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
-    UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -75,23 +73,14 @@ where
         eth_client.clone(),
         common_args.chain,
         common_args.entry_points,
-        format!(
-            "http://{:?}:{:?}",
-            uopool_args.uopool_addr, uopool_args.uopool_port
-        ),
+        format!("http://{:?}:{:?}", uopool_args.uopool_addr, uopool_args.uopool_port),
     )
     .await?;
 
     launch_rpc(
         rpc_args,
-        format!(
-            "http://{:?}:{:?}",
-            uopool_args.uopool_addr, uopool_args.uopool_port
-        ),
-        format!(
-            "http://{:?}:{:?}",
-            bundler_args.bundler_addr, bundler_args.bundler_port
-        ),
+        format!("http://{:?}:{:?}", uopool_args.uopool_addr, uopool_args.uopool_port),
+        format!("http://{:?}:{:?}", bundler_args.bundler_addr, bundler_args.bundler_port),
     )
     .await?;
 
@@ -120,7 +109,7 @@ where
     let chain_conn = Chain::from(chain_id.as_u64());
 
     let wallet: Wallet;
-    if args.send_bundle_mode == SendBundleMode::Flashbots {
+    if args.send_bundle_mode == SendStrategy::Flashbots {
         wallet = Wallet::from_file(args.mnemonic_file.into(), &chain_id, true)
             .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
         info!("Wallet Signer {:?}", wallet.signer);
@@ -147,16 +136,11 @@ where
         uopool_grpc_client,
         args.send_bundle_mode,
         match args.send_bundle_mode {
-            SendBundleMode::EthClient => None,
-            SendBundleMode::Flashbots => {
-                Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()])
-            }
+            SendStrategy::EthClient => None,
+            SendStrategy::Flashbots => Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()]),
         },
     );
-    info!(
-        "Started bundler gRPC service at {:?}:{:?}",
-        args.bundler_addr, args.bundler_port
-    );
+    info!("Started bundler gRPC service at {:?}:{:?}", args.bundler_addr, args.bundler_port);
 
     Ok(())
 }
@@ -205,18 +189,10 @@ where
                 args.min_priority_fee_per_gas,
             );
             let mempool = Mempool::new(
-                Arc::new(RwLock::new(
-                    HashMap::<UserOperationHash, UserOperation>::default(),
-                )),
-                Arc::new(RwLock::new(
-                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
-                )),
-                Arc::new(RwLock::new(
-                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
-                )),
-                Arc::new(RwLock::new(
-                    HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
-                )),
+                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+                Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
             );
             let mut reputation = Reputation::new(
                 MIN_INCLUSION_RATE_DENOMINATOR,
@@ -248,10 +224,7 @@ where
                 args.p2p_opts.bootnodes,
             )
             .await?;
-            info!(
-                "Started uopool gRPC service at {:?}:{:?}",
-                args.uopool_addr, args.uopool_port
-            );
+            info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
         }
         (silius_primitives::UoPoolMode::Standard, StorageType::Database) => {
             let validator = new_canonical(
@@ -261,10 +234,9 @@ where
                 args.min_priority_fee_per_gas,
             );
             let env = Arc::new(
-                init_env::<WriteMap>(datadir.join(DB_FOLDER_NAME)).expect("Init mdbx failed"),
+                init_env::<WriteMap>(datadir.join(DATABASE_FOLDER_NAME)).expect("Init mdbx failed"),
             );
-            env.create_tables()
-                .expect("Create mdbx database tables failed");
+            env.create_tables().expect("Create mdbx database tables failed");
             let mempool = Mempool::new(
                 DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
                 DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
@@ -301,10 +273,7 @@ where
                 args.p2p_opts.bootnodes,
             )
             .await?;
-            info!(
-                "Started uopool gRPC service at {:?}:{:?}",
-                args.uopool_addr, args.uopool_port
-            );
+            info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
         }
         (silius_primitives::UoPoolMode::Unsafe, StorageType::Memory) => {
             let validator = new_canonical_unsafe(
@@ -314,18 +283,10 @@ where
                 args.min_priority_fee_per_gas,
             );
             let mempool = Mempool::new(
-                Arc::new(RwLock::new(
-                    HashMap::<UserOperationHash, UserOperation>::default(),
-                )),
-                Arc::new(RwLock::new(
-                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
-                )),
-                Arc::new(RwLock::new(
-                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
-                )),
-                Arc::new(RwLock::new(
-                    HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
-                )),
+                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+                Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
             );
             let mut reputation = Reputation::new(
                 MIN_INCLUSION_RATE_DENOMINATOR,
@@ -357,10 +318,7 @@ where
                 args.p2p_opts.bootnodes,
             )
             .await?;
-            info!(
-                "Started uopool gRPC service at {:?}:{:?}",
-                args.uopool_addr, args.uopool_port
-            );
+            info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
         }
         (silius_primitives::UoPoolMode::Unsafe, StorageType::Database) => {
             let validator = new_canonical_unsafe(
@@ -370,10 +328,9 @@ where
                 args.min_priority_fee_per_gas,
             );
             let env = Arc::new(
-                init_env::<WriteMap>(datadir.join(DB_FOLDER_NAME)).expect("Init mdbx failed"),
+                init_env::<WriteMap>(datadir.join(DATABASE_FOLDER_NAME)).expect("Init mdbx failed"),
             );
-            env.create_tables()
-                .expect("Create mdbx database tables failed");
+            env.create_tables().expect("Create mdbx database tables failed");
             let mempool = Mempool::new(
                 DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
                 DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
@@ -410,10 +367,7 @@ where
                 args.p2p_opts.bootnodes,
             )
             .await?;
-            info!(
-                "Started uopool gRPC service at {:?}:{:?}",
-                args.uopool_addr, args.uopool_port
-            );
+            info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
         }
     };
 
@@ -463,19 +417,13 @@ pub async fn launch_rpc(
     if args.is_api_method_enabled("eth") {
         if http_api.contains("eth") {
             server.add_methods(
-                EthApiServerImpl {
-                    uopool_grpc_client: uopool_grpc_client.clone(),
-                }
-                .into_rpc(),
+                EthApiServerImpl { uopool_grpc_client: uopool_grpc_client.clone() }.into_rpc(),
                 JsonRpcServerType::Http,
             )?;
         }
         if ws_api.contains("eth") {
             server.add_methods(
-                EthApiServerImpl {
-                    uopool_grpc_client: uopool_grpc_client.clone(),
-                }
-                .into_rpc(),
+                EthApiServerImpl { uopool_grpc_client: uopool_grpc_client.clone() }.into_rpc(),
                 JsonRpcServerType::Ws,
             )?;
         }
@@ -499,11 +447,7 @@ pub async fn launch_rpc(
 
         if ws_api.contains("debug") {
             server.add_methods(
-                DebugApiServerImpl {
-                    uopool_grpc_client,
-                    bundler_grpc_client,
-                }
-                .into_rpc(),
+                DebugApiServerImpl { uopool_grpc_client, bundler_grpc_client }.into_rpc(),
                 JsonRpcServerType::Ws,
             )?;
         }
@@ -523,10 +467,7 @@ pub async fn launch_rpc(
 }
 
 pub fn create_wallet(args: CreateWalletArgs) -> eyre::Result<()> {
-    info!(
-        "Creating bundler wallet... Storing to: {:?}",
-        args.output_path
-    );
+    info!("Creating bundler wallet... Storing to: {:?}", args.output_path);
 
     let path = unwrap_path_or_home(args.output_path)?;
 

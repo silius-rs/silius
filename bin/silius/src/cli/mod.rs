@@ -35,7 +35,8 @@ impl Cli {
 /// Commands to be executed
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Start the bundler with all components (bundling component, user operation mempool, RPC server)
+    /// Start the bundler with all components (bundling component, user operation mempool, RPC
+    /// server)
     #[command(name = "node")]
     Node(Box<commands::NodeCommand>),
 

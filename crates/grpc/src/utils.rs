@@ -19,9 +19,6 @@ pub fn parse_hash(h: Option<crate::H256>) -> Result<H256, Status> {
 pub fn parse_uo(uo: Option<crate::UserOperation>) -> Result<UserOperation, Status> {
     match uo {
         Some(uo) => Ok(uo.into()),
-        None => Err(Status::new(
-            Code::InvalidArgument,
-            "User operation is not valid",
-        )),
+        None => Err(Status::new(Code::InvalidArgument, "User operation is not valid")),
     }
 }

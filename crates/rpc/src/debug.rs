@@ -14,13 +14,14 @@ use silius_grpc::{
     SetReputationResult,
 };
 use silius_primitives::{
-    bundler::DEFAULT_BUNDLE_INTERVAL,
+    constants::bundler::BUNDLE_INTERVAL,
     reputation::{ReputationEntry, StakeInfoResponse},
     BundlerMode, UserOperation,
 };
 use tonic::Request;
 
-/// DebugApiServerImpl implements the ERC-4337 `debug` namespace rpc methods trait [DebugApiServer](DebugApiServer).
+/// DebugApiServerImpl implements the ERC-4337 `debug` namespace rpc methods trait
+/// [DebugApiServer](DebugApiServer).
 pub struct DebugApiServerImpl {
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     pub bundler_grpc_client: BundlerClient<tonic::transport::Channel>,
@@ -70,11 +71,7 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn clear_state(&self) -> RpcResult<ResponseSuccess> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        uopool_grpc_client
-            .clear(Request::new(()))
-            .await
-            .map_err(JsonRpcError::from)?
-            .into_inner();
+        uopool_grpc_client.clear(Request::new(())).await.map_err(JsonRpcError::from)?.into_inner();
 
         Ok(ResponseSuccess::Ok)
     }
@@ -90,15 +87,9 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn dump_mempool(&self, ep: Address) -> RpcResult<Vec<UserOperation>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let req = Request::new(GetAllRequest {
-            ep: Some(ep.into()),
-        });
+        let req = Request::new(GetAllRequest { ep: Some(ep.into()) });
 
-        let res = uopool_grpc_client
-            .get_all(req)
-            .await
-            .map_err(JsonRpcError::from)?
-            .into_inner();
+        let res = uopool_grpc_client.get_all(req).await.map_err(JsonRpcError::from)?.into_inner();
 
         let mut uos: Vec<UserOperation> = res.uos.iter().map(|uo| uo.clone().into()).collect();
         uos.sort_by(|a, b| a.nonce.cmp(&b.nonce));
@@ -106,10 +97,12 @@ impl DebugApiServer for DebugApiServerImpl {
     }
 
     /// Set the reputations for the given array of [ReputationEntry](ReputationEntry)
-    /// and send it to the UoPool gRPC service through the [SetReputationRequest](SetReputationRequest).
+    /// and send it to the UoPool gRPC service through the
+    /// [SetReputationRequest](SetReputationRequest).
     ///
     /// # Arguments
-    /// * `reputation_entries: Vec<ReputationEntry>` - The [ReputationEntry](ReputationEntry) to be set.
+    /// * `reputation_entries: Vec<ReputationEntry>` - The [ReputationEntry](ReputationEntry) to be
+    ///   set.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
@@ -126,11 +119,8 @@ impl DebugApiServer for DebugApiServerImpl {
             ep: Some(ep.into()),
         });
 
-        let res = uopool_grpc_client
-            .set_reputation(req)
-            .await
-            .map_err(JsonRpcError::from)?
-            .into_inner();
+        let res =
+            uopool_grpc_client.set_reputation(req).await.map_err(JsonRpcError::from)?.into_inner();
 
         if res.res == SetReputationResult::SetReputation as i32 {
             return Ok(ResponseSuccess::Ok);
@@ -143,7 +133,8 @@ impl DebugApiServer for DebugApiServerImpl {
         ))
     }
 
-    /// Return the all of [ReputationEntries](ReputationEntry) in the mempool via the [GetAllReputationRequest](GetAllReputationRequest).
+    /// Return the all of [ReputationEntries](ReputationEntry) in the mempool via the
+    /// [GetAllReputationRequest](GetAllReputationRequest).
     ///
     /// # Arguments
     /// * `entry_point: Address` - The address of the entry point.
@@ -153,9 +144,7 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn dump_reputation(&self, ep: Address) -> RpcResult<Vec<ReputationEntry>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let request = Request::new(GetAllReputationRequest {
-            ep: Some(ep.into()),
-        });
+        let request = Request::new(GetAllReputationRequest { ep: Some(ep.into()) });
 
         let res = uopool_grpc_client
             .get_all_reputation(request)
@@ -178,7 +167,7 @@ impl DebugApiServer for DebugApiServerImpl {
 
         let req = Request::new(SetModeRequest {
             mode: Into::<GrpcMode>::into(mode).into(),
-            interval: DEFAULT_BUNDLE_INTERVAL,
+            interval: BUNDLE_INTERVAL,
         });
 
         match bundler_grpc_client.set_bundler_mode(req).await {
@@ -188,7 +177,8 @@ impl DebugApiServer for DebugApiServerImpl {
     }
 
     /// Immediately send the current bundle of user operations.
-    /// This is useful for testing or in situations where waiting for the next scheduled bundle is not desirable.
+    /// This is useful for testing or in situations where waiting for the next scheduled bundle is
+    /// not desirable.
     ///
     ///
     /// # Returns
@@ -199,11 +189,7 @@ impl DebugApiServer for DebugApiServerImpl {
         let req = Request::new(());
 
         match bundler_grpc_client.send_bundle_now(req).await {
-            Ok(res) => Ok(res
-                .into_inner()
-                .res
-                .expect("Must return send bundle tx data")
-                .into()),
+            Ok(res) => Ok(res.into_inner().res.expect("Must return send bundle tx data").into()),
             Err(s) => Err(JsonRpcError::from(s).into()),
         }
     }
@@ -219,10 +205,8 @@ impl DebugApiServer for DebugApiServerImpl {
     async fn get_stake_status(&self, addr: Address, ep: Address) -> RpcResult<StakeInfoResponse> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let req = Request::new(GetStakeInfoRequest {
-            addr: Some(addr.into()),
-            ep: Some(ep.into()),
-        });
+        let req =
+            Request::new(GetStakeInfoRequest { addr: Some(addr.into()), ep: Some(ep.into()) });
 
         match uopool_grpc_client.get_stake_info(req).await {
             Ok(res) => Ok({

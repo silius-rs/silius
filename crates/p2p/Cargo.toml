@@ -6,39 +6,63 @@ edition = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = """
-AA (ERC-4337) Bundler p2p components
-"""
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Account abstraction (ERC-4337) P2P implementation"
+homepage = "https://github.com/silius-rs/silius/tree/main/crates/p2p"
 
 [dependencies]
+# workspace dependencies
+silius-primitives = { workspace = true }
+
+# eth
 alloy-chains = { workspace = true }
-async-trait = "0.1"
-delay_map = "0.3.0"
 discv5 = { workspace = true }
 ethers = { workspace = true }
-eyre = "0.6.8"
-futures = "0.3.28"
-futures-bounded = "0.2.0"
-lazy_static = { workspace = true }
-libp2p-mplex = { version = "0.40.0" }
-sha2 = "0.10.8"
-silius-primitives = { path = "../primitives" }
-snap = "1"
 ssz_rs = { workspace = true }
 ssz_rs_derive = { workspace = true }
-thiserror = "1"
+
+# p2p
+libp2p = { version = "0.52.3", features = [
+    "identify",
+    "yamux",
+    "noise",
+    "gossipsub",
+    "dns",
+    "tcp",
+    "tokio",
+    "secp256k1",
+    "macros",
+    "request-response",
+] }
+libp2p-mplex = { version = "0.40.0" }
+
+# cryptography
+sha2 = "0.10.8"
+
+# async
+async-trait = "0.1"
+futures = "0.3.28"
+futures-bounded = "0.2.0"
+
+# tokio
 tokio = { workspace = true }
 tokio-util = { version = "0.7.10", features = ["codec"] }
+
+# misc
+delay_map = "0.3.0"
+eyre = "0.6.8"
+lazy_static = { workspace = true }
+snap = "1"
+thiserror = { workspace = true }
 tracing = { workspace = true }
 unsigned-varint = { version = "0.8.0", features = ["codec"] }
 
-[dependencies.libp2p]
-version = "0.52.3"
-features = ["identify", "yamux", "noise", "gossipsub", "dns", "tcp", "tokio", "secp256k1", "macros", "request-response"]
-
 [dev-dependencies]
-env_logger = "*"
+# eth
 ethers = { workspace = true }
+
+# misc
+env_logger = "0.10.1"
 test-log = "0.2.12"
-tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

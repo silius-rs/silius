@@ -1,12 +1,12 @@
-use crate::config::Config;
-use crate::discovery::{self, Discovery};
-use crate::gossipsub::{create_gossisub, Gossipsub};
-use crate::peer_manager::{PeerManager, PeerManagerEvent};
-use crate::request_response;
-use discv5::enr::CombinedKey;
-use discv5::Enr;
-use libp2p::gossipsub;
-use libp2p::swarm::NetworkBehaviour;
+use crate::{
+    config::Config,
+    discovery::{self, Discovery},
+    gossipsub::{create_gossisub, Gossipsub},
+    peer_manager::{PeerManager, PeerManagerEvent},
+    request_response,
+};
+use discv5::{enr::CombinedKey, Enr};
+use libp2p::{gossipsub, swarm::NetworkBehaviour};
 use std::time::Duration;
 
 /// The behaviour of the p2p network.
@@ -37,12 +37,7 @@ impl Behaviour {
         let discovery = Discovery::new(enr, key, config)?;
         let peer_manager = PeerManager::new(ping_interval, target_peers);
 
-        Ok(Self {
-            gossipsub,
-            reqrep,
-            discv5: discovery,
-            peer_manager,
-        })
+        Ok(Self { gossipsub, reqrep, discv5: discovery, peer_manager })
     }
 }
 

@@ -35,17 +35,11 @@ async fn reqrep_case(request_case: Request, response_case: Response) -> eyre::Re
     let receiver_fut = async {
         loop {
             match peer2.next_event().await {
-                NetworkEvent::RequestMessage {
-                    request,
-                    response_sender,
-                    peer_id,
-                } => {
+                NetworkEvent::RequestMessage { request, response_sender, peer_id } => {
                     println!("received request");
                     assert_eq!(request, request_case.clone());
                     assert_eq!(peer1_id, peer_id);
-                    peer2
-                        .send_response(response_sender, response_case.clone())
-                        .unwrap();
+                    peer2.send_response(response_sender, response_case.clone()).unwrap();
                 }
                 NetworkEvent::ResponseMessage { .. } => {
                     panic!("Unexpected response")
@@ -67,11 +61,7 @@ async fn reqrep_case(request_case: Request, response_case: Response) -> eyre::Re
 
 #[tokio::test]
 async fn reqrep_status() -> eyre::Result<()> {
-    reqrep_case(
-        Request::Status(Status::default()),
-        Response::Status(Status::default()),
-    )
-    .await?;
+    reqrep_case(Request::Status(Status::default()), Response::Status(Status::default())).await?;
     Ok(())
 }
 
@@ -87,21 +77,13 @@ async fn reqrep_goodbye() -> eyre::Result<()> {
 
 #[tokio::test]
 async fn reqrep_ping_pong() -> eyre::Result<()> {
-    reqrep_case(
-        Request::Ping(Default::default()),
-        Response::Pong(Default::default()),
-    )
-    .await?;
+    reqrep_case(Request::Ping(Default::default()), Response::Pong(Default::default())).await?;
     Ok(())
 }
 
 #[tokio::test]
 async fn reqrep_metadata() -> eyre::Result<()> {
-    reqrep_case(
-        Request::GetMetadata(GetMetadata),
-        Response::Metadata(Default::default()),
-    )
-    .await?;
+    reqrep_case(Request::GetMetadata(GetMetadata), Response::Metadata(Default::default())).await?;
     Ok(())
 }
 

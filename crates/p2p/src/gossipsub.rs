@@ -3,7 +3,7 @@ use libp2p::gossipsub::{
     RawMessage, TopicHash, ValidationMode, WhitelistSubscriptionFilter,
 };
 use sha2::{Digest, Sha256};
-use silius_primitives::consts::p2p::{
+use silius_primitives::constants::p2p::{
     MAX_GOSSIP_SNAP_SIZE, MESSAGE_DOMAIN_VALID_SNAPPY, SSZ_SNAPPY_ENCODING, TOPIC_PREFIX,
     USER_OPS_WITH_ENTRY_POINT_TOPIC,
 };
@@ -24,17 +24,13 @@ pub struct SnappyTransform {
 
 impl SnappyTransform {
     pub fn new(max_size_per_message: usize) -> Self {
-        SnappyTransform {
-            max_size_per_message,
-        }
+        SnappyTransform { max_size_per_message }
     }
 }
 
 impl Default for SnappyTransform {
     fn default() -> Self {
-        SnappyTransform {
-            max_size_per_message: MAX_GOSSIP_SNAP_SIZE,
-        }
+        SnappyTransform { max_size_per_message: MAX_GOSSIP_SNAP_SIZE }
     }
 }
 
@@ -101,10 +97,10 @@ pub fn message_id_fn(message: &Message) -> MessageId {
     let topic_len_bytes = topic_bytes.len().to_le_bytes();
 
     let mut vec: Vec<u8> = Vec::with_capacity(
-        MESSAGE_DOMAIN_VALID_SNAPPY.len()
-            + topic_len_bytes.len()
-            + topic_bytes.len()
-            + message.data.len(),
+        MESSAGE_DOMAIN_VALID_SNAPPY.len() +
+            topic_len_bytes.len() +
+            topic_bytes.len() +
+            message.data.len(),
     );
     vec.extend_from_slice(&MESSAGE_DOMAIN_VALID_SNAPPY);
     vec.extend_from_slice(&topic_len_bytes);
@@ -131,9 +127,7 @@ pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, &'static s
         snappy_transform,
     )?;
     for mempool_id in mempool_ids {
-        let _ = gossipsub
-            .subscribe(&topic(&mempool_id))
-            .map_err(|_| "subscribe error")?;
+        let _ = gossipsub.subscribe(&topic(&mempool_id)).map_err(|_| "subscribe error")?;
     }
 
     Ok(gossipsub)

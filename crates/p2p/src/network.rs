@@ -77,12 +77,8 @@ pub enum NetworkEvent {
     NewListenAddr(Multiaddr),
 }
 
-pub type EntrypointChannels = Vec<(
-    Chain,
-    Address,
-    UnboundedReceiver<(UserOperation, U256)>,
-    UnboundedSender<UserOperation>,
-)>;
+pub type EntrypointChannels =
+    Vec<(Chain, Address, UnboundedReceiver<(UserOperation, U256)>, UnboundedSender<UserOperation>)>;
 
 /// P2P network struct that holds the libp2p Swarm
 /// Other components should interact with Network directly instead of behaviour
@@ -132,11 +128,9 @@ impl Network {
         yamux_config.set_window_update_mode(libp2p::yamux::WindowUpdateMode::on_read());
         let swarm = SwarmBuilder::with_existing_identity(key)
             .with_tokio()
-            .with_tcp(
-                libp2p::tcp::Config::default().nodelay(true),
-                noise::Config::new,
-                || upgrade::SelectUpgrade::new(yamux_config, mplex_config),
-            )
+            .with_tcp(libp2p::tcp::Config::default().nodelay(true), noise::Config::new, || {
+                upgrade::SelectUpgrade::new(yamux_config, mplex_config)
+            })
             .expect("building p2p transport failed")
             .with_behaviour(|_| behaviour)
             .expect("building p2p behaviour failed")
@@ -148,21 +142,13 @@ impl Network {
             ..Default::default() // FIXME: when mempool id of canonical will be known
         };
 
-        Ok(Self {
-            swarm,
-            entrypoint_channels,
-            metadata,
-        })
+        Ok(Self { swarm, entrypoint_channels, metadata })
     }
 
     /// handle gossipsub event
     fn handle_gossipsub_event(&self, event: Box<gossipsub::Event>) -> Option<NetworkEvent> {
         match *event {
-            gossipsub::Event::Message {
-                propagation_source,
-                message_id,
-                message,
-            } => {
+            gossipsub::Event::Message { propagation_source, message_id, message } => {
                 let userops = match UserOperationsWithEntryPoint::deserialize(message.data.as_ref())
                 {
                     Ok(userops) => userops,
@@ -171,21 +157,19 @@ impl Network {
                         return None;
                     }
                 };
-                self.entrypoint_channels
-                    .iter()
-                    .find_map(|(_, ep, _, new_coming_uos_ch)| {
-                        if *ep == userops.entrypoint_address() {
-                            for user_op in userops.clone().user_operations().into_iter() {
-                                new_coming_uos_ch
-                                    .unbounded_send(user_op)
-                                    .expect("new useop channel should be open all the time");
-                            }
-                            Some(())
-                        } else {
-                            warn!("Received unsupported entrypoint userops {ep:?} from p2p");
-                            None
+                self.entrypoint_channels.iter().find_map(|(_, ep, _, new_coming_uos_ch)| {
+                    if *ep == userops.entrypoint_address() {
+                        for user_op in userops.clone().user_operations().into_iter() {
+                            new_coming_uos_ch
+                                .unbounded_send(user_op)
+                                .expect("new useop channel should be open all the time");
                         }
-                    });
+                        Some(())
+                    } else {
+                        warn!("Received unsupported entrypoint userops {ep:?} from p2p");
+                        None
+                    }
+                });
                 let message = PubsubMessage::UserOps(userops);
 
                 Some(NetworkEvent::PubsubMessage {
@@ -208,36 +192,25 @@ impl Network {
     /// handle reqrep event
     fn handle_reqrep_event(&self, event: request_response::Event) -> Option<NetworkEvent> {
         match event {
-            request_response::Event::Request {
-                peer_id,
-                request,
-                response_sender,
-                ..
-            } => match request {
-                Request::Ping(_ping) => {
-                    // TODO: need to update metadata of peer (based on ping value)
-                    let response = Response::Pong(Pong::new(self.metadata.seq_number));
-                    response_sender
-                        .send(response)
-                        .expect("channel should exist");
-                    None
+            request_response::Event::Request { peer_id, request, response_sender, .. } => {
+                match request {
+                    Request::Ping(_ping) => {
+                        // TODO: need to update metadata of peer (based on ping value)
+                        let response = Response::Pong(Pong::new(self.metadata.seq_number));
+                        response_sender.send(response).expect("channel should exist");
+                        None
+                    }
+                    Request::GetMetadata(_) => {
+                        let response = Response::Metadata(self.metadata.clone());
+                        response_sender.send(response).expect("channel should exist");
+                        None
+                    }
+                    _ => Some(NetworkEvent::RequestMessage { peer_id, request, response_sender }),
                 }
-                Request::GetMetadata(_) => {
-                    let response = Response::Metadata(self.metadata.clone());
-                    response_sender
-                        .send(response)
-                        .expect("channel should exist");
-                    None
-                }
-                _ => Some(NetworkEvent::RequestMessage {
-                    peer_id,
-                    request,
-                    response_sender,
-                }),
-            },
-            request_response::Event::Response {
-                peer_id, response, ..
-            } => Some(NetworkEvent::ResponseMessage { peer_id, response }),
+            }
+            request_response::Event::Response { peer_id, response, .. } => {
+                Some(NetworkEvent::ResponseMessage { peer_id, response })
+            }
             _ => None,
         }
     }
@@ -254,12 +227,9 @@ impl Network {
                 self.send_request(&peer, Request::Ping(Ping::new(self.metadata.seq_number)));
                 None
             }
-            PeerManagerEvent::PeerConnectedIncoming(peer)
-            | PeerManagerEvent::PeerConnectedOutgoing(peer) => {
-                self.swarm
-                    .behaviour_mut()
-                    .gossipsub
-                    .add_explicit_peer(&peer);
+            PeerManagerEvent::PeerConnectedIncoming(peer) |
+            PeerManagerEvent::PeerConnectedOutgoing(peer) => {
+                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer);
 
                 Some(NetworkEvent::PeerConnected(peer))
             }
@@ -345,14 +315,9 @@ impl Network {
         user_ops: UserOperationsWithEntryPoint,
     ) -> Result<MessageId, PublishError> {
         let mut buf = Vec::new();
-        let _ = user_ops
-            .serialize(&mut buf)
-            .expect("ssz of user ops serialization failed");
+        let _ = user_ops.serialize(&mut buf).expect("ssz of user ops serialization failed");
         let topic_hash: TopicHash = topic(user_ops.chain().canonical_mempool_id()).into();
-        self.swarm
-            .behaviour_mut()
-            .gossipsub
-            .publish(topic_hash, buf)
+        self.swarm.behaviour_mut().gossipsub.publish(topic_hash, buf)
     }
 
     /// Dial a peer.
@@ -372,10 +337,7 @@ impl Network {
 
     /// Subscribe to a topic.
     pub fn subscribe(&mut self, mempool_id: &str) -> Result<bool, SubscriptionError> {
-        self.swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&topic(mempool_id))
+        self.swarm.behaviour_mut().gossipsub.subscribe(&topic(mempool_id))
     }
 
     /// Return the nodes local ENR.
@@ -390,10 +352,7 @@ impl Network {
 
     /// Send a request to a peer.
     pub fn send_request(&mut self, peer: &PeerId, request: Request) -> RequestId {
-        self.swarm
-            .behaviour_mut()
-            .reqrep
-            .send_request(peer, request)
+        self.swarm.behaviour_mut().reqrep.send_request(peer, request)
     }
 
     /// Send a response to a peer.
@@ -402,9 +361,6 @@ impl Network {
         response_channel: oneshot::Sender<Response>,
         response: Response,
     ) -> Result<(), Response> {
-        self.swarm
-            .behaviour_mut()
-            .reqrep
-            .send_response(response_channel, response)
+        self.swarm.behaviour_mut().reqrep.send_response(response_channel, response)
     }
 }

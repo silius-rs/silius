@@ -1,3 +1,5 @@
+//! Primitives for reputation
+
 use super::utils::{as_checksum_addr, as_hex_string, as_u64};
 use educe::Educe;
 use ethers::{
@@ -67,12 +69,7 @@ pub struct ReputationEntry {
 
 impl ReputationEntry {
     pub fn default_with_addr(addr: Address) -> Self {
-        Self {
-            address: addr,
-            uo_seen: 0,
-            uo_included: 0,
-            status: Status::OK.into(),
-        }
+        Self { address: addr, uo_seen: 0, uo_included: 0, status: Status::OK.into() }
     }
 }
 

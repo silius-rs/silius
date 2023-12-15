@@ -1,3 +1,5 @@
+//! Utils for creating ethers providers
+
 use async_stream::stream;
 use ethers::{
     providers::{Http, Middleware, Provider, Ws},

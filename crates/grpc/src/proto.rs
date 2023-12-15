@@ -89,9 +89,7 @@ pub mod types {
         fn from(val: ethers::types::U256) -> Self {
             let mut bytes: [u8; 32] = [0; 32];
             val.to_big_endian(bytes.as_mut());
-            PbU256 {
-                data: prost::bytes::Bytes::copy_from_slice(&bytes),
-            }
+            PbU256 { data: prost::bytes::Bytes::copy_from_slice(&bytes) }
         }
     }
 
@@ -342,24 +340,24 @@ pub mod uopool {
 }
 
 pub mod bundler {
-    use silius_primitives::BundlerMode as GrpcMode;
+    use silius_primitives::BundlerMode;
 
     tonic::include_proto!("bundler");
 
-    impl From<Mode> for GrpcMode {
+    impl From<Mode> for BundlerMode {
         fn from(value: Mode) -> Self {
             match value {
-                Mode::Auto => Self::Auto,
+                Mode::Auto => Self::Auto(0),
                 Mode::Manual => Self::Manual,
             }
         }
     }
 
-    impl From<GrpcMode> for Mode {
-        fn from(value: GrpcMode) -> Self {
+    impl From<BundlerMode> for Mode {
+        fn from(value: BundlerMode) -> Self {
             match value {
-                GrpcMode::Auto => Self::Auto,
-                GrpcMode::Manual => Self::Manual,
+                BundlerMode::Auto(_) => Self::Auto,
+                BundlerMode::Manual => Self::Manual,
             }
         }
     }

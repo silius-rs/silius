@@ -53,8 +53,7 @@ impl NetworkBehaviour for PeerManager {
     fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {
         if let libp2p::swarm::FromSwarm::ConnectionClosed(close_info) = event {
             self.peer_db.disconnect(close_info.peer_id);
-            self.events
-                .push_back(PeerManagerEvent::PeerDisconnected(close_info.peer_id));
+            self.events.push_back(PeerManagerEvent::PeerDisconnected(close_info.peer_id));
         }
     }
 
@@ -75,8 +74,7 @@ impl NetworkBehaviour for PeerManager {
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         self.peer_db.new_connected(peer);
         self.ping_peers.insert(peer);
-        self.events
-            .push_back(PeerManagerEvent::PeerConnectedIncoming(peer));
+        self.events.push_back(PeerManagerEvent::PeerConnectedIncoming(peer));
         Ok(ConnectionHandler)
     }
 
@@ -89,8 +87,7 @@ impl NetworkBehaviour for PeerManager {
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         self.peer_db.new_connected(peer);
         self.ping_peers.insert(peer);
-        self.events
-            .push_back(PeerManagerEvent::PeerConnectedOutgoing(peer));
+        self.events.push_back(PeerManagerEvent::PeerConnectedOutgoing(peer));
         Ok(ConnectionHandler)
     }
 

@@ -19,9 +19,7 @@ pub struct PeerDB {
 
 impl PeerDB {
     pub fn new() -> Self {
-        Self {
-            peers: HashMap::new(),
-        }
+        Self { peers: HashMap::new() }
     }
 
     pub fn new_connected(&mut self, peer_id: PeerId) {

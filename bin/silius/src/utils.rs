@@ -3,7 +3,7 @@ use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
-use silius_primitives::{bundler::SendBundleMode, UoPoolMode};
+use silius_primitives::{bundler::SendStrategy, UoPoolMode};
 use std::{future::Future, str::FromStr};
 use tracing::info;
 
@@ -30,8 +30,8 @@ pub fn parse_u256(s: &str) -> Result<U256, String> {
 }
 
 /// Parses SendBundleMode from string
-pub fn parse_send_bundle_mode(s: &str) -> Result<SendBundleMode, String> {
-    SendBundleMode::from_str(s).map_err(|_| format!("String {s} is not a valid SendBundleMode"))
+pub fn parse_send_bundle_mode(s: &str) -> Result<SendStrategy, String> {
+    SendStrategy::from_str(s).map_err(|_| format!("String {s} is not a valid SendBundleMode"))
 }
 
 /// Parses UoPoolMode from string
