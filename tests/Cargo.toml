@@ -6,23 +6,31 @@ edition = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = """
-AA (ERC-4337) bundler integration tests
-"""
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Silius integration tests"
+homepage = "https://github.com/silius-rs/silius/tree/main/tests"
 
 [dependencies]
+# workspace dependencies
+silius-contracts = { workspace = true }
+silius-mempool = { workspace = true }
+silius-primitives = { workspace = true }
+
+# eth
 alloy-chains = { workspace = true }
 ethers = { workspace = true }
-eyre = { workspace = true }
+
+# async
 parking_lot = { workspace = true }
-silius-contracts = { path = "../crates/contracts" }
-silius-primitives = { path = "../crates/primitives" }
-silius-uopool = { path = "../crates/uopool" }
-tempdir = "0.3.7"
+
+# tokio
 tokio = { workspace = true }
 
-[dev-dependencies]
-futures = "0.3.28"
+# misc
+eyre = { workspace = true }
+tempdir = "0.3.7"
 
-[package.metadata.cargo-udeps.ignore]
-normal = ["alloy-chains", "silius-contracts", "silius-primitives", "silius-uopool"]
+[dev-dependencies]
+# async
+futures = "0.3.28"

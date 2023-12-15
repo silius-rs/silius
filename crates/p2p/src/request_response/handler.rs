@@ -13,9 +13,8 @@ use futures::{
     channel::oneshot::{self, Receiver, Sender},
     future::BoxFuture,
     stream::FuturesUnordered,
-    FutureExt, StreamExt, TryFutureExt,
+    AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt, TryFutureExt,
 };
-use futures::{AsyncReadExt, AsyncWriteExt};
 use libp2p::{
     bytes::BytesMut,
     swarm::{
@@ -59,27 +58,14 @@ pub struct OutboundInfo {
 /// Events emitted by the handler.
 #[derive(Debug)]
 pub enum HandlerEvent {
-    Request {
-        request: Request,
-        request_id: RequestId,
-        response_sender: oneshot::Sender<Response>,
-    },
-    Response {
-        response: Response,
-        request_id: RequestId,
-    },
+    Request { request: Request, request_id: RequestId, response_sender: oneshot::Sender<Response> },
+    Response { response: Response, request_id: RequestId },
     ResponseSent(RequestId),
     ResponseOmission(RequestId),
     InboundTimeout(RequestId),
     OutboundTimeout(RequestId),
-    InboundError {
-        request_id: RequestId,
-        error: BoundError,
-    },
-    OutboundError {
-        request_id: RequestId,
-        error: BoundError,
-    },
+    InboundError { request_id: RequestId, error: BoundError },
+    OutboundError { request_id: RequestId, error: BoundError },
     DialUpgradeTimeout(RequestId),
     OutboundUnsurpportedProtocol(RequestId),
 }
@@ -142,18 +128,11 @@ impl Handler {
         >,
     ) {
         let (mut socket, protocol_id) = protocol;
-        let InboundInfo {
-            request_sender,
-            response_receiver,
-            request_id,
-        } = info;
+        let InboundInfo { request_sender, response_receiver, request_id } = info;
         let recv = async move {
             let mut data = Vec::new();
             let socket_mut = &mut socket;
-            socket_mut
-                .take(REQUEST_SIZE_MAXIMUM)
-                .read_to_end(&mut data)
-                .await?;
+            socket_mut.take(REQUEST_SIZE_MAXIMUM).read_to_end(&mut data).await?;
 
             trace!("Inbound bytes: {:?}", data);
             trace!("Received {:?} bytes", data.len());
@@ -222,9 +201,8 @@ impl Handler {
                     // encode <encoded-payload>
                     let mut writer = snap::write::FrameEncoder::new(vec![]);
                     writer.write_all(&ssz_bytes)?;
-                    let compressed_data = writer
-                        .into_inner()
-                        .map_err(|e| BoundError::IoError(e.into_error()))?;
+                    let compressed_data =
+                        writer.into_inner().map_err(|e| BoundError::IoError(e.into_error()))?;
                     bytes.extend_from_slice(&compressed_data);
 
                     trace!("Inbound sending {:?}", bytes.to_vec());
@@ -242,11 +220,7 @@ impl Handler {
             }
         };
 
-        if self
-            .worker_streams
-            .try_push(BoundTypeId::Inbound(request_id), recv.boxed())
-            .is_err()
-        {
+        if self.worker_streams.try_push(BoundTypeId::Inbound(request_id), recv.boxed()).is_err() {
             warn!("Dropping inbound stream because we are at capacity")
         }
     }
@@ -260,10 +234,7 @@ impl Handler {
         >,
     ) {
         let (mut socket, protocol_id) = protocol;
-        let OutboundInfo {
-            request,
-            request_id,
-        } = info;
+        let OutboundInfo { request, request_id } = info;
         let send = async move {
             trace!("Outbound {:?}", request);
             let mut buffer = Vec::new();
@@ -294,9 +265,8 @@ impl Handler {
             // encode payload
             let mut writer = snap::write::FrameEncoder::new(vec![]);
             writer.write_all(&buffer)?;
-            let compressed_data = writer
-                .into_inner()
-                .map_err(|e| BoundError::IoError(e.into_error()))?;
+            let compressed_data =
+                writer.into_inner().map_err(|e| BoundError::IoError(e.into_error()))?;
             bytes.extend_from_slice(&compressed_data);
 
             trace!("Outbound bytes {:?}", bytes.to_vec());
@@ -305,10 +275,7 @@ impl Handler {
             socket_mut.close().await?;
 
             let mut compressed_response = Vec::new();
-            socket_mut
-                .take(RESPONSE_SIZE_MAXIMUM)
-                .read_to_end(&mut compressed_response)
-                .await?;
+            socket_mut.take(RESPONSE_SIZE_MAXIMUM).read_to_end(&mut compressed_response).await?;
 
             trace!("Outbound received {:?}", compressed_response);
 
@@ -345,17 +312,10 @@ impl Handler {
                 }
             };
 
-            Ok(HandlerEvent::Response {
-                response,
-                request_id,
-            })
+            Ok(HandlerEvent::Response { response, request_id })
         };
 
-        if self
-            .worker_streams
-            .try_push(BoundTypeId::Outbound(request_id), send.boxed())
-            .is_err()
-        {
+        if self.worker_streams.try_push(BoundTypeId::Outbound(request_id), send.boxed()).is_err() {
             warn!("Dropping inbound stream because we are at capacity")
         }
     }
@@ -385,11 +345,8 @@ impl ConnectionHandler for Handler {
 
         let request_id = RequestId(self.inbound_request_id.fetch_add(1, Ordering::Relaxed));
 
-        let inbound_info = InboundInfo {
-            request_sender: rq_send,
-            response_receiver: rs_recv,
-            request_id,
-        };
+        let inbound_info =
+            InboundInfo { request_sender: rq_send, response_receiver: rs_recv, request_id };
 
         self.inbound.push(
             rq_recv
@@ -428,21 +385,17 @@ impl ConnectionHandler for Handler {
                 StreamUpgradeError::Timeout => self
                     .pending_events
                     .push_back(HandlerEvent::DialUpgradeTimeout(error.info.request_id)),
-                StreamUpgradeError::NegotiationFailed => {
-                    self.pending_events
-                        .push_back(HandlerEvent::OutboundUnsurpportedProtocol(
-                            error.info.request_id,
-                        ))
+                StreamUpgradeError::NegotiationFailed => self
+                    .pending_events
+                    .push_back(HandlerEvent::OutboundUnsurpportedProtocol(error.info.request_id)),
+                dial_error => {
+                    warn!("outbound stream with {:?} failed with {dial_error:?}", error.info)
                 }
-                dial_error => warn!(
-                    "outbound stream with {:?} failed with {dial_error:?}",
-                    error.info
-                ),
             },
-            ConnectionEvent::ListenUpgradeError(_)
-            | ConnectionEvent::LocalProtocolsChange(_)
-            | ConnectionEvent::RemoteProtocolsChange(_)
-            | ConnectionEvent::AddressChange(_) => {}
+            ConnectionEvent::ListenUpgradeError(_) |
+            ConnectionEvent::LocalProtocolsChange(_) |
+            ConnectionEvent::RemoteProtocolsChange(_) |
+            ConnectionEvent::AddressChange(_) => {}
         }
     }
 
@@ -486,24 +439,14 @@ impl ConnectionHandler for Handler {
         }
 
         if let Some(event) = self.pending_events.pop_front() {
-            return Poll::Ready(libp2p::swarm::ConnectionHandlerEvent::NotifyBehaviour(
-                event,
-            ));
+            return Poll::Ready(libp2p::swarm::ConnectionHandlerEvent::NotifyBehaviour(event));
         };
 
         while let Poll::Ready(Some(result)) = self.inbound.poll_next_unpin(cx) {
             match result {
-                Ok(RequestContainer {
-                    request,
-                    request_id,
-                    response_sender,
-                }) => {
+                Ok(RequestContainer { request, request_id, response_sender }) => {
                     return Poll::Ready(libp2p::swarm::ConnectionHandlerEvent::NotifyBehaviour(
-                        HandlerEvent::Request {
-                            request,
-                            response_sender,
-                            request_id,
-                        },
+                        HandlerEvent::Request { request, response_sender, request_id },
                     ));
                 }
                 Err(oneshot::Canceled) => {}
@@ -511,15 +454,13 @@ impl ConnectionHandler for Handler {
         }
 
         if let Some(request) = self.outbound.pop_front() {
-            return Poll::Ready(
-                libp2p::swarm::ConnectionHandlerEvent::OutboundSubstreamRequest {
-                    protocol: SubstreamProtocol::new(
-                        OutboundRepUpgrade(request.clone().request),
-                        request,
-                    )
-                    .with_timeout(self.substream_timeout),
-                },
-            );
+            return Poll::Ready(libp2p::swarm::ConnectionHandlerEvent::OutboundSubstreamRequest {
+                protocol: SubstreamProtocol::new(
+                    OutboundRepUpgrade(request.clone().request),
+                    request,
+                )
+                .with_timeout(self.substream_timeout),
+            });
         };
 
         Poll::Pending

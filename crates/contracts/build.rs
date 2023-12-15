@@ -33,20 +33,12 @@ fn compile_aa_smart_contracts() -> eyre::Result<()> {
     let build_info = root.join("contracts").join("build-info");
 
     // compile interfaces
-    compile(
-        &root,
-        &root.join("contracts").join("interfaces"),
-        &build_info,
-        &target,
-    )?;
+    compile(&root, &root.join("contracts").join("interfaces"), &build_info, &target)?;
 
     // compile sender creator smart contract
     compile(
         &root,
-        &root
-            .join("contracts")
-            .join("core")
-            .join("SenderCreator.sol"),
+        &root.join("contracts").join("core").join("SenderCreator.sol"),
         &build_info,
         &target,
     )?;

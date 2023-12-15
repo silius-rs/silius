@@ -1,4 +1,6 @@
-use crate::consts::supported_chains::{DEV, GOERLI, MUMBAI, SEPOLIA};
+//! Chain extensions
+
+use crate::constants::supported_chains::{DEV, GOERLI, MUMBAI, SEPOLIA};
 use alloy_chains::Chain;
 
 pub trait ChainExt {
@@ -12,7 +14,7 @@ impl ChainExt for Chain {
             GOERLI => "QmTmj4cizhWpEFCCqk5dP67yws7R2PPgCtb2bd2RgVPCbF",
             SEPOLIA => "QmdDwVFoEEcgv5qnaTB8ncnXGMnqrhnA5nYpRr4ouWe4AT",
             MUMBAI => "QmQfRyE9iVTBqZ17hPSP4tuMzaez83Y5wD874ymyRtj9VE",
-            _ => panic!("Chain {self:?} canonical mempool is not supported"),
+            _ => panic!("Canonical mempool on chain {self:?} is not supported!"),
         }
     }
 }

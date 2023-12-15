@@ -6,7 +6,7 @@ use ethers::{
     utils::parse_ether,
 };
 use silius_contracts::entry_point::EntryPointAPI;
-use silius_primitives::consts::entry_point::ADDRESS;
+use silius_primitives::constants::entry_point::ADDRESS;
 use silius_tests::common::gen::SimpleAccountFactory;
 use std::{env, sync::Arc, time::Duration};
 
@@ -24,9 +24,7 @@ async fn main() -> eyre::Result<()> {
             Provider::<Http>::try_from(provider_url)?.interval(Duration::from_millis(10u64));
         let chain_id = provider.get_chainid().await?.as_u64();
 
-        let wallet = MnemonicBuilder::<English>::default()
-            .phrase(seed_phrase.as_str())
-            .build()?;
+        let wallet = MnemonicBuilder::<English>::default().phrase(seed_phrase.as_str()).build()?;
         let client =
             SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
                 .nonce_manager(wallet.address())

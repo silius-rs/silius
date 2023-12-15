@@ -1,4 +1,5 @@
-//! A `Wallet` is a wrapper around an ethers wallet with an optional field for Flashbots bundle identifier
+//! Wrapper around an ethers wallet with an optional field for Flashbots bundle identifier
+
 use crate::UserOperation;
 use ethers::{
     prelude::{k256::ecdsa::SigningKey, rand},
@@ -19,7 +20,8 @@ pub struct Wallet {
 
 impl Wallet {
     /// Builds a `Wallet` and construct using a randomly generated number
-    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to None
+    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to
+    /// None
     ///
     /// # Arguments
     /// * `path` - The path to the file where the mnemonic phrase will be written
@@ -59,15 +61,13 @@ impl Wallet {
                 flashbots_signer: Some(flashbots_wallet.with_chain_id(chain_id.as_u64())),
             })
         } else {
-            Ok(Self {
-                signer: wallet.with_chain_id(chain_id.as_u64()),
-                flashbots_signer: None,
-            })
+            Ok(Self { signer: wallet.with_chain_id(chain_id.as_u64()), flashbots_signer: None })
         }
     }
 
     /// Create a new wallet from the given file containing the mnemonic phrase
-    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to None
+    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to
+    /// None
     ///
     /// # Arguments
     /// * `path` - The path to the file where the mnemonic phrase is stored
@@ -100,15 +100,13 @@ impl Wallet {
                 flashbots_signer: Some(flashbots_wallet.with_chain_id(chain_id.as_u64())),
             })
         } else {
-            Ok(Self {
-                signer: wallet.with_chain_id(chain_id.as_u64()),
-                flashbots_signer: None,
-            })
+            Ok(Self { signer: wallet.with_chain_id(chain_id.as_u64()), flashbots_signer: None })
         }
     }
 
     /// Create a new wallet from the given mnemonic phrase
-    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to None
+    /// if `flashbots_key` is true, then a Flashbots key is also created, otherwise it is set to
+    /// None
     ///
     /// # Arguments
     /// * `phrase` - The mnemonic phrase
@@ -136,10 +134,7 @@ impl Wallet {
                 flashbots_signer: Some(flashbots_wallet.with_chain_id(chain_id.as_u64())),
             })
         } else {
-            Ok(Self {
-                signer: wallet.with_chain_id(chain_id.as_u64()),
-                flashbots_signer: None,
-            })
+            Ok(Self { signer: wallet.with_chain_id(chain_id.as_u64()), flashbots_signer: None })
         }
     }
 
@@ -160,9 +155,6 @@ impl Wallet {
     ) -> eyre::Result<UserOperation> {
         let h = uo.hash(ep, chain_id);
         let sig = self.signer.sign_message(h.0.as_bytes()).await?;
-        Ok(UserOperation {
-            signature: sig.to_vec().into(),
-            ..uo.clone()
-        })
+        Ok(UserOperation { signature: sig.to_vec().into(), ..uo.clone() })
     }
 }

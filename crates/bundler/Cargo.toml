@@ -6,29 +6,44 @@ edition = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
-description = """
-AA (ERC-4337) bundler bundling implementation
-"""
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Account abstraction (ERC-4337) bundling implementation"
+homepage = "https://github.com/silius-rs/silius/tree/main/crates/bundler"
 
 [dependencies]
+# workspace dependencies
+silius-contracts = { workspace = true }
+silius-primitives = { workspace = true }
+
+# eth
 alloy-chains = { workspace = true }
-async-trait = "0.1"
-bytes = "1.4.0"
 ethers = { workspace = true }
 ethers-flashbots = { git = "https://github.com/qi-protocol/ethers-flashbots.git", rev = "1c6504cd2d1f4d67e4af2dd9a5ee676a284452f9" }
+
+# async
+async-trait = "0.1"
+
+# tokio
+tokio = { workspace = true }
+
+# misc
+bytes = "1.4.0"
 eyre = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
-silius-contracts = { path = "../contracts" }
-silius-primitives = { path = "../primitives" }
-tokio = { workspace = true }
 tracing = { workspace = true }
 url = "2.4.0"
 
 [dev-dependencies]
+# eth
 alloy-primitives = "0.2.0"
 alloy-sol-types = "0.2.0"
-dotenv = "0.15.0"
 ethers-flashbots-test = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", rev = "1eda9b7bb84e82f43f35b98c34d9066f9596b41d" }
+
+# rpc
 jsonrpsee = { version = "0.20.0", features = ["server", "macros", "client"] }
+
+# misc
+dotenv = "0.15.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

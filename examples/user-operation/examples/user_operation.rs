@@ -21,13 +21,8 @@ async fn main() -> eyre::Result<()> {
     println!("User operation hash: {:?}", uo_hash);
 
     // sign user operation
-    let uo_signed = wallet
-        .sign_uo(
-            &uo,
-            &Address::from_str(ENTRY_POINT).unwrap(),
-            &CHAIN_ID.into(),
-        )
-        .await?;
+    let uo_signed =
+        wallet.sign_uo(&uo, &Address::from_str(ENTRY_POINT).unwrap(), &CHAIN_ID.into()).await?;
     println!("User operation signed: {:?}", uo_signed);
 
     Ok(())

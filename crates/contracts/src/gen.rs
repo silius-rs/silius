@@ -8,14 +8,8 @@ use std::collections::HashMap;
 abigen!(AccountAPI, "$OUT_DIR/IAccount.sol/IAccount.json");
 abigen!(EntryPointAPI, "$OUT_DIR/IEntryPoint.sol/IEntryPoint.json");
 abigen!(PaymasterAPI, "$OUT_DIR/IPaymaster.sol/IPaymaster.json");
-abigen!(
-    SenderCreatorAPI,
-    "$OUT_DIR/SenderCreator.sol/SenderCreator.json"
-);
-abigen!(
-    StakeManagerAPI,
-    "$OUT_DIR/IStakeManager.sol/IStakeManager.json"
-);
+abigen!(SenderCreatorAPI, "$OUT_DIR/SenderCreator.sol/SenderCreator.json");
+abigen!(StakeManagerAPI, "$OUT_DIR/IStakeManager.sol/IStakeManager.json");
 
 lazy_static! {
     pub static ref SELECTORS_NAMES: HashMap<Selector, String> = {

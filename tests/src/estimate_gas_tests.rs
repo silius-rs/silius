@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::common::{
     deploy_entry_point, deploy_simple_account_factory,
     gen::{EntryPointContract, SimpleAccountFactory},
@@ -14,10 +12,9 @@ use ethers::{
     utils::GethInstance,
 };
 use silius_contracts::EntryPoint;
-use silius_primitives::UserOperation;
-use silius_primitives::Wallet as UoWallet;
-use silius_uopool::validate::validator::new_canonical;
-use silius_uopool::UoPool;
+use silius_mempool::{validate::validator::new_canonical, UoPool};
+use silius_primitives::{UserOperation, Wallet as UoWallet};
+use std::sync::Arc;
 
 async fn setup_basic() -> eyre::Result<(
     Arc<ClientType>,
@@ -59,9 +56,7 @@ macro_rules! estimate_gas_with_init_code {
                 None,
             );
 
-            let wallet = MnemonicBuilder::<English>::default()
-                .phrase(SEED_PHRASE)
-                .build()?;
+            let wallet = MnemonicBuilder::<English>::default().phrase(SEED_PHRASE).build()?;
             let owner_address = wallet.address();
             let address: H160 = simple_account_factory
                 .contract()
@@ -78,9 +73,8 @@ macro_rules! estimate_gas_with_init_code {
             let _receipt = client.send_transaction(initial_fund, None).await?.await?;
             let _balance = client.get_balance(address, None).await?;
 
-            let call = simple_account_factory
-                .contract()
-                .create_account(owner_address, U256::from(1));
+            let call =
+                simple_account_factory.contract().create_account(owner_address, U256::from(1));
             let tx: TypedTransaction = call.tx;
             let mut init_code = Vec::new();
             init_code.extend_from_slice(simple_account_factory.address.as_bytes());
@@ -113,24 +107,14 @@ macro_rules! estimate_gas_with_init_code {
             };
 
             let uo_wallet = UoWallet::from_phrase(SEED_PHRASE, &chain_id.into(), false)?;
-            let user_op = uo_wallet
-                .sign_uo(&user_op, &entry_point.address, &chain_id.into())
-                .await?;
+            let user_op =
+                uo_wallet.sign_uo(&user_op, &entry_point.address, &chain_id.into()).await?;
 
-            let res = uopool
-                .estimate_user_operation_gas(&user_op)
-                .await
-                .expect("estimate done");
+            let _ = uopool.estimate_user_operation_gas(&user_op).await.expect("estimate done");
             Ok(())
         }
     };
 }
 
-estimate_gas_with_init_code!(
-    setup_database_mempool_reputation(),
-    estimate_gas_init_code_datbase
-);
-estimate_gas_with_init_code!(
-    setup_memory_mempool_reputation(),
-    estimate_gas_init_code_memory
-);
+estimate_gas_with_init_code!(setup_database_mempool_reputation(), estimate_gas_init_code_datbase);
+estimate_gas_with_init_code!(setup_memory_mempool_reputation(), estimate_gas_init_code_memory);

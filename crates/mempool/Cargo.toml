@@ -1,0 +1,52 @@
+[package]
+name = "silius-mempool"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Account abstractiono (ERC-4337) mempool implementation"
+homepage = "https://github.com/silius-rs/silius/tree/main/crates/mempool"
+
+[dependencies]
+# workspace dependencies
+silius-contracts = { workspace = true }
+silius-primitives = { workspace = true }
+
+# eth
+alloy-chains = { workspace = true }
+ethers = { workspace = true }
+
+# reth
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
+reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
+
+# async
+async-trait = { workspace = true }
+futures = "0.3.28"
+futures-util = { workspace = true }
+parking_lot = { workspace = true }
+
+# tokio
+tokio = { workspace = true }
+
+# misc
+bin-layout = "7.1.0"
+educe = { version = "0.4", features = ["Debug", "Default"] }
+enumset = "1.1.2"
+eyre = { workspace = true }
+page_size = "0.5.0"
+prost = "0.11"
+serde = "1"
+serde_json = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+# workspace dependencies
+silius-primitives = { workspace = true, features = ["test-utils"] }
+
+# misc
+tempdir = "0.3.7"

@@ -1,3 +1,5 @@
+//! Misc utils
+
 use ethers::{
     types::{Address, Bytes, U256},
     utils::{hex, to_checksum},

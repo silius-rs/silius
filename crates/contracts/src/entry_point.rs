@@ -1,25 +1,29 @@
-use super::gen::entry_point_api::{
-    EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult,
-    ValidationResultWithAggregation,
-};
-use super::gen::stake_manager_api::DepositInfo;
 pub use super::gen::{
     EntryPointAPI, EntryPointAPIEvents, StakeManagerAPI, UserOperationEventFilter,
     ValidatePaymasterUserOpReturn, SELECTORS_INDICES, SELECTORS_NAMES,
 };
-use super::tracer::JS_TRACER;
+use super::{
+    gen::{
+        entry_point_api::{
+            EntryPointAPIErrors, FailedOp, SenderAddressResult, UserOperation, ValidationResult,
+            ValidationResultWithAggregation,
+        },
+        stake_manager_api::DepositInfo,
+    },
+    tracer::JS_TRACER,
+};
 use crate::gen::ExecutionResult;
-use ethers::abi::AbiDecode;
-use ethers::prelude::{ContractError, Event};
-use ethers::providers::{JsonRpcError, Middleware, MiddlewareError, ProviderError};
-use ethers::types::{
-    Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-    GethTrace, TransactionRequest, U256,
+use ethers::{
+    abi::AbiDecode,
+    prelude::{ContractError, Event},
+    providers::{JsonRpcError, Middleware, MiddlewareError, ProviderError},
+    types::{
+        Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
+        GethTrace, TransactionRequest, U256,
+    },
 };
 use regex::Regex;
-use std::fmt::Display;
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{fmt::Display, str::FromStr, sync::Arc};
 use thiserror::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,12 +44,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
     pub fn new(eth_client: Arc<M>, address: Address) -> Self {
         let entry_point_api = EntryPointAPI::new(address, eth_client.clone());
         let stake_manager_api = StakeManagerAPI::new(address, eth_client.clone());
-        Self {
-            eth_client,
-            address,
-            entry_point_api,
-            stake_manager_api,
-        }
+        Self { eth_client, address, entry_point_api, stake_manager_api }
     }
 
     pub fn entry_point_api(&self) -> &EntryPointAPI<M> {
@@ -68,18 +67,16 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         err_msg: ContractError<M>,
     ) -> Result<EntryPointAPIErrors, EntryPointErr> {
         match err_msg {
-            ContractError::DecodingError(e) => Err(EntryPointErr::DecodeErr(format!(
-                "Decoding error on msg: {e:?}"
-            ))),
-            ContractError::AbiError(e) => Err(EntryPointErr::UnknownErr(format!(
-                "Contract call with abi error: {e:?} ",
-            ))),
+            ContractError::DecodingError(e) => {
+                Err(EntryPointErr::DecodeErr(format!("Decoding error on msg: {e:?}")))
+            }
+            ContractError::AbiError(e) => {
+                Err(EntryPointErr::UnknownErr(format!("Contract call with abi error: {e:?} ",)))
+            }
             ContractError::MiddlewareError { e } => EntryPointErr::from_middleware_err::<M>(e),
             ContractError::ProviderError { e } => EntryPointErr::from_provider_err(&e),
             ContractError::Revert(data) => decode_revert_error(data),
-            _ => Err(EntryPointErr::UnknownErr(format!(
-                "Unkown error: {err_msg:?}",
-            ))),
+            _ => Err(EntryPointErr::UnknownErr(format!("Unkown error: {err_msg:?}",))),
         }
     }
 
@@ -98,9 +95,9 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                 EntryPointAPIErrors::ValidationResult(res) => {
                     Ok(SimulateValidationResult::ValidationResult(res))
                 }
-                EntryPointAPIErrors::ValidationResultWithAggregation(res) => Ok(
-                    SimulateValidationResult::ValidationResultWithAggregation(res),
-                ),
+                EntryPointAPIErrors::ValidationResultWithAggregation(res) => {
+                    Ok(SimulateValidationResult::ValidationResultWithAggregation(res))
+                }
                 _ => Err(EntryPointErr::UnknownErr(format!(
                     "Simulate validation with invalid error: {op:?}"
                 ))),
@@ -164,9 +161,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
         match res {
             Ok(deposit_info) => Ok(deposit_info),
-            _ => Err(EntryPointErr::UnknownErr(
-                "Error calling get deposit info".to_string(),
-            )),
+            _ => Err(EntryPointErr::UnknownErr("Error calling get deposit info".to_string())),
         }
     }
 
@@ -175,9 +170,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
 
         match res {
             Ok(balance) => Ok(balance),
-            _ => Err(EntryPointErr::UnknownErr(
-                "Error calling balance of".to_string(),
-            )),
+            _ => Err(EntryPointErr::UnknownErr("Error calling balance of".to_string())),
         }
     }
 
@@ -192,11 +185,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         &self,
         init_code: Bytes,
     ) -> Result<SenderAddressResult, EntryPointErr> {
-        let res = self
-            .entry_point_api
-            .get_sender_address(init_code)
-            .call()
-            .await;
+        let res = self.entry_point_api.get_sender_address(init_code).call().await;
 
         match res {
             Ok(_) => Err(EntryPointErr::UnknownErr(
@@ -294,7 +283,8 @@ pub enum EntryPointErr {
     NetworkErr(String),
     DecodeErr(String),
     CallDataErr(String),
-    UnknownErr(String), // describe impossible error. We should fix the codes here(or contract codes) if this occurs.
+    UnknownErr(String), /* describe impossible error. We should fix the codes here(or contract
+                         * codes) if this occurs. */
 }
 
 impl Display for EntryPointErr {
@@ -306,18 +296,15 @@ impl Display for EntryPointErr {
 impl EntryPointErr {
     fn from_provider_err(err: &ProviderError) -> Result<EntryPointAPIErrors, Self> {
         match err {
-            ProviderError::JsonRpcClientError(err) => err
-                .as_error_response()
-                .map(Self::from_json_rpc_error)
-                .unwrap_or(Err(EntryPointErr::UnknownErr(format!(
-                    "Unknown JSON-RPC client error: {err:?}"
-                )))),
-            ProviderError::HTTPError(err) => Err(EntryPointErr::NetworkErr(format!(
-                "Entry point HTTP error: {err:?}"
-            ))),
-            _ => Err(EntryPointErr::UnknownErr(format!(
-                "Unknown error in provider: {err:?}"
-            ))),
+            ProviderError::JsonRpcClientError(err) => {
+                err.as_error_response().map(Self::from_json_rpc_error).unwrap_or(Err(
+                    EntryPointErr::UnknownErr(format!("Unknown JSON-RPC client error: {err:?}")),
+                ))
+            }
+            ProviderError::HTTPError(err) => {
+                Err(EntryPointErr::NetworkErr(format!("Entry point HTTP error: {err:?}")))
+            }
+            _ => Err(EntryPointErr::UnknownErr(format!("Unknown error in provider: {err:?}"))),
         }
     }
 
@@ -360,9 +347,7 @@ impl EntryPointErr {
             }
         }
 
-        Err(Self::UnknownErr(format!(
-            "Json rpc error {err:?} doesn't contain data field."
-        )))
+        Err(Self::UnknownErr(format!("Json rpc error {err:?} doesn't contain data field.")))
     }
 
     fn from_middleware_err<M: Middleware>(
@@ -376,9 +361,7 @@ impl EntryPointErr {
             return EntryPointErr::from_provider_err(err);
         }
 
-        Err(EntryPointErr::UnknownErr(format!(
-            "Unknown middleware error: {err:?}"
-        )))
+        Err(EntryPointErr::UnknownErr(format!("Unknown middleware error: {err:?}")))
     }
 }
 
@@ -397,9 +380,7 @@ mod tests {
         let eth_client = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let ep = EntryPoint::<Provider<Http>>::new(
             eth_client.clone(),
-            "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-                .parse()
-                .unwrap(),
+            "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(),
         );
 
         let max_priority_fee_per_gas = 1500000000_u64.into();
@@ -421,10 +402,7 @@ mod tests {
 
         let res = ep.simulate_validation(uo.clone()).await.unwrap();
 
-        assert!(matches!(
-            res,
-            SimulateValidationResult::ValidationResult { .. },
-        ));
+        assert!(matches!(res, SimulateValidationResult::ValidationResult { .. },));
 
         let trace = ep.simulate_validation_trace(uo).await.unwrap();
 

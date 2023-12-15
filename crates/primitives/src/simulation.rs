@@ -1,3 +1,5 @@
+//! Simulation (validation) primitives
+
 use ethers::{
     prelude::{EthAbiCodec, EthAbiType},
     providers::MiddlewareError,
@@ -43,48 +45,22 @@ lazy_static! {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SimulationCheckError {
     Signature {},
-    Expiration {
-        valid_after: U256,
-        valid_until: U256,
-        paymaster: Option<Address>,
-    },
-    Validation {
-        message: String,
-    },
-    Opcode {
-        entity: String,
-        opcode: String,
-    },
-    Execution {
-        message: String,
-    },
-    StorageAccess {
-        slot: String,
-    },
-    Unstaked {
-        entity: String,
-        message: String,
-    },
-    CallStack {
-        message: String,
-    },
-    CodeHashes {
-        message: String,
-    },
+    Expiration { valid_after: U256, valid_until: U256, paymaster: Option<Address> },
+    Validation { message: String },
+    Opcode { entity: String, opcode: String },
+    Execution { message: String },
+    StorageAccess { slot: String },
+    Unstaked { entity: String, message: String },
+    CallStack { message: String },
+    CodeHashes { message: String },
     OutOfGas {},
-    MiddlewareError {
-        message: String,
-    },
-    UnknownError {
-        message: String,
-    },
+    MiddlewareError { message: String },
+    UnknownError { message: String },
 }
 
 impl<M: MiddlewareError> From<M> for SimulationCheckError {
     fn from(err: M) -> Self {
-        SimulationCheckError::MiddlewareError {
-            message: err.to_string(),
-        }
+        SimulationCheckError::MiddlewareError { message: err.to_string() }
     }
 }
 

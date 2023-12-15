@@ -32,11 +32,7 @@ async fn pubsub_msg() -> eyre::Result<()> {
     let receiver_fut = async {
         loop {
             match peer2.next_event().await {
-                NetworkEvent::PubsubMessage {
-                    source_peer,
-                    message,
-                    ..
-                } => {
+                NetworkEvent::PubsubMessage { source_peer, message, .. } => {
                     assert_eq!(source_peer, peer1_id);
                     assert_eq!(message, PubsubMessage::UserOps(uo_entrypoint.clone()));
                     return;

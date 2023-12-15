@@ -11,12 +11,12 @@ use ethers::{
     utils::{Geth, GethInstance},
 };
 use parking_lot::RwLock;
-use silius_primitives::{
-    reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
-};
-use silius_uopool::{
+use silius_mempool::{
     init_env, CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
     UserOperationsByEntity, UserOperationsBySender, WriteMap,
+};
+use silius_primitives::{
+    reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -36,10 +36,7 @@ pub struct DeployedContract<C> {
 }
 impl<C> DeployedContract<C> {
     pub fn new(contract: C, addr: Address) -> Self {
-        Self {
-            contract,
-            address: addr,
-        }
+        Self { contract, address: addr }
     }
 
     pub fn contract(&self) -> &C {
@@ -50,9 +47,7 @@ impl<C> DeployedContract<C> {
 pub async fn deploy_entry_point<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> eyre::Result<DeployedContract<EntryPointContract<M>>> {
-    let (ep, receipt) = EntryPointContract::deploy(client, ())?
-        .send_with_receipt()
-        .await?;
+    let (ep, receipt) = EntryPointContract::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(ep, addr))
 }
@@ -61,9 +56,8 @@ pub async fn deploy_simple_account_factory<M: Middleware + 'static>(
     client: Arc<M>,
     entry_point_address: Address,
 ) -> eyre::Result<DeployedContract<SimpleAccountFactory<M>>> {
-    let (ep, receipt) = SimpleAccountFactory::deploy(client, entry_point_address)?
-        .send_with_receipt()
-        .await?;
+    let (ep, receipt) =
+        SimpleAccountFactory::deploy(client, entry_point_address)?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(ep, addr))
 }
@@ -71,9 +65,7 @@ pub async fn deploy_simple_account_factory<M: Middleware + 'static>(
 pub async fn deploy_test_opcode_account<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> eyre::Result<DeployedContract<TestOpcodesAccount<M>>> {
-    let (acc, receipt) = TestOpcodesAccount::deploy(client, ())?
-        .send_with_receipt()
-        .await?;
+    let (acc, receipt) = TestOpcodesAccount::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(acc, addr))
 }
@@ -81,9 +73,8 @@ pub async fn deploy_test_opcode_account<M: Middleware + 'static>(
 pub async fn deploy_test_opcode_account_factory<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> eyre::Result<DeployedContract<TestOpcodesAccountFactory<M>>> {
-    let (factory, receipt) = TestOpcodesAccountFactory::deploy(client, ())?
-        .send_with_receipt()
-        .await?;
+    let (factory, receipt) =
+        TestOpcodesAccountFactory::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
@@ -92,9 +83,8 @@ pub async fn deploy_test_storage_account_factory<M: Middleware + 'static>(
     client: Arc<M>,
     test_coin_addr: Address,
 ) -> eyre::Result<DeployedContract<TestStorageAccountFactory<M>>> {
-    let (factory, receipt) = TestStorageAccountFactory::deploy(client, test_coin_addr)?
-        .send_with_receipt()
-        .await?;
+    let (factory, receipt) =
+        TestStorageAccountFactory::deploy(client, test_coin_addr)?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
@@ -102,9 +92,7 @@ pub async fn deploy_test_storage_account_factory<M: Middleware + 'static>(
 pub async fn deploy_test_storage_account<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> eyre::Result<DeployedContract<TestStorageAccount<M>>> {
-    let (acc, receipt) = TestStorageAccount::deploy(client, ())?
-        .send_with_receipt()
-        .await?;
+    let (acc, receipt) = TestStorageAccount::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(acc, addr))
 }
@@ -113,9 +101,7 @@ pub async fn deploy_test_recursion_account<M: Middleware + 'static>(
     client: Arc<M>,
     ep: Address,
 ) -> eyre::Result<DeployedContract<TestRecursionAccount<M>>> {
-    let (acc, receipt) = TestRecursionAccount::deploy(client, ep)?
-        .send_with_receipt()
-        .await?;
+    let (acc, receipt) = TestRecursionAccount::deploy(client, ep)?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(acc, addr))
 }
@@ -123,9 +109,8 @@ pub async fn deploy_test_recursion_account<M: Middleware + 'static>(
 pub async fn deploy_test_rules_account_factory<M: Middleware + 'static>(
     client: Arc<M>,
 ) -> eyre::Result<DeployedContract<TestRulesAccountFactory<M>>> {
-    let (factory, receipt) = TestRulesAccountFactory::deploy(client, ())?
-        .send_with_receipt()
-        .await?;
+    let (factory, receipt) =
+        TestRulesAccountFactory::deploy(client, ())?.send_with_receipt().await?;
     let addr = receipt.contract_address.unwrap_or(Address::zero());
     Ok(DeployedContract::new(factory, addr))
 }
@@ -149,9 +134,7 @@ pub async fn deploy_test_coin<M: Middleware + 'static>(
 pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Http>)> {
     let chain_id: u64 = 1337;
     let tmp_dir = TempDir::new("test_geth")?;
-    let wallet = MnemonicBuilder::<English>::default()
-        .phrase(SEED_PHRASE)
-        .build()?;
+    let wallet = MnemonicBuilder::<English>::default().phrase(SEED_PHRASE).build()?;
 
     let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();
     let provider =
@@ -176,14 +159,13 @@ pub fn setup_database_mempool_reputation() -> (
         DatabaseTable<WriteMap, UserOperations>,
         DatabaseTable<WriteMap, UserOperationsBySender>,
         DatabaseTable<WriteMap, UserOperationsByEntity>,
-        DatabaseTable<WriteMap, silius_uopool::CodeHashes>,
+        DatabaseTable<WriteMap, silius_mempool::CodeHashes>,
     >,
     Reputation<HashSet<H160>, DatabaseTable<WriteMap, EntitiesReputation>>,
 ) {
     let dir = TempDir::new("test-silius-db").expect("create tmp");
     let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
-    env.create_tables()
-        .expect("Create mdbx database tables failed");
+    env.create_tables().expect("Create mdbx database tables failed");
     let mempool = Mempool::new(
         DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
         DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
@@ -211,24 +193,16 @@ pub fn setup_memory_mempool_reputation() -> (
         Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
         Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
     >,
-    silius_uopool::Reputation<
+    silius_mempool::Reputation<
         Arc<RwLock<HashSet<H160>>>,
         Arc<RwLock<HashMap<H160, ReputationEntry>>>,
     >,
 ) {
     let mempool = Mempool::new(
-        Arc::new(RwLock::new(
-            HashMap::<UserOperationHash, UserOperation>::default(),
-        )),
-        Arc::new(RwLock::new(
-            HashMap::<Address, HashSet<UserOperationHash>>::default(),
-        )),
-        Arc::new(RwLock::new(
-            HashMap::<Address, HashSet<UserOperationHash>>::default(),
-        )),
-        Arc::new(RwLock::new(
-            HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
-        )),
+        Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+        Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+        Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
+        Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
     );
     let reputation = Reputation::new(
         10,

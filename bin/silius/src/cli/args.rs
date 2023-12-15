@@ -7,12 +7,11 @@ use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use silius_p2p::config::{Config, ListenAddr};
 use silius_primitives::{
-    bundler::{SendBundleMode, DEFAULT_BUNDLE_INTERVAL},
-    consts::{
-        networking::{
-            DEFAULT_BUNDLER_GRPC_PORT, DEFAULT_HTTP_RPC_PORT, DEFAULT_UOPOOL_GRPC_PORT,
-            DEFAULT_WS_RPC_PORT,
-        },
+    bundler::SendStrategy,
+    constants::{
+        bundler::BUNDLE_INTERVAL,
+        grpc::{BUNDLER_PORT, MEMPOOL_PORT},
+        rpc::{HTTP_PORT, WS_PORT},
         supported_chains::SUPPORTED_NAMED_CHAINS,
     },
     UoPoolMode,
@@ -36,7 +35,7 @@ pub struct BundlerArgs {
     pub bundler_addr: IpAddr,
 
     /// Bundler gRPC port to listen on.
-    #[clap(long = "bundler.port", default_value_t = DEFAULT_BUNDLER_GRPC_PORT)]
+    #[clap(long = "bundler.port", default_value_t = BUNDLER_PORT)]
     pub bundler_port: u16,
 
     /// Path to the mnemonic file.
@@ -56,14 +55,14 @@ pub struct BundlerArgs {
     /// The bundle interval in seconds.
     ///
     /// By default the interval time is set to 10
-    #[clap(long, default_value_t = DEFAULT_BUNDLE_INTERVAL)]
+    #[clap(long, default_value_t = BUNDLE_INTERVAL)]
     pub bundle_interval: u64,
 
     /// Sets the send bundle mode.
     ///
     /// By default, this option is set to `eth-client`.
     #[clap(long, default_value = "eth-client", value_parser=parse_send_bundle_mode)]
-    pub send_bundle_mode: SendBundleMode,
+    pub send_bundle_mode: SendStrategy,
 }
 
 /// UoPool CLI args
@@ -74,7 +73,7 @@ pub struct UoPoolArgs {
     pub uopool_addr: IpAddr,
 
     /// UoPool gRPC port to listen on.
-    #[clap(long = "uopool.port", default_value_t = DEFAULT_UOPOOL_GRPC_PORT)]
+    #[clap(long = "uopool.port", default_value_t = MEMPOOL_PORT)]
     pub uopool_port: u16,
 
     /// Data directory (primarily for database).
@@ -147,7 +146,7 @@ pub struct RpcArgs {
     /// Sets the HTTP RPC port to listen on.
     ///
     /// By default, this option is set to `3000`
-    #[clap(long = "http.port", default_value_t = DEFAULT_HTTP_RPC_PORT)]
+    #[clap(long = "http.port", default_value_t = HTTP_PORT)]
     pub http_port: u16,
 
     /// Configures the HTTP RPC API modules.
@@ -177,7 +176,7 @@ pub struct RpcArgs {
     /// Sets the WS RPC port to listen on.
     ///
     /// By default, this option is set to `3001`
-    #[clap(long = "ws.port", default_value_t = DEFAULT_WS_RPC_PORT)]
+    #[clap(long = "ws.port", default_value_t = WS_PORT)]
     pub ws_port: u16,
 
     /// Configures the WS RPC API modules.
@@ -321,7 +320,7 @@ mod tests {
                     .unwrap(),
                 min_balance: U256::from(100000000000000000_u64),
                 bundle_interval: 10,
-                send_bundle_mode: SendBundleMode::EthClient,
+                send_bundle_mode: SendStrategy::EthClient,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
             },
@@ -357,20 +356,12 @@ mod tests {
                 http: true,
                 http_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 http_port: 3000,
-                http_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                http_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: true,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 ws_port: 3001,
-                ws_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                ws_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
                 eth_client_proxy_address: None,
             },
@@ -397,11 +388,7 @@ mod tests {
                 http: true,
                 http_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 http_port: 3000,
-                http_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                http_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: false,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -438,11 +425,7 @@ mod tests {
                 ws: true,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 ws_port: 3001,
-                ws_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                ws_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
                 eth_client_proxy_address: None,
             },
@@ -468,11 +451,7 @@ mod tests {
                 http: false,
                 http_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 http_port: 3000,
-                http_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                http_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: false,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -492,11 +471,7 @@ mod tests {
                 http: true,
                 http_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 http_port: 3000,
-                http_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                http_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: false,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -522,11 +497,7 @@ mod tests {
                 ws: true,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 ws_port: 3001,
-                ws_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                ws_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
                 eth_client_proxy_address: None,
             }
@@ -542,20 +513,12 @@ mod tests {
                 http: true,
                 http_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 http_port: 3000,
-                http_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                http_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: true,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 ws_port: 3001,
-                ws_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                ws_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 ws_origins: vec![String::from("127.0.0.1:4321")],
                 eth_client_proxy_address: None,
             }
@@ -571,11 +534,7 @@ mod tests {
                 http: false,
                 http_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 http_port: 3000,
-                http_api: vec![
-                    String::from("eth"),
-                    String::from("debug"),
-                    String::from("web3")
-                ],
+                http_api: vec![String::from("eth"), String::from("debug"), String::from("web3")],
                 http_corsdomain: vec![String::from("127.0.0.1:4321")],
                 ws: false,
                 ws_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),

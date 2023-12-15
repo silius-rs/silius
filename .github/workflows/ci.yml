@@ -19,13 +19,18 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
       - uses: actions/checkout@v2
 
-      - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Setup Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          components: rustfmt, clippy
+          components: clippy
+
+      - name: Setup Rust toolchain (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
 
       - name: Install cargo tools
         run: |
@@ -100,6 +105,7 @@ jobs:
           repository: eth-infinitism/bundler-spec-tests
           ref: 'b9f192f39298e6586729d40f29e3098c92e5c0b9'
           submodules: true
+
       - uses: actions/checkout@v3
         with:
           path:

@@ -1,14 +1,14 @@
 use jsonrpsee::types::{error::ErrorCode, ErrorObject, ErrorObjectOwned};
 use serde_json::json;
 use silius_primitives::{
-    consts::rpc_error_codes::{
+    constants::rpc::{
         ENTITY_BANNED_OR_THROTTLED, EXECUTION, EXPIRATION, OPCODE, SANITY_CHECK, SIGNATURE,
         STAKE_TOO_LOW, VALIDATION,
     },
+    mempool::ValidationError,
     reputation::ReputationError,
     sanity::SanityCheckError,
     simulation::SimulationCheckError,
-    uopool::ValidationError,
 };
 
 /// A wrapper for the [ErrorObjectOwned](ErrorObjectOwned) type.
@@ -202,14 +202,8 @@ impl From<SimulationCheckError> for JsonRpcError {
                 "Invalid UserOp signature or paymaster signature",
                 None::<bool>,
             ),
-            SimulationCheckError::Expiration {
-                valid_after,
-                valid_until,
-                paymaster,
-            } => ErrorObject::owned(
-                EXPIRATION,
-                "User operation is expired or will expire soon",
-                {
+            SimulationCheckError::Expiration { valid_after, valid_until, paymaster } => {
+                ErrorObject::owned(EXPIRATION, "User operation is expired or will expire soon", {
                     if let Some(paymaster) = paymaster {
                         Some(json!({
                             "valid_after": valid_after, "valid_until": valid_until, "paymaster": paymaster,
@@ -219,8 +213,8 @@ impl From<SimulationCheckError> for JsonRpcError {
                             "valid_after": valid_after, "valid_until": valid_until,
                         }))
                     }
-                },
-            ),
+                })
+            }
             SimulationCheckError::Validation { message } => {
                 ErrorObject::owned(VALIDATION, message, None::<bool>)
             }

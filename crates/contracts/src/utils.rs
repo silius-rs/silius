@@ -39,14 +39,12 @@ impl From<entry_point_api::UserOperation> for UserOperation {
 }
 
 pub fn parse_from_input_data(data: Bytes) -> Option<Vec<UserOperation>> {
-    EntryPointAPICalls::decode(data)
-        .ok()
-        .and_then(|call| match call {
-            EntryPointAPICalls::HandleOps(ops) => {
-                Some(ops.ops.into_iter().map(|op| op.into()).collect())
-            }
-            _ => None,
-        })
+    EntryPointAPICalls::decode(data).ok().and_then(|call| match call {
+        EntryPointAPICalls::HandleOps(ops) => {
+            Some(ops.ops.into_iter().map(|op| op.into()).collect())
+        }
+        _ => None,
+    })
 }
 
 #[cfg(test)]

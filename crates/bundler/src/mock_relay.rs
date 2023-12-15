@@ -8,8 +8,7 @@ use ethers::{
 use ethers_flashbots_test::{relay::SendBundleResponse, SimulatedBundle, SimulatedTransaction};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub const INIT_BLOCK: u64 = 17832062;
 
@@ -38,9 +37,7 @@ impl MockFlashbotsBlockBuilderRelay {
             .parse::<LocalWallet>()?;
         let client = Arc::new(SignerMiddleware::new(mock_eth_client.clone(), wallet));
 
-        Ok(Self {
-            mock_eth_client: client,
-        })
+        Ok(Self { mock_eth_client: client })
     }
 }
 
@@ -52,7 +49,8 @@ impl MockFlashbotsRelayServer for MockFlashbotsBlockBuilderRelay {
 
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(12)).await;
-            // let _ = MockFlashbotsBlockBuilderRelay::create_pending_bundle(&provider, &bundle_req);
+            // let _ = MockFlashbotsBlockBuilderRelay::create_pending_bundle(&provider,
+            // &bundle_req);
         });
 
         Ok(SendBundleResponse::default())

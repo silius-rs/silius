@@ -1,4 +1,4 @@
-# Silius RPC
+# silius-rpc
 
 Silius RPC crate provides an interface for handling RPC methods according to the [ERC-4337 specs](https://eips.ethereum.org/EIPS/eip-4337#rpc-methods-eth-namespace).
 

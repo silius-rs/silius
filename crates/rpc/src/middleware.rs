@@ -1,13 +1,19 @@
 use hyper::{Body, Request, Response};
 use hyper_tls::HttpsConnector;
-use jsonrpsee::core::error::Error as JsonRpcError;
-use jsonrpsee::types::error::{ErrorCode, METHOD_NOT_FOUND_MSG};
-use jsonrpsee::types::ErrorObjectOwned;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::Poll;
-use std::{error::Error, task::Context};
+use jsonrpsee::{
+    core::error::Error as JsonRpcError,
+    types::{
+        error::{ErrorCode, METHOD_NOT_FOUND_MSG},
+        ErrorObjectOwned,
+    },
+};
+use std::{
+    error::Error,
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 use tower::{Layer, Service};
 
 /// The proxy layer for the [json rpc server](JsonRpcServer)
@@ -26,9 +32,7 @@ impl ProxyJsonRpcLayer {
     /// # Returns
     /// * `Self` - A ProxyJsonRpcLayer instance
     pub fn new(address: impl Into<String>) -> Self {
-        Self {
-            address: address.into(),
-        }
+        Self { address: address.into() }
     }
 }
 
@@ -60,10 +64,7 @@ impl<S> ProxyJsonRpcRequest<S> {
     /// # Returns
     /// * `Result<Self, JsonRpcError>` - A ProxyJsonRpcRequest instance
     pub fn new(inner: S, address: &str) -> Result<Self, JsonRpcError> {
-        Ok(Self {
-            inner,
-            address: Arc::from(address),
-        })
+        Ok(Self { inner, address: Arc::from(address) })
     }
 }
 
@@ -104,8 +105,8 @@ where
             }
 
             if let Ok(err) = serde_json::from_slice::<JsonRpcErrorResponse>(&res_bb) {
-                if err.error.code() == ErrorCode::MethodNotFound.code()
-                    && err.error.message() == METHOD_NOT_FOUND_MSG
+                if err.error.code() == ErrorCode::MethodNotFound.code() &&
+                    err.error.message() == METHOD_NOT_FOUND_MSG
                 {
                     let req = Request::post(addr.clone())
                         .header(hyper::header::CONTENT_TYPE, "application/json")

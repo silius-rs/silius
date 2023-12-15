@@ -8,9 +8,7 @@ use examples_simple_account::{
     simple_account::SimpleAccountExecute, EstimateResult, Request, Response,
 };
 use reqwest;
-use silius_primitives::consts::entry_point::ADDRESS;
-use silius_primitives::UserOperation;
-use silius_primitives::Wallet as UoWallet;
+use silius_primitives::{constants::entry_point::ADDRESS, UserOperation, Wallet as UoWallet};
 use silius_tests::common::gen::SimpleAccountFactory;
 use std::{env, sync::Arc, time::Duration};
 
@@ -27,9 +25,7 @@ async fn main() -> eyre::Result<()> {
             .interval(Duration::from_millis(10u64));
         let chain_id = provider.get_chainid().await?.as_u64();
 
-        let wallet = MnemonicBuilder::<English>::default()
-            .phrase(seed_phrase.as_str())
-            .build()?;
+        let wallet = MnemonicBuilder::<English>::default().phrase(seed_phrase.as_str()).build()?;
         let client =
             SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
                 .nonce_manager(wallet.address());
@@ -59,10 +55,7 @@ async fn main() -> eyre::Result<()> {
         println!("init_code: {:?}", init_code);
 
         let (gas_price, priority_fee) = provider.estimate_eip1559_fees(None).await?;
-        println!(
-            "gas_price: {:?}, priority_fee: {:?}",
-            gas_price, priority_fee
-        );
+        println!("gas_price: {:?}, priority_fee: {:?}", gas_price, priority_fee);
 
         let execution = SimpleAccountExecute::new(Address::zero(), U256::from(0), Bytes::default());
         println!("{:}", Bytes::from(execution.encode()));
@@ -81,11 +74,7 @@ async fn main() -> eyre::Result<()> {
         };
         let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &chain_id.into(), false)?;
         let user_op = uo_wallet
-            .sign_uo(
-                &user_op,
-                &ADDRESS.to_string().parse::<Address>()?,
-                &chain_id.into(),
-            )
+            .sign_uo(&user_op, &ADDRESS.to_string().parse::<Address>()?, &chain_id.into())
             .await?;
 
         let value = serde_json::to_value(&user_op).unwrap();
@@ -110,10 +99,7 @@ async fn main() -> eyre::Result<()> {
         println!("json: {:?}", v);
 
         let user_op = UserOperation {
-            pre_verification_gas: v
-                .result
-                .pre_verification_gas
-                .saturating_add(U256::from(1000)),
+            pre_verification_gas: v.result.pre_verification_gas.saturating_add(U256::from(1000)),
             verification_gas_limit: v.result.verification_gas_limit,
             call_gas_limit: v.result.call_gas_limit.saturating_add(U256::from(2000)),
             max_priority_fee_per_gas: priority_fee,
@@ -121,21 +107,14 @@ async fn main() -> eyre::Result<()> {
             ..user_op
         };
         let user_op = uo_wallet
-            .sign_uo(
-                &user_op,
-                &ADDRESS.to_string().parse::<Address>()?,
-                &chain_id.into(),
-            )
+            .sign_uo(&user_op, &ADDRESS.to_string().parse::<Address>()?, &chain_id.into())
             .await?;
 
         let send_body = Request {
             jsonrpc: "2.0".to_string(),
             id: 1,
             method: "eth_sendUserOperation".to_string(),
-            params: vec![
-                serde_json::to_value(&user_op).unwrap(),
-                ADDRESS.to_string().into(),
-            ],
+            params: vec![serde_json::to_value(&user_op).unwrap(), ADDRESS.to_string().into()],
         };
         let post = reqwest::Client::builder()
             .build()?

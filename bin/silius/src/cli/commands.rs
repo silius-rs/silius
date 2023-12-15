@@ -170,12 +170,8 @@ pub struct RpcCommand {
 impl RpcCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
-        launch_rpc(
-            self.rpc,
-            self.uopool_grpc_listen_address,
-            self.bundler_grpc_listen_address,
-        )
-        .await?;
+        launch_rpc(self.rpc, self.uopool_grpc_listen_address, self.bundler_grpc_listen_address)
+            .await?;
         pending().await
     }
 }

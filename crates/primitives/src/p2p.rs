@@ -1,9 +1,12 @@
+//! P2P primitives
+
 use crate::UserOperation;
 use alloy_chains::Chain;
 use ethers::types::{Address, U256 as EthersU256};
 use ssz_rs::{List, Vector, U256};
 use ssz_rs_derive::Serializable;
 
+/// Gossipsub message type
 #[derive(Clone, Debug, Default, Serializable, PartialEq)]
 pub struct UserOperationsWithEntryPoint {
     // entrypoint address
@@ -50,6 +53,7 @@ impl UserOperationsWithEntryPoint {
     }
 }
 
+/// Message type in Req/Resp protocol
 #[derive(Clone, Debug, Default, Serializable)]
 pub struct PooledUserOps {
     mempool_id: Vector<u8, 32>,

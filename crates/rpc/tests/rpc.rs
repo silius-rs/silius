@@ -20,10 +20,7 @@ async fn only_http_rpc_server() {
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_methods(
-            DummyEthApiServerImpl { chain_id }.into_rpc(),
-            JsonRpcServerType::Http,
-        )
+        .add_methods(DummyEthApiServerImpl { chain_id }.into_rpc(), JsonRpcServerType::Http)
         .unwrap();
 
     let (http_handle, _ws_handle) = server.start().await.unwrap();
@@ -48,10 +45,7 @@ async fn only_ws_rpc_server() {
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_methods(
-            DummyEthApiServerImpl { chain_id }.into_rpc(),
-            JsonRpcServerType::Ws,
-        )
+        .add_methods(DummyEthApiServerImpl { chain_id }.into_rpc(), JsonRpcServerType::Ws)
         .unwrap();
 
     let (_http_handle, ws_handle) = server.start().await.unwrap();
@@ -79,10 +73,7 @@ async fn http_and_ws_rpc_server() {
 
     let chain_id: U64 = U64::from(0x7a69);
     server
-        .add_methods(
-            DummyEthApiServerImpl { chain_id }.into_rpc(),
-            JsonRpcServerType::Both,
-        )
+        .add_methods(DummyEthApiServerImpl { chain_id }.into_rpc(), JsonRpcServerType::Both)
         .unwrap();
 
     let (http_handle, ws_handle) = server.start().await.unwrap();

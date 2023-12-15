@@ -1,3 +1,5 @@
+//! Basic transaction type for account abstraction (ERC-4337)
+
 use super::utils::{as_checksum_addr, as_checksum_bytes, get_address};
 use ethers::{
     abi::AbiEncode,
@@ -9,9 +11,11 @@ use rustc_hex::FromHexError;
 use serde::{Deserialize, Serialize};
 use ssz_rs::List;
 use std::{ops::Deref, slice::Windows, str::FromStr};
+
 /// This could be increased if we found bigger bytes, the propper value is not sure right now.
 const MAXIMUM_SSZ_BYTES_LENGTH: usize = 1024;
-/// Transaction type for ERC-4337 account abstraction
+
+/// Transaction type for account abstraction (ERC-4337)
 #[derive(
     Clone,
     Debug,
@@ -47,7 +51,8 @@ pub struct UserOperation {
     /// The amount of gas to allocate for the verification step
     pub verification_gas_limit: U256,
 
-    /// The amount of gas to pay bundler to compensate for the pre-verification execution and calldata
+    /// The amount of gas to pay bundler to compensate for the pre-verification execution and
+    /// calldata
     pub pre_verification_gas: U256,
 
     /// Maximum fee per gas (similar to EIP-1559)
@@ -56,7 +61,8 @@ pub struct UserOperation {
     /// Maximum priority fee per gas (similar to EIP-1559)
     pub max_priority_fee_per_gas: U256,
 
-    /// Address of paymaster sponsoring the user operation, followed by extra data to send to the paymaster (can be empty)
+    /// Address of paymaster sponsoring the user operation, followed by extra data to send to the
+    /// paymaster (can be empty)
     pub paymaster_and_data: Bytes,
 
     /// Data passed to the account along with the nonce during the verification step
@@ -467,12 +473,10 @@ fn ssz_unpack_bytes(
     encoding: &[u8],
     total_bytes_read: usize,
 ) -> Result<(Bytes, usize), ssz_rs::DeserializeError> {
-    let range = bytes_zone
-        .next()
-        .ok_or(ssz_rs::DeserializeError::AdditionalInput {
-            provided: encoding.len(),
-            expected: total_bytes_read,
-        })?;
+    let range = bytes_zone.next().ok_or(ssz_rs::DeserializeError::AdditionalInput {
+        provided: encoding.len(),
+        expected: total_bytes_read,
+    })?;
     let start = range[0];
     let end = range[1];
     let bytes_data = Bytes::from_iter(encoding[start..end].iter());
@@ -492,12 +496,10 @@ impl ssz_rs::Deserialize for UserOperation {
             let encoded_length = <[u8; 20] as ssz_rs::Serializable>::size_hint();
             let end = start + encoded_length;
             let target =
-                encoding
-                    .get(start..end)
-                    .ok_or(ssz_rs::DeserializeError::ExpectedFurtherInput {
-                        provided: encoding.len() - start,
-                        expected: encoded_length,
-                    })?;
+                encoding.get(start..end).ok_or(ssz_rs::DeserializeError::ExpectedFurtherInput {
+                    provided: encoding.len() - start,
+                    expected: encoded_length,
+                })?;
             let result = <[u8; 20] as ssz_rs::Deserialize>::deserialize(target)?;
             container.sender = Address::from_slice(&result);
             encoded_length
@@ -648,9 +650,7 @@ mod tests {
         ];
         assert_eq!(
             uos[0].hash(
-                &"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-                    .parse()
-                    .unwrap(),
+                &"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(),
                 &80_001.into()
             ),
             "0x95418c07086df02ff6bc9e8bdc150b380cb761beecc098630440bcec6e862702"
@@ -660,9 +660,7 @@ mod tests {
         );
         assert_eq!(
             uos[1].hash(
-                &"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-                    .parse()
-                    .unwrap(),
+                &"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(),
                 &80_001.into()
             ),
             "0x7c1b8c9df49a9e09ecef0f0fe6841d895850d29820f9a4b494097764085dcd7e"
@@ -704,10 +702,7 @@ mod tests {
         assert_eq!(uo_decode.verification_gas_limit, uo.verification_gas_limit);
         assert_eq!(uo_decode.pre_verification_gas, uo.pre_verification_gas);
         assert_eq!(uo_decode.max_fee_per_gas, uo.max_fee_per_gas);
-        assert_eq!(
-            uo_decode.max_priority_fee_per_gas,
-            uo.max_priority_fee_per_gas
-        );
+        assert_eq!(uo_decode.max_priority_fee_per_gas, uo.max_priority_fee_per_gas);
         assert_eq!(uo_decode.paymaster_and_data, uo.paymaster_and_data);
         assert_eq!(uo_decode.signature, uo.signature);
     }

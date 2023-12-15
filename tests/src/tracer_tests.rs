@@ -28,20 +28,14 @@ async fn setup() -> eyre::Result<Context<ClientType>> {
     let client = Arc::new(_client);
 
     let tracer_test = deploy_tracer_test(client.clone()).await?;
-    Ok(Context {
-        _geth,
-        client,
-        tracer_test,
-    })
+    Ok(Context { _geth, client, tracer_test })
 }
 
 async fn trace_call<M: Middleware + 'static>(
     c: &Context<M>,
     func_data: Bytes,
 ) -> eyre::Result<JsTracerFrame> {
-    let req = TransactionRequest::new()
-        .to(c.tracer_test.address)
-        .data(func_data);
+    let req = TransactionRequest::new().to(c.tracer_test.address).data(func_data);
     let res = c
         .client
         .clone()
@@ -89,10 +83,7 @@ async fn trace_exec_self<M: Middleware + 'static>(
 async fn count_opcode_depth_bigger_than_1() -> eyre::Result<()> {
     let c = setup().await?;
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
-    let func_data = contract
-        .abi()
-        .function("callTimeStamp")?
-        .encode_input(&[])?;
+    let func_data = contract.abi().function("callTimeStamp")?.encode_input(&[])?;
     let ret = trace_exec_self(&c, func_data, false, true).await?;
     let log: ExecSelfResultFilter = ExecSelfResultFilter::decode_log(&RawLog::from((
         ret.logs[0]
@@ -104,13 +95,7 @@ async fn count_opcode_depth_bigger_than_1() -> eyre::Result<()> {
         ret.logs[0].data.to_vec(),
     )))?;
     assert_eq!(log.success, true);
-    assert_eq!(
-        *ret.calls_from_entry_point[0]
-            .opcodes
-            .get("TIMESTAMP")
-            .unwrap(),
-        1
-    );
+    assert_eq!(*ret.calls_from_entry_point[0].opcodes.get("TIMESTAMP").unwrap(), 1);
     Ok(())
 }
 
@@ -118,14 +103,7 @@ async fn count_opcode_depth_bigger_than_1() -> eyre::Result<()> {
 async fn trace_exec_self_should_revert() -> eyre::Result<()> {
     let c = setup().await?;
     let ret = trace_exec_self(&c, Bytes::from_str("0xdead")?.to_vec(), true, true).await?;
-    assert!(
-        ret.debug
-            .join(",")
-            .matches("execution reverted")
-            .collect::<Vec<&str>>()
-            .len()
-            > 0
-    );
+    assert!(ret.debug.join(",").matches("execution reverted").collect::<Vec<&str>>().len() > 0);
     assert_eq!(ret.logs.len(), 1);
 
     let log: ExecSelfResultFilter = ExecSelfResultFilter::decode_log(&RawLog::from((
@@ -173,10 +151,7 @@ async fn should_report_direct_use_of_gas_opcode() -> eyre::Result<()> {
     let contract: &BaseContract = c.tracer_test.contract().deref().deref();
     let func_data = contract.abi().function("testCallGas")?.encode_input(&[])?;
     let ret = trace_exec_self(&c, func_data, false, false).await?;
-    assert_eq!(
-        *ret.calls_from_entry_point[0].opcodes.get("GAS").unwrap(),
-        1
-    );
+    assert_eq!(*ret.calls_from_entry_point[0].opcodes.get("GAS").unwrap(), 1);
     Ok(())
 }
 

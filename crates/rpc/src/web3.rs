@@ -1,7 +1,7 @@
 use crate::web3_api::Web3ApiServer;
 use async_trait::async_trait;
 use jsonrpsee::core::RpcResult;
-use silius_primitives::consts::entry_point::VERSION;
+use silius_primitives::constants::entry_point::VERSION;
 
 pub struct Web3ApiServerImpl {}
 

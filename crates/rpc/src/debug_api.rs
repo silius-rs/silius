@@ -53,7 +53,8 @@ pub trait DebugApi {
     /// Set the reputations for the given array of [ReputationEntry](ReputationEntry)
     ///
     /// # Arguments
-    /// * `reputation_entries: Vec<ReputationEntry>` - The [ReputationEntry](ReputationEntry) to be set.
+    /// * `reputation_entries: Vec<ReputationEntry>` - The [ReputationEntry](ReputationEntry) to be
+    ///   set.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
@@ -86,7 +87,8 @@ pub trait DebugApi {
     async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<ResponseSuccess>;
 
     /// Immediately send the current bundle of user operations.
-    /// This is useful for testing or in situations where waiting for the next scheduled bundle is not desirable.
+    /// This is useful for testing or in situations where waiting for the next scheduled bundle is
+    /// not desirable.
     ///
     ///
     /// # Returns

@@ -12,8 +12,8 @@ use ethers_flashbots::{
 };
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{
-    bundler::SendBundleMode,
-    consts::{flashbots_relay_endpoints, supported_chains},
+    bundler::SendStrategy,
+    constants::{flashbots_relay_endpoints, supported_chains},
     UserOperation, Wallet,
 };
 use std::{sync::Arc, time::Duration};
@@ -41,8 +41,9 @@ where
     pub entry_point: Address,
     /// [Chain](Chain) instance representing the blockchain network to be used
     pub chain: Chain,
-    /// Send bundle mode determines whether to send the bundle to a regular Eth execution client or to Flashbots
-    pub send_bundle_mode: SendBundleMode,
+    /// Send bundle mode determines whether to send the bundle to a regular Eth execution client or
+    /// to Flashbots
+    pub send_bundle_mode: SendStrategy,
     /// Block Builder relay endpoints
     pub relay_endpoints: Option<Vec<String>>,
     /// Ethereum signer middleware
@@ -58,7 +59,8 @@ where
     M: Middleware + 'static,
 {
     /// Create a new `Bundler` instance
-    /// if `send_bundle_mode` is `SendBundleMode::Flashbots` and `relay_endpoints` is `None`, the default Flashbots relay endpoint will be used
+    /// if `send_bundle_mode` is `SendBundleMode::Flashbots` and `relay_endpoints` is `None`, the
+    /// default Flashbots relay endpoint will be used
     ///
     /// # Returns
     /// * `Self` - A new `Bundler` instance
@@ -69,24 +71,22 @@ where
         beneficiary: Address,
         entry_point: Address,
         chain: Chain,
-        send_bundle_mode: SendBundleMode,
+        send_bundle_mode: SendStrategy,
         relay_endpoints: Option<Vec<String>>,
         min_balance: U256,
     ) -> eyre::Result<Self> {
-        if !(chain.id() == supported_chains::MAINNET
-            || chain.id() == supported_chains::GOERLI
-            || chain.id() == supported_chains::SEPOLIA)
-            && send_bundle_mode == SendBundleMode::Flashbots
+        if !(chain.id() == supported_chains::MAINNET ||
+            chain.id() == supported_chains::GOERLI ||
+            chain.id() == supported_chains::SEPOLIA) &&
+            send_bundle_mode == SendStrategy::Flashbots
         {
             panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia");
         };
 
         match send_bundle_mode {
-            SendBundleMode::EthClient => {
-                let client = Arc::new(SignerMiddleware::new(
-                    eth_client.clone(),
-                    wallet.signer.clone(),
-                ));
+            SendStrategy::EthClient => {
+                let client =
+                    Arc::new(SignerMiddleware::new(eth_client.clone(), wallet.signer.clone()));
 
                 Ok(Self {
                     wallet,
@@ -100,7 +100,7 @@ where
                     min_balance,
                 })
             }
-            SendBundleMode::Flashbots => match relay_endpoints {
+            SendStrategy::Flashbots => match relay_endpoints {
                 None => {
                     let relay_endpoints = vec![flashbots_relay_endpoints::FLASHBOTS.to_string()];
                     let flashbots_client = generate_flashbots_middleware(
@@ -144,7 +144,8 @@ where
         }
     }
 
-    /// Send a bundle of [UserOperations](UserOperation) to the Ethereum execution client or Flashbots' relay, depending on the [SendBundleMode](SendBundleMode)
+    /// Send a bundle of [UserOperations](UserOperation) to the Ethereum execution client or
+    /// Flashbots' relay, depending on the [SendBundleMode](SendBundleMode)
     ///
     /// # Arguments
     /// * `uos` - An array of [UserOperations](UserOperation)
@@ -161,12 +162,13 @@ where
         trace!("Bundle content: {uos:?}");
 
         match self.send_bundle_mode {
-            SendBundleMode::EthClient => self.send_next_bundle_eth(uos).await,
-            SendBundleMode::Flashbots => self.send_next_bundle_flashbots(uos).await,
+            SendStrategy::EthClient => self.send_next_bundle_eth(uos).await,
+            SendStrategy::Flashbots => self.send_next_bundle_flashbots(uos).await,
         }
     }
 
-    /// Helper function to generate a [TypedTransaction](TypedTransaction) from an array of user operations.
+    /// Helper function to generate a [TypedTransaction](TypedTransaction) from an array of user
+    /// operations.
     ///
     /// # Arguments
     /// * `client` - A provider that implements [Middleware](Middleware) trait
@@ -184,26 +186,17 @@ where
     {
         let ep = EntryPointAPI::new(self.entry_point, client.clone());
 
-        let nonce = client
-            .clone()
-            .get_transaction_count(self.wallet.signer.address(), None)
-            .await?;
-        let balance = client
-            .clone()
-            .get_balance(self.wallet.signer.address(), None)
-            .await?;
+        let nonce =
+            client.clone().get_transaction_count(self.wallet.signer.address(), None).await?;
+        let balance = client.clone().get_balance(self.wallet.signer.address(), None).await?;
         let beneficiary = if balance < self.min_balance {
             self.wallet.signer.address()
         } else {
             self.beneficiary
         };
 
-        let mut tx: TypedTransaction = ep
-            .handle_ops(
-                uos.clone().into_iter().map(Into::into).collect(),
-                beneficiary,
-            )
-            .tx;
+        let mut tx: TypedTransaction =
+            ep.handle_ops(uos.clone().into_iter().map(Into::into).collect(), beneficiary).tx;
 
         match self.chain.id() {
             // Mumbai
@@ -212,11 +205,7 @@ where
             }
             // All other surpported networks, including Mainnet, Goerli
             _ => {
-                let accesslist = client
-                    .clone()
-                    .create_access_list(&tx, None)
-                    .await?
-                    .access_list;
+                let accesslist = client.clone().create_access_list(&tx, None).await?.access_list;
                 tx.set_access_list(accesslist.clone());
                 let estimated_gas = client.clone().estimate_gas(&tx, None).await?;
 
@@ -258,10 +247,7 @@ where
 
         trace!("Sending transaction to the execution client: {tx:?}");
 
-        let tx = client
-            .send_transaction(tx, None)
-            .await?
-            .interval(Duration::from_millis(75));
+        let tx = client.send_transaction(tx, None).await?.interval(Duration::from_millis(75));
         let tx_hash = tx.tx_hash();
 
         let tx_receipt = tx.await?;
@@ -353,16 +339,10 @@ async fn simulate_flashbots_bundle<M: Middleware + 'static>(
     for tx in &simulated_bundle.transactions {
         trace!("Simulate bundle: {:?}", tx);
         if let Some(err) = &tx.error {
-            return Err(eyre::eyre!(
-                "Transaction failed simulation with error: {:?}",
-                err
-            ));
+            return Err(eyre::eyre!("Transaction failed simulation with error: {:?}", err));
         }
         if let Some(revert) = &tx.revert {
-            return Err(eyre::eyre!(
-                "Transaction failed simulation with revert: {:?}",
-                revert
-            ));
+            return Err(eyre::eyre!("Transaction failed simulation with revert: {:?}", revert));
         }
     }
 
@@ -374,7 +354,8 @@ async fn simulate_flashbots_bundle<M: Middleware + 'static>(
 /// # Arguments
 /// * `client` - An [Flashbots SignerMiddleware](FlashbotsSignerMiddleware)
 /// * `tx` - A [EIP-1559 TypedTransaction](TypedTransaction)
-/// * `revertible` - If true the bundle is revertible, otherwise any transactions in the bundle revert will revert the whole bundle
+/// * `revertible` - If true the bundle is revertible, otherwise any transactions in the bundle
+///   revert will revert the whole bundle
 ///
 /// # Returns
 /// * `BundleRequest` - A [BundleRequest](BundleRequest)
@@ -434,20 +415,14 @@ pub(crate) fn generate_flashbots_middleware<M: Middleware + 'static>(
         None => return Err(eyre::eyre!("No Flashbots signer provided")),
     };
 
-    let mut flashbots_middleware = FlashbotsMiddleware::new(
-        eth_client,
-        Url::parse(relay_endpoint)?,
-        bundle_signer.clone(),
-    );
+    let mut flashbots_middleware =
+        FlashbotsMiddleware::new(eth_client, Url::parse(relay_endpoint)?, bundle_signer.clone());
     flashbots_middleware.set_simulation_relay(
         Url::parse(relay_endpoint).expect("Failed to parse simulation relay URL"),
         bundle_signer.clone(),
     );
 
-    let client = Arc::new(SignerMiddleware::new(
-        flashbots_middleware,
-        wallet.signer.clone(),
-    ));
+    let client = Arc::new(SignerMiddleware::new(flashbots_middleware, wallet.signer.clone()));
 
     Ok(client)
 }
@@ -476,7 +451,7 @@ mod test {
         utils::{parse_units, Anvil, AnvilInstance},
     };
     use jsonrpsee::server::{ServerBuilder, ServerHandle};
-    use silius_primitives::{bundler::SendBundleMode, consts::flashbots_relay_endpoints, Wallet};
+    use silius_primitives::{bundler::SendStrategy, constants::flashbots_relay_endpoints, Wallet};
     use std::sync::Arc;
 
     sol! {
@@ -549,25 +524,19 @@ mod test {
             wallet.signer.address(),
             ep_address,
             Chain::from(1),
-            SendBundleMode::Flashbots,
+            SendStrategy::Flashbots,
             Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()]),
             U256::from(100000000000000000u64),
         )
         .expect("Failed to create bundler");
 
-        Ok(TestContext {
-            bundler,
-            entry_point: ep_address,
-            anvil,
-        })
+        Ok(TestContext { bundler, entry_point: ep_address, anvil })
     }
 
     async fn start_mock_server() -> eyre::Result<(ServerHandle, MockFlashbotsBlockBuilderRelay)> {
         // Start a mock server connecting to the Anvil, exposing the port at 3001
         let mock_relay = MockFlashbotsBlockBuilderRelay::new(8545u64).await.unwrap();
-        let server = ServerBuilder::new()
-            .build("127.0.0.1:3001".to_string())
-            .await?;
+        let server = ServerBuilder::new().build("127.0.0.1:3001".to_string()).await?;
         let handle = server.start(mock_relay.clone().into_rpc());
 
         Ok((handle, mock_relay))
@@ -592,7 +561,7 @@ mod test {
             wallet.signer.address(),
             ep_address,
             Chain::from(5),
-            SendBundleMode::Flashbots,
+            SendStrategy::Flashbots,
             Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.to_string()]),
             U256::from(100000000000000000u64),
         )
@@ -616,9 +585,7 @@ mod test {
         let approve_call_data = approve.encode();
 
         let address = bundler.wallet.signer.address();
-        let nonce = flashbots_client
-            .get_transaction_count(address.clone(), None)
-            .await?;
+        let nonce = flashbots_client.get_transaction_count(address.clone(), None).await?;
 
         let (max_fee_per_gas, max_priority_fee) = eth_client.estimate_eip1559_fees(None).await?;
 
@@ -663,9 +630,7 @@ mod test {
         let depositor = mock_relay.mock_eth_client.clone();
         let address = bundler.wallet.signer.address();
 
-        let eth_client = Arc::new(Provider::<Http>::try_from(
-            "http://127.0.0.1:8545".to_string(),
-        )?);
+        let eth_client = Arc::new(Provider::<Http>::try_from("http://127.0.0.1:8545".to_string())?);
 
         // Create a Flashbots signer middleware
         let flashbots_client = generate_flashbots_middleware(
@@ -681,18 +646,10 @@ mod test {
 
         // Deposit 500 ETH to get WETH and transfer to the bundler
         let value = U256::from(parse_units("500.0", "ether").unwrap());
-        let _ = depositor_weth_instance
-            .deposit()
-            .value(value)
-            .send()
-            .await?
-            .await?;
+        let _ = depositor_weth_instance.deposit().value(value).send().await?.await?;
 
-        let _ = depositor_weth_instance
-            .transfer(address.clone(), value.clone())
-            .send()
-            .await?
-            .await?;
+        let _ =
+            depositor_weth_instance.transfer(address.clone(), value.clone()).send().await?.await?;
 
         let balance_before = flashbots_client.clone().get_balance(address, None).await?;
 
@@ -727,10 +684,7 @@ mod test {
         };
         let swap_call_data = swap_eth.encode();
 
-        let nonce = flashbots_client
-            .clone()
-            .get_transaction_count(address, None)
-            .await?;
+        let nonce = flashbots_client.clone().get_transaction_count(address, None).await?;
 
         // Craft a bundle with approve() and swapExactETHForTokens()
         let approve_tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {

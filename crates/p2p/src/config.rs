@@ -98,14 +98,8 @@ impl Default for Config {
 impl Config {
     pub fn to_listen_config(&self) -> ListenConfig {
         match &self.listen_addr {
-            ListenAddress::Ipv4(v) => ListenConfig::Ipv4 {
-                ip: v.addr,
-                port: v.udp_port,
-            },
-            ListenAddress::Ipv6(v) => ListenConfig::Ipv6 {
-                ip: v.addr,
-                port: v.udp_port,
-            },
+            ListenAddress::Ipv4(v) => ListenConfig::Ipv4 { ip: v.addr, port: v.udp_port },
+            ListenAddress::Ipv6(v) => ListenConfig::Ipv6 { ip: v.addr, port: v.udp_port },
             ListenAddress::Dual(ipv4, ipv6) => ListenConfig::DualStack {
                 ipv4: ipv4.addr,
                 ipv4_port: ipv4.udp_port,
