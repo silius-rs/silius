@@ -81,6 +81,8 @@ Bundler was tested on the following networks:
 | Ethereum      | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
 | Polygon PoS   | :soon:    | :heavy_check_mark: (Mumbai)                   |
 
+**You could also try any other evm network but it is possible you would meet some problems so use is at your own risk. You are welcomed to open any issues when you meet a problem**
+
 ## Supported entry point
 The address of the entry point smart contract is the same on all EVM networks.
 | Address    | Version   | Commit    | Audited   |

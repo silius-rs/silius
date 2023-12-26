@@ -80,7 +80,6 @@ pub mod flashbots_relay_endpoints {
 /// Supported chains
 pub mod supported_chains {
     pub const SUPPORTED_CHAINS: [u64; 5] = [MAINNET, GOERLI, SEPOLIA, DEV, MUMBAI];
-    pub const SUPPORTED_NAMED_CHAINS: [&str; 5] = ["mainnet", "goerli", "sepolia", "dev", "mumbai"];
 
     // dev
     pub const DEV: u64 = 1337;

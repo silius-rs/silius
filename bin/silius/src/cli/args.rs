@@ -1,6 +1,7 @@
 use crate::utils::{
     parse_address, parse_duration, parse_enr, parse_send_bundle_mode, parse_u256, parse_uopool_mode,
 };
+use alloy_chains::NamedChain;
 use clap::{Parser, ValueEnum};
 use discv5::Enr;
 use ethers::types::{Address, U256};
@@ -12,7 +13,6 @@ use silius_primitives::{
         bundler::BUNDLE_INTERVAL,
         grpc::{BUNDLER_PORT, MEMPOOL_PORT},
         rpc::{HTTP_PORT, WS_PORT},
-        supported_chains::SUPPORTED_NAMED_CHAINS,
     },
     UoPoolMode,
 };
@@ -119,8 +119,8 @@ pub struct BundlerAndUoPoolArgs {
     pub eth_client_address: String,
 
     /// Chain information.
-    #[clap(long, value_parser = SUPPORTED_NAMED_CHAINS)]
-    pub chain: Option<String>,
+    #[clap(long)]
+    pub chain: Option<NamedChain>,
 
     /// Entry point addresses.
     #[clap(long, value_delimiter=',', value_parser=parse_address)]
@@ -339,6 +339,8 @@ mod tests {
             "bundleranduopoolargs",
             "--eth-client-address",
             "http://127.0.0.1:8545",
+            "--chain",
+            "holesky",
             "--entry-points",
             "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
             "--poll-interval",
@@ -347,7 +349,7 @@ mod tests {
         assert_eq!(
             BundlerAndUoPoolArgs {
                 eth_client_address: String::from("http://127.0.0.1:8545"),
-                chain: None,
+                chain: Some(NamedChain::Holesky),
                 entry_points: vec![
                     Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990").unwrap()
                 ],
