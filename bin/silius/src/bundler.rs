@@ -4,7 +4,7 @@ use crate::{
     },
     utils::unwrap_path_or_home,
 };
-use alloy_chains::Chain;
+use alloy_chains::{Chain, NamedChain};
 use ethers::{providers::Middleware, types::Address};
 use parking_lot::RwLock;
 use silius_contracts::EntryPoint;
@@ -46,7 +46,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 pub async fn launch_bundler<M>(
     bundler_args: BundlerArgs,
@@ -63,7 +63,7 @@ where
         uopool_args.clone(),
         eth_client.clone(),
         block_streams,
-        common_args.chain.clone(),
+        common_args.chain,
         common_args.entry_points.clone(),
     )
     .await?;
@@ -90,7 +90,7 @@ where
 pub async fn launch_bundling<M>(
     args: BundlerArgs,
     eth_client: Arc<M>,
-    chain: Option<String>,
+    chain: Option<NamedChain>,
     entry_points: Vec<Address>,
     uopool_grpc_listen_address: String,
 ) -> eyre::Result<()>
@@ -149,7 +149,7 @@ pub async fn launch_uopool<M>(
     args: UoPoolArgs,
     eth_client: Arc<M>,
     block_streams: Vec<BlockStream>,
-    chain: Option<String>,
+    chain: Option<NamedChain>,
     entry_points: Vec<Address>,
 ) -> eyre::Result<()>
 where
@@ -483,12 +483,27 @@ pub fn create_wallet(args: CreateWalletArgs) -> eyre::Result<()> {
     Ok(())
 }
 
-async fn check_connected_chain<M>(eth_client: Arc<M>, chain: Option<String>) -> eyre::Result<String>
+async fn check_connected_chain<M>(
+    eth_client: Arc<M>,
+    chain: Option<NamedChain>,
+) -> eyre::Result<String>
 where
     M: Middleware + Clone + 'static,
 {
     if let Some(chain) = chain {
-        let chain = Chain::from_str(chain.as_str())?;
+        match chain {
+            NamedChain::Mainnet |
+            NamedChain::Goerli |
+            NamedChain::Sepolia |
+            NamedChain::PolygonMumbai |
+            NamedChain::Dev => {}
+            _ => {
+                warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                warn!("Chain {:?} is not officially supported yet! You could possibly meet a lot of problems with silius. Use at your own risk!!", chain);
+                warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            }
+        }
+        let chain: Chain = chain.into();
 
         let chain_id = eth_client.get_chainid().await?.as_u64();
         if chain.id() != chain_id {
