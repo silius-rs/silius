@@ -4,6 +4,7 @@
 mod builder;
 #[cfg(feature = "mdbx")]
 mod database;
+pub mod error;
 mod memory;
 mod mempool;
 mod reputation;
@@ -19,7 +20,11 @@ pub use database::{
         CodeHashes, EntitiesReputation, UserOperations, UserOperationsByEntity,
         UserOperationsBySender,
     },
-    DBError, DatabaseTable, WriteMap,
+    DatabaseError, DatabaseTable, WriteMap,
+};
+pub use error::{
+    InvalidMempoolUserOperationError, MempoolError, MempoolErrorKind, ReputationError, SanityError,
+    SimulationError,
 };
 pub use mempool::{
     mempool_id, AddRemoveUserOp, AddRemoveUserOpHash, Mempool, MempoolId, UserOperationAct,

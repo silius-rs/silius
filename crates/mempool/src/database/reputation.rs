@@ -1,8 +1,5 @@
 use super::{tables::EntitiesReputation, utils::WrapAddress, DatabaseTable};
-use crate::{
-    mempool::ClearOp,
-    reputation::{ReputationEntryOp, ReputationOpError},
-};
+use crate::{mempool::ClearOp, reputation::ReputationEntryOp, ReputationError};
 use ethers::types::Address;
 use reth_db::{
     cursor::{DbCursorRO, DbCursorRW},
@@ -21,7 +18,7 @@ impl<E: EnvironmentKind> ClearOp for DatabaseTable<E, EntitiesReputation> {
 }
 
 impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputation> {
-    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError> {
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationError> {
         let addr_wrap: WrapAddress = (*addr).into();
 
         let tx = self.env.tx()?;
@@ -34,7 +31,7 @@ impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputati
         &mut self,
         addr: &Address,
         entry: ReputationEntry,
-    ) -> Result<Option<ReputationEntry>, ReputationOpError> {
+    ) -> Result<Option<ReputationEntry>, ReputationError> {
         let tx = self.env.tx_mut()?;
         let original = tx.get::<EntitiesReputation>((*addr).into())?;
         tx.put::<EntitiesReputation>((*addr).into(), entry.into())?;
@@ -42,11 +39,11 @@ impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputati
         Ok(original.map(|o| o.into()))
     }
 
-    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError> {
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError> {
         Ok(self.get_entry(addr)?.is_some())
     }
 
-    fn update(&mut self) -> Result<(), ReputationOpError> {
+    fn update(&mut self) -> Result<(), ReputationError> {
         let tx = self.env.tx_mut()?;
         let mut cursor = tx.cursor_write::<EntitiesReputation>()?;
 

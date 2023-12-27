@@ -111,13 +111,13 @@ pub fn message_id_fn(message: &Message) -> MessageId {
 }
 
 /// Creates a gossipsub instance with the given mempool ids
-pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, &'static str> {
+pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, String> {
     let filter = create_whitelist_filter(mempool_ids.clone());
     let gs_config = ConfigBuilder::default()
         .validate_messages()
         .validation_mode(ValidationMode::Anonymous)
         .message_id_fn(message_id_fn)
-        .build()?;
+        .build().map_err(|err| err.to_string())?;
     let snappy_transform = SnappyTransform::new(MAX_GOSSIP_SNAP_SIZE);
     let mut gossipsub = Gossipsub::new_with_subscription_filter_and_transform(
         MessageAuthenticity::Anonymous,

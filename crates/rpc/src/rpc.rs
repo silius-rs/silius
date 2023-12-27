@@ -168,11 +168,11 @@ impl JsonRpcServer {
 
             let server = ServerBuilder::new()
                 .http_only()
-                .set_middleware(service)
+                .set_http_middleware(service)
                 .build(SocketAddr::new(self.http_addr, self.http_port))
                 .await?;
 
-            Some(server.start(self.http_methods.clone())?)
+            Some(server.start(self.http_methods.clone()))
         } else {
             None
         };
@@ -183,11 +183,11 @@ impl JsonRpcServer {
 
             let server = ServerBuilder::new()
                 .ws_only()
-                .set_middleware(service)
+                .set_http_middleware(service)
                 .build(SocketAddr::new(self.ws_addr, self.ws_port))
                 .await?;
 
-            Some(server.start(self.ws_methods.clone())?)
+            Some(server.start(self.ws_methods.clone()))
         } else {
             None
         };

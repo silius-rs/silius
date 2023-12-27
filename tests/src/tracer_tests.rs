@@ -48,7 +48,7 @@ async fn trace_call<M: Middleware + 'static>(
                     disable_stack: None,
                     enable_memory: None,
                     enable_return_data: None,
-                    tracer: Some(GethDebugTracerType::JsTracer(JS_TRACER.to_string())),
+                    tracer: Some(GethDebugTracerType::JsTracer(JS_TRACER.into())),
                     tracer_config: None,
                     timeout: None,
                 },

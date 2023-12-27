@@ -1,14 +1,13 @@
 use crate::{
-    mempool::{
-        Mempool, MempoolError, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
-    },
+    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     mempool_id,
-    reputation::{HashSetOp, ReputationEntryOp, ReputationOpError},
+    reputation::{HashSetOp, ReputationEntryOp},
     utils::calculate_call_gas_limit,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
-    MempoolId, Overhead, Reputation,
+    InvalidMempoolUserOperationError, MempoolError, MempoolErrorKind, MempoolId, Overhead,
+    Reputation, ReputationError, SanityError, SimulationError,
 };
 use alloy_chains::Chain;
 use ethers::{
@@ -19,17 +18,12 @@ use ethers::{
 use eyre::format_err;
 use futures::channel::mpsc::UnboundedSender;
 use silius_contracts::{
-    entry_point::{EntryPointErr, UserOperationEventFilter},
-    utils::parse_from_input_data,
-    EntryPoint,
+    entry_point::UserOperationEventFilter, utils::parse_from_input_data, EntryPoint,
 };
 use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
     get_address,
-    mempool::{AddError, ValidationError},
-    reputation::{ReputationEntry, ReputationError, StakeInfo, StakeInfoResponse, Status},
-    sanity::SanityCheckError,
-    simulation::SimulationCheckError,
+    reputation::{ReputationEntry, StakeInfo, StakeInfoResponse, Status},
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
@@ -115,9 +109,11 @@ where
     /// Returns all of the [UserOperations](UserOperation) in the mempool
     ///
     /// # Returns
-    /// `Vec<UserOperation>` - An array of [UserOperations](UserOperation)
-    pub fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
-        self.mempool.get_all()
+    /// `Result<Vec<UserOperation>, eyre::Error>` - An array of [UserOperations](UserOperation)
+    pub fn get_all(&self) -> eyre::Result<Vec<UserOperation>> {
+        self.mempool.get_all().map_err(|err| {
+            format_err!("Getting all user operations from mempool failed with error: {err:?}",)
+        })
     }
 
     /// Returns an array of [ReputationEntry](ReputationEntry) for entities.
@@ -138,7 +134,7 @@ where
     pub fn set_reputation(
         &mut self,
         reputation: Vec<ReputationEntry>,
-    ) -> Result<(), ReputationOpError> {
+    ) -> Result<(), ReputationError> {
         self.reputation.set_entities(reputation)
     }
 
@@ -174,11 +170,12 @@ where
     /// `uo` - The [UserOperation](UserOperation) to validate
     ///
     /// # Returns
-    /// `Result<UserOperationValidationOutcome, ValidationError>` - The validation outcome
+    /// `Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>` - The validation
+    /// outcome
     pub async fn validate_user_operation(
         &self,
         uo: &UserOperation,
-    ) -> Result<UserOperationValidationOutcome, ValidationError> {
+    ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError> {
         self.validator
             .validate_user_operation(
                 uo,
@@ -205,22 +202,26 @@ where
     /// validation
     ///
     /// # Returns
-    /// `Result<UserOperationHash, AddError>` - The hash of the added [UserOperation](UserOperation)
+    /// `Result<UserOperationHash, MempoolError>` - The hash of the added
+    /// [UserOperation](UserOperation)
     pub async fn add_user_operation(
         &mut self,
         uo: UserOperation,
-        res: Result<UserOperationValidationOutcome, ValidationError>,
-    ) -> Result<UserOperationHash, AddError> {
+        res: Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>,
+    ) -> Result<UserOperationHash, MempoolError> {
         let res = match res {
             Ok(res) => res,
             Err(err) => {
-                if let ValidationError::Sanity(SanityCheckError::Reputation(
-                    ReputationError::EntityBanned { address, entity: _ },
-                )) = err.clone()
+                if let InvalidMempoolUserOperationError::Sanity(SanityError::Reputation(
+                    ReputationError::BannedEntity { address, entity: _ },
+                )) = err
                 {
                     self.remove_user_operation_by_entity(&address);
                 }
-                return Err(AddError::Verification(err));
+                return Err(MempoolError {
+                    hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+                    kind: err.into(),
+                });
             }
         };
 
@@ -246,21 +247,24 @@ where
                 // update reputation
                 self.reputation
                     .increment_seen(&uo.sender)
-                    .map_err(|e| AddError::MempoolError { message: format!("{e:?}") })?;
+                    .map_err(|e| MempoolError { hash: uo_hash, kind: e.into() })?;
                 if let Some(f_addr) = get_address(&uo.init_code) {
                     self.reputation
                         .increment_seen(&f_addr)
-                        .map_err(|e| AddError::MempoolError { message: format!("{e:?}") })?;
+                        .map_err(|e| MempoolError { hash: uo_hash, kind: e.into() })?;
                 }
                 if let Some(p_addr) = get_address(&uo.paymaster_and_data) {
                     self.reputation
                         .increment_seen(&p_addr)
-                        .map_err(|e| AddError::MempoolError { message: format!("{e:?}") })?;
+                        .map_err(|e| MempoolError { hash: uo_hash, kind: e.into() })?;
                 }
 
                 Ok(uo_hash)
             }
-            Err(e) => Err(AddError::MempoolError { message: format!("{e:?}") }),
+            Err(e) => Err(MempoolError {
+                hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+                kind: e,
+            }),
         }
     }
 
@@ -269,8 +273,10 @@ where
     ///
     /// # Returns
     /// `Result<Vec<UserOperation>, eyre::Error>` - The sorted [UserOperations](UserOperation)
-    pub fn get_sorted_user_operations(&self) -> Result<Vec<UserOperation>, MempoolError> {
-        self.mempool.get_sorted()
+    pub fn get_sorted_user_operations(&self) -> eyre::Result<Vec<UserOperation>> {
+        self.mempool.get_sorted().map_err(|err| {
+            format_err!("Getting sorted user operations from mempool failed with error: {err:?}",)
+        })
     }
 
     /// Bundles an array of [UserOperations](UserOperation)
@@ -436,12 +442,12 @@ where
     /// * `uo` - The [UserOperation](UserOperation) to estimate the gas for.
     ///
     /// # Returns
-    /// `Result<UserOperationGasEstimation, SimulationCheckError>` - The gas estimation result,
+    /// `Result<UserOperationGasEstimation, MempoolError>` - The gas estimation result,
     /// which includes the `verification_gas_limit`, `call_gas_limit` and `pre_verification_gas`.
     pub async fn estimate_user_operation_gas(
         &self,
         uo: &UserOperation,
-    ) -> Result<UserOperationGasEstimation, SimulationCheckError> {
+    ) -> Result<UserOperationGasEstimation, MempoolError> {
         let val_out = self
             .validator
             .validate_user_operation(
@@ -451,37 +457,35 @@ where
                 UserOperationValidatorMode::SimulationTrace.into(),
             )
             .await
-            .map_err(|err| match err {
-                ValidationError::Sanity(_) => {
-                    SimulationCheckError::UnknownError { message: "Unknown error".to_string() }
-                }
-                ValidationError::Simulation(err) => err,
+            .map_err(|err| MempoolError {
+                hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+                kind: err.into(),
             })?;
 
         match self.entry_point.simulate_execution(uo.clone()).await {
             Ok(_) => {}
-            Err(err) => return Err(SimulationCheckError::Execution { message: err.to_string() }),
+            Err(err) => {
+                return Err(MempoolError {
+                    hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+                    kind: SimulationError::from(err).into(),
+                })
+            }
         }
 
         let exec_res = match self.entry_point.simulate_handle_op(uo.clone()).await {
             Ok(res) => res,
             Err(err) => {
-                return Err(match err {
-                    EntryPointErr::FailedOp(err) => {
-                        SimulationCheckError::Execution { message: err.to_string() }
-                    }
-                    EntryPointErr::RevertError(err) => {
-                        SimulationCheckError::Execution { message: err.to_string() }
-                    }
-                    _ => SimulationCheckError::UnknownError { message: format!("{err:?}") },
+                return Err(MempoolError {
+                    hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+                    kind: SimulationError::from(err).into(),
                 })
             }
         };
 
-        let base_fee_per_gas = self
-            .base_fee_per_gas()
-            .await
-            .map_err(|err| SimulationCheckError::UnknownError { message: err.to_string() })?;
+        let base_fee_per_gas = self.base_fee_per_gas().await.map_err(|err| MempoolError {
+            hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+            kind: MempoolErrorKind::Provider { inner: err.to_string() },
+        })?;
         let call_gas_limit = calculate_call_gas_limit(
             exec_res.paid,
             exec_res.pre_op_gas,

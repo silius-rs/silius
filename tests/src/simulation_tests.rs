@@ -25,15 +25,15 @@ use silius_mempool::{
         validator::{new_canonical, StandardValidator},
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
-    CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, Mempool, Reputation,
-    ReputationEntryOp, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct,
-    UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
+    CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, InvalidMempoolUserOperationError,
+    Mempool, Reputation, ReputationEntryOp, SimulationError, UserOperationAct,
+    UserOperationAddrAct, UserOperationCodeHashAct, UserOperations, UserOperationsByEntity,
+    UserOperationsBySender, WriteMap,
 };
 use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
-    mempool::ValidationError,
     reputation::ReputationEntry,
-    simulation::{CodeHash, SimulationCheckError},
+    simulation::CodeHash,
     UserOperation, UserOperationHash,
 };
 use std::{
@@ -117,7 +117,7 @@ async fn setup_basic() -> eyre::Result<(
         deploy_test_storage_account_factory(client.clone(), test_coin.address).await?;
     let rules_factory = deploy_test_rules_account_factory(client.clone()).await?;
 
-    let storage_account_call = rules_factory.contract().create("".to_string());
+    let storage_account_call = rules_factory.contract().create("".into());
     let storage_account_address = storage_account_call.call().await?;
 
     storage_account_call.send().await?;
@@ -257,7 +257,7 @@ where
     let (head, address) = call_init_code_for_addr.split_at(12);
     eyre::ensure!(
         !head.iter().any(|i| *i != 0),
-        format!("call init code returns non address data : {:?}", call_init_code_for_addr)
+        format!("call init code returns non address data : {call_init_code_for_addr:?}")
     );
 
     let sender = Address::from_slice(address);
@@ -314,7 +314,7 @@ where
 async fn validate<M, T, Y, X, Z, H, R>(
     context: &TestContext<M, T, Y, X, Z, H, R>,
     uo: UserOperation,
-) -> Result<UserOperationValidationOutcome, ValidationError>
+) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
 where
     M: Middleware + 'static,
     T: UserOperationAct,
@@ -342,7 +342,7 @@ async fn test_user_operation<M, T, Y, X, Z, H, R>(
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> Result<UserOperationValidationOutcome, ValidationError>
+) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
 where
     M: Middleware + 'static,
     T: UserOperationAct,
@@ -368,7 +368,7 @@ where
 async fn test_existing_user_operation(
     validate_rule: String,
     pm_rule: String,
-) -> Result<UserOperationValidationOutcome, ValidationError> {
+) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError> {
     let c = setup_database().await.expect("Setup context failed");
     let uo = existing_storage_account_user_operation(&c, validate_rule, pm_rule);
     validate(&c, uo).await
@@ -378,13 +378,12 @@ macro_rules! accept_plain_request {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) =
-                create_opcode_factory_init_code("".to_string()).await.unwrap();
+            let (init_code, init_func) = create_opcode_factory_init_code("".into()).await.unwrap();
 
             let c = $setup;
             test_user_operation(
                 &c,
-                "".to_string(),
+                "".into(),
                 None,
                 init_code,
                 init_func,
@@ -403,13 +402,13 @@ macro_rules! reject_unkown_rule {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+            let (init_code, init_func) = create_opcode_factory_init_code("".into())
                 .await
                 .unwrap();
             let c = $setup;
             let res = test_user_operation(
                 &c,
-                "<unknown-rule>".to_string(),
+                "<unknown-rule>".into(),
                 None,
                 init_code.clone(),
                 init_func.clone(),
@@ -418,7 +417,7 @@ macro_rules! reject_unkown_rule {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Validation { message })) if message.contains("unknown-rule")
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Validation { inner })) if inner.contains("unknown-rule")
             ));
 
             Ok(())
@@ -432,13 +431,13 @@ macro_rules! fail_with_bad_opcode_in_ctr {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("coinbase".to_string())
+            let (init_code, init_func) = create_opcode_factory_init_code("coinbase".into())
                 .await
                 .unwrap();
             let c = $setup;
             let res = test_user_operation(
                 &c,
-                "".to_string(),
+                "".into(),
                 None,
                 init_code.clone(),
                 init_func.clone(),
@@ -447,7 +446,7 @@ macro_rules! fail_with_bad_opcode_in_ctr {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Opcode { entity, opcode })) if entity==FACTORY && opcode == "COINBASE"
             ));
 
             Ok(())
@@ -461,14 +460,14 @@ macro_rules! fail_with_bad_opcode_in_paymaster {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+            let (init_code, init_func) = create_opcode_factory_init_code("".into())
                 .await
                 .unwrap();
             let c = $setup;
             let res = test_user_operation(
                 &c,
-                "".to_string(),
-                Some("coinbase".to_string()),
+                "".into(),
+                Some("coinbase".into()),
                 init_code,
                 init_func,
                 c.opcodes_factory.address,
@@ -476,7 +475,7 @@ macro_rules! fail_with_bad_opcode_in_paymaster {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Opcode { entity, opcode })) if entity==PAYMASTER && opcode == "COINBASE"
             ));
 
             Ok(())
@@ -494,13 +493,13 @@ macro_rules! fail_with_bad_opcode_in_validation {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+            let (init_code, init_func) = create_opcode_factory_init_code("".into())
                 .await
                 .unwrap();
 
             let res = test_user_operation(
                 &c,
-                "blockhash".to_string(),
+                "blockhash".into(),
                 None,
                 init_code,
                 init_func,
@@ -509,7 +508,7 @@ macro_rules! fail_with_bad_opcode_in_validation {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "BLOCKHASH"
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Opcode { entity, opcode })) if entity==SENDER && opcode == "BLOCKHASH"
             ));
 
             Ok(())
@@ -530,13 +529,13 @@ macro_rules!fail_if_create_too_many {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_opcode_factory_init_code("".to_string())
+            let (init_code, init_func) = create_opcode_factory_init_code("".into())
                 .await
                 .unwrap();
 
             let res = test_user_operation(
                 &c,
-                "create2".to_string(),
+                "create2".into(),
                 None,
                 init_code,
                 init_func,
@@ -545,7 +544,7 @@ macro_rules!fail_if_create_too_many {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Opcode { entity, opcode })) if entity==SENDER && opcode == "CREATE2"
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Opcode { entity, opcode })) if entity==SENDER && opcode == "CREATE2"
             ));
 
             Ok(())
@@ -561,11 +560,11 @@ macro_rules! fail_referencing_self_token {
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
             let (init_code, init_func) =
-                create_storage_factory_init_code(0, "".to_string()).await.unwrap();
+                create_storage_factory_init_code(0, "".into()).await.unwrap();
 
             let res = test_user_operation(
                 &c,
-                "balance-self".to_string(),
+                "balance-self".into(),
                 None,
                 init_code,
                 init_func,
@@ -574,7 +573,7 @@ macro_rules! fail_referencing_self_token {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Unstaked { .. }))
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Unstaked { .. }))
             ));
 
             Ok(())
@@ -601,53 +600,53 @@ macro_rules! test_existing_user_operation {
 test_existing_user_operation!(
     setup_database().await?,
     account_succeeds_referecing_its_own_balance_database,
-    "balance-self".to_string(),
-    "".to_string()
+    "balance-self".into(),
+    "".into()
 );
 test_existing_user_operation!(
     setup_memory().await?,
     account_succeeds_referecing_its_own_balance_memory,
-    "balance-self".to_string(),
-    "".to_string()
+    "balance-self".into(),
+    "".into()
 );
 
 test_existing_user_operation!(
     setup_database().await?,
     account_can_reference_its_own_allowance_on_other_contract_balance_database,
-    "allowance-1-self".to_string(),
-    "".to_string()
+    "allowance-1-self".into(),
+    "".into()
 );
 test_existing_user_operation!(
     setup_memory().await?,
     account_can_reference_its_own_allowance_on_other_contract_balance_memory,
-    "allowance-1-self".to_string(),
-    "".to_string()
+    "allowance-1-self".into(),
+    "".into()
 );
 
 test_existing_user_operation!(
     setup_database().await?,
     access_self_struct_data_database,
-    "struct-self".to_string(),
-    "".to_string()
+    "struct-self".into(),
+    "".into()
 );
 test_existing_user_operation!(
     setup_memory().await?,
     access_self_struct_data_memory,
-    "struct-self".to_string(),
-    "".to_string()
+    "struct-self".into(),
+    "".into()
 );
 
 test_existing_user_operation!(
     setup_database().await?,
     fail_if_referencing_self_token_balance_after_wallet_creation_database,
-    "balance-self".to_string(),
-    "".to_string()
+    "balance-self".into(),
+    "".into()
 );
 test_existing_user_operation!(
     setup_memory().await?,
     fail_if_referencing_self_token_balance_after_wallet_creation_memory,
-    "balance-self".to_string(),
-    "".to_string()
+    "balance-self".into(),
+    "".into()
 );
 
 macro_rules! fail_with_unstaked_paymaster_returning_context {
@@ -681,7 +680,7 @@ macro_rules! fail_with_unstaked_paymaster_returning_context {
             let res = validate(&c, uo).await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::Unstaked { .. }))
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Unstaked { .. }))
             ));
 
             Ok(())
@@ -723,7 +722,9 @@ macro_rules! fail_with_validation_recursively_calls_handle_ops {
             let res = validate(&c, uo).await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::CallStack { .. }))
+                Err(InvalidMempoolUserOperationError::Simulation(
+                    SimulationError::CallStack { .. }
+                ))
             ));
 
             Ok(())
@@ -745,10 +746,10 @@ macro_rules! succeed_with_inner_revert {
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
             let (init_code, init_func) =
-                create_storage_factory_init_code(0, "".to_string()).await.unwrap();
+                create_storage_factory_init_code(0, "".into()).await.unwrap();
             test_user_operation(
                 &c,
-                "inner-revert".to_string(),
+                "inner-revert".into(),
                 None,
                 init_code,
                 init_func,
@@ -770,11 +771,11 @@ macro_rules! fail_with_inner_oog_revert {
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
             let (init_code, init_func) =
-                create_storage_factory_init_code(0, "".to_string()).await.unwrap();
+                create_storage_factory_init_code(0, "".into()).await.unwrap();
 
             let res = test_user_operation(
                 &c,
-                "oog".to_string(),
+                "oog".into(),
                 None,
                 init_code,
                 init_func,
@@ -783,7 +784,7 @@ macro_rules! fail_with_inner_oog_revert {
             .await;
             assert!(matches!(
                 res,
-                Err(ValidationError::Simulation(SimulationCheckError::OutOfGas { .. }))
+                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::OutOfGas { .. }))
             ));
 
             Ok(())

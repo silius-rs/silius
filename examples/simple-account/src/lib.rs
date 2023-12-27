@@ -43,7 +43,7 @@ pub mod simple_account {
         }
 
         pub fn encode(&self) -> Vec<u8> {
-            self.0.encode()
+            self.0.abi_encode()
         }
     }
 }

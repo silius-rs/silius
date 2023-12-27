@@ -216,7 +216,7 @@ impl RpcArgs {
     /// # Returns
     /// * `bool` - Returns `true` if the given API method is enabled, otherwise `false`.
     pub fn is_api_method_enabled(&self, method: &str) -> bool {
-        self.http_api.contains(&method.to_string()) || self.ws_api.contains(&method.to_string())
+        self.http_api.contains(&method.into()) || self.ws_api.contains(&method.into())
     }
 }
 
@@ -293,7 +293,7 @@ impl P2PArgs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use discv5::enr::{CombinedKey, EnrBuilder};
+    use discv5::enr::{CombinedKey, Enr as EnrBuilder};
     use std::{
         net::{IpAddr, Ipv4Addr},
         str::FromStr,
@@ -582,7 +582,7 @@ mod tests {
     #[test]
     fn p2p_opts() {
         let key = CombinedKey::secp256k1_from_bytes([1; 32].as_mut()).unwrap();
-        let enr = EnrBuilder::new("v4")
+        let enr = EnrBuilder::builder()
             .ip4(Ipv4Addr::new(8, 8, 8, 8))
             .tcp4(4337)
             .udp4(4337)

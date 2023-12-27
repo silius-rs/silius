@@ -28,7 +28,7 @@ impl Cli {
             3 => "debug",
             _ => "trace",
         }
-        .to_string()
+        .into()
     }
 }
 
@@ -61,7 +61,7 @@ pub fn run() -> eyre::Result<()> {
     let cli = Cli::parse();
 
     let rust_log = match std::env::var("RUST_LOG") {
-        Ok(val) => format!("{},silius={}", val, cli.get_log_level()),
+        Ok(val) => format!("{val},silius={}", cli.get_log_level()),
         Err(_) => format!("silius={}", cli.get_log_level()),
     };
     std::env::set_var("RUST_LOG", rust_log);

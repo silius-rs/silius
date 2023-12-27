@@ -2,13 +2,13 @@ use crate::{
     mempool::{UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
-    Mempool, Reputation,
+    Mempool, Reputation, SimulationError,
 };
 use ethers::providers::Middleware;
 use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
     constants::validation::entities::{FACTORY, LEVEL_TO_ENTITY},
-    simulation::{SimulationCheckError, CREATE2_OPCODE, FORBIDDEN_OPCODES},
+    simulation::{CREATE2_OPCODE, FORBIDDEN_OPCODES},
     UserOperation,
 };
 
@@ -24,14 +24,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
     /// `helper` - The [SimulationTraceHelper]
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SimulationCheckError] error.
+    /// None if the check passes, otherwise a [SimulationError] error.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         _uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -47,7 +47,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
                 // [OP-011] - block opcodes
                 for op in call_info.opcodes.keys() {
                     if FORBIDDEN_OPCODES.contains(op) {
-                        return Err(SimulationCheckError::Opcode {
+                        return Err(SimulationError::Opcode {
                             entity: LEVEL_TO_ENTITY[l].to_string(),
                             opcode: op.clone(),
                         });
@@ -60,7 +60,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
                     if LEVEL_TO_ENTITY[l] == FACTORY && *c == 1 {
                         continue;
                     }
-                    return Err(SimulationCheckError::Opcode {
+                    return Err(SimulationError::Opcode {
                         entity: LEVEL_TO_ENTITY[l].to_string(),
                         opcode: CREATE2_OPCODE.to_string(),
                     });

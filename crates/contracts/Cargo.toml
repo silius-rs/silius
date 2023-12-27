@@ -21,9 +21,9 @@ ethers = { workspace = true }
 # misc
 eyre = { workspace = true }
 lazy_static = { workspace = true }
-regex = "1.9.6"
-serde = "1"
-serde_json = "1"
+regex = "1.10.2"
+serde = { workspace = true }
+serde_json ={ workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

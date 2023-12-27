@@ -80,9 +80,9 @@ async fn main() -> eyre::Result<()> {
         let value = serde_json::to_value(&user_op).unwrap();
 
         let req_body = Request {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: "2.0".into(),
             id: 1,
-            method: "eth_estimateUserOperationGas".to_string(),
+            method: "eth_estimateUserOperationGas".into(),
             params: vec![value, ADDRESS.to_string().into()],
         };
         println!("req_body: {:?}", serde_json::to_string(&req_body)?);
@@ -111,9 +111,9 @@ async fn main() -> eyre::Result<()> {
             .await?;
 
         let send_body = Request {
-            jsonrpc: "2.0".to_string(),
+            jsonrpc: "2.0".into(),
             id: 1,
-            method: "eth_sendUserOperation".to_string(),
+            method: "eth_sendUserOperation".into(),
             params: vec![serde_json::to_value(&user_op).unwrap(), ADDRESS.to_string().into()],
         };
         let post =

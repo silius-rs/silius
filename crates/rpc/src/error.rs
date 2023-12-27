@@ -1,14 +1,14 @@
-use jsonrpsee::types::{error::ErrorCode, ErrorObject, ErrorObjectOwned};
-use serde_json::json;
-use silius_primitives::{
-    constants::rpc::{
-        ENTITY_BANNED_OR_THROTTLED, EXECUTION, EXPIRATION, OPCODE, SANITY_CHECK, SIGNATURE,
-        STAKE_TOO_LOW, VALIDATION,
-    },
-    mempool::ValidationError,
-    reputation::ReputationError,
-    sanity::SanityCheckError,
-    simulation::SimulationCheckError,
+use crate::codes::{
+    BANNED_OR_THROTTLED_ENTITY, EXECUTION, OPCODE, SANITY, SIGNATURE, STAKE_TOO_LOW, TIMESTAMP,
+    VALIDATION,
+};
+use jsonrpsee::types::{
+    error::{ErrorCode, INTERNAL_ERROR_CODE},
+    ErrorObject, ErrorObjectOwned,
+};
+use silius_mempool::{
+    InvalidMempoolUserOperationError, MempoolError, MempoolErrorKind, ReputationError, SanityError,
+    SimulationError,
 };
 
 /// A wrapper for the [ErrorObjectOwned](ErrorObjectOwned) type.
@@ -21,245 +21,132 @@ impl From<JsonRpcError> for ErrorObjectOwned {
     }
 }
 
-impl From<SanityCheckError> for JsonRpcError {
-    /// Convert a [SanityCheckError](SanityCheckError) to a [JsonRpcError](JsonRpcError).
-    fn from(err: SanityCheckError) -> Self {
-        JsonRpcError(
-        match err {
-            SanityCheckError::SenderOrInitCode { sender, init_code } => {
-                ErrorObject::owned(
-                    SANITY_CHECK,
-                    format!(
-                        "Either the sender {sender} is an existing contract, or the initCode {init_code} is not empty (but not both)",
-                    ),
-                    None::<bool>,
-                )
-            },
-            SanityCheckError::FactoryVerification { init_code } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!("Init code {init_code} is not valid (factory check)",),
-                None::<bool>,
-            ),
-            SanityCheckError::HighVerificationGasLimit {
-                verification_gas_limit,
-                max_verification_gas,
-            } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!(
-                    "Verification gas limit {verification_gas_limit} is higher than max verification gas {max_verification_gas}",
-                ),
-                None::<bool>,
-            ),
-            SanityCheckError::LowPreVerificationGas {
-                pre_verification_gas,
-                pre_verification_gas_expected,
-            } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!(
-                    "Pre-verification gas {pre_verification_gas} is lower than calculated pre-verification gas {pre_verification_gas_expected}",
-                ),
-                None::<bool>,
-            ),
-            SanityCheckError::PaymasterVerification { paymaster_and_data } => {
-                ErrorObject::owned(
-                    SANITY_CHECK,
-                    format!(
-                        "Paymaster and data {paymaster_and_data} is invalid (paymaster check)",
-                    ),
-                    None::<bool>,
-                )
-            },
-            SanityCheckError::LowCallGasLimit {
-                call_gas_limit,
-                call_gas_limit_expected,
-            } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!(
-                    "Call gas limit {call_gas_limit} is lower than call gas estimation {call_gas_limit_expected}",
-                ),
-                None::<bool>,
-            ),
-            SanityCheckError::LowMaxFeePerGas {
-                max_fee_per_gas,
-                base_fee_per_gas: base_fee,
-            } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!(
-                    "Max fee per gas {max_fee_per_gas} is lower than base fee {base_fee}",
-                ),
-                None::<bool>,
-            ),
-            SanityCheckError::HighMaxPriorityFeePerGas {
-                max_priority_fee_per_gas,
-                max_fee_per_gas,
-            } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!(
-                    "Max priority fee per gas {max_priority_fee_per_gas} is higher than max fee per gas {max_fee_per_gas}",
-                ),
-                None::<bool>,
-            ),
-            SanityCheckError::LowMaxPriorityFeePerGas {
-                max_priority_fee_per_gas,
-                min_priority_fee_per_gas,
-            } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!(
-                    "Max priority fee per gas {max_priority_fee_per_gas} is lower than min priority fee per gas {min_priority_fee_per_gas}",
-                ),
-                None::<bool>,
-            ),
-            SanityCheckError::SenderVerification { sender, message } => ErrorObject::owned(
-                SANITY_CHECK,
-                format!("Sender {sender:?} {message}",),
-                None::<bool>,
-            ),
-            SanityCheckError::EntityVerification { entity, address, message } => {
-                ErrorObject::owned(
-                    OPCODE,
-                    format!("Entity {entity} with {address:?} {message}",),
-                    None::<bool>,
-                )
-            },
-            SanityCheckError::Reputation(err) =>
-                match err {
-                    ReputationError::EntityBanned { entity, address } => {
-                        ErrorObject::owned(
-                            ENTITY_BANNED_OR_THROTTLED,
-                            format!("Entity {entity} with {address:?} is banned",),
-                            None::<bool>,
-                        )
-                    },
-                    ReputationError::ThrottledLimit { address, entity } => {
-                        ErrorObject::owned(
-                            ENTITY_BANNED_OR_THROTTLED,
-                            format!("Limit for throttled entity {entity} with {address:?} exceeded",),
-                            None::<bool>,
-                        )
-                    }
-                    ReputationError::UnstakedEntityVerification { entity, address, message } => {
-                        ErrorObject::owned(
-                            STAKE_TOO_LOW,
-                            format!("Unstaked entity {entity} with {address:?} {message}",),
-                            None::<bool>,
-                        )
-                    },
-                    ReputationError::StakeTooLow { entity, address, min_stake, min_unstake_delay } => {
-                        ErrorObject::owned(
-                            STAKE_TOO_LOW,
-                            format!("Entity {entity} with {address} has too low stake: min stake {min_stake}, min unstake delay {min_unstake_delay}",),
-                            None::<bool>,
-                        )
-                    },
-                    ReputationError::UnstakeDelayTooLow { entity, address, min_stake, min_unstake_delay } => {
-                        ErrorObject::owned(
-                            STAKE_TOO_LOW,
-                            format!("Entity {entity} with {address} has too low unstake delay: min stake {min_stake}, min unstake delay {min_unstake_delay}",),
-                            None::<bool>,
-                        )
-                    },
-                    ReputationError::UnknownError { message } => {
-                        ErrorObject::owned(
-                            SANITY_CHECK,
-                            message,
-                            None::<bool>,
-                        )
-                    }
-                }
-             ,
-            SanityCheckError::Validation { message } => {
-                ErrorObject::owned(
-                    VALIDATION,
-                    message,
-                    None::<bool>,
-                )
-            },
-            SanityCheckError::MiddlewareError { message } => {
-                ErrorObject::owned(
-                    ErrorCode::InternalError.code(),
-                    message,
-                    None::<bool>,
-                )
-            },
-            SanityCheckError::UnknownError { message } => {
-                ErrorObject::owned(
-                    SANITY_CHECK,
-                    message,
-                    None::<bool>,
-                )
-            },
-        }
-    )
+impl From<ErrorObjectOwned> for JsonRpcError {
+    /// Convert a [ErrorObjectOwned](ErrorObjectOwned) to a [JsonRpcError](JsonRpcError).
+    fn from(err: ErrorObjectOwned) -> Self {
+        JsonRpcError(err)
     }
 }
 
-impl From<SimulationCheckError> for JsonRpcError {
-    /// Convert a [SimulationCheckError](SimulationCheckError) to a [JsonRpcError](JsonRpcError).
-    fn from(err: SimulationCheckError) -> Self {
+impl From<MempoolError> for JsonRpcError {
+    /// Convert a [MempoolError](MempoolError) to a [JsonRpcError](JsonRpcError).
+    fn from(err: MempoolError) -> Self {
+        match err.kind {
+            MempoolErrorKind::InvalidUserOperation(err) => match err {
+                InvalidMempoolUserOperationError::Sanity(err) => err.into(),
+                InvalidMempoolUserOperationError::Simulation(err) => err.into(),
+                InvalidMempoolUserOperationError::Reputation(err) => err.into(),
+            },
+            _ => ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<bool>).into(),
+        }
+    }
+}
+
+impl From<ReputationError> for JsonRpcError {
+    /// Convert a [ReputationError](ReputationError) to a [JsonRpcError](JsonRpcError).
+    fn from(err: ReputationError) -> Self {
         JsonRpcError(match err {
-            SimulationCheckError::Signature {} => ErrorObject::owned(
-                SIGNATURE,
-                "Invalid UserOp signature or paymaster signature",
-                None::<bool>,
-            ),
-            SimulationCheckError::Expiration { valid_after, valid_until, paymaster } => {
-                ErrorObject::owned(EXPIRATION, "User operation is expired or will expire soon", {
-                    if let Some(paymaster) = paymaster {
-                        Some(json!({
-                            "valid_after": valid_after, "valid_until": valid_until, "paymaster": paymaster,
-                        }))
-                    } else {
-                        Some(json!({
-                            "valid_after": valid_after, "valid_until": valid_until,
-                        }))
-                    }
-                })
+            ReputationError::BannedEntity { entity: _, address: _ } => {
+                ErrorObject::owned(BANNED_OR_THROTTLED_ENTITY, err.to_string(), None::<bool>)
             }
-            SimulationCheckError::Validation { message } => {
-                ErrorObject::owned(VALIDATION, message, None::<bool>)
+            ReputationError::ThrottledEntity { entity: _, address: _ } => {
+                ErrorObject::owned(BANNED_OR_THROTTLED_ENTITY, err.to_string(), None::<bool>)
             }
-            SimulationCheckError::Opcode { entity, opcode } => ErrorObject::owned(
-                OPCODE,
-                format!("{entity} uses banned opcode: {opcode}"),
-                None::<bool>,
-            ),
-            SimulationCheckError::Execution { message } => {
-                ErrorObject::owned(EXECUTION, message, None::<bool>)
+            ReputationError::StakeTooLow { entity: _, address: _, stake: _, min_stake: _ } => {
+                ErrorObject::owned(STAKE_TOO_LOW, err.to_string(), None::<bool>)
             }
-            SimulationCheckError::StorageAccess { slot } => ErrorObject::owned(
-                OPCODE,
-                format!("Storage access validation failed for slot: {slot}"),
-                None::<bool>,
-            ),
-            SimulationCheckError::Unstaked { entity, message } => {
-                ErrorObject::owned(OPCODE, format!("unstaked {entity} {message}"), None::<bool>)
+            ReputationError::UnstakeDelayTooLow {
+                entity: _,
+                address: _,
+                unstake_delay: _,
+                min_unstake_delay: _,
+            } => ErrorObject::owned(STAKE_TOO_LOW, err.to_string(), None::<bool>),
+            ReputationError::UnstakedEntity { entity: _, address: _ } => {
+                ErrorObject::owned(STAKE_TOO_LOW, err.to_string(), None::<bool>)
             }
-            SimulationCheckError::CallStack { message } => {
-                ErrorObject::owned(OPCODE, message, None::<bool>)
-            }
-            SimulationCheckError::CodeHashes { message } => {
-                ErrorObject::owned(OPCODE, message, None::<bool>)
-            }
-            SimulationCheckError::OutOfGas {} => {
-                ErrorObject::owned(OPCODE, "User operation out of gas", None::<bool>)
-            }
-            SimulationCheckError::MiddlewareError { message } => {
-                ErrorObject::owned(ErrorCode::InternalError.code(), message, None::<bool>)
-            }
-            SimulationCheckError::UnknownError { message } => {
-                ErrorObject::owned(ErrorCode::InternalError.code(), message, None::<bool>)
-            }
+            _ => ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<bool>),
         })
     }
 }
 
-impl From<ValidationError> for JsonRpcError {
-    /// Convert a [ValidationError](ValidationError) to a [JsonRpcError](JsonRpcError).
-    fn from(err: ValidationError) -> Self {
-        match err {
-            ValidationError::Sanity(err) => err.into(),
-            ValidationError::Simulation(err) => err.into(),
-        }
+impl From<SanityError> for JsonRpcError {
+    /// Convert a [SanityError](SanityError) to a [JsonRpcError](JsonRpcError).
+    fn from(err: SanityError) -> Self {
+        JsonRpcError(match err {
+            SanityError::VerificationGasLimitTooHigh {
+                verification_gas_limit: _,
+                verification_gas_limit_expected: _,
+            } => ErrorObject::owned(SANITY, err.to_string(), None::<bool>),
+            SanityError::PreVerificationGasTooLow {
+                pre_verification_gas: _,
+                pre_verification_gas_expected: _,
+            } => ErrorObject::owned(SANITY, err.to_string(), None::<bool>),
+            SanityError::CallGasLimitTooLow { call_gas_limit: _, call_gas_limit_expected: _ } => {
+                ErrorObject::owned(SANITY, err.to_string(), None::<bool>)
+            }
+            SanityError::MaxFeePerGasTooLow { max_fee_per_gas: _, base_fee_per_gas: _ } => {
+                ErrorObject::owned(SANITY, err.to_string(), None::<bool>)
+            }
+            SanityError::MaxPriorityFeePerGasTooHigh {
+                max_priority_fee_per_gas: _,
+                max_fee_per_gas: _,
+            } => ErrorObject::owned(SANITY, err.to_string(), None::<bool>),
+            SanityError::MaxPriorityFeePerGasTooLow {
+                max_priority_fee_per_gas: _,
+                max_priority_fee_per_gas_expected: _,
+            } => ErrorObject::owned(SANITY, err.to_string(), None::<bool>),
+            SanityError::Paymaster { inner: _ } => {
+                ErrorObject::owned(SANITY, err.to_string(), None::<bool>)
+            }
+            SanityError::Sender { inner: _ } => {
+                ErrorObject::owned(SANITY, err.to_string(), None::<bool>)
+            }
+            SanityError::EntityRoles { entity: _, address: _, entity_other: _ } => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SanityError::Reputation(err) => JsonRpcError::from(err).0,
+            _ => ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<bool>),
+        })
+    }
+}
+
+impl From<SimulationError> for JsonRpcError {
+    /// Convert a [SimulationError](SimulationError) to a [JsonRpcError](JsonRpcError).
+    fn from(err: SimulationError) -> Self {
+        JsonRpcError(match err {
+            SimulationError::Signature => {
+                ErrorObject::owned(SIGNATURE, err.to_string(), None::<bool>)
+            }
+            SimulationError::Timestamp { inner: _ } => {
+                ErrorObject::owned(TIMESTAMP, err.to_string(), None::<bool>)
+            }
+            SimulationError::Validation { inner: _ } => {
+                ErrorObject::owned(VALIDATION, err.to_string(), None::<bool>)
+            }
+            SimulationError::Execution { inner: _ } => {
+                ErrorObject::owned(EXECUTION, err.to_string(), None::<bool>)
+            }
+            SimulationError::Opcode { entity: _, opcode: _ } => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SimulationError::StorageAccess { slot: _ } => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SimulationError::Unstaked { entity: _, address: _, inner: _ } => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SimulationError::CallStack { inner: _ } => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SimulationError::CodeHashes {} => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SimulationError::OutOfGas {} => {
+                ErrorObject::owned(OPCODE, err.to_string(), None::<bool>)
+            }
+            SimulationError::Reputation(err) => JsonRpcError::from(err).0,
+            _ => ErrorObject::owned(INTERNAL_ERROR_CODE, err.to_string(), None::<bool>),
+        })
     }
 }
 

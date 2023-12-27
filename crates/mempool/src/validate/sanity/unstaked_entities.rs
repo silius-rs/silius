@@ -2,6 +2,7 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, Reputation, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
+    ReputationError, SanityError,
 };
 use ethers::{
     providers::Middleware,
@@ -14,8 +15,7 @@ use silius_primitives::{
             INCLUSION_RATE_FACTOR, SAME_SENDER_MEMPOOL_COUNT, SAME_UNSTAKED_ENTITY_MEMPOOL_COUNT,
         },
     },
-    reputation::{ReputationEntry, ReputationError, StakeInfo},
-    sanity::SanityCheckError,
+    reputation::{ReputationEntry, StakeInfo},
     UserOperation,
 };
 use std::cmp;
@@ -29,12 +29,8 @@ impl UnstakedEntities {
         &self,
         addr: &Address,
         helper: &SanityHelper<'a, M>,
-    ) -> Result<StakeInfo, SanityCheckError> {
-        let info = helper.entry_point.get_deposit_info(addr).await.map_err(|_| {
-            SanityCheckError::UnknownError {
-                message: "Couldn't retrieve deposit info from entry point".to_string(),
-            }
-        })?;
+    ) -> Result<StakeInfo, SanityError> {
+        let info = helper.entry_point.get_deposit_info(addr).await?;
 
         Ok(StakeInfo {
             address: *addr,
@@ -49,14 +45,12 @@ impl UnstakedEntities {
         addr: &Address,
         _helper: &SanityHelper<M>,
         reputation: &Reputation<H, R>,
-    ) -> Result<ReputationEntry, SanityCheckError>
+    ) -> Result<ReputationEntry, SanityError>
     where
         H: HashSetOp,
         R: ReputationEntryOp,
     {
-        reputation.get(addr).map_err(|_| SanityCheckError::UnknownError {
-            message: "Failed to retrieve reputation entry".into(),
-        })
+        reputation.get(addr).map_err(|e| e.into())
     }
 
     /// Calculates allowed number of user operations
@@ -83,14 +77,14 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
     /// perform the sanity check.
     ///
     /// # Returns
-    /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
+    /// None if the sanity check is successful, otherwise a [SanityError] is returned.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -108,12 +102,10 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
         // [STO-040] - UserOperation may not use an entity address (factory/paymaster/aggregator)
         // that is used as an "account" in another UserOperation in the mempool
         if mempool.get_number_by_entity(&sender) > 0 {
-            return Err(SanityCheckError::EntityVerification {
-                entity: SENDER.to_string(),
+            return Err(SanityError::EntityRoles {
+                entity: SENDER.into(),
                 address: sender,
-                message:
-                    "is used as a different entity in another UserOperation currently in mempool"
-                        .to_string(),
+                entity_other: "(factory/paymaster/aggregator)".into(),
             });
         }
 
@@ -123,10 +115,9 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
         if reputation.verify_stake(SENDER, Some(sender_stake)).is_err() &&
             mempool.get_number_by_sender(&uo.sender) >= SAME_SENDER_MEMPOOL_COUNT
         {
-            return Err(ReputationError::UnstakedEntityVerification {
-                entity: SENDER.to_string(),
+            return Err(ReputationError::UnstakedEntity {
+                entity: SENDER.into(),
                 address: uo.sender,
-                message: "has too many user operations in the mempool".into(),
             }
             .into());
         }
@@ -137,12 +128,10 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
             // (factory/paymaster/aggregator) that is used as an "account" in another UserOperation
             // in the mempool
             if mempool.get_number_by_sender(&factory) > 0 {
-                return Err(SanityCheckError::EntityVerification {
-                    entity: FACTORY.to_string(),
-                    address: factory,
-                    message:
-                        "is used as a sender entity in another UserOperation currently in mempool"
-                            .to_string(),
+                return Err(SanityError::EntityRoles {
+                    entity: FACTORY.into(),
+                    address: sender,
+                    entity_other: "(sender/paymaster/aggregator)".into(),
                 });
             }
 
@@ -152,10 +141,9 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
                 let entity = self.get_entity(&factory, helper, reputation)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
                 if mempool.get_number_by_entity(&factory) as u64 >= uos_allowed {
-                    return Err(ReputationError::UnstakedEntityVerification {
-                        entity: FACTORY.to_string(),
+                    return Err(ReputationError::UnstakedEntity {
+                        entity: FACTORY.into(),
                         address: factory,
-                        message: "has too many user operations in the mempool".into(),
                     }
                     .into());
                 }
@@ -168,12 +156,10 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
             // (factory/paymaster/aggregator) that is used as an "account" in another UserOperation
             // in the mempool
             if mempool.get_number_by_sender(&paymaster) > 0 {
-                return Err(SanityCheckError::EntityVerification {
-                    entity: PAYMASTER.to_string(),
-                    address: paymaster,
-                    message:
-                        "is used as a sender entity in another UserOperation currently in mempool"
-                            .to_string(),
+                return Err(SanityError::EntityRoles {
+                    entity: PAYMASTER.into(),
+                    address: sender,
+                    entity_other: "(sender/factory/aggregator)".into(),
                 });
             }
 
@@ -183,10 +169,9 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
                 let entity = self.get_entity(&paymaster, helper, reputation)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
                 if mempool.get_number_by_entity(&paymaster) as u64 >= uos_allowed {
-                    return Err(ReputationError::UnstakedEntityVerification {
-                        entity: PAYMASTER.to_string(),
+                    return Err(ReputationError::UnstakedEntity {
+                        entity: PAYMASTER.into(),
                         address: paymaster,
-                        message: "has too many user operations in the mempool".into(),
                     }
                     .into());
                 }

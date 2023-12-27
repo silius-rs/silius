@@ -2,14 +2,12 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
-    Reputation,
+    Reputation, SimulationError,
 };
 use ethers::providers::Middleware;
 use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
-    constants::validation::entities::LEVEL_TO_ENTITY,
-    simulation::{SimulationCheckError, CREATE2_OPCODE},
-    UserOperation,
+    constants::validation::entities::LEVEL_TO_ENTITY, simulation::CREATE2_OPCODE, UserOperation,
 };
 
 #[derive(Clone)]
@@ -23,7 +21,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for ExternalContracts {
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -43,8 +41,8 @@ impl<M: Middleware> SimulationTraceCheck<M> for ExternalContracts {
                         && size.contract_size <= 2
                         && size.opcode != CREATE2_OPCODE.to_string()
                     {
-                        return Err(SimulationCheckError::Opcode {
-                            entity: LEVEL_TO_ENTITY[l].to_string(),
+                        return Err(SimulationError::Opcode {
+                            entity: LEVEL_TO_ENTITY[l].into(),
                             opcode: size.opcode.clone(),
                         });
                     }
@@ -52,8 +50,8 @@ impl<M: Middleware> SimulationTraceCheck<M> for ExternalContracts {
 
                 for (addr, info) in call_info.ext_code_access_info.iter() {
                     if *addr == helper.entry_point.address() {
-                        return Err(SimulationCheckError::Opcode {
-                            entity: LEVEL_TO_ENTITY[l].to_string(),
+                        return Err(SimulationError::Opcode {
+                            entity: LEVEL_TO_ENTITY[l].into(),
                             opcode: info.clone(),
                         });
                     }

@@ -33,4 +33,4 @@ tempdir = "0.3.7"
 
 [dev-dependencies]
 # async
-futures = "0.3.28"
+futures = { workspace = true }

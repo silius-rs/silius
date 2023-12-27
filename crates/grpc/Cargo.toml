@@ -25,26 +25,26 @@ discv5 = { workspace = true }
 ethers = { workspace = true }
 
 # grpc
-prost = "0.11"
-tonic = { version = "0.8", default-features = false, features = [
+prost = "0.12.3"
+tonic = { version = "0.10.2", default-features = false, features = [
     "codegen",
     "prost",
     "transport",
 ] }
 
 # p2p
-libp2p-identity = "0.2.3"
+libp2p-identity = "0.2.8"
 
 # async
 async-trait = { workspace = true }
-futures = "0.3.28"
+futures = { workspace = true }
 parking_lot = { workspace = true }
 
 # tokio
 tokio = { workspace = true }
 
 # misc
-arrayref = "0.3"
+arrayref = "0.3.7"
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
 serde_json = { workspace = true }
@@ -52,6 +52,6 @@ tracing = { workspace = true }
 
 [build-dependencies]
 # grpc
-prost-build = "0.11"
+prost-build = "0.12.3"
 protobuf-src = "1.1.0"
-tonic-build = "0.8"
+tonic-build = "0.10.2"

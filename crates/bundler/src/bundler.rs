@@ -102,7 +102,7 @@ where
             }
             SendStrategy::Flashbots => match relay_endpoints {
                 None => {
-                    let relay_endpoints = vec![flashbots_relay_endpoints::FLASHBOTS.to_string()];
+                    let relay_endpoints = vec![flashbots_relay_endpoints::FLASHBOTS.into()];
                     let flashbots_client = generate_flashbots_middleware(
                         eth_client.clone(),
                         Some(relay_endpoints.clone()),
@@ -525,7 +525,7 @@ mod test {
             ep_address,
             Chain::from(1),
             SendStrategy::Flashbots,
-            Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()]),
+            Some(vec![flashbots_relay_endpoints::FLASHBOTS.into()]),
             U256::from(100000000000000000u64),
         )
         .expect("Failed to create bundler");
@@ -562,14 +562,14 @@ mod test {
             ep_address,
             Chain::from(5),
             SendStrategy::Flashbots,
-            Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.to_string()]),
+            Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.into()]),
             U256::from(100000000000000000u64),
         )
         .expect("Failed to create bundler");
 
         let flashbots_client = generate_flashbots_middleware(
             eth_client.clone(),
-            Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.to_string()]),
+            Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.into()]),
             bundler.wallet.clone(),
         )?;
 
@@ -582,7 +582,7 @@ mod test {
             .unwrap(),
             wad: alloy_U256::MAX,
         };
-        let approve_call_data = approve.encode();
+        let approve_call_data = approve.abi_encode();
 
         let address = bundler.wallet.signer.address();
         let nonce = flashbots_client.get_transaction_count(address.clone(), None).await?;
@@ -635,7 +635,7 @@ mod test {
         // Create a Flashbots signer middleware
         let flashbots_client = generate_flashbots_middleware(
             eth_client,
-            Some(vec!["http://127.0.0.1:3001".to_string()]),
+            Some(vec!["http://127.0.0.1:3001".into()]),
             bundler.wallet.clone(),
         )?;
 
@@ -663,7 +663,7 @@ mod test {
             .unwrap(),
             wad: alloy_U256::MAX,
         };
-        let approve_call_data = approve.encode();
+        let approve_call_data = approve.abi_encode();
 
         let path = vec![
             // WETH address
@@ -682,7 +682,7 @@ mod test {
             to: alloy_Address::from_slice(address.clone().as_bytes()),
             deadline: alloy_U256::MAX,
         };
-        let swap_call_data = swap_eth.encode();
+        let swap_call_data = swap_eth.abi_encode();
 
         let nonce = flashbots_client.clone().get_transaction_count(address, None).await?;
 

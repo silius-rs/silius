@@ -16,7 +16,7 @@ use super::{
 use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
-    Reputation,
+    InvalidMempoolUserOperationError, Reputation, SanityError, SimulationError,
 };
 use alloy_chains::Chain;
 use enumset::EnumSet;
@@ -25,14 +25,11 @@ use ethers::{
     types::{BlockNumber, GethTrace, U256},
 };
 use silius_contracts::{
-    entry_point::{EntryPointErr, SimulateValidationResult},
+    entry_point::{EntryPointError, SimulateValidationResult},
     tracer::JsTracerFrame,
     EntryPoint,
 };
-use silius_primitives::{
-    mempool::ValidationError, sanity::SanityCheckError, simulation::SimulationCheckError,
-    UserOperation,
-};
+use silius_primitives::UserOperation;
 use tracing::debug;
 
 pub type StandardValidator<M> = StandardUserOperationValidator<
@@ -172,23 +169,18 @@ where
     ///
     /// # Returns
     /// A [SimulateValidationResult](crate::entry_point::SimulateValidationResult) if the simulation
-    /// was successful, otherwise a [SimulationCheckError](crate::simulation::SimulationCheckError).
+    /// was successful, otherwise a [SimulationError](crate::error::SimulationError).
     async fn simulate_validation(
         &self,
         uo: &UserOperation,
-    ) -> Result<SimulateValidationResult, SimulationCheckError> {
+    ) -> Result<SimulateValidationResult, SimulationError> {
         match self.entry_point.simulate_validation(uo.clone()).await {
             Ok(res) => Ok(res),
-            Err(err) => match err {
-                EntryPointErr::FailedOp(f) => {
-                    Err(SimulationCheckError::Validation { message: f.reason })
-                }
-                _ => Err(SimulationCheckError::UnknownError {
-                    message: format!(
-                        "Unknown error when simulating validation on entry point. Error message: {err:?}"
-                    ),
-                }),
-            },
+            Err(err) => Err(match err {
+                EntryPointError::FailedOp(op) => SimulationError::Validation { inner: op.reason },
+                EntryPointError::Provider { inner } => SimulationError::Provider { inner },
+                _ => SimulationError::Other { inner: err.to_string() },
+            }),
         }
     }
 
@@ -201,23 +193,18 @@ where
     ///
     /// # Returns
     /// A [GethTrace](ethers::types::GethTrace) if the simulation was successful, otherwise a
-    /// [SimulationCheckError](crate::simulation::SimulationCheckError).
+    /// [SimulationError](crate::error::SimulationError).
     async fn simulate_validation_trace(
         &self,
         uo: &UserOperation,
-    ) -> Result<GethTrace, SimulationCheckError> {
+    ) -> Result<GethTrace, SimulationError> {
         match self.entry_point.simulate_validation_trace(uo.clone()).await {
             Ok(trace) => Ok(trace),
-            Err(err) => match err {
-                EntryPointErr::FailedOp(f) => {
-                    Err(SimulationCheckError::Validation { message: f.reason })
-                }
-                _ => Err(SimulationCheckError::UnknownError {
-                    message: format!(
-                        "Unknown error when simulating validation on entry point. Error message: {err:?}"
-                    ),
-                }),
-            },
+            Err(err) => Err(match err {
+                EntryPointError::FailedOp(op) => SimulationError::Validation { inner: op.reason },
+                EntryPointError::Provider { inner } => SimulationError::Provider { inner },
+                _ => SimulationError::Other { inner: err.to_string() },
+            }),
         }
     }
 }
@@ -245,14 +232,15 @@ where
     ///
     /// # Returns
     /// A [UserOperationValidationOutcome](UserOperationValidationOutcome) if the validation was
-    /// successful, otherwise a [ValidationError](ValidationError).
+    /// successful, otherwise a
+    /// [InvalidMempoolUserOperationError](InvalidMempoolUserOperationError).
     async fn validate_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         mode: EnumSet<UserOperationValidatorMode>,
-    ) -> Result<UserOperationValidationOutcome, ValidationError>
+    ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -294,11 +282,7 @@ where
             .eth_client()
             .get_block(BlockNumber::Latest)
             .await
-            .map_err(|e| {
-                ValidationError::Sanity(SanityCheckError::MiddlewareError {
-                    message: e.to_string(),
-                })
-            })?
+            .map_err(|e| SanityError::Provider { inner: e.to_string() })?
             .expect("block should exist");
         out.verified_block = U256::from(block_number.hash.expect("block hash should exist").0);
 
@@ -306,7 +290,7 @@ where
             debug!("Simulate user operation with trace from {:?}", uo.sender);
             let geth_trace = self.simulate_validation_trace(uo).await?;
             let js_trace: JsTracerFrame = JsTracerFrame::try_from(geth_trace)
-                .map_err(|error| SimulationCheckError::Validation { message: error.to_string() })?;
+                .map_err(|error| SimulationError::Validation { inner: error.to_string() })?;
 
             let mut sim_helper = SimulationTraceHelper {
                 entry_point: &self.entry_point,
