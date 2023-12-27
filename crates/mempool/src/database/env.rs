@@ -6,9 +6,11 @@ use reth_db::{
         DatabaseFlags, Environment, EnvironmentFlags, EnvironmentKind, Geometry, Mode, PageSize,
         SyncMode, RO, RW,
     },
-    Error, TableType,
+    Error as RethDatabaseError, TableType,
 };
-use std::{fmt::Display, fs, path::PathBuf};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{fs, path::PathBuf};
+use thiserror::Error;
 
 // Code adapted from: https://github.com/paradigmxyz/reth/blob/main/crates/storage/db/src/implementation/mdbx/mod.rs
 #[derive(Debug)]
@@ -23,30 +25,46 @@ impl<'a, E: EnvironmentKind> DatabaseGAT<'a> for Env<E> {
 }
 
 impl<E: EnvironmentKind> Database for Env<E> {
-    fn tx(&self) -> Result<<Self as DatabaseGAT<'_>>::TX, Error> {
-        Ok(Tx::new(self.inner.begin_ro_txn().map_err(|e| Error::InitTransaction(e.into()))?))
+    fn tx(&self) -> Result<<Self as DatabaseGAT<'_>>::TX, RethDatabaseError> {
+        Ok(Tx::new(
+            self.inner.begin_ro_txn().map_err(|e| RethDatabaseError::InitTransaction(e.into()))?,
+        ))
     }
 
-    fn tx_mut(&self) -> Result<<Self as DatabaseGAT<'_>>::TXMut, Error> {
-        Ok(Tx::new(self.inner.begin_rw_txn().map_err(|e| Error::InitTransaction(e.into()))?))
+    fn tx_mut(&self) -> Result<<Self as DatabaseGAT<'_>>::TXMut, RethDatabaseError> {
+        Ok(Tx::new(
+            self.inner.begin_rw_txn().map_err(|e| RethDatabaseError::InitTransaction(e.into()))?,
+        ))
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum DBError {
-    DBInternalError(Error),
+/// Database error
+#[derive(Debug, Error)]
+pub enum DatabaseError {
+    /// Internal database error
+    #[error(transparent)]
+    Internal(RethDatabaseError),
+    /// Databse not found
+    #[error("Database not found")]
     NotFound,
 }
 
-impl From<Error> for DBError {
-    fn from(value: Error) -> Self {
-        DBError::DBInternalError(value)
+impl From<RethDatabaseError> for DatabaseError {
+    fn from(value: RethDatabaseError) -> Self {
+        DatabaseError::Internal(value)
     }
 }
 
-impl Display for DBError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+impl Serialize for DatabaseError {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&format!("{self:?}"))
+    }
+}
+
+// TODO: implement correct deserialization
+impl<'de> Deserialize<'de> for DatabaseError {
+    fn deserialize<D: Deserializer<'de>>(_: D) -> Result<Self, D::Error> {
+        Ok(DatabaseError::NotFound)
     }
 }
 
@@ -83,14 +101,15 @@ impl<E: EnvironmentKind> Env<E> {
                 ..Default::default()
             })
             .open(path.as_path())
-            .map_err(|e| Error::DatabaseLocation(e.into()))?;
+            .map_err(|e| RethDatabaseError::DatabaseLocation(e.into()))?;
 
         Ok(Self { inner: env })
     }
 
     /// Creates all the defined tables, if necessary
-    pub fn create_tables(&self) -> Result<(), Error> {
-        let tx = self.inner.begin_rw_txn().map_err(|e| Error::InitTransaction(e.into()))?;
+    pub fn create_tables(&self) -> Result<(), RethDatabaseError> {
+        let tx =
+            self.inner.begin_rw_txn().map_err(|e| RethDatabaseError::InitTransaction(e.into()))?;
 
         for (table_type, table) in TABLES {
             let flags = match table_type {
@@ -98,10 +117,11 @@ impl<E: EnvironmentKind> Env<E> {
                 TableType::DupSort => DatabaseFlags::DUP_SORT,
             };
 
-            tx.create_db(Some(table), flags).map_err(|e| Error::TableCreation(e.into()))?;
+            tx.create_db(Some(table), flags)
+                .map_err(|e| RethDatabaseError::TableCreation(e.into()))?;
         }
 
-        tx.commit().map_err(|e| Error::Commit(e.into()))?;
+        tx.commit().map_err(|e| RethDatabaseError::Commit(e.into()))?;
 
         Ok(())
     }

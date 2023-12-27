@@ -22,7 +22,7 @@ alloy-chains = { workspace = true }
 ethers = { workspace = true }
 
 # async
-futures = "0.3.28"
+futures = { workspace = true }
 parking_lot = { workspace = true }
 
 # tokio

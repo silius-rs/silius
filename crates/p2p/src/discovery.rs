@@ -1,7 +1,7 @@
 use crate::config::Config;
 use discv5::{
     enr::{CombinedKey, NodeId},
-    Discv5, Discv5ConfigBuilder, Discv5Event, Enr,
+    Discv5, ConfigBuilder, Event, Enr,
 };
 use futures::{stream::FuturesUnordered, Future, FutureExt, StreamExt};
 use libp2p::swarm::{dummy::ConnectionHandler, NetworkBehaviour};
@@ -31,20 +31,20 @@ pub enum EventStream {
     Awaiting(
         Pin<
             Box<
-                dyn Future<Output = Result<mpsc::Receiver<Discv5Event>, discv5::Discv5Error>>
+                dyn Future<Output = Result<mpsc::Receiver<Event>, discv5::Error>>
                     + Send,
             >,
         >,
     ),
     /// The future has completed.
-    Present(mpsc::Receiver<Discv5Event>),
+    Present(mpsc::Receiver<Event>),
     // The future has failed or discv5 has been disabled. There are no events from discv5.
     InActive,
 }
 
 impl Discovery {
     pub fn new(enr: Enr, key: CombinedKey, config: Config) -> eyre::Result<Self> {
-        let config = Discv5ConfigBuilder::new(config.to_listen_config()).build();
+        let config = ConfigBuilder::new(config.to_listen_config()).build();
         let discovery: Discv5<_> = Discv5::new(enr, key, config).map_err(|e| eyre::anyhow!(e))?;
 
         let event_stream_fut = discovery.event_stream().boxed();
@@ -88,7 +88,6 @@ impl NetworkBehaviour for Discovery {
     fn poll(
         &mut self,
         cx: &mut std::task::Context<'_>,
-        _params: &mut impl libp2p::swarm::PollParameters,
     ) -> Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
         while let Poll::Ready(Some(query_result)) = self.active_queries.poll_next_unpin(cx) {
             match query_result {
@@ -116,12 +115,12 @@ impl NetworkBehaviour for Discovery {
             EventStream::Present(ref mut stream) => {
                 while let Poll::Ready(Some(event)) = stream.poll_recv(cx) {
                     match event {
-                        Discv5Event::Discovered(_) => {}
-                        Discv5Event::EnrAdded { .. } |
-                        Discv5Event::NodeInserted { .. } |
-                        Discv5Event::SessionEstablished(_, _) |
-                        Discv5Event::SocketUpdated(_) |
-                        Discv5Event::TalkRequest(_) => {}
+                        Event::Discovered(_) => {}
+                        Event::EnrAdded { .. } |
+                        Event::NodeInserted { .. } |
+                        Event::SessionEstablished(_, _) |
+                        Event::SocketUpdated(_) |
+                        Event::TalkRequest(_) => {}
                     }
                 }
             }
@@ -129,7 +128,7 @@ impl NetworkBehaviour for Discovery {
         };
         Poll::Pending
     }
-    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {}
+    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm) {}
 
     fn on_connection_handler_event(
         &mut self,

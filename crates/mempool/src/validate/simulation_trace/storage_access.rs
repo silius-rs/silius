@@ -2,7 +2,7 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
-    Reputation,
+    Reputation, ReputationError, SimulationError,
 };
 use ethers::{
     providers::Middleware,
@@ -13,7 +13,6 @@ use silius_contracts::entry_point::SELECTORS_INDICES;
 use silius_primitives::{
     constants::validation::entities::{FACTORY_LEVEL, LEVEL_TO_ENTITY, NUMBER_OF_LEVELS},
     reputation::StakeInfo,
-    simulation::SimulationCheckError,
     UserOperation,
 };
 use std::collections::{HashMap, HashSet};
@@ -68,7 +67,7 @@ impl StorageAccess {
         addr: &Address,
         slot: &String,
         slots: &HashMap<Address, HashSet<Bytes>>,
-    ) -> Result<bool, SimulationCheckError> {
+    ) -> Result<bool, SimulationError> {
         if *slot == addr.to_string() {
             return Ok(true);
         }
@@ -78,7 +77,7 @@ impl StorageAccess {
         }
 
         let slot_num = U256::from_str_radix(slot, 16)
-            .map_err(|_| SimulationCheckError::StorageAccess { slot: slot.clone() })?;
+            .map_err(|_| SimulationError::StorageAccess { slot: slot.clone() })?;
 
         if let Some(slots) = slots.get(addr) {
             for slot in slots {
@@ -104,14 +103,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
     /// `helper` - The [SimulationTraceHelper](crate::validate::SimulationTraceHelper)
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SimulationCheckError] error.
+    /// None if the check passes, otherwise a [SimulationError] error.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -173,15 +172,16 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                         {
                             slot_staked = slot.clone();
                         } else {
-                            return Err(SimulationCheckError::StorageAccess { slot });
+                            return Err(SimulationError::StorageAccess { slot });
                         }
                     }
 
                     if !slot_staked.is_empty() && !stake_info_l.is_staked() {
-                        return Err(SimulationCheckError::Unstaked {
-                            entity: LEVEL_TO_ENTITY[l].to_string(),
-                            message: format!("accessed slot {addr} slot {slot_staked}"),
-                        });
+                        return Err(ReputationError::UnstakedEntity {
+                            entity: LEVEL_TO_ENTITY[l].into(),
+                            address: stake_info_l.address,
+                        }
+                        .into());
                     }
                 }
             }

@@ -2,10 +2,10 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
-    Reputation,
+    Reputation, SimulationError,
 };
 use ethers::providers::Middleware;
-use silius_primitives::{simulation::SimulationCheckError, UserOperation};
+use silius_primitives::UserOperation;
 
 #[derive(Clone)]
 pub struct Gas;
@@ -20,14 +20,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for Gas {
     /// `helper` - The [SimulationTraceHelper](crate::validate::SimulationTraceHelper)
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SimulationCheckError] error.
+    /// None if the check passes, otherwise a [SimulationError] error.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         _uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -40,7 +40,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for Gas {
         // current call stack depth
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             if call_info.oog.unwrap_or(false) {
-                return Err(SimulationCheckError::OutOfGas {});
+                return Err(SimulationError::OutOfGas {});
             }
         }
 

@@ -50,7 +50,7 @@ impl PeerManager {
 impl NetworkBehaviour for PeerManager {
     type ConnectionHandler = ConnectionHandler;
     type ToSwarm = PeerManagerEvent;
-    fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {
+    fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm) {
         if let libp2p::swarm::FromSwarm::ConnectionClosed(close_info) = event {
             self.peer_db.disconnect(close_info.peer_id);
             self.events.push_back(PeerManagerEvent::PeerDisconnected(close_info.peer_id));
@@ -113,7 +113,6 @@ impl NetworkBehaviour for PeerManager {
     fn poll(
         &mut self,
         cx: &mut std::task::Context<'_>,
-        _params: &mut impl libp2p::swarm::PollParameters,
     ) -> Poll<ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>> {
         loop {
             match self.ping_peers.poll_next_unpin(cx) {

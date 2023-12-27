@@ -2,7 +2,7 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
-    Reputation,
+    Reputation, ReputationError, SimulationError,
 };
 use ethers::{abi::AbiDecode, providers::Middleware};
 use silius_contracts::{
@@ -12,8 +12,7 @@ use silius_contracts::{
 use silius_primitives::{
     constants::validation::entities::{LEVEL_TO_ENTITY, PAYMASTER},
     simulation::{
-        SimulationCheckError, CREATE_OPCODE, RETURN_OPCODE, REVERT_OPCODE,
-        VALIDATE_PAYMASTER_USER_OP_FUNCTION,
+        CREATE_OPCODE, RETURN_OPCODE, REVERT_OPCODE, VALIDATE_PAYMASTER_USER_OP_FUNCTION,
     },
     UserOperation,
 };
@@ -29,12 +28,12 @@ impl CallStack {
     /// `calls` - The vector of [CallEntry] that will be filled with the parsed call stack
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SimulationCheckError] error.
+    /// None if the check passes, otherwise a [SimulationError] error.
     fn parse_call_stack(
         &self,
         trace: &JsTracerFrame,
         calls: &mut Vec<CallEntry>,
-    ) -> Result<(), SimulationCheckError> {
+    ) -> Result<(), SimulationError> {
         let mut st: Vec<Call> = vec![];
 
         for call in trace.calls.iter() {
@@ -102,14 +101,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
     /// `helper` - The [SimulationTraceHelper](crate::validate::SimulationTraceHelper)
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SimulationCheckError] error.
+    /// None if the check passes, otherwise a [SimulationError] error.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -135,8 +134,8 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
                     call.method.clone().unwrap_or_default() != *"depositTo")
             {
                 // [OP-054] - any other access to the EntryPoint is forbidden
-                return Err(SimulationCheckError::CallStack {
-                    message: format!("Illegal call into entry point during validation {call:?}"),
+                return Err(SimulationError::CallStack {
+                    inner: "Illegal call into entry point during validation {call:?}".into(),
                 });
             }
 
@@ -145,9 +144,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
             if call.to.unwrap_or_default() != helper.entry_point.address() &&
                 !call.value.unwrap_or_default().is_zero()
             {
-                return Err(SimulationCheckError::CallStack {
-                    message: format!("Illegal call {call:?}"),
-                });
+                return Err(SimulationError::CallStack { inner: "Illegal call {call:?}".into() });
             }
 
             // paymaster
@@ -158,11 +155,8 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
                 {
                     if let Some(ret) = call.ret.as_ref() {
                         let validate_paymaster_return: ValidatePaymasterUserOpReturn =
-                            AbiDecode::decode(ret).map_err(|_| {
-                                SimulationCheckError::Validation {
-                                    message: "Error during simulate validation on entry point"
-                                        .to_string(),
-                                }
+                            AbiDecode::decode(ret).map_err(|_| SimulationError::Validation {
+                                inner: "Error during simulate validation on entry point".into(),
                             })?;
                         let context = validate_paymaster_return.context;
 
@@ -171,10 +165,11 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
                         if !context.is_empty() &&
                             reputation.verify_stake(PAYMASTER, Some(*stake_info)).is_err()
                         {
-                            return Err(SimulationCheckError::Unstaked {
-                                entity: PAYMASTER.to_string(),
-                                message: "must not return context".to_string(),
-                            });
+                            return Err(ReputationError::UnstakedEntity {
+                                entity: PAYMASTER.into(),
+                                address: stake_info.address,
+                            }
+                            .into());
                         }
                     }
                 }

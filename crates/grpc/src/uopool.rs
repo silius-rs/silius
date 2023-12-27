@@ -17,17 +17,17 @@ use futures::{channel::mpsc::unbounded, StreamExt};
 use libp2p_identity::{secp256k1, Keypair};
 use parking_lot::RwLock;
 use silius_mempool::{
-    mempool_id, validate::validator::StandardUserOperationValidator, HashSetOp, Mempool, MempoolId,
-    Reputation, ReputationEntryOp, SanityCheck, SimulationCheck, SimulationTraceCheck,
-    UoPool as UserOperationPool, UoPoolBuilder, UserOperationAct, UserOperationAddrAct,
-    UserOperationCodeHashAct,
+    mempool_id, validate::validator::StandardUserOperationValidator, HashSetOp, Mempool,
+    MempoolErrorKind, MempoolId, Reputation, ReputationEntryOp, SanityCheck, SimulationCheck,
+    SimulationTraceCheck, UoPool as UserOperationPool, UoPoolBuilder, UserOperationAct,
+    UserOperationAddrAct, UserOperationCodeHashAct,
 };
 use silius_p2p::{
     config::Config,
     enr::{build_enr, keypair_to_combined},
     network::{EntrypointChannels, Network},
 };
-use silius_primitives::{mempool::AddError, provider::BlockStream, UserOperation};
+use silius_primitives::{provider::BlockStream, UserOperation};
 use std::{
     collections::HashMap, env, net::SocketAddr, os::unix::prelude::PermissionsExt, path::PathBuf,
     str::FromStr, sync::Arc, time::Duration,
@@ -135,16 +135,14 @@ where
                 data: serde_json::to_string(&uo_hash)
                     .map_err(|err| Status::internal(format!("Failed to serialize hash: {err}")))?,
             })),
-            Err(err) => match err {
-                AddError::Verification(err) => Ok(Response::new(AddResponse {
+            Err(err) => match err.kind {
+                MempoolErrorKind::InvalidUserOperation(_) => Ok(Response::new(AddResponse {
                     res: AddResult::NotAdded as i32,
                     data: serde_json::to_string(&err).map_err(|err| {
                         Status::internal(format!("Failed to serialize error: {err}"))
                     })?,
                 })),
-                AddError::MempoolError { message } => {
-                    Err(Status::internal(format!("Internal error: {message}")))
-                }
+                _ => Err(Status::internal(format!("Internal error: {err}"))),
             },
         }
     }

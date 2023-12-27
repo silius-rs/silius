@@ -137,7 +137,7 @@ where
         args.send_bundle_mode,
         match args.send_bundle_mode {
             SendStrategy::EthClient => None,
-            SendStrategy::Flashbots => Some(vec![flashbots_relay_endpoints::FLASHBOTS.to_string()]),
+            SendStrategy::Flashbots => Some(vec![flashbots_relay_endpoints::FLASHBOTS.into()]),
         },
     );
     info!("Started bundler gRPC service at {:?}:{:?}", args.bundler_addr, args.bundler_port);

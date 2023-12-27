@@ -1,6 +1,9 @@
-use crate::mempool::{
-    AddRemoveUserOp, AddRemoveUserOpHash, ClearOp, MempoolError, UserOperationAddrOp,
-    UserOperationCodeHashOp, UserOperationOp,
+use crate::{
+    mempool::{
+        AddRemoveUserOp, AddRemoveUserOpHash, ClearOp, UserOperationAddrOp,
+        UserOperationCodeHashOp, UserOperationOp,
+    },
+    MempoolErrorKind,
 };
 use ethers::types::{Address, U256};
 use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
@@ -12,14 +15,14 @@ impl AddRemoveUserOp for HashMap<UserOperationHash, UserOperation> {
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolError> {
+    ) -> Result<UserOperationHash, MempoolErrorKind> {
         let uo_hash = uo.hash(ep, chain_id);
         self.insert(uo_hash, uo);
 
         Ok(uo_hash)
     }
 
-    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         if let Some(user_op) = self.get(uo_hash) {
             user_op.clone()
         } else {
@@ -34,11 +37,11 @@ impl UserOperationOp for HashMap<UserOperationHash, UserOperation> {
     fn get_by_uo_hash(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> Result<Option<UserOperation>, MempoolError> {
+    ) -> Result<Option<UserOperation>, MempoolErrorKind> {
         Ok(self.get(uo_hash).cloned())
     }
 
-    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         let mut uos: Vec<UserOperation> = self.values().cloned().collect();
         uos.sort_by(|a, b| {
             if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
@@ -50,7 +53,7 @@ impl UserOperationOp for HashMap<UserOperationHash, UserOperation> {
         Ok(uos)
     }
 
-    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         Ok(self.values().cloned().collect())
     }
 }
@@ -66,7 +69,11 @@ impl UserOperationAddrOp for HashMap<Address, HashSet<UserOperationHash>> {
 }
 
 impl AddRemoveUserOpHash for HashMap<Address, HashSet<UserOperationHash>> {
-    fn add(&mut self, address: &Address, uo_hash: UserOperationHash) -> Result<(), MempoolError> {
+    fn add(
+        &mut self,
+        address: &Address,
+        uo_hash: UserOperationHash,
+    ) -> Result<(), MempoolErrorKind> {
         self.entry(*address).or_default().insert(uo_hash);
         Ok(())
     }
@@ -75,7 +82,7 @@ impl AddRemoveUserOpHash for HashMap<Address, HashSet<UserOperationHash>> {
         &mut self,
         address: &Address,
         uo_hash: &UserOperationHash,
-    ) -> Result<bool, MempoolError> {
+    ) -> Result<bool, MempoolErrorKind> {
         if let Some(uos) = self.get_mut(address) {
             uos.remove(uo_hash);
 
@@ -90,7 +97,7 @@ impl AddRemoveUserOpHash for HashMap<Address, HashSet<UserOperationHash>> {
 }
 
 impl UserOperationCodeHashOp for HashMap<UserOperationHash, Vec<CodeHash>> {
-    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         Ok(self.contains_key(uo_hash))
     }
 
@@ -98,12 +105,15 @@ impl UserOperationCodeHashOp for HashMap<UserOperationHash, Vec<CodeHash>> {
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: Vec<CodeHash>,
-    ) -> Result<(), MempoolError> {
+    ) -> Result<(), MempoolErrorKind> {
         self.insert(*uo_hash, hashes.clone());
         Ok(())
     }
 
-    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<Vec<CodeHash>, MempoolError> {
+    fn get_code_hashes(
+        &self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<Vec<CodeHash>, MempoolErrorKind> {
         if let Some(hashes) = self.get(uo_hash) {
             Ok(hashes.clone())
         } else {
@@ -111,7 +121,10 @@ impl UserOperationCodeHashOp for HashMap<UserOperationHash, Vec<CodeHash>> {
         }
     }
 
-    fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn remove_code_hashes(
+        &mut self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<bool, MempoolErrorKind> {
         self.remove(uo_hash);
         Ok(true)
     }

@@ -2,7 +2,7 @@ use crate::config::Config;
 use discv5::{
     enr::{
         k256::{ecdsa::VerifyingKey, CompressedPoint},
-        CombinedKey, CombinedPublicKey, EnrBuilder,
+        CombinedKey, CombinedPublicKey, Enr as EnrBuilder,
     },
     Enr,
 };
@@ -27,7 +27,7 @@ pub fn keypair_to_combined(keypair: Keypair) -> eyre::Result<CombinedKey> {
 
 /// Build an ENR from a libp2p Keypair and config
 pub fn build_enr(enr_key: &CombinedKey, config: &Config) -> eyre::Result<Enr> {
-    let mut enr_builder = EnrBuilder::new("v4");
+    let mut enr_builder = EnrBuilder::builder();
 
     if let Some(ip) = config.ipv4_addr {
         enr_builder.ip4(ip);

@@ -2,13 +2,13 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
-    Reputation,
+    Reputation, SanityError,
 };
 use ethers::{
     providers::Middleware,
     types::{BlockNumber, U256},
 };
-use silius_primitives::{sanity::SanityCheckError, UserOperation};
+use silius_primitives::UserOperation;
 
 #[derive(Clone)]
 pub struct MaxFee {
@@ -24,14 +24,14 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
     /// `helper` - The helper struct that contains the middleware
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SanityCheckError]
+    /// None if the check passes, otherwise a [SanityError]
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -41,7 +41,7 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
         R: ReputationEntryOp,
     {
         if uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
-            return Err(SanityCheckError::HighMaxPriorityFeePerGas {
+            return Err(SanityError::MaxPriorityFeePerGasTooHigh {
                 max_priority_fee_per_gas: uo.max_priority_fee_per_gas,
                 max_fee_per_gas: uo.max_fee_per_gas,
             });
@@ -52,23 +52,22 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
             .eth_client()
             .get_block(BlockNumber::Latest)
             .await
-            .map_err(|err| SanityCheckError::UnknownError { message: err.to_string() })?
-            .ok_or(SanityCheckError::UnknownError { message: "No block found".to_string() })?;
-        let base_fee_per_gas = block
-            .base_fee_per_gas
-            .ok_or(SanityCheckError::UnknownError { message: "No base fee".to_string() })?;
+            .map_err(|err| SanityError::Provider { inner: err.to_string() })?
+            .ok_or(SanityError::Other { inner: "No block found".into() })?;
+        let base_fee_per_gas =
+            block.base_fee_per_gas.ok_or(SanityError::Other { inner: "No base fee".into() })?;
 
         if base_fee_per_gas > uo.max_fee_per_gas {
-            return Err(SanityCheckError::LowMaxFeePerGas {
+            return Err(SanityError::MaxFeePerGasTooLow {
                 max_fee_per_gas: uo.max_fee_per_gas,
                 base_fee_per_gas,
             });
         }
 
         if uo.max_priority_fee_per_gas < self.min_priority_fee_per_gas {
-            return Err(SanityCheckError::LowMaxPriorityFeePerGas {
+            return Err(SanityError::MaxPriorityFeePerGasTooLow {
                 max_priority_fee_per_gas: uo.max_priority_fee_per_gas,
-                min_priority_fee_per_gas: self.min_priority_fee_per_gas,
+                max_priority_fee_per_gas_expected: self.min_priority_fee_per_gas,
             });
         }
 

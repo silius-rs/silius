@@ -1,5 +1,5 @@
 use super::{
-    env::DBError,
+    env::DatabaseError,
     tables::{CodeHashes, UserOperations, UserOperationsByEntity, UserOperationsBySender},
     utils::{
         WrapAddress, WrapCodeHash, WrapCodeHashVec, WrapUserOpSet, WrapUserOperation,
@@ -7,9 +7,12 @@ use super::{
     },
     DatabaseTable,
 };
-use crate::mempool::{
-    AddRemoveUserOp, AddRemoveUserOpHash, ClearOp, MempoolError, UserOperationAddrOp,
-    UserOperationCodeHashOp, UserOperationOp,
+use crate::{
+    mempool::{
+        AddRemoveUserOp, AddRemoveUserOpHash, ClearOp, UserOperationAddrOp,
+        UserOperationCodeHashOp, UserOperationOp,
+    },
+    MempoolErrorKind,
 };
 use ethers::types::{Address, U256};
 use reth_db::{
@@ -26,7 +29,7 @@ impl<E: EnvironmentKind> AddRemoveUserOp for DatabaseTable<E, UserOperations> {
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolError> {
+    ) -> Result<UserOperationHash, MempoolErrorKind> {
         let hash = uo.hash(ep, chain_id);
         let tx = self.env.tx_mut()?;
         let uo_hash_wrap: WrapUserOperationHash = hash.into();
@@ -36,7 +39,7 @@ impl<E: EnvironmentKind> AddRemoveUserOp for DatabaseTable<E, UserOperations> {
         Ok(hash)
     }
 
-    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx_mut()?;
@@ -54,7 +57,7 @@ macro_rules! impl_add_remove_user_op_hash {
                 &mut self,
                 address: &Address,
                 uo_hash: UserOperationHash,
-            ) -> Result<(), MempoolError> {
+            ) -> Result<(), MempoolErrorKind> {
                 let tx = self.env.tx_mut()?;
                 let uo_hash_wrap: WrapUserOperationHash = uo_hash.into();
                 if let Some(mut uo_hash_set) = tx.get::<$table>(address.clone().into())? {
@@ -73,7 +76,7 @@ macro_rules! impl_add_remove_user_op_hash {
                 &mut self,
                 address: &Address,
                 uo_hash: &UserOperationHash,
-            ) -> Result<bool, MempoolError> {
+            ) -> Result<bool, MempoolErrorKind> {
                 let tx = self.env.tx_mut()?;
                 if let Some(mut uo_hash_set) =
                     tx.get::<UserOperationsBySender>(address.clone().into())?
@@ -100,7 +103,7 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
     fn get_by_uo_hash(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> Result<Option<UserOperation>, MempoolError> {
+    ) -> Result<Option<UserOperation>, MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx()?;
@@ -110,7 +113,7 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
         Ok(res.map(|uo| uo.into()))
     }
 
-    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.env
             .tx()
             .and_then(|tx| {
@@ -128,10 +131,10 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
                 });
                 Ok(uos)
             })
-            .map_err(|e| MempoolError::DBError(DBError::DBInternalError(e)))
+            .map_err(|e| MempoolErrorKind::Database(DatabaseError::Internal(e)))
     }
 
-    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         let tx = self.env.tx()?;
         let mut c = tx.cursor_read::<UserOperations>()?;
         let mut res = Vec::new();
@@ -165,7 +168,7 @@ impl_user_op_addr_op!(UserOperationsBySender);
 impl_user_op_addr_op!(UserOperationsByEntity);
 
 impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes> {
-    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx()?;
@@ -177,7 +180,7 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: Vec<CodeHash>,
-    ) -> Result<(), MempoolError> {
+    ) -> Result<(), MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
         let tx = self.env.tx_mut()?;
@@ -188,7 +191,10 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
         Ok(())
     }
 
-    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<Vec<CodeHash>, MempoolError> {
+    fn get_code_hashes(
+        &self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<Vec<CodeHash>, MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
         let tx = self.env.tx_mut()?;
         let res = tx.get::<CodeHashes>(uo_hash_wrap)?;
@@ -200,7 +206,10 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
             .unwrap_or(vec![]))
     }
 
-    fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn remove_code_hashes(
+        &mut self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<bool, MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
         let tx = self.env.tx_mut()?;
         if tx.get::<CodeHashes>(uo_hash_wrap.clone())?.is_some() {

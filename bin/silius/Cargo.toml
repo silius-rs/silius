@@ -27,19 +27,19 @@ discv5 = { workspace = true }
 ethers = { workspace = true }
 
 # cli
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4.4.12", features = ["derive"] }
 
 # async
 parking_lot = { workspace = true }
-pin-utils = "0.1"
+pin-utils = "0.1.0"
 
 # tokio
 tokio = { workspace = true }
 
 # misc
-dirs = "4.0"
+dirs = "5.0.1"
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
-log = "0.4.19"
+log = "0.4.20"
 tracing = { workspace = true }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

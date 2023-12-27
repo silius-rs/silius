@@ -9,7 +9,6 @@ pub mod mempool;
 pub mod p2p;
 pub mod provider;
 pub mod reputation;
-pub mod sanity;
 pub mod simulation;
 mod user_operation;
 mod utils;

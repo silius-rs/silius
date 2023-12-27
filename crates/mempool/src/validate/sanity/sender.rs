@@ -3,12 +3,10 @@ use crate::{
     reputation::{HashSetOp, ReputationEntryOp},
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
-    Reputation,
+    Reputation, SanityError,
 };
 use ethers::providers::Middleware;
-use silius_primitives::{
-    constants::mempool::GAS_INCREASE_PERC, sanity::SanityCheckError, UserOperation,
-};
+use silius_primitives::{constants::mempool::GAS_INCREASE_PERC, UserOperation};
 
 #[derive(Clone)]
 pub struct Sender;
@@ -24,7 +22,7 @@ impl<M: Middleware> SanityCheck<M> for Sender {
     /// perform the sanity check.
     ///
     /// # Returns
-    /// Nothing if the sanity check is successful, otherwise a [SanityCheckError](SanityCheckError)
+    /// Nothing if the sanity check is successful, otherwise a [SanityError](SanityError)
     /// is returned.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
@@ -32,7 +30,7 @@ impl<M: Middleware> SanityCheck<M> for Sender {
         mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -41,15 +39,19 @@ impl<M: Middleware> SanityCheck<M> for Sender {
         H: HashSetOp,
         R: ReputationEntryOp,
     {
-        let code = helper.entry_point.eth_client().get_code(uo.sender, None).await?;
+        let code = helper
+            .entry_point
+            .eth_client()
+            .get_code(uo.sender, None)
+            .await
+            .map_err(|e| SanityError::Provider { inner: e.to_string() })?;
 
         // check if sender or init code
         if (code.is_empty() && uo.init_code.is_empty()) ||
             (!code.is_empty() && !uo.init_code.is_empty())
         {
-            return Err(SanityCheckError::SenderOrInitCode {
-                sender: uo.sender,
-                init_code: uo.init_code.clone(),
+            return Err(SanityError::Sender {
+                inner: "sender {uo.sender} is an existing contract, or the initCode {uo.init_code.clone()} is not empty (but not both)".into(),
             });
         }
 
@@ -73,9 +75,9 @@ impl<M: Middleware> SanityCheck<M> for Sender {
                         GAS_INCREASE_PERC.into(),
                     )
             {
-                return Err(SanityCheckError::SenderVerification {
-                    sender: uo.sender,
-                    message: "couldn't replace user operation (gas increase too low)".into(),
+                return Err(SanityError::Sender {
+                    inner: "{uo.sender} couldn't replace user operation (gas increase too low)"
+                        .into(),
                 });
             }
         }

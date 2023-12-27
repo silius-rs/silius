@@ -1,40 +1,11 @@
-use crate::mempool::ClearOp;
-#[cfg(feature = "mdbx")]
-use crate::DBError;
+use crate::{mempool::ClearOp, ReputationError};
 use ethers::types::{Address, Bytes, U256};
 use parking_lot::RwLock;
 use silius_primitives::{
     get_address,
-    reputation::{ReputationEntry, ReputationError, ReputationStatus, StakeInfo, Status},
+    reputation::{ReputationEntry, ReputationStatus, StakeInfo, Status},
 };
 use std::{fmt::Debug, ops::Deref, sync::Arc};
-
-#[derive(Debug)]
-pub enum ReputationOpError {
-    #[cfg(feature = "mdbx")]
-    DBError(DBError),
-    ReputationError(ReputationError),
-}
-
-impl From<ReputationError> for ReputationOpError {
-    fn from(value: ReputationError) -> Self {
-        Self::ReputationError(value)
-    }
-}
-
-#[cfg(feature = "mdbx")]
-impl From<DBError> for ReputationOpError {
-    fn from(value: DBError) -> Self {
-        Self::DBError(value)
-    }
-}
-
-#[cfg(feature = "mdbx")]
-impl From<reth_db::Error> for ReputationOpError {
-    fn from(value: reth_db::Error) -> Self {
-        Self::DBError(DBError::DBInternalError(value))
-    }
-}
 
 /// Trait representing operations on a HashSet.
 pub trait HashSetOp: Default + Sync + Send {
@@ -97,7 +68,7 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
     ///
     /// Returns `Ok(Some(entry))` if the entry exists, `Ok(None)` if the entry does not exist,
     /// or an `Err` if an error occurred during the retrieval.
-    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError>;
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationError>;
 
     /// Sets the reputation entry for the given address.
     ///
@@ -115,7 +86,7 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
         &mut self,
         addr: &Address,
         entry: ReputationEntry,
-    ) -> Result<Option<ReputationEntry>, ReputationOpError>;
+    ) -> Result<Option<ReputationEntry>, ReputationError>;
 
     /// Checks if a reputation entry exists for the given address.
     ///
@@ -127,7 +98,7 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
     ///
     /// Returns `Ok(true)` if the entry exists, `Ok(false)` if the entry does not exist,
     /// or an `Err` if an error occurred during the check.
-    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError>;
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError>;
 
     /// Updates the reputation entries.
     ///
@@ -135,7 +106,7 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
     ///
     /// Returns `Ok(())` if the update was successful, or an `Err` if an error occurred during the
     /// update.
-    fn update(&mut self) -> Result<(), ReputationOpError>;
+    fn update(&mut self) -> Result<(), ReputationError>;
 
     /// Retrieves all reputation entries.
     ///
@@ -146,7 +117,7 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
 }
 
 impl<T: ReputationEntryOp> ReputationEntryOp for Arc<RwLock<T>> {
-    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError> {
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationError> {
         self.read().get_entry(addr)
     }
 
@@ -154,15 +125,15 @@ impl<T: ReputationEntryOp> ReputationEntryOp for Arc<RwLock<T>> {
         &mut self,
         addr: &Address,
         entry: ReputationEntry,
-    ) -> Result<Option<ReputationEntry>, ReputationOpError> {
+    ) -> Result<Option<ReputationEntry>, ReputationError> {
         self.write().set_entry(addr, entry)
     }
 
-    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError> {
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError> {
         self.read().contains_entry(addr)
     }
 
-    fn update(&mut self) -> Result<(), ReputationOpError> {
+    fn update(&mut self) -> Result<(), ReputationError> {
         self.write().update()
     }
 
@@ -251,7 +222,7 @@ where
     /// #Returns
     /// * `Ok(())` if the address was added successfully
     /// * `Err(ReputationError::AlreadyExists)` if the address already exists
-    fn set_default(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+    fn set_default(&mut self, addr: &Address) -> Result<(), ReputationError> {
         if !self.entities.contains_entry(addr)? {
             let ent = ReputationEntry::default_with_addr(*addr);
 
@@ -269,7 +240,7 @@ where
     /// # Returns
     /// * `Ok(ReputationEntry)` if the address exists
     /// * `Err(ReputationError::NotFound)` if the address does not exist
-    pub fn get(&self, addr: &Address) -> Result<ReputationEntry, ReputationOpError> {
+    pub fn get(&self, addr: &Address) -> Result<ReputationEntry, ReputationError> {
         if let Some(ent) = self.entities.get_entry(addr)? {
             Ok(ReputationEntry { status: self.get_status(addr)?, ..ent.clone() })
         } else {
@@ -285,7 +256,7 @@ where
     /// # Returns
     /// * `Ok(())` if the address was incremented successfully
     /// * `Err(ReputationError::NotFound)` if the address does not exist
-    pub fn increment_seen(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+    pub fn increment_seen(&mut self, addr: &Address) -> Result<(), ReputationError> {
         self.set_default(addr)?;
         if let Some(mut ent) = self.entities.get_entry(addr)? {
             ent.uo_seen += 1;
@@ -303,7 +274,7 @@ where
     /// # Returns
     /// * `Ok(())` if the address was incremented successfully
     /// * `Err(ReputationError::NotFound)` if the address does not exist
-    pub fn increment_included(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+    pub fn increment_included(&mut self, addr: &Address) -> Result<(), ReputationError> {
         self.set_default(addr)?;
         if let Some(mut ent) = self.entities.get_entry(addr)? {
             ent.uo_included += 1;
@@ -317,7 +288,7 @@ where
     /// # Returns
     /// * `Ok(())` if the address was updated successfully
     /// * `Err(ReputationError::NotFound)` if the address does not exist
-    pub fn update_hourly(&mut self) -> Result<(), ReputationOpError> {
+    pub fn update_hourly(&mut self) -> Result<(), ReputationError> {
         self.entities.update()
     }
 
@@ -392,7 +363,7 @@ where
     ///
     /// # Returns
     /// * `Ok(ReputationStatus)` if the address exists
-    pub fn get_status(&self, addr: &Address) -> Result<ReputationStatus, ReputationOpError> {
+    pub fn get_status(&self, addr: &Address) -> Result<ReputationStatus, ReputationError> {
         if self.whitelist.is_in_list(addr) {
             return Ok(Status::OK.into());
         }
@@ -424,7 +395,7 @@ where
     /// # Returns
     /// * `Ok(())` if the address was updated successfully
     /// * `Err(ReputationError::NotFound)` if the address does not exist
-    pub fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), ReputationOpError> {
+    pub fn update_handle_ops_reverted(&mut self, addr: &Address) -> Result<(), ReputationError> {
         self.set_default(addr)?;
         if let Some(mut ent) = self.entities.get_entry(addr)? {
             ent.uo_seen = 100;
@@ -458,10 +429,10 @@ where
 
             let err = if info.stake < self.min_stake {
                 ReputationError::StakeTooLow {
+                    entity: entity.into(),
                     address: info.address,
-                    entity: entity.to_string(),
+                    stake: info.stake,
                     min_stake: self.min_stake,
-                    min_unstake_delay: self.min_unstake_delay,
                 }
             } else if info.unstake_delay < U256::from(2)
             // TODO: remove this when spec tests are updated!!!!
@@ -469,8 +440,8 @@ where
             {
                 ReputationError::UnstakeDelayTooLow {
                     address: info.address,
-                    entity: entity.to_string(),
-                    min_stake: self.min_stake,
+                    entity: entity.into(),
+                    unstake_delay: info.unstake_delay,
                     min_unstake_delay: self.min_unstake_delay,
                 }
             } else {
@@ -489,7 +460,7 @@ where
     ///
     /// # Returns
     /// * `Ok(())` if the entries were set successfully
-    pub fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), ReputationOpError> {
+    pub fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), ReputationError> {
         for en in entries {
             self.entities.set_entry(&en.address.clone(), en)?;
         }
@@ -501,14 +472,14 @@ where
     ///
     /// # Returns
     /// * All [reputation entries](ReputationEntries)
-    pub fn get_all(&self) -> Result<Vec<ReputationEntry>, ReputationOpError> {
+    pub fn get_all(&self) -> Result<Vec<ReputationEntry>, ReputationError> {
         Ok(self
             .entities
             .get_all()
             .into_iter()
             .flat_map(|entry| {
                 let status = self.get_status(&entry.address)?;
-                Ok::<ReputationEntry, ReputationOpError>(ReputationEntry { status, ..entry })
+                Ok::<ReputationEntry, ReputationError>(ReputationEntry { status, ..entry })
             })
             .collect())
     }
@@ -520,7 +491,7 @@ where
     pub fn get_status_from_bytes(
         &self,
         bytes: &Bytes,
-    ) -> Result<ReputationStatus, ReputationOpError> {
+    ) -> Result<ReputationStatus, ReputationError> {
         let addr_opt = get_address(bytes.deref());
         if let Some(addr) = addr_opt {
             self.get_status(&addr)

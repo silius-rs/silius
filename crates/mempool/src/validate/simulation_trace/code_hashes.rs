@@ -3,17 +3,14 @@ use crate::{
     reputation::{HashSetOp, ReputationEntryOp},
     utils::equal_code_hashes,
     validate::{SimulationTraceCheck, SimulationTraceHelper},
-    Reputation,
+    Reputation, SimulationError,
 };
 use ethers::{
     providers::Middleware,
     types::{Address, H256},
     utils::keccak256,
 };
-use silius_primitives::{
-    simulation::{CodeHash, SimulationCheckError},
-    UserOperation,
-};
+use silius_primitives::{simulation::CodeHash, UserOperation};
 use std::sync::Arc;
 use tokio::task::JoinSet;
 use tracing::debug;
@@ -30,13 +27,13 @@ impl CodeHashes {
     /// `eth_client` - The Ethereum client
     ///
     /// # Returns
-    /// None if code hash is available, otherwise [SimulationCheckError](SimulationCheckError).
+    /// None if code hash is available, otherwise [SimulationError](SimulationError).
     async fn get_code_hashes<M: Middleware + 'static>(
         &self,
         addrs: Vec<Address>,
         hashes: &mut Vec<CodeHash>,
         eth_client: &Arc<M>,
-    ) -> Result<(), SimulationCheckError> {
+    ) -> Result<(), SimulationError> {
         let mut ts: JoinSet<Option<(Address, H256)>> = JoinSet::new();
 
         for addr in addrs {
@@ -54,8 +51,8 @@ impl CodeHashes {
             match res {
                 Ok(Some(h)) => hashes.push(CodeHash { address: h.0, hash: h.1 }),
                 Ok(None) | Err(_) => {
-                    return Err(SimulationCheckError::UnknownError {
-                        message: "Failed to retrieve code hashes".to_string(),
+                    return Err(SimulationError::Other {
+                        inner: "Failed to retrieve code hashes".into(),
                     });
                 }
             }
@@ -74,14 +71,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
     /// `helper` - The [SimulationTraceHelper](SimulationTraceHelper)
     ///
     /// # Returns
-    /// None if the check passes, otherwise a [SimulationCheckError] error.
+    /// None if the check passes, otherwise a [SimulationError] error.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -108,17 +105,15 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
         match mempool.has_code_hashes(&uo_hash) {
             Ok(true) => {
                 // 2nd simulation
-                let hashes_prev = mempool.get_code_hashes(&uo_hash).map_err(|err| {
-                    SimulationCheckError::UnknownError { message: format!("{err:?}") }
-                })?;
+                let hashes_prev = mempool
+                    .get_code_hashes(&uo_hash)
+                    .map_err(|err| SimulationError::Other { inner: err.to_string() })?;
                 debug!(
                     "Veryfing {:?} code hashes in 2nd simulation: {:?} vs {:?}",
                     uo_hash, hashes, hashes_prev
                 );
                 if !equal_code_hashes(hashes, &hashes_prev) {
-                    return Err(SimulationCheckError::CodeHashes {
-                        message: "Modified code hashes after 1st simulation".to_string(),
-                    });
+                    return Err(SimulationError::CodeHashes {});
                 } else {
                     helper.code_hashes = Some(hashes.to_vec());
                 }
@@ -128,9 +123,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
                 debug!("Setting code hashes in 1st simulation: {:?}", hashes);
                 helper.code_hashes = Some(hashes.to_vec());
             }
-            Err(err) => {
-                return Err(SimulationCheckError::UnknownError { message: format!("{err:?}") })
-            }
+            Err(err) => return Err(SimulationError::Other { inner: err.to_string() }),
         }
 
         Ok(())

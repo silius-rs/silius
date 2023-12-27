@@ -29,7 +29,7 @@ pub struct MockFlashbotsBlockBuilderRelay {
 #[cfg(test)]
 impl MockFlashbotsBlockBuilderRelay {
     pub async fn new(port: u64) -> eyre::Result<Self> {
-        let url = format!("http://127.0.0.1:{}", port).to_string();
+        let url = format!("http://127.0.0.1:{port}");
         let mock_eth_client = Provider::<Http>::try_from(&url)?;
 
         // Create a wallet and SignerMiddleware

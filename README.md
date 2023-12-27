@@ -81,7 +81,7 @@ Bundler was tested on the following networks:
 | Ethereum      | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
 | Polygon PoS   | :soon:    | :heavy_check_mark: (Mumbai)                   |
 
-**You could also try any other evm network but it is possible you would meet some problems so use is at your own risk. You are welcomed to open any issues when you meet a problem**
+**You can also try the Silius on any other EVM network, but you may encounter some problems (e.g., gas calculating differences on L2s) - please use it at our own risk! You are always welcome to open up a new issue when you meet any problem.** :warning:
 
 ## Supported entry point
 The address of the entry point smart contract is the same on all EVM networks.

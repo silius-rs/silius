@@ -112,7 +112,7 @@ impl Network {
             config,
             entrypoint_channels
                 .iter()
-                .map(|(c, _, _, _)| c.canonical_mempool_id().to_string())
+                .map(|(c, _, _, _)| c.canonical_mempool_id().into())
                 .collect(),
             ping_interval,
             target_peers,
@@ -124,8 +124,7 @@ impl Network {
         mplex_config.set_max_buffer_behaviour(MaxBufferBehaviour::Block);
 
         // yamux config
-        let mut yamux_config = libp2p::yamux::Config::default();
-        yamux_config.set_window_update_mode(libp2p::yamux::WindowUpdateMode::on_read());
+        let yamux_config = libp2p::yamux::Config::default();
         let swarm = SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_tcp(libp2p::tcp::Config::default().nodelay(true), noise::Config::new, || {

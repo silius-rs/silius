@@ -1,4 +1,4 @@
-use crate::{error::JsonRpcError, eth_api::EthApiServer};
+use crate::{codes::USER_OPERATION_HASH, error::JsonRpcError, eth_api::EthApiServer};
 use async_trait::async_trait;
 use ethers::{
     types::{Address, U64},
@@ -9,10 +9,10 @@ use silius_grpc::{
     uo_pool_client::UoPoolClient, AddRequest, AddResult, EstimateUserOperationGasRequest,
     EstimateUserOperationGasResult, UserOperationHashRequest,
 };
+use silius_mempool::MempoolError;
 use silius_primitives::{
-    constants::rpc::USER_OPERATION_HASH, mempool::ValidationError,
-    simulation::SimulationCheckError, UserOperation, UserOperationByHash,
-    UserOperationGasEstimation, UserOperationHash, UserOperationPartial, UserOperationReceipt,
+    UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+    UserOperationPartial, UserOperationReceipt,
 };
 use std::str::FromStr;
 use tonic::Request;
@@ -84,7 +84,7 @@ impl EthApiServer for EthApiServerImpl {
         }
 
         Err(JsonRpcError::from(
-            serde_json::from_str::<ValidationError>(&res.data).map_err(JsonRpcError::from)?,
+            serde_json::from_str::<MempoolError>(&res.data).map_err(JsonRpcError::from)?,
         )
         .0)
     }
@@ -126,7 +126,7 @@ impl EthApiServer for EthApiServerImpl {
         }
 
         Err(JsonRpcError::from(
-            serde_json::from_str::<SimulationCheckError>(&res.data).map_err(JsonRpcError::from)?,
+            serde_json::from_str::<MempoolError>(&res.data).map_err(JsonRpcError::from)?,
         )
         .0)
     }

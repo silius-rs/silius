@@ -2,10 +2,10 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
-    Reputation,
+    Reputation, SanityError,
 };
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{sanity::SanityCheckError, UserOperation};
+use silius_primitives::UserOperation;
 
 #[derive(Clone)]
 pub struct CallGas;
@@ -19,14 +19,14 @@ impl<M: Middleware> SanityCheck<M> for CallGas {
     /// `helper` - The helper struct that contains the entry point and the Ethereum client.
     ///
     /// # Returns
-    /// None if the sanity check passes, otherwise [SanityCheckError].
+    /// None if the sanity check passes, otherwise [SanityError].
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         _helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -44,7 +44,7 @@ impl<M: Middleware> SanityCheck<M> for CallGas {
             return Ok(());
         }
 
-        Err(SanityCheckError::LowCallGasLimit {
+        Err(SanityError::CallGasLimitTooLow {
             call_gas_limit: uo.call_gas_limit,
             call_gas_limit_expected: call_gas_limit,
         })

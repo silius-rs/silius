@@ -1,7 +1,7 @@
 use hyper::{Body, Request, Response};
 use hyper_tls::HttpsConnector;
 use jsonrpsee::{
-    core::error::Error as JsonRpcError,
+    core::ClientError as JsonRpcError,
     types::{
         error::{ErrorCode, METHOD_NOT_FOUND_MSG},
         ErrorObjectOwned,
@@ -105,8 +105,8 @@ where
             }
 
             if let Ok(err) = serde_json::from_slice::<JsonRpcErrorResponse>(&res_bb) {
-                if err.error.code() == ErrorCode::MethodNotFound.code() &&
-                    err.error.message() == METHOD_NOT_FOUND_MSG
+                if err.error.code() == ErrorCode::MethodNotFound.code()
+                    && err.error.message() == METHOD_NOT_FOUND_MSG
                 {
                     let req = Request::post(addr.clone())
                         .header(hyper::header::CONTENT_TYPE, "application/json")

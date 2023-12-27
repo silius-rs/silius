@@ -2,10 +2,10 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
-    Reputation,
+    Reputation, SanityError,
 };
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{get_address, sanity::SanityCheckError, UserOperation};
+use silius_primitives::{get_address, UserOperation};
 
 #[derive(Clone)]
 pub struct Paymaster;
@@ -21,14 +21,14 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
     /// perform the sanity check.
     ///
     /// # Returns
-    /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
+    /// None if the sanity check is successful, otherwise a [SanityError] is returned.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -39,15 +39,15 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
     {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                let code = helper.entry_point.eth_client().get_code(addr, None).await?;
+                let code = helper
+                    .entry_point
+                    .eth_client()
+                    .get_code(addr, None)
+                    .await
+                    .map_err(|e| SanityError::Provider { inner: e.to_string() })?;
 
                 if !code.is_empty() {
-                    let deposit_info =
-                        helper.entry_point.get_deposit_info(&addr).await.map_err(|_| {
-                            SanityCheckError::UnknownError {
-                                message: "Couldn't retrieve deposit info from entry point".into(),
-                            }
-                        })?;
+                    let deposit_info = helper.entry_point.get_deposit_info(&addr).await?;
 
                     if U256::from(deposit_info.deposit) >= uo.max_fee_per_gas {
                         return Ok(());
@@ -55,9 +55,7 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
                 }
             }
 
-            return Err(SanityCheckError::PaymasterVerification {
-                paymaster_and_data: uo.paymaster_and_data.clone(),
-            });
+            return Err(SanityError::Paymaster { inner: "Problem with paymaster".into() });
         }
 
         Ok(())

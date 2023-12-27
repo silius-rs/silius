@@ -2,10 +2,10 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
-    Overhead, Reputation,
+    Overhead, Reputation, SanityError,
 };
 use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{sanity::SanityCheckError, UserOperation};
+use silius_primitives::UserOperation;
 
 #[derive(Clone)]
 pub struct VerificationGas {
@@ -23,7 +23,7 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
     /// perform the sanity check.
     ///
     /// # Returns
-    /// Nothing if the sanity check is successful, otherwise a [SanityCheckError](SanityCheckError)
+    /// Nothing if the sanity check is successful, otherwise a [SanityError](SanityError)
     /// is returned.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
@@ -31,7 +31,7 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         _helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -41,15 +41,15 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
         R: ReputationEntryOp,
     {
         if uo.verification_gas_limit > self.max_verification_gas {
-            return Err(SanityCheckError::HighVerificationGasLimit {
+            return Err(SanityError::VerificationGasLimitTooHigh {
                 verification_gas_limit: uo.verification_gas_limit,
-                max_verification_gas: self.max_verification_gas,
+                verification_gas_limit_expected: self.max_verification_gas,
             });
         }
 
         let pre_gas = Overhead::default().calculate_pre_verification_gas(uo);
         if uo.pre_verification_gas < pre_gas {
-            return Err(SanityCheckError::LowPreVerificationGas {
+            return Err(SanityError::PreVerificationGasTooLow {
                 pre_verification_gas: uo.pre_verification_gas,
                 pre_verification_gas_expected: pre_gas,
             });

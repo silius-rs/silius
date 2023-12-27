@@ -2,7 +2,7 @@
 use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
-    Reputation,
+    InvalidMempoolUserOperationError, Reputation, SanityError, SimulationError,
 };
 use alloy_chains::Chain;
 use enumset::{EnumSet, EnumSetType};
@@ -10,10 +10,8 @@ use ethers::{providers::Middleware, types::U256};
 use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame, EntryPoint};
 use silius_primitives::{
     constants::validation::entities::NUMBER_OF_LEVELS,
-    mempool::ValidationError,
     reputation::StakeInfo,
-    sanity::SanityCheckError,
-    simulation::{CodeHash, SimulationCheckError, StorageMap},
+    simulation::{CodeHash, StorageMap},
     UserOperation, UserOperationHash,
 };
 
@@ -58,7 +56,7 @@ pub trait UserOperationValidator: Send + Sync {
         mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         mode: EnumSet<UserOperationValidatorMode>,
-    ) -> Result<UserOperationValidationOutcome, ValidationError>
+    ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -91,7 +89,7 @@ pub trait SanityCheck<M: Middleware>: Send + Sync {
     /// # Returns
     ///
     /// Returns `Ok(())` if the user operation passes all sanity checks, otherwise returns a
-    /// `SanityCheckError` indicating the reason for failure.
+    /// `SanityError` indicating the reason for failure.
     ///
     /// # Generic Parameters
     ///
@@ -107,7 +105,7 @@ pub trait SanityCheck<M: Middleware>: Send + Sync {
         mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -129,7 +127,7 @@ macro_rules! sanity_check_impls {
                 mempool: &Mempool<T, Y, X, Z>,
                 reputation: &Reputation<H, R>,
                 helper: &SanityHelper<M>,
-            ) -> Result<(), SanityCheckError>
+            ) -> Result<(), SanityError>
             where
                 T: UserOperationAct,
                 Y: UserOperationAddrAct,
@@ -153,7 +151,7 @@ impl<M: Middleware> SanityCheck<M> for () {
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         _helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -198,12 +196,12 @@ pub trait SimulationCheck: Send + Sync {
     /// # Returns
     ///
     /// Returns `Ok(())` if the user operation passes the simulation check,
-    /// otherwise returns a `SimulationCheckError`.
+    /// otherwise returns a `SimulationError`.
     fn check_user_operation(
         &self,
         uo: &UserOperation,
         helper: &mut SimulationHelper,
-    ) -> Result<(), SimulationCheckError>;
+    ) -> Result<(), SimulationError>;
 }
 macro_rules! simulation_check_impls {
     ( $( $name:ident )+ ) => {
@@ -215,7 +213,7 @@ macro_rules! simulation_check_impls {
                 &self,
                 uo: &UserOperation,
                 helper: &mut SimulationHelper,
-            ) -> Result<(), SimulationCheckError>
+            ) -> Result<(), SimulationError>
                 {
                     let ($($name,)+) = self;
                     ($($name.check_user_operation(uo, helper)?,)+);
@@ -269,14 +267,14 @@ pub trait SimulationTraceCheck<M: Middleware>: Send + Sync {
     /// # Returns
     ///
     /// Returns `Ok(())` if the user operation passes the simulation check, or an error of type
-    /// `SimulationCheckError` otherwise.
+    /// `SimulationError` otherwise.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -297,7 +295,7 @@ macro_rules! simulation_trace_check_impls {
                 mempool: &Mempool<T, Y, X, Z>,
                 reputation: &Reputation<H, R>,
                 helper: &mut SimulationTraceHelper<M>,
-            ) -> Result<(), SimulationCheckError>
+            ) -> Result<(), SimulationError>
             where
                 T: UserOperationAct,
                 Y: UserOperationAddrAct,
@@ -321,7 +319,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for () {
         _mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
         _helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationCheckError>
+    ) -> Result<(), SimulationError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,

@@ -2,6 +2,7 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, Reputation, ReputationEntryOp},
     validate::{SanityCheck, SanityHelper},
+    ReputationError, SanityError,
 };
 use ethers::{providers::Middleware, types::Address};
 use silius_primitives::{
@@ -9,8 +10,7 @@ use silius_primitives::{
         entities::{FACTORY, PAYMASTER, SENDER},
         reputation::THROTTLED_ENTITY_MEMPOOL_COUNT,
     },
-    reputation::{ReputationError, Status},
-    sanity::SanityCheckError,
+    reputation::Status,
     UserOperation,
 };
 
@@ -24,16 +24,12 @@ impl Entities {
         addr: &Address,
         _helper: &SanityHelper<M>,
         reputation: &Reputation<H, R>,
-    ) -> Result<Status, SanityCheckError>
+    ) -> Result<Status, SanityError>
     where
         H: HashSetOp,
         R: ReputationEntryOp,
     {
-        Ok(Status::from(reputation.get_status(addr).map_err(|_| {
-            SanityCheckError::UnknownError {
-                message: "Failed to retrieve reputation status".into(),
-            }
-        })?))
+        Ok(Status::from(reputation.get_status(addr)?))
     }
 
     /// [SREP-020] - a BANNED address is not allowed into the mempool.
@@ -42,13 +38,11 @@ impl Entities {
         entity: &str,
         addr: &Address,
         status: &Status,
-    ) -> Result<(), SanityCheckError> {
+    ) -> Result<(), SanityError> {
         if *status == Status::BANNED {
-            return Err(ReputationError::EntityBanned {
-                entity: entity.to_string(),
-                address: *addr,
-            }
-            .into());
+            return Err(
+                ReputationError::BannedEntity { entity: entity.into(), address: *addr }.into()
+            );
         }
 
         Ok(())
@@ -64,7 +58,7 @@ impl Entities {
         _helper: &SanityHelper<M>,
         mempool: &Mempool<T, Y, X, Z>,
         _reputation: &Reputation<H, R>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,
@@ -77,11 +71,9 @@ impl Entities {
             (mempool.get_number_by_sender(addr) + mempool.get_number_by_entity(addr)) >=
                 THROTTLED_ENTITY_MEMPOOL_COUNT
         {
-            return Err(ReputationError::ThrottledLimit {
-                entity: entity.to_string(),
-                address: *addr,
-            }
-            .into());
+            return Err(
+                ReputationError::ThrottledEntity { entity: entity.into(), address: *addr }.into()
+            );
         }
 
         Ok(())
@@ -99,14 +91,14 @@ impl<M: Middleware> SanityCheck<M> for Entities {
     /// perform the sanity check.
     ///
     /// # Returns
-    /// None if the sanity check is successful, otherwise a [SanityCheckError] is returned.
+    /// None if the sanity check is successful, otherwise a [SanityError] is returned.
     async fn check_user_operation<T, Y, X, Z, H, R>(
         &self,
         uo: &UserOperation,
         mempool: &Mempool<T, Y, X, Z>,
         reputation: &Reputation<H, R>,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityCheckError>
+    ) -> Result<(), SanityError>
     where
         T: UserOperationAct,
         Y: UserOperationAddrAct,

@@ -19,7 +19,7 @@ use libp2p::{
     bytes::BytesMut,
     swarm::{
         handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound},
-        ConnectionHandler, ConnectionHandlerEvent, ConnectionId, KeepAlive, StreamUpgradeError,
+        ConnectionHandler, ConnectionHandlerEvent, ConnectionId, StreamUpgradeError,
         SubstreamProtocol,
     },
 };
@@ -322,16 +322,17 @@ impl Handler {
 }
 
 impl ConnectionHandler for Handler {
-    type Error = Error;
     type FromBehaviour = OutboundInfo;
     type ToBehaviour = HandlerEvent;
     type InboundOpenInfo = InboundInfo;
     type InboundProtocol = InboundReqUpgrade;
     type OutboundOpenInfo = OutboundInfo;
     type OutboundProtocol = OutboundRepUpgrade;
-    fn connection_keep_alive(&self) -> libp2p::swarm::KeepAlive {
-        KeepAlive::Yes
+
+    fn connection_keep_alive(&self) -> bool {
+        true
     }
+
     fn listen_protocol(
         &self,
     ) -> libp2p::swarm::SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
@@ -392,10 +393,7 @@ impl ConnectionHandler for Handler {
                     warn!("outbound stream with {:?} failed with {dial_error:?}", error.info)
                 }
             },
-            ConnectionEvent::ListenUpgradeError(_) |
-            ConnectionEvent::LocalProtocolsChange(_) |
-            ConnectionEvent::RemoteProtocolsChange(_) |
-            ConnectionEvent::AddressChange(_) => {}
+            _ => {}
         }
     }
 
@@ -408,7 +406,6 @@ impl ConnectionHandler for Handler {
             Self::OutboundProtocol,
             Self::OutboundOpenInfo,
             Self::ToBehaviour,
-            Self::Error,
         >,
     > {
         match self.worker_streams.poll_unpin(cx) {

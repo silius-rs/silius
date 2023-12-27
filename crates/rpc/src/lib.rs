@@ -1,6 +1,7 @@
 //! Silius RPC crate provides an interface for handling RPC methods according to the ERC-4337 spec.
 #![allow(dead_code)]
 
+pub mod codes;
 mod debug;
 pub mod debug_api;
 mod error;

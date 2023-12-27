@@ -7,7 +7,7 @@ use futures::channel::oneshot;
 use libp2p::{
     swarm::{
         dial_opts::DialOpts, ConnectionClosed, ConnectionDenied, ConnectionId, DialFailure,
-        FromSwarm, NetworkBehaviour, NotifyHandler, PollParameters, THandler, THandlerInEvent,
+        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent,
         THandlerOutEvent, ToSwarm,
     },
     PeerId,
@@ -223,9 +223,7 @@ impl Behaviour {
 
     fn on_connection_closed(
         &mut self,
-        ConnectionClosed { peer_id, connection_id, remaining_established, .. }: ConnectionClosed<
-            <Self as NetworkBehaviour>::ConnectionHandler,
-        >,
+        ConnectionClosed { peer_id, connection_id, remaining_established, .. }: ConnectionClosed,
     ) {
         let connections = self
             .connected
@@ -425,7 +423,7 @@ impl NetworkBehaviour for Behaviour {
         }
     }
 
-    fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
+    fn on_swarm_event(&mut self, event: FromSwarm) {
         match event {
             FromSwarm::ConnectionEstablished(connection_established) => {
                 self.connected
@@ -456,7 +454,6 @@ impl NetworkBehaviour for Behaviour {
     fn poll(
         &mut self,
         _cx: &mut std::task::Context<'_>,
-        _params: &mut impl PollParameters,
     ) -> std::task::Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(ev) = self.pending_events.pop_front() {
             return Poll::Ready(ev);

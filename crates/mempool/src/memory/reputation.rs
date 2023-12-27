@@ -1,6 +1,7 @@
 use crate::{
     mempool::ClearOp,
-    reputation::{HashSetOp, ReputationEntryOp, ReputationOpError},
+    reputation::{HashSetOp, ReputationEntryOp},
+    ReputationError,
 };
 use ethers::types::Address;
 use silius_primitives::reputation::ReputationEntry;
@@ -27,7 +28,7 @@ impl ClearOp for HashMap<Address, ReputationEntry> {
 }
 
 impl ReputationEntryOp for HashMap<Address, ReputationEntry> {
-    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationOpError> {
+    fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationError> {
         Ok(self.get(addr).cloned())
     }
 
@@ -35,15 +36,15 @@ impl ReputationEntryOp for HashMap<Address, ReputationEntry> {
         &mut self,
         addr: &Address,
         entry: ReputationEntry,
-    ) -> Result<Option<ReputationEntry>, ReputationOpError> {
+    ) -> Result<Option<ReputationEntry>, ReputationError> {
         Ok(self.insert(*addr, entry))
     }
 
-    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationOpError> {
+    fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError> {
         Ok(self.contains_key(addr))
     }
 
-    fn update(&mut self) -> Result<(), ReputationOpError> {
+    fn update(&mut self) -> Result<(), ReputationError> {
         for (_, ent) in self.iter_mut() {
             ent.uo_seen = ent.uo_seen * 23 / 24;
             ent.uo_included = ent.uo_included * 23 / 24;

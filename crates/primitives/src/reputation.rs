@@ -100,36 +100,3 @@ pub struct StakeInfoResponse {
     #[serde(rename = "isStaked")]
     pub is_staked: bool,
 }
-
-/// Error object for reputation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ReputationError {
-    EntityBanned {
-        address: Address,
-        entity: String,
-    },
-    ThrottledLimit {
-        address: Address,
-        entity: String,
-    },
-    UnstakedEntityVerification {
-        address: Address,
-        entity: String,
-        message: String,
-    },
-    StakeTooLow {
-        address: Address,
-        entity: String,
-        min_stake: U256,
-        min_unstake_delay: U256,
-    },
-    UnstakeDelayTooLow {
-        address: Address,
-        entity: String,
-        min_stake: U256,
-        min_unstake_delay: U256,
-    },
-    UnknownError {
-        message: String,
-    },
-}

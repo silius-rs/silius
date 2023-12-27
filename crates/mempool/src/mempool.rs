@@ -1,5 +1,4 @@
-#[cfg(feature = "mdbx")]
-use crate::DBError;
+use crate::MempoolErrorKind;
 use ethers::{
     abi::AbiEncode,
     types::{Address, H256, U256},
@@ -17,35 +16,6 @@ pub fn mempool_id(ep: &Address, chain_id: &U256) -> MempoolId {
     )
 }
 
-#[derive(Debug)]
-pub enum MempoolError {
-    #[cfg(feature = "mdbx")]
-    DBError(DBError),
-}
-
-#[cfg(feature = "mdbx")]
-impl From<DBError> for MempoolError {
-    fn from(e: DBError) -> Self {
-        Self::DBError(e)
-    }
-}
-
-#[cfg(feature = "mdbx")]
-impl From<reth_db::Error> for MempoolError {
-    fn from(e: reth_db::Error) -> Self {
-        Self::DBError(e.into())
-    }
-}
-
-#[cfg(feature = "mdbx")]
-impl From<MempoolError> for DBError {
-    fn from(e: MempoolError) -> Self {
-        match e {
-            MempoolError::DBError(e) => e,
-        }
-    }
-}
-
 /// AddRemoveUserOp describe the ability to add and remove user operation
 pub trait AddRemoveUserOp {
     /// Adds a [UserOperation](UserOperation) to the mempool
@@ -57,13 +27,13 @@ pub trait AddRemoveUserOp {
     ///
     /// # Returns
     /// * `Ok(UserOperationHash)` - The hash of the [UserOperation](UserOperation) that was added
-    /// * `Err(MempoolError)` - If the [UserOperation](UserOperation) could not be added
+    /// * `Err(MempoolErrorKind)` - If the [UserOperation](UserOperation) could not be added
     fn add(
         &mut self,
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolError>;
+    ) -> Result<UserOperationHash, MempoolErrorKind>;
     /// Removes a [UserOperation](UserOperation) by its hash
     ///
     /// # Arguments
@@ -72,8 +42,8 @@ pub trait AddRemoveUserOp {
     /// # Returns
     /// * `Ok(bool)` - true if the [UserOperation](UserOperation) was removed, false means it was
     ///   not found
-    /// * `Err(MempoolError)` - If there are some  internal errors
-    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError>;
+    /// * `Err(MempoolErrorKind)` - If there are some  internal errors
+    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind>;
 }
 
 impl<T: AddRemoveUserOp> AddRemoveUserOp for Arc<RwLock<T>> {
@@ -82,11 +52,11 @@ impl<T: AddRemoveUserOp> AddRemoveUserOp for Arc<RwLock<T>> {
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolError> {
+    ) -> Result<UserOperationHash, MempoolErrorKind> {
         self.write().add(uo, ep, chain_id)
     }
 
-    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         self.write().remove_by_uo_hash(uo_hash)
     }
 }
@@ -105,8 +75,12 @@ pub trait AddRemoveUserOpHash {
     /// # Returns
     ///
     /// Returns `Ok(())` if the user operation hash was successfully added to the mempool,
-    /// otherwise returns an error of type `MempoolError`.
-    fn add(&mut self, address: &Address, uo_hash: UserOperationHash) -> Result<(), MempoolError>;
+    /// otherwise returns an error of type `MempoolErrorKind`.
+    fn add(
+        &mut self,
+        address: &Address,
+        uo_hash: UserOperationHash,
+    ) -> Result<(), MempoolErrorKind>;
 
     /// Removes a user operation hash from an address.
     ///
@@ -128,11 +102,15 @@ pub trait AddRemoveUserOpHash {
         &mut self,
         address: &Address,
         uo_hash: &UserOperationHash,
-    ) -> Result<bool, MempoolError>;
+    ) -> Result<bool, MempoolErrorKind>;
 }
 
 impl<T: AddRemoveUserOpHash> AddRemoveUserOpHash for Arc<RwLock<T>> {
-    fn add(&mut self, address: &Address, uo_hash: UserOperationHash) -> Result<(), MempoolError> {
+    fn add(
+        &mut self,
+        address: &Address,
+        uo_hash: UserOperationHash,
+    ) -> Result<(), MempoolErrorKind> {
         self.write().add(address, uo_hash)
     }
 
@@ -140,7 +118,7 @@ impl<T: AddRemoveUserOpHash> AddRemoveUserOpHash for Arc<RwLock<T>> {
         &mut self,
         address: &Address,
         uo_hash: &UserOperationHash,
-    ) -> Result<bool, MempoolError> {
+    ) -> Result<bool, MempoolErrorKind> {
         self.write().remove_uo_hash(address, uo_hash)
     }
 }
@@ -156,42 +134,43 @@ pub trait UserOperationOp {
     /// # Returns
     ///
     /// Returns `Ok(Some(UserOperation))` if the user operation is found,
-    /// `Ok(None)` if the user operation is not found, or an `Err(MempoolError)` if an error occurs.
+    /// `Ok(None)` if the user operation is not found, or an `Err(MempoolErrorKind)` if an error
+    /// occurs.
     fn get_by_uo_hash(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> Result<Option<UserOperation>, MempoolError>;
+    ) -> Result<Option<UserOperation>, MempoolErrorKind>;
 
     /// Retrieves all user operations sorted by max_priority_fee_per_gas.
     ///
     /// # Returns
     ///
     /// Returns `Ok(Vec<UserOperation>)` containing all user operations sorted in the specified
-    /// order, or an `Err(MempoolError)` if an error occurs.
-    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError>;
+    /// order, or an `Err(MempoolErrorKind)` if an error occurs.
+    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind>;
 
     /// Retrieves all user operations.
     ///
     /// # Returns
     ///
     /// Returns `Ok(Vec<UserOperation>)` containing all user operations,
-    /// or an `Err(MempoolError)` if an error occurs.
-    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError>;
+    /// or an `Err(MempoolErrorKind)` if an error occurs.
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind>;
 }
 
 impl<T: UserOperationOp> UserOperationOp for Arc<RwLock<T>> {
     fn get_by_uo_hash(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> Result<Option<UserOperation>, MempoolError> {
+    ) -> Result<Option<UserOperation>, MempoolErrorKind> {
         self.read().get_by_uo_hash(uo_hash)
     }
 
-    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.read().get_sorted()
     }
 
-    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.read().get_all()
     }
 }
@@ -244,8 +223,8 @@ pub trait UserOperationCodeHashOp {
     /// - If the user operation hash has associated code hashes, `Ok(true)` is returned.
     /// - If the user operation hash does not have associated code hashes, `Ok(false)` is returned.
     /// - If an error occurs during the operation, an `Err` variant is returned with a
-    ///   `MempoolError`.
-    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError>;
+    ///   `MempoolErrorKind`.
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind>;
 
     /// Sets the code hashes for the given user operation hash in the memory pool.
     ///
@@ -260,12 +239,12 @@ pub trait UserOperationCodeHashOp {
     ///
     /// - If the code hashes are successfully set, `Ok(())` is returned.
     /// - If an error occurs during the operation, an `Err` variant is returned with a
-    ///   `MempoolError`.
+    ///   `MempoolErrorKind`.
     fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: Vec<CodeHash>,
-    ) -> Result<(), MempoolError>;
+    ) -> Result<(), MempoolErrorKind>;
 
     /// Retrieves the code hashes associated with the given user operation hash from the memory
     /// pool.
@@ -281,8 +260,11 @@ pub trait UserOperationCodeHashOp {
     /// - If the code hashes are successfully retrieved, `Ok(Vec<CodeHash>)` is returned with the
     ///   code hashes.
     /// - If an error occurs during the operation, an `Err` variant is returned with a
-    ///   `MempoolError`.
-    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<Vec<CodeHash>, MempoolError>;
+    ///   `MempoolErrorKind`.
+    fn get_code_hashes(
+        &self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<Vec<CodeHash>, MempoolErrorKind>;
 
     /// Removes the code hashes associated with the given user operation hash from the memory pool.
     ///
@@ -297,12 +279,13 @@ pub trait UserOperationCodeHashOp {
     /// - If the code hashes are successfully removed, `Ok(true)` is returned.
     /// - If the user operation hash does not have associated code hashes, `Ok(false)` is returned.
     /// - If an error occurs during the operation, an `Err` variant is returned with a
-    ///   `MempoolError`.
-    fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError>;
+    ///   `MempoolErrorKind`.
+    fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash)
+        -> Result<bool, MempoolErrorKind>;
 }
 
 impl<T: UserOperationCodeHashOp> UserOperationCodeHashOp for Arc<RwLock<T>> {
-    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         self.read().has_code_hashes(uo_hash)
     }
 
@@ -310,15 +293,21 @@ impl<T: UserOperationCodeHashOp> UserOperationCodeHashOp for Arc<RwLock<T>> {
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: Vec<CodeHash>,
-    ) -> Result<(), MempoolError> {
+    ) -> Result<(), MempoolErrorKind> {
         self.write().set_code_hashes(uo_hash, hashes)
     }
 
-    fn get_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<Vec<CodeHash>, MempoolError> {
+    fn get_code_hashes(
+        &self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<Vec<CodeHash>, MempoolErrorKind> {
         self.read().get_code_hashes(uo_hash)
     }
 
-    fn remove_code_hashes(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    fn remove_code_hashes(
+        &mut self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<bool, MempoolErrorKind> {
         self.write().remove_code_hashes(uo_hash)
     }
 }
@@ -405,7 +394,7 @@ where
         uo: UserOperation,
         ep: &Address,
         chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolError> {
+    ) -> Result<UserOperationHash, MempoolErrorKind> {
         let uo_hash = uo.hash(ep, chain_id);
         let (sender, factory, paymaster) = uo.get_entities();
         self.user_operations.add(uo, ep, chain_id)?;
@@ -418,7 +407,10 @@ where
         }
         Ok(uo_hash)
     }
-    pub fn get(&self, uo_hash: &UserOperationHash) -> Result<Option<UserOperation>, MempoolError> {
+    pub fn get(
+        &self,
+        uo_hash: &UserOperationHash,
+    ) -> Result<Option<UserOperation>, MempoolErrorKind> {
         self.user_operations.get_by_uo_hash(uo_hash)
     }
     pub fn get_all_by_sender(&self, addr: &Address) -> Vec<UserOperation> {
@@ -444,23 +436,23 @@ where
             .filter(|uo_prev| uo_prev.nonce == uo.nonce)
             .max_by_key(|uo_prev| uo_prev.max_priority_fee_per_gas)
     }
-    pub fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    pub fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         self.user_operations_code_hashes.has_code_hashes(uo_hash)
     }
     pub fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
         hashes: Vec<CodeHash>,
-    ) -> Result<(), MempoolError> {
+    ) -> Result<(), MempoolErrorKind> {
         self.user_operations_code_hashes.set_code_hashes(uo_hash, hashes)
     }
     pub fn get_code_hashes(
         &self,
         uo_hash: &UserOperationHash,
-    ) -> Result<Vec<CodeHash>, MempoolError> {
+    ) -> Result<Vec<CodeHash>, MempoolErrorKind> {
         self.user_operations_code_hashes.get_code_hashes(uo_hash)
     }
-    pub fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolError> {
+    pub fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         let uo = if let Some(user_op) = self.user_operations.get_by_uo_hash(uo_hash)? {
             user_op
         } else {
@@ -485,7 +477,7 @@ where
 
         Ok(true)
     }
-    pub fn remove_by_entity(&mut self, entity: &Address) -> Result<(), MempoolError> {
+    pub fn remove_by_entity(&mut self, entity: &Address) -> Result<(), MempoolErrorKind> {
         let uos = self.user_operations_by_entity.get_all_by_address(entity);
 
         for uo_hash in uos {
@@ -495,10 +487,10 @@ where
         Ok(())
     }
     // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
-    pub fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    pub fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.user_operations.get_sorted()
     }
-    pub fn get_all(&self) -> Result<Vec<UserOperation>, MempoolError> {
+    pub fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.user_operations.get_all()
     }
     pub fn clear(&mut self) {

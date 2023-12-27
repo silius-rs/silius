@@ -46,7 +46,7 @@ lint:
 	cargo +nightly fmt --all -- --check
 	cargo clippy --all -- -D warnings -A clippy::derive_partial_eq_without_eq -D clippy::unwrap_used -D clippy::uninlined_format_args
 	cargo sort --check --workspace --grouped
-	cargo udeps --workspace
+	cargo +nightly udeps --workspace
 
 run-geth:
 	cd bundler-spec-tests && docker compose up -d && cd ..

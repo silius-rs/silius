@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use ethers::types::U64;
 use jsonrpsee::{
-    core::{Error as RpcError, RpcResult},
+    core::{ClientError as RpcError, RpcResult},
     http_client::{HttpClient, HttpClientBuilder},
     proc_macros::rpc,
     ws_client::{WsClient, WsClientBuilder},
@@ -43,9 +43,9 @@ impl DummyEthApiServer for DummyEthApiServerImpl {
 }
 
 pub fn build_http_client(addr: IpAddr, port: u16) -> Result<HttpClient, RpcError> {
-    HttpClientBuilder::default().build(format!("http://{}:{}", addr, port))
+    HttpClientBuilder::default().build(format!("http://{addr}:{port}"))
 }
 
 pub async fn build_ws_client(addr: IpAddr, port: u16) -> Result<WsClient, RpcError> {
-    WsClientBuilder::default().build(format!("ws://{}:{}", addr, port)).await
+    WsClientBuilder::default().build(format!("ws://{addr}:{port}")).await
 }
