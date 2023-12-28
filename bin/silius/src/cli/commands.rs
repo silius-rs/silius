@@ -30,7 +30,10 @@ impl NodeCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
-            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
+            let eth_client = Arc::new(
+                create_http_provider(&self.common.eth_client_address, self.common.poll_interval)
+                    .await?,
+            );
             let block_streams =
                 create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
             launch_bundler(
@@ -81,7 +84,10 @@ impl BundlerCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
-            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
+            let eth_client = Arc::new(
+                create_http_provider(&self.common.eth_client_address, self.common.poll_interval)
+                    .await?,
+            );
             launch_bundling(
                 self.bundler,
                 eth_client,
@@ -122,7 +128,10 @@ impl UoPoolCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
         if self.common.eth_client_address.clone().starts_with("http") {
-            let eth_client = Arc::new(create_http_provider(&self.common.eth_client_address).await?);
+            let eth_client = Arc::new(
+                create_http_provider(&self.common.eth_client_address, self.common.poll_interval)
+                    .await?,
+            );
             let block_streams =
                 create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
             launch_uopool(

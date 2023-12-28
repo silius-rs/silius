@@ -1,5 +1,5 @@
 use crate::utils::{
-    parse_address, parse_enr, parse_send_bundle_mode, parse_u256, parse_uopool_mode,
+    parse_address, parse_duration, parse_enr, parse_send_bundle_mode, parse_u256, parse_uopool_mode,
 };
 use clap::{Parser, ValueEnum};
 use discv5::Enr;
@@ -19,6 +19,7 @@ use silius_primitives::{
 use std::{
     net::{IpAddr, Ipv4Addr},
     path::PathBuf,
+    time::Duration,
 };
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -111,7 +112,7 @@ pub struct UoPoolArgs {
 }
 
 /// Common CLI args for bundler and uopool
-#[derive(Debug, Clone, Parser)]
+#[derive(Debug, Clone, Parser, PartialEq)]
 pub struct BundlerAndUoPoolArgs {
     /// Ethereum execution client RPC endpoint.
     #[clap(long, default_value = "http://127.0.0.1:8545")]
@@ -124,6 +125,10 @@ pub struct BundlerAndUoPoolArgs {
     /// Entry point addresses.
     #[clap(long, value_delimiter=',', value_parser=parse_address)]
     pub entry_points: Vec<Address>,
+
+    /// Poll interval event filters and pending transactions in milliseconds.
+    #[clap(long, default_value = "500", value_parser= parse_duration)]
+    pub poll_interval: Duration,
 }
 
 /// RPC CLI args
@@ -325,6 +330,30 @@ mod tests {
                 bundler_port: 3002,
             },
             BundlerArgs::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn bundler_and_uopool_args() {
+        let args = vec![
+            "bundleranduopoolargs",
+            "--eth-client-address",
+            "http://127.0.0.1:8545",
+            "--entry-points",
+            "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
+            "--poll-interval",
+            "5000",
+        ];
+        assert_eq!(
+            BundlerAndUoPoolArgs {
+                eth_client_address: String::from("http://127.0.0.1:8545"),
+                chain: None,
+                entry_points: vec![
+                    Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990").unwrap()
+                ],
+                poll_interval: Duration::from_millis(5000),
+            },
+            BundlerAndUoPoolArgs::try_parse_from(args).unwrap()
         );
     }
 
