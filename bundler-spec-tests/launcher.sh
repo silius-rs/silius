@@ -24,7 +24,8 @@ case $1 in
         --ws \
         --ws.addr 0.0.0.0 \
         --ws.port 3001 \
-        --ws.api eth,debug,web3 & echo $! > bundler.pid
+        --ws.api eth,debug,web3 \
+        --poll-interval 5 & echo $! > bundler.pid
     popd
     cd @account-abstraction && yarn deploy --network localhost
 	;;

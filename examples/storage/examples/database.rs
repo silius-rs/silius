@@ -21,6 +21,7 @@ use std::{
     env,
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 use tempdir::TempDir;
 
@@ -34,7 +35,8 @@ async fn main() -> eyre::Result<()> {
         env.create_tables().expect("Create mdbx database tables failed");
         println!("Database uopool created!");
 
-        let provider = Arc::new(create_http_provider(provider_url.as_str()).await?);
+        let provider =
+            Arc::new(create_http_provider(provider_url.as_str(), Duration::from_secs(1)).await?);
         let ep = Address::from_str(ADDRESS)?;
         let chain = Chain::dev();
         let entry_point = EntryPoint::new(provider.clone(), ep);

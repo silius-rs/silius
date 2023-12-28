@@ -3,7 +3,7 @@
 use async_stream::stream;
 use ethers::{
     providers::{Http, Middleware, Provider, Ws},
-    types::{Chain, H256},
+    types::H256,
 };
 use futures_util::{Stream, StreamExt};
 use std::{pin::Pin, sync::Arc, time::Duration};
@@ -11,16 +11,13 @@ use std::{pin::Pin, sync::Arc, time::Duration};
 pub type BlockStream = Pin<Box<dyn Stream<Item = eyre::Result<H256>> + Send>>;
 
 /// Creates ethers provider with HTTP connection
-pub async fn create_http_provider(addr: &str) -> eyre::Result<Provider<Http>> {
+pub async fn create_http_provider(
+    addr: &str,
+    poll_interval: Duration,
+) -> eyre::Result<Provider<Http>> {
     let provider = Provider::<Http>::try_from(addr)?;
 
-    let chain_id = provider.get_chainid().await?;
-
-    Ok(provider.interval(if chain_id == Chain::Dev.into() {
-        Duration::from_millis(5u64)
-    } else {
-        Duration::from_millis(500u64)
-    }))
+    Ok(provider.interval(poll_interval))
 }
 
 /// Creates ethers provider with WebSockets connection

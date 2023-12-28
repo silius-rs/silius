@@ -4,7 +4,7 @@ use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
 use silius_primitives::{bundler::SendStrategy, UoPoolMode};
-use std::{future::Future, str::FromStr};
+use std::{future::Future, str::FromStr, time::Duration};
 use tracing::info;
 
 /// Unwrap path or returns home directory
@@ -42,6 +42,11 @@ pub fn parse_uopool_mode(s: &str) -> Result<UoPoolMode, String> {
 /// Parses ENR record
 pub fn parse_enr(enr: &str) -> Result<Enr, String> {
     Enr::from_str(enr).map_err(|_| format!("Enr {enr} is not a valid enr."))
+}
+
+pub fn parse_duration(duration: &str) -> Result<Duration, String> {
+    let seconds: u64 = duration.parse().map_err(|_| format!("{duration} must be unsigned int"))?;
+    Ok(Duration::from_millis(seconds))
 }
 
 /// Runs the future to completion or until:

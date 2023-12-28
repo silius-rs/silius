@@ -20,13 +20,15 @@ use std::{
     env,
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     //  uopool needs connection to the execution client
     if let Ok(provider_url) = env::var("PROVIDER_URL") {
-        let provider = Arc::new(create_http_provider(provider_url.as_str()).await?);
+        let provider =
+            Arc::new(create_http_provider(provider_url.as_str(), Duration::from_secs(1)).await?);
         let ep = Address::from_str(ADDRESS)?;
         let chain = Chain::dev();
         let entry_point = EntryPoint::new(provider.clone(), ep);
