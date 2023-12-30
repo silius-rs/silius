@@ -27,11 +27,6 @@ jobs:
         with:
           components: clippy
 
-      - name: Setup Rust toolchain (nightly)
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt
-
       - name: Install cargo tools
         run: |
           curl -L https://github.com/DevinR528/cargo-sort/releases/download/v1.0.9/cargo-sort-x86_64-unknown-linux-gnu.tar.gz | tar -zxvf - -C ~/.cargo/bin/
@@ -62,16 +57,12 @@ jobs:
       - name: Setup third-party dependencies
         run: |
           make setup-thirdparty
-      
-      - name: Install Geth and solc
-        run: |
-          sudo add-apt-repository ppa:ethereum/ethereum
-          sudo apt-get update
-          sudo apt-get install solc
-          wget -c https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.12.0-e501b3b0.tar.gz
-          tar -xf geth-linux-amd64-1.12.0-e501b3b0.tar.gz
-          mv geth-linux-amd64-1.12.0-e501b3b0/geth /usr/local/bin/
-          chmod a+x /usr/local/bin/geth
+          
+      - name: Install geth
+        run: .github/scripts/install_geth.sh
+
+      - name: Install solc
+        run: .github/scripts/install_solc.sh
       
       - name: Build
         run: |
@@ -82,10 +73,6 @@ jobs:
         with:
           name: silius
           path: target/debug/silius
-
-      - name: Lint
-        run: |
-          make lint
       
       - name: Test
         run: |
@@ -94,6 +81,15 @@ jobs:
       - name: Examples
         run: |
           make run-examples
+
+      - name: Setup Rust toolchain (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Lint
+        run: |
+          make lint
   
   bundler_spec_tests:
     name: Run bundler spec tests
