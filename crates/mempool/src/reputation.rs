@@ -1,4 +1,6 @@
-use crate::{mempool::ClearOp, DBError};
+use crate::mempool::ClearOp;
+#[cfg(feature = "mdbx")]
+use crate::DBError;
 use ethers::types::{Address, Bytes, U256};
 use parking_lot::RwLock;
 use silius_primitives::{
@@ -9,6 +11,7 @@ use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 #[derive(Debug)]
 pub enum ReputationOpError {
+    #[cfg(feature = "mdbx")]
     DBError(DBError),
     ReputationError(ReputationError),
 }
@@ -19,12 +22,14 @@ impl From<ReputationError> for ReputationOpError {
     }
 }
 
+#[cfg(feature = "mdbx")]
 impl From<DBError> for ReputationOpError {
     fn from(value: DBError) -> Self {
         Self::DBError(value)
     }
 }
 
+#[cfg(feature = "mdbx")]
 impl From<reth_db::Error> for ReputationOpError {
     fn from(value: reth_db::Error) -> Self {
         Self::DBError(DBError::DBInternalError(value))
