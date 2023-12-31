@@ -20,7 +20,7 @@ jobs:
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Setup Rust toolchain (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -96,13 +96,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: build_and_test
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: eth-infinitism/bundler-spec-tests
           ref: 'b9f192f39298e6586729d40f29e3098c92e5c0b9'
           submodules: true
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path:
             silius
