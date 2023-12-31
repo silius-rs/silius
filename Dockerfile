@@ -1,7 +1,8 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.73.0 AS chef
 WORKDIR /app
 
 LABEL org.opencontainers.image.source=https://github.com/silius-rs/silius
+LABEL org.opencontainers.image.description="Silius - ERC-4337 (Account Abstraction) bundler implementation in Rust."
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 # build cargo-chef plan
