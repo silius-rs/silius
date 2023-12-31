@@ -1,7 +1,7 @@
 # <h1 align="center"> Silius </h1>
 
 ![CI workflow](https://github.com/silius-rs/silius/actions/workflows/ci.yml/badge.svg)
-![Docker workflow](https://github.com/silius-rs/silius/actions/workflows/publish_image.yml/badge.svg)
+![Docker workflow](https://github.com/silius-rs/silius/actions/workflows/docker.yml/badge.svg)
 [![Telegram Group](https://img.shields.io/endpoint?color=neon&style=flat-square&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2F%2BsKeRcN4j3MM3NmNk)](https://t.me/+sKeRcN4j3MM3NmNk)
 [![GitHub stars](https://img.shields.io/github/stars/silius-rs/silius.svg?style=social&label=Star&maxAge=2592000)](https://github.com/silius-rs/silius/stargazers/)
 [![GitHub forks](https://img.shields.io/github/forks/silius-rs/silius.svg?style=social&label=Fork&maxAge=2592000)](https://github.com/silius-rs/silius/network/)
