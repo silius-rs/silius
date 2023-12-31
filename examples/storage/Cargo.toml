@@ -14,7 +14,7 @@ homepage = "https://github.com/silius-rs/silius/tree/main/examples/storage"
 [dependencies]
 # silius dependencies
 silius-contracts = { workspace = true }  # replace with git url: git = "https://github.com/silius-rs/silius.git"
-silius-mempool = { workspace = true }    # replace with git url: git = "https://github.com/silius-rs/silius.git"
+silius-mempool = { workspace = true, features = ["mdbx"] }    # replace with git url: git = "https://github.com/silius-rs/silius.git"
 silius-primitives = { workspace = true } # replace with git url: git = "https://github.com/silius-rs/silius.git"
 
 # eth

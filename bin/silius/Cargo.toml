@@ -16,7 +16,7 @@ homepage = "https://github.com/silius-rs/silius/tree/main/bin/silius"
 silius-bundler = { workspace = true }
 silius-contracts = { workspace = true }
 silius-grpc = { workspace = true }
-silius-mempool = { workspace = true }
+silius-mempool = { workspace = true, features = ["mdbx"] }
 silius-p2p = { workspace = true }
 silius-primitives = { workspace = true }
 silius-rpc = { workspace = true }

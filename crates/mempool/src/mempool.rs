@@ -1,3 +1,4 @@
+#[cfg(feature = "mdbx")]
 use crate::DBError;
 use ethers::{
     abi::AbiEncode,
@@ -18,21 +19,25 @@ pub fn mempool_id(ep: &Address, chain_id: &U256) -> MempoolId {
 
 #[derive(Debug)]
 pub enum MempoolError {
+    #[cfg(feature = "mdbx")]
     DBError(DBError),
 }
 
+#[cfg(feature = "mdbx")]
 impl From<DBError> for MempoolError {
     fn from(e: DBError) -> Self {
         Self::DBError(e)
     }
 }
 
+#[cfg(feature = "mdbx")]
 impl From<reth_db::Error> for MempoolError {
     fn from(e: reth_db::Error) -> Self {
         Self::DBError(e.into())
     }
 }
 
+#[cfg(feature = "mdbx")]
 impl From<MempoolError> for DBError {
     fn from(e: MempoolError) -> Self {
         match e {

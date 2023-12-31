@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 mod builder;
+#[cfg(feature = "mdbx")]
 mod database;
 mod memory;
 mod mempool;
@@ -11,6 +12,7 @@ mod utils;
 pub mod validate;
 
 pub use builder::UoPoolBuilder;
+#[cfg(feature = "mdbx")]
 pub use database::{
     init_env,
     tables::{

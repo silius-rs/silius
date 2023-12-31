@@ -21,8 +21,8 @@ alloy-chains = { workspace = true }
 ethers = { workspace = true }
 
 # reth
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
-reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a" }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a", optional = true }
+reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a", optional = true }
 
 # async
 async-trait = { workspace = true }
@@ -50,3 +50,6 @@ silius-primitives = { workspace = true, features = ["test-utils"] }
 
 # misc
 tempdir = "0.3.7"
+
+[features]
+mdbx = ["dep:reth-db", "dep:reth-libmdbx"]
