@@ -1,7 +1,7 @@
 use crate::config::Config;
 use discv5::{
     enr::{CombinedKey, NodeId},
-    Discv5, ConfigBuilder, Event, Enr,
+    ConfigBuilder, Discv5, Enr, Event,
 };
 use futures::{stream::FuturesUnordered, Future, FutureExt, StreamExt};
 use libp2p::swarm::{dummy::ConnectionHandler, NetworkBehaviour};
@@ -28,14 +28,7 @@ pub struct Discovery {
 pub enum EventStream {
     /// Awaiting an event stream to be generated. This is required due to the poll nature of
     /// `Discovery`
-    Awaiting(
-        Pin<
-            Box<
-                dyn Future<Output = Result<mpsc::Receiver<Event>, discv5::Error>>
-                    + Send,
-            >,
-        >,
-    ),
+    Awaiting(Pin<Box<dyn Future<Output = Result<mpsc::Receiver<Event>, discv5::Error>> + Send>>),
     /// The future has completed.
     Present(mpsc::Receiver<Event>),
     // The future has failed or discv5 has been disabled. There are no events from discv5.

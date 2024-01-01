@@ -105,7 +105,7 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
             return Err(SanityError::EntityRoles {
                 entity: SENDER.into(),
                 address: sender,
-                entity_other: "(factory/paymaster/aggregator)".into(),
+                entity_other: "different".into(),
             });
         }
 
@@ -131,7 +131,7 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
                 return Err(SanityError::EntityRoles {
                     entity: FACTORY.into(),
                     address: sender,
-                    entity_other: "(sender/paymaster/aggregator)".into(),
+                    entity_other: "sender".into(),
                 });
             }
 
@@ -159,7 +159,7 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
                 return Err(SanityError::EntityRoles {
                     entity: PAYMASTER.into(),
                     address: sender,
-                    entity_other: "(sender/factory/aggregator)".into(),
+                    entity_other: "sender".into(),
                 });
             }
 

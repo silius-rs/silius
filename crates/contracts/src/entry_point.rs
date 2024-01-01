@@ -213,9 +213,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                 None,
             )
             .await
-            .map_err(|e| {
-                EntryPointError::from_middleware_error::<M>(e).expect_err("call err is expected")
-            })
+            .map_err(|err| EntryPointError::Provider { inner: err.to_string() })
     }
 
     pub async fn simulate_handle_op<U: Into<UserOperation>>(

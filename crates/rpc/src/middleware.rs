@@ -105,8 +105,8 @@ where
             }
 
             if let Ok(err) = serde_json::from_slice::<JsonRpcErrorResponse>(&res_bb) {
-                if err.error.code() == ErrorCode::MethodNotFound.code()
-                    && err.error.message() == METHOD_NOT_FOUND_MSG
+                if err.error.code() == ErrorCode::MethodNotFound.code() &&
+                    err.error.message() == METHOD_NOT_FOUND_MSG
                 {
                     let req = Request::post(addr.clone())
                         .header(hyper::header::CONTENT_TYPE, "application/json")

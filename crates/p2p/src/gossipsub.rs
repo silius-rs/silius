@@ -117,7 +117,8 @@ pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, String> {
         .validate_messages()
         .validation_mode(ValidationMode::Anonymous)
         .message_id_fn(message_id_fn)
-        .build().map_err(|err| err.to_string())?;
+        .build()
+        .map_err(|err| err.to_string())?;
     let snappy_transform = SnappyTransform::new(MAX_GOSSIP_SNAP_SIZE);
     let mut gossipsub = Gossipsub::new_with_subscription_filter_and_transform(
         MessageAuthenticity::Anonymous,

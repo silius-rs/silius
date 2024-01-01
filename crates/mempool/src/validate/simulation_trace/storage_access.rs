@@ -2,7 +2,7 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
-    Reputation, ReputationError, SimulationError,
+    Reputation, SimulationError,
 };
 use ethers::{
     providers::Middleware,
@@ -177,11 +177,11 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                     }
 
                     if !slot_staked.is_empty() && !stake_info_l.is_staked() {
-                        return Err(ReputationError::UnstakedEntity {
+                        return Err(SimulationError::Unstaked {
                             entity: LEVEL_TO_ENTITY[l].into(),
                             address: stake_info_l.address,
-                        }
-                        .into());
+                            inner: format!("accessed slot {slot_staked}"),
+                        });
                     }
                 }
             }

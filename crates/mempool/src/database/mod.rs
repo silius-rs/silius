@@ -1,5 +1,6 @@
 //! The database implementation of the [Mempool](crate::mempool::Mempool) trait. Primarily used for
 //! storing mempool information in a local database.
+
 pub use self::env::DatabaseError;
 use self::env::Env;
 use reth_libmdbx::EnvironmentKind;
