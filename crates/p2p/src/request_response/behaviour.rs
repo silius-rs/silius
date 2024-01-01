@@ -7,8 +7,8 @@ use futures::channel::oneshot;
 use libp2p::{
     swarm::{
         dial_opts::DialOpts, ConnectionClosed, ConnectionDenied, ConnectionId, DialFailure,
-        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent,
-        THandlerOutEvent, ToSwarm,
+        FromSwarm, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent,
+        ToSwarm,
     },
     PeerId,
 };

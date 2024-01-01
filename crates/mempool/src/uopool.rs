@@ -467,7 +467,7 @@ where
             Err(err) => {
                 return Err(MempoolError {
                     hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
-                    kind: SimulationError::from(err).into(),
+                    kind: SimulationError::Execution { inner: err.to_string() }.into(),
                 })
             }
         }

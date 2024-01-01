@@ -1,3 +1,4 @@
+#[cfg(feature = "mdbx")]
 use crate::DatabaseError;
 use ethers::types::{Address, U256};
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,7 @@ pub enum MempoolErrorKind {
         inner: String,
     },
     /// Database error
+    #[cfg(feature = "mdbx")]
     #[error(transparent)]
     Database(DatabaseError),
     /// Any other error
@@ -70,6 +72,7 @@ impl From<SimulationError> for MempoolErrorKind {
     }
 }
 
+#[cfg(feature = "mdbx")]
 impl From<reth_db::Error> for MempoolErrorKind {
     fn from(e: reth_db::Error) -> Self {
         Self::Database(e.into())
@@ -94,30 +97,32 @@ pub enum InvalidMempoolUserOperationError {
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum ReputationError {
     /// Entity is banned
-    #[error("{entity} {address} is banned")]
+    #[error("{entity} {address:?} is banned")]
     BannedEntity { entity: String, address: Address },
     /// Entity is throttled
-    #[error("{entity} {address} is throttled")]
+    #[error("{entity} {address:?} is throttled")]
     ThrottledEntity { entity: String, address: Address },
     /// Stake of the entity is too low
-    #[error("{entity} {address} stake {stake} is too low {min_stake}")]
+    #[error("{entity} {address:?} stake {stake} is too low {min_stake}")]
     StakeTooLow { entity: String, address: Address, stake: U256, min_stake: U256 },
     /// Unstake delay of the entity is too low
-    #[error("{entity} {address} unstake delay {unstake_delay} is too low {min_unstake_delay}")]
+    #[error("{entity} {address:?} unstake delay {unstake_delay} is too low {min_unstake_delay}")]
     UnstakeDelayTooLow {
         address: Address,
         entity: String,
         unstake_delay: U256,
         min_unstake_delay: U256,
     },
-    /// Entity is unstaked (with optional message)
-    #[error("{entity} {address} is unstaked")]
+    /// Entity is unstaked
+    #[error("{entity} {address:?} is unstaked")]
     UnstakedEntity { entity: String, address: Address },
     /// Database error
+    #[cfg(feature = "mdbx")]
     #[error(transparent)]
     Database(DatabaseError),
 }
 
+#[cfg(feature = "mdbx")]
 impl From<reth_db::Error> for ReputationError {
     fn from(e: reth_db::Error) -> Self {
         Self::Database(e.into())
@@ -158,7 +163,7 @@ pub enum SanityError {
     #[error("{inner}")]
     Sender { inner: String },
     /// Entity role validation
-    #[error("A {entity} at {address} in this user operation is used as a {entity_other} entity in another user operation currently in mempool")]
+    #[error("A {entity} at {address:?} in this user operation is used as a {entity_other} entity in another useroperation currently in mempool")]
     EntityRoles { entity: String, address: Address, entity_other: String },
     /// Reputation error
     #[error(transparent)]
@@ -170,6 +175,7 @@ pub enum SanityError {
         inner: String,
     },
     /// Database error
+    #[cfg(feature = "mdbx")]
     #[error(transparent)]
     Database(DatabaseError),
     /// Any other error
@@ -199,7 +205,7 @@ impl From<EntryPointError> for SanityError {
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum SimulationError {
     /// Signature verification failed
-    #[error("Invalid user operation signature or paymaster signature")]
+    #[error("Invalid userop signature or paymaster signature")]
     Signature,
     /// User operation timestamp invalid
     #[error("{inner}")]
@@ -217,7 +223,7 @@ pub enum SimulationError {
     #[error("Storage access validation failed for slot: {slot}")]
     StorageAccess { slot: String },
     /// Unstaked entity did something it shouldn't
-    #[error("A unstaked {entity} at {address} {inner}")]
+    #[error("A unstaked {entity} at {address:?}: {inner}")]
     Unstaked { entity: String, address: Address, inner: String },
     /// Errors related to calls
     #[error("Illegal call into {inner}")]
@@ -238,6 +244,7 @@ pub enum SimulationError {
         inner: String,
     },
     /// Database error
+    #[cfg(feature = "mdbx")]
     #[error(transparent)]
     Database(DatabaseError),
     /// Any other error

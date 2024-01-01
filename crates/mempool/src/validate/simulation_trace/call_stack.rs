@@ -2,7 +2,7 @@ use crate::{
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
-    Reputation, ReputationError, SimulationError,
+    Reputation, SimulationError,
 };
 use ethers::{abi::AbiDecode, providers::Middleware};
 use silius_contracts::{
@@ -165,11 +165,11 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
                         if !context.is_empty() &&
                             reputation.verify_stake(PAYMASTER, Some(*stake_info)).is_err()
                         {
-                            return Err(ReputationError::UnstakedEntity {
+                            return Err(SimulationError::Unstaked {
                                 entity: PAYMASTER.into(),
                                 address: stake_info.address,
-                            }
-                            .into());
+                                inner: "must not return context".into(),
+                            });
                         }
                     }
                 }

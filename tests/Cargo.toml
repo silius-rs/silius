@@ -14,7 +14,7 @@ homepage = "https://github.com/silius-rs/silius/tree/main/tests"
 [dependencies]
 # workspace dependencies
 silius-contracts = { workspace = true }
-silius-mempool = { workspace = true }
+silius-mempool = { workspace = true, features = ["mdbx"] } 
 silius-primitives = { workspace = true }
 
 # eth

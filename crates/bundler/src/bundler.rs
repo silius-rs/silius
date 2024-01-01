@@ -14,7 +14,7 @@ use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{
     bundler::SendStrategy,
     constants::{flashbots_relay_endpoints, supported_chains},
-    UserOperation, Wallet,
+    UserOperation, UserOperationHash, Wallet,
 };
 use std::{sync::Arc, time::Duration};
 use tracing::{info, trace};
@@ -158,7 +158,13 @@ where
             return Ok(H256::default());
         };
 
-        info!("Creating a new bundle with {} user operations", uos.len());
+        info!(
+            "Creating a new bundle with {} user operations: {:?}",
+            uos.len(),
+            uos.iter()
+                .map(|uo| uo.hash(&self.entry_point, &self.chain.id().into()))
+                .collect::<Vec<UserOperationHash>>()
+        );
         trace!("Bundle content: {uos:?}");
 
         match self.send_bundle_mode {
