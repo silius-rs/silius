@@ -30,6 +30,8 @@ use silius_primitives::{
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, trace};
 
+const FILTER_MAX_DEPTH: u64 = 10;
+
 /// The alternative mempool pool implementation that provides functionalities to add, remove,
 /// validate, and serves data requests from the [RPC API](EthApiServer). Architecturally, the
 /// [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves
@@ -513,10 +515,12 @@ where
         uo_hash: &UserOperationHash,
     ) -> eyre::Result<Option<(UserOperationEventFilter, LogMeta)>> {
         let mut event: Option<(UserOperationEventFilter, LogMeta)> = None;
+        let latest_block = self.entry_point.eth_client().get_block_number().await?;
         let filter = self
             .entry_point
             .entry_point_api()
             .event::<UserOperationEventFilter>()
+            .from_block(latest_block - FILTER_MAX_DEPTH)
             .topic1(uo_hash.0);
         let res: Vec<(UserOperationEventFilter, LogMeta)> = filter.query_with_meta().await?;
         // It is possible have two same user operatation in same bundle
