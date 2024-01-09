@@ -74,12 +74,31 @@ docker run --net=host -v ./bundler-spec-tests/keys/0xf39Fd6e51aad88F6F4ce6aB8827
 
 ## Supported networks
 
-Bundler was tested on the following networks:
+Bundler was tested on the following networks and Silius provides some public endpoints for testing. If you have any problems with the endpoint, you are welcomed to fire an [issue](https://github.com/silius-rs/silius/issues/new).
 
-| Chain         | Mainnet   | Testnet                                       |
-| :--------:    | :-------: | :-------:                                     |
-| Ethereum      | :soon:    | :soon: (Goerli), :heavy_check_mark: (Sepolia) |
-| Polygon PoS   | :soon:    | :heavy_check_mark: (Mumbai)                   |
+| Chain         | Supported Status | Public RPC URL   | 
+| :--------:    | :-------: | :-------: |
+| Ethereum | :heavy_check_mark:| :soon: |
+| Ethereum Goerli | :heavy_check_mark: |  https://rpc.silius.xyz/api/v1/chain/ethereum-goerli |
+| Ethereum Sepolia| :heavy_check_mark: | https://rpc.silius.xyz/api/v1/chain/ethereum-sepolia |
+| Ethereum Holesky| :heavy_check_mark: | https://rpc.silius.xyz/api/v1/chain/ethereum-holesky |
+| Polygon | :x: | :soon: |
+| Polygon Mumbai| :heavy_check_mark:  | https://rpc.silius.xyz/api/v1/chain/polygon-mumbai |
+| Linea | :x: | :soon: |
+| Linea Goerli | :x:  | https://rpc.silius.xyz/api/v1/chain/linea-goerli |
+| Optimism | :x: | :soon: |
+| Optimism Goerli | :x: | https://rpc.silius.xyz/api/v1/chain/optimism-goerli |
+| Optimism Sepolia | :x: | https://rpc.silius.xyz/api/v1/chain/optimism-sepolia |
+| Arbitrum | :x: | :soon: |
+| Arbitrum Goerli | :x: | https://rpc.silius.xyz/api/v1/chain/arbitrum-goerli |
+| Arbitrum Sepolia | :x: | https://rpc.silius.xyz/api/v1/chain/arbitrum-sepolia |
+| BSC | :x: | :soon: |
+| BSC Testnet | :x: | https://rpc.silius.xyz/api/v1/chain/bsc-testnet |
+| Base | :x: | :soon: |
+| Base Goerli | :x: | https://rpc.silius.xyz/api/v1/chain/base-goerli |
+| Base Sepolia | :x: | https://rpc.silius.xyz/api/v1/chain/base-sepolia |
+| Avalanche | :x: | :soon: |
+| Avalanche Fuji | :x: | https://rpc.silius.xyz/api/v1/chain/avalanche-fuji |
 
 **You can also try the Silius on any other EVM network, but you may encounter some problems (e.g., gas calculating differences on L2s) - please use it at our own risk! You are always welcome to open up a new issue when you meet any problem.** :warning:
 
