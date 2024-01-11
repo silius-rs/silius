@@ -34,24 +34,13 @@ impl ReputationEntryOp for HashMap<Address, ReputationEntry> {
 
     fn set_entry(
         &mut self,
-        addr: &Address,
         entry: ReputationEntry,
     ) -> Result<Option<ReputationEntry>, ReputationError> {
-        Ok(self.insert(*addr, entry))
+        Ok(self.insert(entry.address, entry))
     }
 
     fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError> {
         Ok(self.contains_key(addr))
-    }
-
-    fn update(&mut self) -> Result<(), ReputationError> {
-        for (_, ent) in self.iter_mut() {
-            ent.uo_seen = ent.uo_seen * 23 / 24;
-            ent.uo_included = ent.uo_included * 23 / 24;
-        }
-        self.retain(|_, ent| ent.uo_seen > 0 || ent.uo_included > 0);
-
-        Ok(())
     }
 
     fn get_all(&self) -> Vec<ReputationEntry> {

@@ -87,8 +87,9 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let addr = String::from(self.address.as_ref());
-        let mut inner = self.inner.clone();
-
+        let clone = self.inner.clone();
+        // take the service that was ready
+        let mut inner = std::mem::replace(&mut self.inner, clone);
         let res_fut = async move {
             let (req_h, req_b) = req.into_parts();
             let req_bb = hyper::body::to_bytes(req_b).await?;

@@ -1,0 +1,33 @@
+[package]
+name = "silius-metrics"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Account abstraction (ERC-4337) metrics"
+homepage = "https://github.com/silius-rs/silius/tree/main/crates/metrics"
+
+[dependencies]
+silius-mempool = { workspace = true }
+silius-primitives = { workspace = true }
+
+async-trait = { workspace = true }
+ethers = { workspace = true }
+futures = { workspace = true }
+hyper = { version = "0.14.20" }
+jsonrpsee = { workspace = true }
+metrics = { workspace = true }
+metrics-exporter-prometheus = "0.13.0"
+metrics-util = "0.16.0"
+pin-project = "1.1.3"
+serde = { workspace = true }
+thiserror = { workspace = true }
+tower = { version = "0.4.13" }
+tracing = { workspace = true }
+
+
+[features]

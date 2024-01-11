@@ -7,6 +7,7 @@ mod database;
 pub mod error;
 mod memory;
 mod mempool;
+pub mod metrics;
 mod reputation;
 mod uopool;
 mod utils;
@@ -27,9 +28,9 @@ pub use error::{
     SimulationError,
 };
 pub use mempool::{
-    mempool_id, AddRemoveUserOp, AddRemoveUserOpHash, Mempool, MempoolId, UserOperationAct,
-    UserOperationAddrAct, UserOperationAddrOp, UserOperationCodeHashAct, UserOperationCodeHashOp,
-    UserOperationOp,
+    mempool_id, AddRemoveUserOp, AddRemoveUserOpHash, ClearOp, Mempool, MempoolId,
+    UserOperationAct, UserOperationAddrAct, UserOperationAddrOp, UserOperationCodeHashAct,
+    UserOperationCodeHashOp, UserOperationOp,
 };
 pub use reputation::{HashSetOp, Reputation, ReputationEntryOp};
 pub use uopool::UoPool;

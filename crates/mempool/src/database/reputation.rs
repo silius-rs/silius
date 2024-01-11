@@ -2,7 +2,7 @@ use super::{tables::EntitiesReputation, utils::WrapAddress, DatabaseTable};
 use crate::{mempool::ClearOp, reputation::ReputationEntryOp, ReputationError};
 use ethers::types::Address;
 use reth_db::{
-    cursor::{DbCursorRO, DbCursorRW},
+    cursor::DbCursorRO,
     database::Database,
     mdbx::EnvironmentKind,
     transaction::{DbTx, DbTxMut},
@@ -29,39 +29,17 @@ impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputati
 
     fn set_entry(
         &mut self,
-        addr: &Address,
         entry: ReputationEntry,
     ) -> Result<Option<ReputationEntry>, ReputationError> {
         let tx = self.env.tx_mut()?;
-        let original = tx.get::<EntitiesReputation>((*addr).into())?;
-        tx.put::<EntitiesReputation>((*addr).into(), entry.into())?;
+        let original = tx.get::<EntitiesReputation>((entry.address).into())?;
+        tx.put::<EntitiesReputation>((entry.address).into(), entry.into())?;
         tx.commit()?;
         Ok(original.map(|o| o.into()))
     }
 
     fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError> {
         Ok(self.get_entry(addr)?.is_some())
-    }
-
-    fn update(&mut self) -> Result<(), ReputationError> {
-        let tx = self.env.tx_mut()?;
-        let mut cursor = tx.cursor_write::<EntitiesReputation>()?;
-
-        while let Ok(Some((addr_wrap, ent))) = cursor.next() {
-            let mut ent: ReputationEntry = ent.into();
-            ent.uo_seen = ent.uo_seen * 23 / 24;
-            ent.uo_included = ent.uo_included * 23 / 24;
-
-            if ent.uo_seen > 0 || ent.uo_included > 0 {
-                cursor.upsert(addr_wrap, ent.into())?;
-            } else {
-                cursor.delete_current()?;
-            }
-        }
-
-        tx.commit()?;
-
-        Ok(())
     }
 
     fn get_all(&self) -> Vec<ReputationEntry> {

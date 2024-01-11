@@ -1,6 +1,7 @@
 use crate::{
     cli::args::{
-        BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, RpcArgs, StorageType, UoPoolArgs,
+        BundlerAndUoPoolArgs, BundlerArgs, CreateWalletArgs, MetricsArgs, RpcArgs, StorageType,
+        UoPoolArgs,
     },
     utils::unwrap_path_or_home,
 };
@@ -19,6 +20,7 @@ use silius_mempool::{
     CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
     UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
+use silius_metrics::{launch_metrics_exporter, mempool::MetricsHandler};
 use silius_primitives::{
     bundler::SendStrategy,
     constants::{
@@ -55,6 +57,7 @@ pub async fn launch_bundler<M>(
     uopool_args: UoPoolArgs,
     common_args: BundlerAndUoPoolArgs,
     rpc_args: RpcArgs,
+    metrics_args: MetricsArgs,
     eth_client: Arc<M>,
     block_streams: Vec<BlockStream>,
 ) -> eyre::Result<()>
@@ -67,6 +70,7 @@ where
         block_streams,
         common_args.chain,
         common_args.entry_points.clone(),
+        metrics_args.clone(),
     )
     .await?;
 
@@ -76,6 +80,7 @@ where
         common_args.chain,
         common_args.entry_points,
         format!("http://{:?}:{:?}", uopool_args.uopool_addr, uopool_args.uopool_port),
+        metrics_args.clone(),
     )
     .await?;
 
@@ -83,8 +88,13 @@ where
         rpc_args,
         format!("http://{:?}:{:?}", uopool_args.uopool_addr, uopool_args.uopool_port),
         format!("http://{:?}:{:?}", bundler_args.bundler_addr, bundler_args.bundler_port),
+        metrics_args.clone(),
     )
     .await?;
+
+    if metrics_args.enable_metrics {
+        launch_metrics_exporter(metrics_args.listen_addr(), metrics_args.custom_label_value);
+    }
 
     Ok(())
 }
@@ -95,6 +105,7 @@ pub async fn launch_bundling<M>(
     chain: Option<NamedChain>,
     entry_points: Vec<Address>,
     uopool_grpc_listen_address: String,
+    metrics_args: MetricsArgs,
 ) -> eyre::Result<()>
 where
     M: Middleware + Clone + 'static,
@@ -140,6 +151,7 @@ where
                 eth_client,
                 client,
                 uopool_grpc_client,
+                metrics_args.enable_metrics,
             );
         }
         SendStrategy::Flashbots => {
@@ -167,6 +179,7 @@ where
                 eth_client,
                 client,
                 uopool_grpc_client,
+                metrics_args.enable_metrics,
             );
         }
     }
@@ -182,6 +195,7 @@ pub async fn launch_uopool<M>(
     block_streams: Vec<BlockStream>,
     chain: Option<NamedChain>,
     entry_points: Vec<Address>,
+    metrics_args: MetricsArgs,
 ) -> eyre::Result<()>
 where
     M: Middleware + Clone + 'static,
@@ -220,7 +234,10 @@ where
                 args.min_priority_fee_per_gas,
             );
             let mempool = Mempool::new(
-                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
+                Arc::new(RwLock::new(MetricsHandler::new(HashMap::<
+                    UserOperationHash,
+                    UserOperationSigned,
+                >::default()))),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
@@ -233,7 +250,9 @@ where
                 MIN_UNSTAKE_DELAY.into(),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+                Arc::new(RwLock::new(MetricsHandler::new(
+                    HashMap::<Address, ReputationEntry>::default(),
+                ))),
             );
             for whiteaddr in args.whitelist.iter() {
                 reputation.add_whitelist(whiteaddr);
@@ -253,6 +272,7 @@ where
                 node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
+                metrics_args.enable_metrics,
             )
             .await?;
             info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
@@ -269,7 +289,7 @@ where
             );
             env.create_tables().expect("Create mdbx database tables failed");
             let mempool = Mempool::new(
-                DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
+                MetricsHandler::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
                 DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
                 DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
                 DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
@@ -282,7 +302,9 @@ where
                 MIN_UNSTAKE_DELAY.into(),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
-                DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+                MetricsHandler::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(
+                    env.clone(),
+                )),
             );
             for whiteaddr in args.whitelist.iter() {
                 reputation.add_whitelist(whiteaddr);
@@ -302,6 +324,7 @@ where
                 node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
+                metrics_args.enable_metrics,
             )
             .await?;
             info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
@@ -314,7 +337,10 @@ where
                 args.min_priority_fee_per_gas,
             );
             let mempool = Mempool::new(
-                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
+                Arc::new(RwLock::new(MetricsHandler::new(HashMap::<
+                    UserOperationHash,
+                    UserOperationSigned,
+                >::default()))),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
@@ -327,7 +353,9 @@ where
                 MIN_UNSTAKE_DELAY.into(),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+                Arc::new(RwLock::new(MetricsHandler::new(
+                    HashMap::<Address, ReputationEntry>::default(),
+                ))),
             );
             for whiteaddr in args.whitelist.iter() {
                 reputation.add_whitelist(whiteaddr);
@@ -347,6 +375,7 @@ where
                 node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
+                metrics_args.enable_metrics,
             )
             .await?;
             info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
@@ -363,7 +392,7 @@ where
             );
             env.create_tables().expect("Create mdbx database tables failed");
             let mempool = Mempool::new(
-                DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
+                MetricsHandler::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
                 DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
                 DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
                 DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
@@ -376,7 +405,9 @@ where
                 MIN_UNSTAKE_DELAY.into(),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
-                DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+                MetricsHandler::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(
+                    env.clone(),
+                )),
             );
             for whiteaddr in args.whitelist.iter() {
                 reputation.add_whitelist(whiteaddr);
@@ -396,6 +427,7 @@ where
                 node_enr_file,
                 args.p2p_opts.to_config(),
                 args.p2p_opts.bootnodes,
+                metrics_args.enable_metrics,
             )
             .await?;
             info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
@@ -409,6 +441,7 @@ pub async fn launch_rpc(
     args: RpcArgs,
     uopool_grpc_listen_address: String,
     bundler_grpc_listen_address: String,
+    metrics_args: MetricsArgs,
 ) -> eyre::Result<()> {
     if !args.is_enabled() {
         return Err(eyre::eyre!("No RPC protocol is enabled"));
@@ -429,6 +462,11 @@ pub async fn launch_rpc(
 
     if let Some(eth_client_proxy_address) = args.eth_client_proxy_address.clone() {
         server = server.with_proxy(eth_client_proxy_address);
+    }
+
+    if metrics_args.enable_metrics {
+        info!("Enabling json rpc server metrics.");
+        server = server.with_metrics()
     }
 
     let http_api: HashSet<String> = HashSet::from_iter(args.http_api.iter().cloned());
