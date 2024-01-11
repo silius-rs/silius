@@ -2,9 +2,10 @@ use super::middleware::ProxyJsonRpcLayer;
 use eyre::Error;
 use hyper::{http::HeaderValue, Method};
 use jsonrpsee::{
-    server::{ServerBuilder, ServerHandle},
+    server::{RpcServiceBuilder, ServerBuilder, ServerHandle},
     Methods,
 };
+use silius_metrics::rpc::MetricsLayer;
 use std::net::{IpAddr, SocketAddr};
 use tower::ServiceBuilder;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
@@ -33,6 +34,9 @@ pub struct JsonRpcServer {
     ws_cors_layer: Option<CorsLayer>,
     /// The [proxy layer](ProxyJsonRpcLayer) to forward requests.
     proxy_layer: Option<ProxyJsonRpcLayer>,
+    /// This [metric layer](MetricsLayer) is used for collecting and reporting metrics related to
+    /// RPC operations.
+    metric_layer: Option<MetricsLayer>,
 }
 
 pub enum JsonRpcServerType {
@@ -77,6 +81,7 @@ impl JsonRpcServer {
             ws_methods: Methods::new(),
             ws_cors_layer: None,
             proxy_layer: None,
+            metric_layer: None,
         }
     }
 
@@ -130,6 +135,11 @@ impl JsonRpcServer {
         self
     }
 
+    pub fn with_metrics(mut self) -> Self {
+        self.metric_layer = Some(MetricsLayer::new());
+        self
+    }
+
     /// Add methods to the RPC server.
     ///
     /// # Arguments
@@ -165,9 +175,11 @@ impl JsonRpcServer {
             let service = ServiceBuilder::new()
                 .option_layer(self.http_cors_layer.clone())
                 .option_layer(self.proxy_layer.clone());
+            let rpc_service = RpcServiceBuilder::new().option_layer(self.metric_layer.clone());
 
             let server = ServerBuilder::new()
                 .http_only()
+                .set_rpc_middleware(rpc_service)
                 .set_http_middleware(service)
                 .build(SocketAddr::new(self.http_addr, self.http_port))
                 .await?;
@@ -180,9 +192,10 @@ impl JsonRpcServer {
             let service = ServiceBuilder::new()
                 .option_layer(self.ws_cors_layer.clone())
                 .option_layer(self.proxy_layer.clone());
-
+            let rpc_service = RpcServiceBuilder::new().option_layer(self.metric_layer.clone());
             let server = ServerBuilder::new()
                 .ws_only()
+                .set_rpc_middleware(rpc_service)
                 .set_http_middleware(service)
                 .build(SocketAddr::new(self.ws_addr, self.ws_port))
                 .await?;

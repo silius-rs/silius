@@ -42,6 +42,7 @@ silius-bundler = { version = "0.3.0-alpha", path = "crates/bundler", default-fea
 silius-contracts = { version = "0.3.0-alpha", path = "crates/contracts", default-features = false }
 silius-grpc = { version = "0.3.0-alpha", path = "crates/grpc", default-features = false }
 silius-mempool = { version = "0.3.0-alpha", path = "crates/mempool", default-features = false }
+silius-metrics = { version = "0.3.0-alpha", path = "crates/metrics", default-features = false }
 silius-p2p = { version = "0.3.0-alpha", path = "crates/p2p", default-features = false }
 silius-primitives = { version = "0.3.0-alpha", path = "crates/primitives", default-features = false }
 silius-rpc = { version = "0.3.0-alpha", path = "crates/rpc", default-features = false }
@@ -68,6 +69,8 @@ tokio = { version = "1.35", features = ["full"] }
 # misc
 expanded-pathbuf = "0.1.2"
 eyre = "0.6.11"
+jsonrpsee = { version = "0.21.0", features = ["server", "macros", "client"] }
+metrics = "0.22.0"
 lazy_static = "1.4.0"
 parking_lot = "0.12.1"
 serde = "1.0.193"

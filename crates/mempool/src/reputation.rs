@@ -84,7 +84,6 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
     /// operation.
     fn set_entry(
         &mut self,
-        addr: &Address,
         entry: ReputationEntry,
     ) -> Result<Option<ReputationEntry>, ReputationError>;
 
@@ -106,7 +105,15 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
     ///
     /// Returns `Ok(())` if the update was successful, or an `Err` if an error occurred during the
     /// update.
-    fn update(&mut self) -> Result<(), ReputationError>;
+    fn update(&mut self) -> Result<(), ReputationError> {
+        let all = self.get_all();
+        for mut ent in all {
+            ent.uo_seen = ent.uo_seen * 23 / 24;
+            ent.uo_included = ent.uo_included * 23 / 24;
+            self.set_entry(ent)?;
+        }
+        Ok(())
+    }
 
     /// Retrieves all reputation entries.
     ///
@@ -123,10 +130,9 @@ impl<T: ReputationEntryOp> ReputationEntryOp for Arc<RwLock<T>> {
 
     fn set_entry(
         &mut self,
-        addr: &Address,
         entry: ReputationEntry,
     ) -> Result<Option<ReputationEntry>, ReputationError> {
-        self.write().set_entry(addr, entry)
+        self.write().set_entry(entry)
     }
 
     fn contains_entry(&self, addr: &Address) -> Result<bool, ReputationError> {
@@ -226,7 +232,7 @@ where
         if !self.entities.contains_entry(addr)? {
             let ent = ReputationEntry::default_with_addr(*addr);
 
-            self.entities.set_entry(addr, ent)?;
+            self.entities.set_entry(ent)?;
         }
 
         Ok(())
@@ -260,7 +266,7 @@ where
         self.set_default(addr)?;
         if let Some(mut ent) = self.entities.get_entry(addr)? {
             ent.uo_seen += 1;
-            self.entities.set_entry(addr, ent)?;
+            self.entities.set_entry(ent)?;
         }
         Ok(())
     }
@@ -278,7 +284,7 @@ where
         self.set_default(addr)?;
         if let Some(mut ent) = self.entities.get_entry(addr)? {
             ent.uo_included += 1;
-            self.entities.set_entry(addr, ent)?;
+            self.entities.set_entry(ent)?;
         }
         Ok(())
     }
@@ -400,7 +406,7 @@ where
         if let Some(mut ent) = self.entities.get_entry(addr)? {
             ent.uo_seen = 100;
             ent.uo_included = 0;
-            self.entities.set_entry(addr, ent)?;
+            self.entities.set_entry(ent)?;
         }
 
         Ok(())
@@ -462,7 +468,7 @@ where
     /// * `Ok(())` if the entries were set successfully
     pub fn set_entities(&mut self, entries: Vec<ReputationEntry>) -> Result<(), ReputationError> {
         for en in entries {
-            self.entities.set_entry(&en.address.clone(), en)?;
+            self.entities.set_entry(en)?;
         }
 
         Ok(())

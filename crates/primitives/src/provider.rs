@@ -2,7 +2,7 @@
 
 use async_stream::stream;
 use ethers::{
-    providers::{Http, Middleware, Provider, Ws},
+    providers::{Http, Middleware, Provider, PubsubClient, Ws},
     types::H256,
 };
 use futures_util::{Stream, StreamExt};
@@ -27,7 +27,7 @@ pub async fn create_ws_provider(addr: &str) -> eyre::Result<Provider<Ws>> {
 }
 
 /// Listens for new blocks over HTTP connection
-pub async fn create_http_block_stream(provider: Arc<Provider<Http>>) -> BlockStream {
+pub async fn create_http_block_stream<M: Middleware + 'static>(provider: Arc<M>) -> BlockStream {
     Box::pin(stream! {
         let mut stream = provider.watch_blocks().await?.stream();
         while let Some(hash) = stream.next().await {
@@ -37,8 +37,8 @@ pub async fn create_http_block_stream(provider: Arc<Provider<Http>>) -> BlockStr
 }
 
 /// Create multiple HTTP block streams
-pub async fn create_http_block_streams(
-    provider: Arc<Provider<Http>>,
+pub async fn create_http_block_streams<M: Middleware + 'static>(
+    provider: Arc<M>,
     n: usize,
 ) -> Vec<BlockStream> {
     let mut streams = Vec::new();
@@ -49,7 +49,10 @@ pub async fn create_http_block_streams(
 }
 
 /// Listens for new block over WS connection
-pub async fn create_ws_block_stream(provider: Arc<Provider<Ws>>) -> BlockStream {
+pub async fn create_ws_block_stream<M: Middleware + 'static>(provider: Arc<M>) -> BlockStream
+where
+    <M as Middleware>::Provider: PubsubClient,
+{
     Box::pin(stream! {
         let mut stream = provider.subscribe_blocks().await?;
         while let Some(block) = stream.next().await {
@@ -61,7 +64,13 @@ pub async fn create_ws_block_stream(provider: Arc<Provider<Ws>>) -> BlockStream 
 }
 
 /// Creates multiple WS block streams
-pub async fn create_ws_block_streams(provider: Arc<Provider<Ws>>, n: usize) -> Vec<BlockStream> {
+pub async fn create_ws_block_streams<M: Middleware + 'static>(
+    provider: Arc<M>,
+    n: usize,
+) -> Vec<BlockStream>
+where
+    <M as Middleware>::Provider: PubsubClient,
+{
     let mut streams = Vec::new();
     for _ in 0..n {
         streams.push(create_ws_block_stream(provider.clone()).await);

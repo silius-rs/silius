@@ -10,6 +10,7 @@ use ethers::{
 };
 use parking_lot::Mutex;
 use silius_bundler::{Bundler, SendBundleOp};
+use silius_metrics::grpc::MetricsLayer;
 use silius_primitives::{UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
@@ -173,6 +174,7 @@ pub fn bundler_service_run<M, S>(
     eth_client: Arc<M>,
     client: Arc<S>,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
+    enable_metrics: bool,
 ) where
     M: Middleware + Clone + 'static,
     S: SendBundleOp + Clone + 'static,
@@ -198,6 +200,11 @@ pub fn bundler_service_run<M, S>(
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
         let svc = bundler_server::BundlerServer::new(bundler_service);
-        builder.add_service(svc).serve(addr).await
+        if enable_metrics {
+            builder.layer(MetricsLayer).add_service(svc).serve(addr).await
+        } else {
+            builder.add_service(svc).serve(addr).await
+        }
+        // let route = builder.add_service(svc)
     });
 }

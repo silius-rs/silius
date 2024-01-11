@@ -16,6 +16,7 @@ homepage = "https://github.com/silius-rs/silius/tree/main/crates/grpc"
 silius-bundler = { workspace = true }
 silius-contracts = { workspace = true }
 silius-mempool = { workspace = true }
+silius-metrics = { workspace = true }
 silius-p2p = { workspace = true }
 silius-primitives = { workspace = true }
 
@@ -25,12 +26,14 @@ discv5 = { workspace = true }
 ethers = { workspace = true }
 
 # grpc
+hyper = { version = "0.14.20" }
 prost = "0.12.3"
 tonic = { version = "0.10.2", default-features = false, features = [
     "codegen",
     "prost",
     "transport",
 ] }
+tower = { version = "0.4.13" }
 
 # p2p
 libp2p-identity = "0.2.8"
@@ -47,6 +50,7 @@ tokio = { workspace = true }
 arrayref = "0.3.7"
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
+metrics = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 

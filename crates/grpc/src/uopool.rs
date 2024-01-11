@@ -22,6 +22,7 @@ use silius_mempool::{
     SimulationTraceCheck, UoPool as UserOperationPool, UoPoolBuilder, UserOperationAct,
     UserOperationAddrAct, UserOperationCodeHashAct,
 };
+use silius_metrics::grpc::MetricsLayer;
 use silius_p2p::{
     config::Config,
     enr::{build_enr, keypair_to_combined},
@@ -402,6 +403,7 @@ pub async fn uopool_service_run<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>(
     node_enr_file: PathBuf,
     config: Config,
     bootnodes: Vec<Enr>,
+    enable_metrics: bool,
 ) -> Result<()>
 where
     M: Middleware + Clone + 'static,
@@ -560,8 +562,11 @@ where
             SimCk,
             SimTrCk,
         >::new(uopool_map, chain));
-
-        builder.add_service(svc).serve(addr).await
+        if enable_metrics {
+            builder.layer(MetricsLayer).add_service(svc).serve(addr).await
+        } else {
+            builder.add_service(svc).serve(addr).await
+        }
     });
 
     tokio::time::sleep(Duration::from_secs(1)).await;

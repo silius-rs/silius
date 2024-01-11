@@ -1,11 +1,13 @@
 use crate::utils::{
-    parse_address, parse_duration, parse_enr, parse_send_bundle_mode, parse_u256, parse_uopool_mode,
+    parse_address, parse_duration, parse_enr, parse_label_value, parse_send_bundle_mode,
+    parse_u256, parse_uopool_mode,
 };
 use alloy_chains::NamedChain;
 use clap::{Parser, ValueEnum};
 use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
+use silius_metrics::label::LabelValue;
 use silius_p2p::config::{Config, ListenAddr};
 use silius_primitives::{
     bundler::SendStrategy,
@@ -17,7 +19,7 @@ use silius_primitives::{
     UoPoolMode,
 };
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     time::Duration,
 };
@@ -129,6 +131,9 @@ pub struct BundlerAndUoPoolArgs {
     /// Poll interval event filters and pending transactions in milliseconds.
     #[clap(long, default_value = "500", value_parser= parse_duration)]
     pub poll_interval: Duration,
+
+    #[clap(flatten)]
+    pub metrics: MetricsArgs,
 }
 
 /// RPC CLI args
@@ -290,6 +295,25 @@ impl P2PArgs {
         }
     }
 }
+
+#[derive(Clone, Debug, Parser, PartialEq)]
+pub struct MetricsArgs {
+    #[clap(long)]
+    pub enable_metrics: bool,
+    #[clap(long, value_delimiter = ',', value_parser=parse_label_value)]
+    pub custom_label_value: Option<Vec<LabelValue>>,
+    #[clap(long = "metrics.addr", default_value = "127.0.0.1")]
+    pub listen_address: Ipv4Addr,
+    #[clap(long = "metrics.port", default_value = "3030")]
+    pub port: u16,
+}
+
+impl MetricsArgs {
+    pub fn listen_addr(&self) -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(self.listen_address), self.port)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354,6 +378,12 @@ mod tests {
                     Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990").unwrap()
                 ],
                 poll_interval: Duration::from_millis(5000),
+                metrics: MetricsArgs {
+                    enable_metrics: false,
+                    custom_label_value: None,
+                    listen_address: Ipv4Addr::new(127, 0, 0, 1),
+                    port: 3030
+                }
             },
             BundlerAndUoPoolArgs::try_parse_from(args).unwrap()
         );
@@ -619,6 +649,32 @@ mod tests {
                 node_enr: Some(PathBuf::from("~/.silius/p2p/node-enr"))
             },
             P2PArgs::try_parse_from(args).unwrap()
+        )
+    }
+
+    #[test]
+    fn metrics_args() {
+        let args = vec![
+            "metricsargs",
+            "--enable-metrics",
+            "--metrics.addr",
+            "127.0.0.1",
+            "--metrics.port",
+            "9090",
+            "--custom-label-value",
+            "custom=value",
+        ];
+        assert_eq!(
+            MetricsArgs {
+                enable_metrics: true,
+                listen_address: Ipv4Addr::new(127, 0, 0, 1),
+                port: 9090,
+                custom_label_value: Some(vec![LabelValue::new(
+                    String::from("custom"),
+                    String::from("value")
+                )])
+            },
+            MetricsArgs::try_parse_from(args).unwrap()
         )
     }
 }
