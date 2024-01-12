@@ -2,8 +2,8 @@ use super::{
     env::DatabaseError,
     tables::{CodeHashes, UserOperations, UserOperationsByEntity, UserOperationsBySender},
     utils::{
-        WrapAddress, WrapCodeHash, WrapCodeHashVec, WrapUserOpSet, WrapUserOperation,
-        WrapUserOperationHash,
+        WrapAddress, WrapCodeHash, WrapCodeHashVec, WrapUserOpSet, WrapUserOperationHash,
+        WrapUserOperationSigned,
     },
     DatabaseTable,
 };
@@ -14,7 +14,7 @@ use crate::{
     },
     MempoolErrorKind,
 };
-use ethers::types::{Address, U256};
+use ethers::types::Address;
 use reth_db::{
     cursor::DbCursorRO,
     database::Database,
@@ -24,19 +24,13 @@ use reth_db::{
 use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 
 impl<E: EnvironmentKind> AddRemoveUserOp for DatabaseTable<E, UserOperations> {
-    fn add(
-        &mut self,
-        uo: UserOperation,
-        ep: &Address,
-        chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolErrorKind> {
-        let hash = uo.hash(ep, chain_id);
+    fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
         let tx = self.env.tx_mut()?;
-        let uo_hash_wrap: WrapUserOperationHash = hash.into();
-        let uo_wrap: WrapUserOperation = uo.into();
+        let uo_hash_wrap: WrapUserOperationHash = uo.hash.into();
+        let uo_wrap: WrapUserOperationSigned = uo.user_operation.into();
         tx.put::<UserOperations>(uo_hash_wrap, uo_wrap)?;
         tx.commit()?;
-        Ok(hash)
+        Ok(uo.hash)
     }
 
     fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
@@ -110,7 +104,7 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
         let res = tx.get::<UserOperations>(uo_hash_wrap)?;
         tx.commit()?;
 
-        Ok(res.map(|uo| uo.into()))
+        Ok(res.map(|uo| UserOperation::from_user_operation_signed(*uo_hash, uo.into())))
     }
 
     fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
@@ -120,7 +114,11 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
                 let mut cursor = tx.cursor_read::<UserOperations>()?;
                 let mut uos: Vec<UserOperation> = cursor
                     .walk(Some(WrapUserOperationHash::default()))?
-                    .map(|a| a.map(|(_, uo)| uo.into()))
+                    .map(|a| {
+                        a.map(|(hash, uo)| {
+                            UserOperation::from_user_operation_signed(hash.into(), uo.into())
+                        })
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 uos.sort_by(|a, b| {
                     if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
@@ -138,8 +136,8 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
         let tx = self.env.tx()?;
         let mut c = tx.cursor_read::<UserOperations>()?;
         let mut res = Vec::new();
-        while let Some((_, uo)) = c.next()? {
-            res.push(uo.into())
+        while let Some((hash, uo)) = c.next()? {
+            res.push(UserOperation::from_user_operation_signed(hash.into(), uo.into()))
         }
 
         Ok(res)

@@ -16,7 +16,7 @@ use eyre::format_err;
 use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
-use silius_primitives::{get_address, provider::BlockStream, UserOperation};
+use silius_primitives::{get_address, provider::BlockStream, UserOperation, UserOperationSigned};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
 
@@ -93,18 +93,13 @@ where
         if let Some(txs) = txs {
             for tx in txs {
                 if tx.to == Some(uopool.entry_point.address()) {
-                    let dec: Result<(Vec<UserOperation>, Address), _> =
+                    let dec: Result<(Vec<UserOperationSigned>, Address), _> =
                         uopool.entry_point.entry_point_api().decode("handleOps", tx.input);
 
                     if let Ok((uos, _)) = dec {
                         uopool.remove_user_operations(
                             uos.iter()
-                                .map(|uo| {
-                                    uo.hash(
-                                        &uopool.entry_point.address(),
-                                        &uopool.chain.id().into(),
-                                    )
-                                })
+                                .map(|uo| uo.hash(&uopool.entry_point.address(), uopool.chain.id()))
                                 .collect(),
                         );
 

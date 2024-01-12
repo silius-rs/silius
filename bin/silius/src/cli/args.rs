@@ -228,8 +228,8 @@ pub struct CreateWalletArgs {
     pub output_path: Option<ExpandedPathBuf>,
 
     /// The chain id.
-    #[clap(long, value_parser=parse_u256, default_value="1")]
-    pub chain_id: U256,
+    #[clap(long, default_value = "1")]
+    pub chain_id: u64,
 
     /// Whether to create a Flashbots key.
     #[clap(long, default_value_t = false)]

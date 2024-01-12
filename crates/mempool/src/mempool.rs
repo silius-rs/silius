@@ -10,9 +10,10 @@ use std::sync::Arc;
 
 pub type MempoolId = H256;
 
-pub fn mempool_id(ep: &Address, chain_id: &U256) -> MempoolId {
+pub fn mempool_id(ep: &Address, chain_id: u64) -> MempoolId {
     H256::from_slice(
-        keccak256([to_checksum(ep, None).encode(), chain_id.encode()].concat()).as_slice(),
+        keccak256([to_checksum(ep, None).encode(), U256::from(chain_id).encode()].concat())
+            .as_slice(),
     )
 }
 
@@ -22,18 +23,11 @@ pub trait AddRemoveUserOp {
     ///
     /// # Arguments
     /// * `uo` - The [UserOperation](UserOperation) to add
-    /// * `ep` - The [Address](Address) of the endpoint
-    /// * `chain_id` - The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) Chain ID.
     ///
     /// # Returns
     /// * `Ok(UserOperationHash)` - The hash of the [UserOperation](UserOperation) that was added
     /// * `Err(MempoolErrorKind)` - If the [UserOperation](UserOperation) could not be added
-    fn add(
-        &mut self,
-        uo: UserOperation,
-        ep: &Address,
-        chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolErrorKind>;
+    fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind>;
     /// Removes a [UserOperation](UserOperation) by its hash
     ///
     /// # Arguments
@@ -47,13 +41,8 @@ pub trait AddRemoveUserOp {
 }
 
 impl<T: AddRemoveUserOp> AddRemoveUserOp for Arc<RwLock<T>> {
-    fn add(
-        &mut self,
-        uo: UserOperation,
-        ep: &Address,
-        chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolErrorKind> {
-        self.write().add(uo, ep, chain_id)
+    fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
+        self.write().add(uo)
     }
 
     fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
@@ -389,15 +378,10 @@ where
             user_operations_code_hashes,
         }
     }
-    pub fn add(
-        &mut self,
-        uo: UserOperation,
-        ep: &Address,
-        chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolErrorKind> {
-        let uo_hash = uo.hash(ep, chain_id);
+    pub fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
         let (sender, factory, paymaster) = uo.get_entities();
-        self.user_operations.add(uo, ep, chain_id)?;
+        let uo_hash = uo.hash;
+        self.user_operations.add(uo)?;
         self.user_operations_by_sender.add(&sender, uo_hash)?;
         if let Some(factory) = factory {
             self.user_operations_by_entity.add(&factory, uo_hash)?;

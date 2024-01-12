@@ -5,21 +5,16 @@ use crate::{
     },
     MempoolErrorKind,
 };
-use ethers::types::{Address, U256};
-use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
+use ethers::types::Address;
+use silius_primitives::{
+    simulation::CodeHash, UserOperation, UserOperationHash, UserOperationSigned,
+};
 use std::collections::{HashMap, HashSet};
 
-impl AddRemoveUserOp for HashMap<UserOperationHash, UserOperation> {
-    fn add(
-        &mut self,
-        uo: UserOperation,
-        ep: &Address,
-        chain_id: &U256,
-    ) -> Result<UserOperationHash, MempoolErrorKind> {
-        let uo_hash = uo.hash(ep, chain_id);
-        self.insert(uo_hash, uo);
-
-        Ok(uo_hash)
+impl AddRemoveUserOp for HashMap<UserOperationHash, UserOperationSigned> {
+    fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
+        self.insert(uo.hash, uo.user_operation);
+        Ok(uo.hash)
     }
 
     fn remove_by_uo_hash(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
@@ -33,16 +28,23 @@ impl AddRemoveUserOp for HashMap<UserOperationHash, UserOperation> {
     }
 }
 
-impl UserOperationOp for HashMap<UserOperationHash, UserOperation> {
+impl UserOperationOp for HashMap<UserOperationHash, UserOperationSigned> {
     fn get_by_uo_hash(
         &self,
         uo_hash: &UserOperationHash,
     ) -> Result<Option<UserOperation>, MempoolErrorKind> {
-        Ok(self.get(uo_hash).cloned())
+        if let Some(uo) = self.get(uo_hash) {
+            Ok(Some(UserOperation::from_user_operation_signed(*uo_hash, uo.clone())))
+        } else {
+            Ok(None)
+        }
     }
 
     fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
-        let mut uos: Vec<UserOperation> = self.values().cloned().collect();
+        let mut uos: Vec<UserOperation> = self
+            .iter()
+            .map(|(hash, uo)| UserOperation::from_user_operation_signed(*hash, uo.clone()))
+            .collect();
         uos.sort_by(|a, b| {
             if a.max_priority_fee_per_gas != b.max_priority_fee_per_gas {
                 b.max_priority_fee_per_gas.cmp(&a.max_priority_fee_per_gas)
@@ -54,7 +56,10 @@ impl UserOperationOp for HashMap<UserOperationHash, UserOperation> {
     }
 
     fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
-        Ok(self.values().cloned().collect())
+        Ok(self
+            .iter()
+            .map(|(hash, uo)| UserOperation::from_user_operation_signed(*hash, uo.clone()))
+            .collect())
     }
 }
 
@@ -136,7 +141,7 @@ impl ClearOp for HashMap<UserOperationHash, Vec<CodeHash>> {
     }
 }
 
-impl ClearOp for HashMap<UserOperationHash, UserOperation> {
+impl ClearOp for HashMap<UserOperationHash, UserOperationSigned> {
     fn clear(&mut self) {
         self.clear()
     }
@@ -157,7 +162,7 @@ mod tests {
     #[tokio::test]
     async fn memory_mempool() {
         let mempool = Mempool::new(
-            HashMap::<UserOperationHash, UserOperation>::default(),
+            HashMap::<UserOperationHash, UserOperationSigned>::default(),
             HashMap::<Address, HashSet<UserOperationHash>>::default(),
             HashMap::<Address, HashSet<UserOperationHash>>::default(),
             HashMap::<UserOperationHash, Vec<CodeHash>>::default(),

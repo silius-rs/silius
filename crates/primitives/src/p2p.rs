@@ -1,6 +1,6 @@
 //! P2P primitives
 
-use crate::UserOperation;
+use crate::{UserOperation, UserOperationSigned};
 use alloy_chains::Chain;
 use ethers::types::{Address, U256 as EthersU256};
 use ssz_rs::{List, Vector, U256};
@@ -13,7 +13,7 @@ pub struct UserOperationsWithEntryPoint {
     entrypoint_contract: Vector<u8, 20>,
     verified_at_block_hash: U256,
     chain_id: U256,
-    user_operations: List<UserOperation, 4096>,
+    user_operations: List<UserOperationSigned, 4096>,
 }
 
 impl UserOperationsWithEntryPoint {
@@ -29,18 +29,19 @@ impl UserOperationsWithEntryPoint {
         let mut buf: [u8; 32] = [0; 32];
         chain_id.to_little_endian(&mut buf);
         let chain_id = U256::from_bytes_le(buf);
+        let uos: Vec<UserOperationSigned> = user_operations.into_iter().map(Into::into).collect();
         Self {
             entrypoint_contract: <Vector<u8, 20>>::try_from(entrypoint_address.as_bytes().to_vec())
                 .expect("entrypoint address is valid"),
             verified_at_block_hash,
             chain_id,
             // FIXME: should have a bound check here or return Err
-            user_operations: <List<UserOperation, 4096>>::try_from(user_operations)
+            user_operations: <List<UserOperationSigned, 4096>>::try_from(uos)
                 .expect("Too many user operations"),
         }
     }
 
-    pub fn user_operations(self) -> Vec<UserOperation> {
+    pub fn user_operations(self) -> Vec<UserOperationSigned> {
         self.user_operations.to_vec()
     }
 
@@ -58,5 +59,5 @@ impl UserOperationsWithEntryPoint {
 pub struct PooledUserOps {
     mempool_id: Vector<u8, 32>,
     more_flag: u64,
-    user_operations: List<UserOperation, 4096>,
+    user_operations: List<UserOperationSigned, 4096>,
 }

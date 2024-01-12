@@ -174,7 +174,7 @@ where
         &self,
         uo: &UserOperation,
     ) -> Result<SimulateValidationResult, SimulationError> {
-        match self.entry_point.simulate_validation(uo.clone()).await {
+        match self.entry_point.simulate_validation(uo.user_operation.clone()).await {
             Ok(res) => Ok(res),
             Err(err) => Err(match err {
                 EntryPointError::FailedOp(op) => SimulationError::Validation { inner: op.reason },
@@ -198,7 +198,7 @@ where
         &self,
         uo: &UserOperation,
     ) -> Result<GethTrace, SimulationError> {
-        match self.entry_point.simulate_validation_trace(uo.clone()).await {
+        match self.entry_point.simulate_validation_trace(uo.user_operation.clone()).await {
             Ok(trace) => Ok(trace),
             Err(err) => Err(match err {
                 EntryPointError::FailedOp(op) => SimulationError::Validation { inner: op.reason },
@@ -260,7 +260,7 @@ where
         }
 
         if let Some(uo) = mempool.get_prev_by_sender(uo) {
-            out.prev_hash = Some(uo.hash(&self.entry_point.address(), &self.chain.id().into()));
+            out.prev_hash = Some(uo.hash);
         }
         debug!("Simulate user operation from {:?}", uo.sender);
         let sim_res = self.simulate_validation(uo).await?;

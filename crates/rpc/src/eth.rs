@@ -12,7 +12,7 @@ use silius_grpc::{
 use silius_mempool::MempoolError;
 use silius_primitives::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
-    UserOperationPartial, UserOperationReceipt,
+    UserOperationReceipt, UserOperationRequest, UserOperationSigned,
 };
 use std::str::FromStr;
 use tonic::Request;
@@ -61,19 +61,33 @@ impl EthApiServer for EthApiServerImpl {
     /// Send a user operation via the [AddRequest](AddRequest).
     ///
     /// # Arguments
-    /// * `user_operation: UserOperation` - The user operation to be sent.
+    /// * `user_operation: UserOperationRequest` - The user operation to be sent.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
     /// * `RpcResult<UserOperationHash>` - The hash of the sent user operation.
     async fn send_user_operation(
         &self,
-        uo: UserOperation,
+        uo: UserOperationRequest,
         ep: Address,
     ) -> RpcResult<UserOperationHash> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let req = Request::new(AddRequest { uo: Some(uo.into()), ep: Some(ep.into()) });
+        let res = uopool_grpc_client
+            .get_chain_id(Request::new(()))
+            .await
+            .map_err(JsonRpcError::from)?
+            .into_inner();
+
+        let uo: UserOperationSigned = uo.into();
+
+        let req = Request::new(AddRequest {
+            uo: Some(
+                UserOperation::from_user_operation_signed(uo.hash(&ep, res.chain_id), uo.clone())
+                    .into(),
+            ),
+            ep: Some(ep.into()),
+        });
 
         let res = uopool_grpc_client.add(req).await.map_err(JsonRpcError::from)?.into_inner();
 
@@ -89,13 +103,13 @@ impl EthApiServer for EthApiServerImpl {
         .0)
     }
 
-    /// Estimate the gas required for a [UserOperation](UserOperation) via the
+    /// Estimate the gas required for a [UserOperation](UserOperationRequest) via the
     /// [EstimateUserOperationGasRequest](EstimateUserOperationGasRequest). This allows you to
     /// gauge the computational cost of the operation. See [How ERC-4337 Gas Estimation Works](https://www.alchemy.com/blog/erc-4337-gas-estimation).
     ///
     /// # Arguments
-    /// * `user_operation: [UserOperationPartial](UserOperationPartial)` - The partial user
-    ///   operation for which to estimate the gas.
+    /// * `user_operation: [UserOperation](UserOperationRequest)` - User operation for which to
+    ///   estimate the gas.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
@@ -103,15 +117,30 @@ impl EthApiServer for EthApiServerImpl {
     ///   [UserOperationGasEstimation](UserOperationGasEstimation) for the user operation.
     async fn estimate_user_operation_gas(
         &self,
-        uo: UserOperationPartial,
+        uo: UserOperationRequest,
         ep: Address,
     ) -> RpcResult<UserOperationGasEstimation> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
-        let req = Request::new(EstimateUserOperationGasRequest {
-            uo: Some(UserOperation::from(uo).into()),
-            ep: Some(ep.into()),
-        });
+        let res = uopool_grpc_client
+            .get_chain_id(Request::new(()))
+            .await
+            .map_err(JsonRpcError::from)?
+            .into_inner();
+
+        let uo: UserOperationSigned = uo.into();
+
+        let req: Request<EstimateUserOperationGasRequest> =
+            Request::new(EstimateUserOperationGasRequest {
+                uo: Some(
+                    UserOperation::from_user_operation_signed(
+                        uo.hash(&ep, res.chain_id),
+                        uo.clone(),
+                    )
+                    .into(),
+                ),
+                ep: Some(ep.into()),
+            });
 
         let res = uopool_grpc_client
             .estimate_user_operation_gas(req)

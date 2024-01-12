@@ -1,7 +1,6 @@
 //! Primitives for reputation
 
 use super::utils::{as_checksum_addr, as_hex_string, as_u64};
-use educe::Educe;
 use ethers::{
     prelude::{EthAbiCodec, EthAbiType},
     types::{Address, U256},
@@ -11,8 +10,7 @@ use serde::{Deserialize, Serialize};
 pub type ReputationStatus = u64;
 
 /// All possible reputation statuses
-#[derive(Default, Clone, Educe, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
-#[educe(Debug)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     #[default]
@@ -46,7 +44,7 @@ impl From<ReputationStatus> for Status {
 #[derive(
     Default,
     Clone,
-    Educe,
+    Debug,
     Eq,
     PartialEq,
     PartialOrd,
@@ -56,7 +54,6 @@ impl From<ReputationStatus> for Status {
     EthAbiCodec,
     EthAbiType,
 )]
-#[educe(Debug)]
 pub struct ReputationEntry {
     pub address: Address,
     #[serde(rename = "opsSeen", serialize_with = "as_hex_string")]
@@ -74,8 +71,7 @@ impl ReputationEntry {
 }
 
 /// Stake info
-#[derive(Clone, Copy, Default, Educe, Eq, PartialEq, Serialize, Deserialize)]
-#[educe(Debug)]
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StakeInfo {
     #[serde(rename = "addr", serialize_with = "as_checksum_addr")]
     pub address: Address,
@@ -92,8 +88,7 @@ impl StakeInfo {
 }
 
 /// Stake info response for RPC
-#[derive(Clone, Copy, Default, Educe, Eq, PartialEq, Serialize, Deserialize)]
-#[educe(Debug)]
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StakeInfoResponse {
     #[serde(rename = "stakeInfo")]
     pub stake_info: StakeInfo,

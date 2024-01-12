@@ -156,11 +156,14 @@ impl Network {
                         return None;
                     }
                 };
-                self.entrypoint_channels.iter().find_map(|(_, ep, _, new_coming_uos_ch)| {
+                self.entrypoint_channels.iter().find_map(|(chain, ep, _, new_coming_uos_ch)| {
                     if *ep == userops.entrypoint_address() {
                         for user_op in userops.clone().user_operations().into_iter() {
                             new_coming_uos_ch
-                                .unbounded_send(user_op)
+                                .unbounded_send(UserOperation::from_user_operation_signed(
+                                    user_op.hash(ep, chain.id()),
+                                    user_op,
+                                ))
                                 .expect("new useop channel should be open all the time");
                         }
                         Some(())

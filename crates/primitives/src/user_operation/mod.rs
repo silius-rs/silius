@@ -1,36 +1,65 @@
 //! Basic transaction type for account abstraction (ERC-4337)
 
-use super::utils::{as_checksum_addr, as_checksum_bytes, get_address};
+mod hash;
+mod request;
+
+use crate::{get_address, utils::as_checksum_addr};
+use derive_more::{AsRef, Deref};
 use ethers::{
     abi::AbiEncode,
-    prelude::{EthAbiCodec, EthAbiType},
+    contract::{EthAbiCodec, EthAbiType},
     types::{Address, Bytes, Log, TransactionReceipt, H256, U256, U64},
     utils::keccak256,
 };
-use rustc_hex::FromHexError;
+pub use hash::UserOperationHash;
+pub use request::UserOperationRequest;
 use serde::{Deserialize, Serialize};
 use ssz_rs::List;
-use std::{ops::Deref, slice::Windows, str::FromStr};
+use std::{cmp::Ord, ops::Deref, slice::Windows};
 
-/// This could be increased if we found bigger bytes, the propper value is not sure right now.
-const MAXIMUM_SSZ_BYTES_LENGTH: usize = 1024;
+/// User operation with hash
+#[derive(AsRef, Deref, Debug, Clone)]
+pub struct UserOperation {
+    /// Hash of the user operation
+    pub hash: UserOperationHash,
 
-/// Transaction type for account abstraction (ERC-4337)
+    /// Raw user operation
+    #[deref]
+    #[as_ref]
+    pub user_operation: UserOperationSigned,
+}
+
+impl UserOperation {
+    pub fn from_user_operation_signed(
+        hash: UserOperationHash,
+        user_operation: UserOperationSigned,
+    ) -> Self {
+        Self { hash, user_operation }
+    }
+}
+
+impl From<UserOperation> for UserOperationSigned {
+    fn from(value: UserOperation) -> Self {
+        value.user_operation
+    }
+}
+
+/// User operation
 #[derive(
+    Default,
     Clone,
     Debug,
-    Default,
+    Ord,
+    PartialOrd,
     PartialEq,
     Eq,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Deserialize,
     EthAbiCodec,
     EthAbiType,
+    Serialize,
+    Deserialize,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct UserOperation {
+pub struct UserOperationSigned {
     /// Sender of the user operation
     #[serde(serialize_with = "as_checksum_addr")]
     pub sender: Address,
@@ -39,7 +68,6 @@ pub struct UserOperation {
     pub nonce: U256,
 
     /// Init code for the account (needed if account not yet deployed and needs to be created)
-    #[serde(serialize_with = "as_checksum_bytes")]
     pub init_code: Bytes,
 
     /// The data that is passed to the sender during the main execution call
@@ -69,7 +97,39 @@ pub struct UserOperation {
     pub signature: Bytes,
 }
 
-impl UserOperation {
+/// User operation without signature (helper for packing user operation)
+#[derive(EthAbiCodec, EthAbiType)]
+struct UserOperationNoSignature {
+    pub sender: Address,
+    pub nonce: U256,
+    pub init_code: H256,
+    pub call_data: H256,
+    pub call_gas_limit: U256,
+    pub verification_gas_limit: U256,
+    pub pre_verification_gas: U256,
+    pub max_fee_per_gas: U256,
+    pub max_priority_fee_per_gas: U256,
+    pub paymaster_and_data: H256,
+}
+
+impl From<UserOperationSigned> for UserOperationNoSignature {
+    fn from(value: UserOperationSigned) -> Self {
+        Self {
+            sender: value.sender,
+            nonce: value.nonce,
+            init_code: keccak256(value.init_code.deref()).into(),
+            call_data: keccak256(value.call_data.deref()).into(),
+            call_gas_limit: value.call_gas_limit,
+            verification_gas_limit: value.verification_gas_limit,
+            pre_verification_gas: value.pre_verification_gas,
+            max_fee_per_gas: value.max_fee_per_gas,
+            max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+            paymaster_and_data: keccak256(value.paymaster_and_data.deref()).into(),
+        }
+    }
+}
+
+impl UserOperationSigned {
     /// Packs the user operation into bytes
     pub fn pack(&self) -> Bytes {
         self.clone().encode().into()
@@ -77,18 +137,18 @@ impl UserOperation {
 
     /// Packs the user operation without signature to bytes (used for calculating the hash)
     pub fn pack_without_signature(&self) -> Bytes {
-        let user_operation_packed = UserOperationUnsigned::from(self.clone());
+        let user_operation_packed = UserOperationNoSignature::from(self.clone());
         user_operation_packed.encode().into()
     }
 
     /// Calculates the hash of the user operation
-    pub fn hash(&self, entry_point: &Address, chain_id: &U256) -> UserOperationHash {
+    pub fn hash(&self, entry_point: &Address, chain_id: u64) -> UserOperationHash {
         H256::from_slice(
             keccak256(
                 [
                     keccak256(self.pack_without_signature().deref()).to_vec(),
                     entry_point.encode(),
-                    chain_id.encode(),
+                    U256::from(chain_id).encode(),
                 ]
                 .concat(),
             )
@@ -176,7 +236,7 @@ impl UserOperation {
     /// Creates random user operation (for testing purposes)
     #[cfg(feature = "test-utils")]
     pub fn random() -> Self {
-        UserOperation::default()
+        UserOperationSigned::default()
             .sender(Address::random())
             .verification_gas_limit(100_000.into())
             .pre_verification_gas(21_000.into())
@@ -184,242 +244,8 @@ impl UserOperation {
     }
 }
 
-/// User operation hash
-#[derive(
-    Eq, Hash, PartialEq, Debug, Serialize, Deserialize, Clone, Copy, Default, PartialOrd, Ord,
-)]
-pub struct UserOperationHash(pub H256);
-
-impl From<H256> for UserOperationHash {
-    fn from(value: H256) -> Self {
-        Self(value)
-    }
-}
-
-impl From<UserOperationHash> for H256 {
-    fn from(value: UserOperationHash) -> Self {
-        value.0
-    }
-}
-
-impl From<[u8; 32]> for UserOperationHash {
-    fn from(value: [u8; 32]) -> Self {
-        Self(H256::from_slice(&value))
-    }
-}
-
-impl FromStr for UserOperationHash {
-    type Err = FromHexError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        H256::from_str(s).map(|h| h.into())
-    }
-}
-
-impl UserOperationHash {
-    #[inline]
-    pub const fn as_fixed_bytes(&self) -> &[u8; 32] {
-        &self.0 .0
-    }
-
-    #[inline]
-    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.0 .0
-    }
-
-    #[inline]
-    pub const fn repeat_byte(byte: u8) -> UserOperationHash {
-        UserOperationHash(H256([byte; 32]))
-    }
-
-    #[inline]
-    pub const fn zero() -> UserOperationHash {
-        UserOperationHash::repeat_byte(0u8)
-    }
-
-    pub fn assign_from_slice(&mut self, src: &[u8]) {
-        self.as_bytes_mut().copy_from_slice(src);
-    }
-
-    pub fn from_slice(src: &[u8]) -> Self {
-        let mut ret = Self::zero();
-        ret.assign_from_slice(src);
-        ret
-    }
-}
-
-/// User operation without signature
-#[derive(EthAbiCodec, EthAbiType)]
-pub struct UserOperationUnsigned {
-    pub sender: Address,
-    pub nonce: U256,
-    pub init_code: H256,
-    pub call_data: H256,
-    pub call_gas_limit: U256,
-    pub verification_gas_limit: U256,
-    pub pre_verification_gas: U256,
-    pub max_fee_per_gas: U256,
-    pub max_priority_fee_per_gas: U256,
-    pub paymaster_and_data: H256,
-}
-
-impl From<UserOperation> for UserOperationUnsigned {
-    fn from(value: UserOperation) -> Self {
-        Self {
-            sender: value.sender,
-            nonce: value.nonce,
-            init_code: keccak256(value.init_code.deref()).into(),
-            call_data: keccak256(value.call_data.deref()).into(),
-            call_gas_limit: value.call_gas_limit,
-            verification_gas_limit: value.verification_gas_limit,
-            pre_verification_gas: value.pre_verification_gas,
-            max_fee_per_gas: value.max_fee_per_gas,
-            max_priority_fee_per_gas: value.max_priority_fee_per_gas,
-            paymaster_and_data: keccak256(value.paymaster_and_data.deref()).into(),
-        }
-    }
-}
-
-/// Receipt of the user operation (returned from the RPC endpoint eth_getUserOperationReceipt)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserOperationReceipt {
-    #[serde(rename = "userOpHash")]
-    pub user_operation_hash: UserOperationHash,
-    #[serde(serialize_with = "as_checksum_addr")]
-    pub sender: Address,
-    pub nonce: U256,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub paymaster: Option<Address>,
-    pub actual_gas_cost: U256,
-    pub actual_gas_used: U256,
-    pub success: bool,
-    pub reason: String,
-    pub logs: Vec<Log>,
-    #[serde(rename = "receipt")]
-    pub tx_receipt: TransactionReceipt,
-}
-
-/// Struct that is returned from the RPC endpoint eth_getUserOperationByHash
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserOperationByHash {
-    pub user_operation: UserOperation,
-    #[serde(serialize_with = "as_checksum_addr")]
-    pub entry_point: Address,
-    pub transaction_hash: H256,
-    pub block_hash: H256,
-    pub block_number: U64,
-}
-
-/// User operation with all fields being optional
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserOperationPartial {
-    pub sender: Option<Address>,
-    pub nonce: Option<U256>,
-    pub init_code: Option<Bytes>,
-    pub call_data: Option<Bytes>,
-    pub call_gas_limit: Option<U256>,
-    pub verification_gas_limit: Option<U256>,
-    pub pre_verification_gas: Option<U256>,
-    pub max_fee_per_gas: Option<U256>,
-    pub max_priority_fee_per_gas: Option<U256>,
-    pub paymaster_and_data: Option<Bytes>,
-    pub signature: Option<Bytes>,
-}
-
-impl From<UserOperationPartial> for UserOperation {
-    fn from(user_operation: UserOperationPartial) -> Self {
-        Self {
-            sender: {
-                if let Some(sender) = user_operation.sender {
-                    sender
-                } else {
-                    Address::zero()
-                }
-            },
-            nonce: {
-                if let Some(nonce) = user_operation.nonce {
-                    nonce
-                } else {
-                    U256::zero()
-                }
-            },
-            init_code: {
-                if let Some(init_code) = user_operation.init_code {
-                    init_code
-                } else {
-                    Bytes::default()
-                }
-            },
-            call_data: {
-                if let Some(call_data) = user_operation.call_data {
-                    call_data
-                } else {
-                    Bytes::default()
-                }
-            },
-            call_gas_limit: {
-                if let Some(call_gas_limit) = user_operation.call_gas_limit {
-                    call_gas_limit
-                } else {
-                    U256::zero()
-                }
-            },
-            verification_gas_limit: {
-                if let Some(verification_gas_limit) = user_operation.verification_gas_limit {
-                    verification_gas_limit
-                } else {
-                    U256::zero()
-                }
-            },
-            pre_verification_gas: {
-                if let Some(pre_verification_gas) = user_operation.pre_verification_gas {
-                    pre_verification_gas
-                } else {
-                    U256::zero()
-                }
-            },
-            max_fee_per_gas: {
-                if let Some(max_fee_per_gas) = user_operation.max_fee_per_gas {
-                    max_fee_per_gas
-                } else {
-                    U256::zero()
-                }
-            },
-            max_priority_fee_per_gas: {
-                if let Some(max_priority_fee_per_gas) = user_operation.max_priority_fee_per_gas {
-                    max_priority_fee_per_gas
-                } else {
-                    U256::zero()
-                }
-            },
-            paymaster_and_data: {
-                if let Some(paymaster_and_data) = user_operation.paymaster_and_data {
-                    paymaster_and_data
-                } else {
-                    Bytes::default()
-                }
-            },
-            signature: {
-                if let Some(signature) = user_operation.signature {
-                    signature
-                } else {
-                    Bytes::default()
-                }
-            },
-        }
-    }
-}
-
-/// Gas estimations for user operation (returned from the RPC endpoint eth_estimateUserOperationGas)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserOperationGasEstimation {
-    pub pre_verification_gas: U256,
-    pub verification_gas_limit: U256,
-    pub call_gas_limit: U256,
-}
+/// This could be increased if we found bigger bytes, not sure about the proper value right now.
+const MAXIMUM_SSZ_BYTES_LENGTH: usize = 1024;
 
 fn btyes_to_list(
     value: &Bytes,
@@ -429,7 +255,7 @@ fn btyes_to_list(
         .map_err(|(data, _)| ssz_rs::SerializeError::MaximumEncodedLengthReached(data.len()))
 }
 
-impl ssz_rs::Serialize for UserOperation {
+impl ssz_rs::Serialize for UserOperationSigned {
     fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
         let mut serializer = ssz_rs::__internal::Serializer::default();
         serializer.with_element(&self.sender.0)?;
@@ -483,7 +309,7 @@ fn ssz_unpack_bytes(
     Ok((bytes_data, end - start))
 }
 
-impl ssz_rs::Deserialize for UserOperation {
+impl ssz_rs::Deserialize for UserOperationSigned {
     fn deserialize(encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
     where
         Self: Sized,
@@ -584,7 +410,7 @@ impl ssz_rs::Deserialize for UserOperation {
     }
 }
 
-impl ssz_rs::Serializable for UserOperation {
+impl ssz_rs::Serializable for UserOperationSigned {
     fn is_variable_size() -> bool {
         true
     }
@@ -593,26 +419,68 @@ impl ssz_rs::Serializable for UserOperation {
         0
     }
 }
+
+/// Receipt of the user operation (returned from the RPC endpoint eth_getUserOperationReceipt)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOperationReceipt {
+    #[serde(rename = "userOpHash")]
+    pub user_operation_hash: UserOperationHash,
+    #[serde(serialize_with = "as_checksum_addr")]
+    pub sender: Address,
+    pub nonce: U256,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paymaster: Option<Address>,
+    pub actual_gas_cost: U256,
+    pub actual_gas_used: U256,
+    pub success: bool,
+    pub reason: String,
+    pub logs: Vec<Log>,
+    #[serde(rename = "receipt")]
+    pub tx_receipt: TransactionReceipt,
+}
+
+/// Struct that is returned from the RPC endpoint eth_getUserOperationByHash
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOperationByHash {
+    pub user_operation: UserOperationSigned,
+    #[serde(serialize_with = "as_checksum_addr")]
+    pub entry_point: Address,
+    pub transaction_hash: H256,
+    pub block_hash: H256,
+    pub block_number: U64,
+}
+
+/// Gas estimations for user operation (returned from the RPC endpoint eth_estimateUserOperationGas)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOperationGasEstimation {
+    pub pre_verification_gas: U256,
+    pub verification_gas_limit: U256,
+    pub call_gas_limit: U256,
+}
+
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use std::str::FromStr;
 
     #[test]
-    fn user_operation_pack() {
+    fn user_operation_signed_pack() {
         let uos =  vec![
-            UserOperation::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
-            UserOperation::default().sender("0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap()).call_gas_limit(200_000.into()).verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_fee_per_gas(3_000_000_000_u64.into()).max_priority_fee_per_gas(1_000_000_000.into()).signature("0x7cb39607585dee8e297d0d7a669ad8c5e43975220b6773c10a138deadbc8ec864981de4b9b3c735288a217115fb33f8326a61ddabc60a534e3b5536515c70f931c".parse().unwrap()),
+            UserOperationSigned::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
+            UserOperationSigned::default().sender("0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap()).call_gas_limit(200_000.into()).verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_fee_per_gas(3_000_000_000_u64.into()).max_priority_fee_per_gas(1_000_000_000.into()).signature("0x7cb39607585dee8e297d0d7a669ad8c5e43975220b6773c10a138deadbc8ec864981de4b9b3c735288a217115fb33f8326a61ddabc60a534e3b5536515c70f931c".parse().unwrap()),
         ];
         assert_eq!(uos[0].pack(), "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000186a000000000000000000000000000000000000000000000000000000000000052080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".parse::<Bytes>().unwrap());
         assert_eq!(uos[1].pack(), "0x0000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000030d4000000000000000000000000000000000000000000000000000000000000186a0000000000000000000000000000000000000000000000000000000000000520800000000000000000000000000000000000000000000000000000000b2d05e00000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000417cb39607585dee8e297d0d7a669ad8c5e43975220b6773c10a138deadbc8ec864981de4b9b3c735288a217115fb33f8326a61ddabc60a534e3b5536515c70f931c00000000000000000000000000000000000000000000000000000000000000".parse::<Bytes>().unwrap());
     }
 
     #[test]
-    fn user_operation_pack_without_signature() {
+    fn user_operation_signed_pack_without_signature() {
         let uos =  vec![
-            UserOperation::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
-            UserOperation {
+            UserOperationSigned::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
+            UserOperationSigned {
                 sender: "0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap(),
                 nonce: 1.into(),
                 init_code: Bytes::default(),
@@ -631,10 +499,10 @@ mod tests {
     }
 
     #[test]
-    fn user_operation_hash() {
+    fn user_operation_signed_hash() {
         let uos =  vec![
-            UserOperation::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
-            UserOperation {
+            UserOperationSigned::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
+            UserOperationSigned {
                 sender: "0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap(),
                 nonce: U256::zero(),
                 init_code: "0x9406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
@@ -649,20 +517,14 @@ mod tests {
             },
         ];
         assert_eq!(
-            uos[0].hash(
-                &"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(),
-                &80_001.into()
-            ),
+            uos[0].hash(&"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(), 80_001),
             "0x95418c07086df02ff6bc9e8bdc150b380cb761beecc098630440bcec6e862702"
                 .parse::<H256>()
                 .unwrap()
                 .into()
         );
         assert_eq!(
-            uos[1].hash(
-                &"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(),
-                &80_001.into()
-            ),
+            uos[1].hash(&"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(), 80_001),
             "0x7c1b8c9df49a9e09ecef0f0fe6841d895850d29820f9a4b494097764085dcd7e"
                 .parse::<H256>()
                 .unwrap()
@@ -671,8 +533,8 @@ mod tests {
     }
 
     #[test]
-    fn user_operation_ssz() {
-        let uo = UserOperation {
+    fn user_operation_signed_ssz() {
+        let uo = UserOperationSigned {
             sender: "0x1F9090AAE28B8A3DCEADF281B0F12828E676C326".parse().unwrap(),
             nonce: 100.into(),
             init_code: "0x9406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
@@ -688,11 +550,11 @@ mod tests {
         let mut encoded = Vec::new();
         ssz_rs::Serialize::serialize(&uo, &mut encoded).unwrap();
         // generated by python codes
-        let expected_encode =Bytes::from_str("1f9090aae28b8a3dceadf281b0f12828e676c3266400000000000000000000000000000000000000000000000000000000000000e40000003c010000a086010000000000000000000000000000000000000000000000000000000000f483050000000000000000000000000000000000000000000000000000000000b4af000000000000000000000000000000000000000000000000000000000000dea5076500000000000000000000000000000000000000000000000000000000c0a5076500000000000000000000000000000000000000000000000000000000c0010000c10100009406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000b61d27f60000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c00000000000000000000000000000000000000000000000000005af3107a4000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000001febfd4657afe1f1c05c1ec65f3f9cc992a3ac083c424454ba61eab93152195e1400d74df01fc9fa53caadcb83a891d478b713016bcc0c64307c1ad3d7ea2e2d921b").unwrap().to_vec();
+        let expected_encode = Bytes::from_str("1f9090aae28b8a3dceadf281b0f12828e676c3266400000000000000000000000000000000000000000000000000000000000000e40000003c010000a086010000000000000000000000000000000000000000000000000000000000f483050000000000000000000000000000000000000000000000000000000000b4af000000000000000000000000000000000000000000000000000000000000dea5076500000000000000000000000000000000000000000000000000000000c0a5076500000000000000000000000000000000000000000000000000000000c0010000c10100009406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000b61d27f60000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c00000000000000000000000000000000000000000000000000005af3107a4000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000001febfd4657afe1f1c05c1ec65f3f9cc992a3ac083c424454ba61eab93152195e1400d74df01fc9fa53caadcb83a891d478b713016bcc0c64307c1ad3d7ea2e2d921b").unwrap().to_vec();
         assert_eq!(encoded, expected_encode);
 
         let uo_decode =
-            <UserOperation as ssz_rs::Deserialize>::deserialize(&expected_encode).unwrap();
+            <UserOperationSigned as ssz_rs::Deserialize>::deserialize(&expected_encode).unwrap();
 
         assert_eq!(uo_decode.sender, uo.sender);
         assert_eq!(uo_decode.nonce, uo.nonce);

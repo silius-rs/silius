@@ -16,7 +16,7 @@ use silius_mempool::{
     UserOperationsByEntity, UserOperationsBySender, WriteMap,
 };
 use silius_primitives::{
-    reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
+    reputation::ReputationEntry, simulation::CodeHash, UserOperationHash, UserOperationSigned,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -188,7 +188,7 @@ pub fn setup_database_mempool_reputation() -> (
 #[allow(clippy::type_complexity)]
 pub fn setup_memory_mempool_reputation() -> (
     Mempool<
-        Arc<RwLock<HashMap<UserOperationHash, silius_primitives::UserOperation>>>,
+        Arc<RwLock<HashMap<UserOperationHash, silius_primitives::UserOperationSigned>>>,
         Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
         Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
         Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
@@ -199,7 +199,7 @@ pub fn setup_memory_mempool_reputation() -> (
     >,
 ) {
     let mempool = Mempool::new(
-        Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+        Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
         Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
         Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
         Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),

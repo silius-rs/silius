@@ -96,6 +96,7 @@ pub mod types {
     impl From<silius_primitives::UserOperation> for UserOperation {
         fn from(user_operation: silius_primitives::UserOperation) -> Self {
             Self {
+                hash: Some(user_operation.hash.into()),
                 sender: Some(user_operation.sender.into()),
                 nonce: Some(user_operation.nonce.into()),
                 init_code: prost::bytes::Bytes::copy_from_slice(user_operation.init_code.as_ref()),
@@ -115,6 +116,98 @@ pub mod types {
 
     impl From<UserOperation> for silius_primitives::UserOperation {
         fn from(user_operation: UserOperation) -> Self {
+            Self {
+                hash: {
+                    if let Some(hash) = user_operation.hash {
+                        hash.into()
+                    } else {
+                        UserOperationHash::default()
+                    }
+                },
+                user_operation: silius_primitives::UserOperationSigned {
+                    sender: {
+                        if let Some(sender) = user_operation.sender {
+                            sender.into()
+                        } else {
+                            Address::zero()
+                        }
+                    },
+                    nonce: {
+                        if let Some(nonce) = user_operation.nonce {
+                            nonce.into()
+                        } else {
+                            U256::zero()
+                        }
+                    },
+                    init_code: user_operation.init_code.into(),
+                    call_data: user_operation.call_data.into(),
+                    call_gas_limit: {
+                        if let Some(call_gas_limit) = user_operation.call_gas_limit {
+                            call_gas_limit.into()
+                        } else {
+                            U256::zero()
+                        }
+                    },
+                    verification_gas_limit: {
+                        if let Some(verification_gas_limit) = user_operation.verification_gas_limit
+                        {
+                            verification_gas_limit.into()
+                        } else {
+                            U256::zero()
+                        }
+                    },
+                    pre_verification_gas: {
+                        if let Some(pre_verification_gas) = user_operation.pre_verification_gas {
+                            pre_verification_gas.into()
+                        } else {
+                            U256::zero()
+                        }
+                    },
+                    max_fee_per_gas: {
+                        if let Some(max_fee_per_gas) = user_operation.max_fee_per_gas {
+                            max_fee_per_gas.into()
+                        } else {
+                            U256::zero()
+                        }
+                    },
+                    max_priority_fee_per_gas: {
+                        if let Some(max_priority_fee_per_gas) =
+                            user_operation.max_priority_fee_per_gas
+                        {
+                            max_priority_fee_per_gas.into()
+                        } else {
+                            U256::zero()
+                        }
+                    },
+                    paymaster_and_data: user_operation.paymaster_and_data.into(),
+                    signature: user_operation.signature.into(),
+                },
+            }
+        }
+    }
+
+    impl From<silius_primitives::UserOperationSigned> for UserOperationSigned {
+        fn from(user_operation: silius_primitives::UserOperationSigned) -> Self {
+            Self {
+                sender: Some(user_operation.sender.into()),
+                nonce: Some(user_operation.nonce.into()),
+                init_code: prost::bytes::Bytes::copy_from_slice(user_operation.init_code.as_ref()),
+                call_data: prost::bytes::Bytes::copy_from_slice(user_operation.call_data.as_ref()),
+                call_gas_limit: Some(user_operation.call_gas_limit.into()),
+                verification_gas_limit: Some(user_operation.verification_gas_limit.into()),
+                pre_verification_gas: Some(user_operation.pre_verification_gas.into()),
+                max_fee_per_gas: Some(user_operation.max_fee_per_gas.into()),
+                max_priority_fee_per_gas: Some(user_operation.max_priority_fee_per_gas.into()),
+                paymaster_and_data: prost::bytes::Bytes::copy_from_slice(
+                    user_operation.paymaster_and_data.as_ref(),
+                ),
+                signature: prost::bytes::Bytes::copy_from_slice(user_operation.signature.as_ref()),
+            }
+        }
+    }
+
+    impl From<UserOperationSigned> for silius_primitives::UserOperationSigned {
+        fn from(user_operation: UserOperationSigned) -> Self {
             Self {
                 sender: {
                     if let Some(sender) = user_operation.sender {

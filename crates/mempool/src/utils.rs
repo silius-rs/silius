@@ -1,5 +1,5 @@
 use ethers::types::{Address, H256, U256};
-use silius_primitives::{simulation::CodeHash, UserOperation};
+use silius_primitives::{simulation::CodeHash, UserOperationSigned};
 use std::{collections::HashMap, ops::Deref};
 
 pub fn equal_code_hashes(hashes: &Vec<CodeHash>, hashes_prev: &Vec<CodeHash>) -> bool {
@@ -50,16 +50,16 @@ impl Default for Overhead {
 }
 
 impl Overhead {
-    /// Calculates the pre-verification gas of a [UserOperation](UserOperation)
-    /// The function first packs the [UserOperation](UserOperation) by calling the
+    /// Calculates the pre-verification gas of a [UserOperation](UserOperationSigned)
+    /// The function first packs the [UserOperation](UserOperationSigned) by calling the
     /// [pack](UserOperation::pack) method, then extracts the call data for gas calculation.
     ///
     /// # Arguments
-    /// `uo` - The [UserOperation](UserOperation) to calculate the pre-verification gas for
+    /// `uo` - The [UserOperation](UserOperationSigned) to calculate the pre-verification gas for
     ///
     /// # Returns
-    /// The pre-verification gas of the [UserOperation](UserOperation)
-    pub fn calculate_pre_verification_gas(&self, uo: &UserOperation) -> U256 {
+    /// The pre-verification gas of the [UserOperation](UserOperationSigned)
+    pub fn calculate_pre_verification_gas(&self, uo: &UserOperationSigned) -> U256 {
         let uo_pack = uo.pack();
 
         let call_data = uo_pack.deref().iter().fold(U256::zero(), |acc, &x| {
@@ -157,13 +157,13 @@ pub mod tests {
     use ethers::types::{Address, Bytes, H256, U256};
     use silius_primitives::{
         reputation::{ReputationEntry, Status},
-        UserOperation, UserOperationHash,
+        UserOperation, UserOperationHash, UserOperationSigned,
     };
 
     #[test]
     fn pre_verification_gas_calculation() {
         let gas_oh = Overhead::default();
-        let uo = UserOperation {
+        let uo = UserOperationSigned {
             sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::zero(),
             init_code: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b3bf2c3e70000000000000000000000001d9a2cb3638c2fc8bf9c01d088b79e75cd188b17000000000000000000000000789d9058feecf1948af429793e7f1eb4a75db2220000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
@@ -183,7 +183,7 @@ pub mod tests {
     #[test]
     fn pre_verification_gas_calculation_with_large_user_operation() {
         let gas_oh = Overhead::default();
-        let uo = UserOperation {
+        let uo = UserOperationSigned {
             sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::max_value(),
             init_code: Bytes::from(vec![255; 1024]), // Large init_code
@@ -211,7 +211,7 @@ pub mod tests {
             bundle_size: U256::from(1),
             sig_size: U256::from(65),
         };
-        let uo = UserOperation {
+        let uo = UserOperationSigned {
             sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::max_value(),
             init_code: Bytes::from(vec![255; 1024]), // Large init_code
@@ -242,7 +242,7 @@ pub mod tests {
             sig_size: U256::max_value(),
         };
 
-        let uo = UserOperation {
+        let uo = UserOperationSigned {
             sender: Address::default(),
             nonce: U256::max_value(),
             init_code: Bytes::from(vec![255; 1024]), // Large init_code
@@ -310,42 +310,58 @@ pub mod tests {
         Z: UserOperationCodeHashAct,
     {
         let ep = Address::random();
-        let chain_id = U256::from(5);
+        let chain_id = 5_u64;
         let senders = vec![Address::random(), Address::random(), Address::random()];
 
-        let mut uo: UserOperation;
+        let mut uo: UserOperationSigned;
         let mut uo_hash: UserOperationHash = Default::default();
         for i in 0..2 {
-            uo = UserOperation {
+            uo = UserOperationSigned {
                 sender: senders[0],
                 nonce: U256::from(i),
-                ..UserOperation::random()
+                ..UserOperationSigned::random()
             };
-            uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
+            uo_hash = uo.hash(&ep, chain_id);
 
-            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
+            assert_eq!(
+                mempool
+                    .add(UserOperation::from_user_operation_signed(uo_hash, uo.clone()))
+                    .unwrap(),
+                uo_hash
+            );
+            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap().user_operation, uo);
 
-            uo = UserOperation {
+            uo = UserOperationSigned {
                 sender: senders[1],
                 nonce: U256::from(i),
-                ..UserOperation::random()
+                ..UserOperationSigned::random()
             };
+            uo_hash = uo.hash(&ep, chain_id);
 
-            uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
-
-            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
+            assert_eq!(
+                mempool
+                    .add(UserOperation::from_user_operation_signed(uo_hash, uo.clone()))
+                    .unwrap(),
+                uo_hash
+            );
+            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap().user_operation, uo);
         }
 
         for i in 0..3 {
-            uo = UserOperation {
+            uo = UserOperationSigned {
                 sender: senders[2],
                 nonce: U256::from(i),
-                ..UserOperation::random()
+                ..UserOperationSigned::random()
             };
+            uo_hash = uo.hash(&ep, chain_id);
 
-            uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
-
-            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap(), uo);
+            assert_eq!(
+                mempool
+                    .add(UserOperation::from_user_operation_signed(uo_hash, uo.clone()))
+                    .unwrap(),
+                uo_hash
+            );
+            assert_eq!(mempool.get(&uo_hash).unwrap().unwrap().user_operation, uo);
         }
 
         assert_eq!(mempool.get_all().unwrap().len(), 7);
@@ -366,14 +382,20 @@ pub mod tests {
         assert_eq!(mempool.get_all_by_sender(&senders[0]).len(), 0);
 
         for i in 0..3 {
-            uo = UserOperation {
+            uo = UserOperationSigned {
                 sender: senders[2],
                 nonce: U256::from(i),
                 max_priority_fee_per_gas: U256::from(i + 1),
-                ..UserOperation::random()
+                ..UserOperationSigned::random()
             };
+            uo_hash = uo.hash(&ep, chain_id);
 
-            mempool.add(uo.clone(), &ep, &chain_id).unwrap();
+            assert_eq!(
+                mempool
+                    .add(UserOperation::from_user_operation_signed(uo_hash, uo.clone()))
+                    .unwrap(),
+                uo_hash
+            );
         }
 
         let sorted = mempool.get_sorted().unwrap();
@@ -383,13 +405,17 @@ pub mod tests {
         assert_eq!(sorted.len(), 3);
         assert_eq!(mempool.clear(), ());
 
-        let uo = UserOperation {
+        uo = UserOperationSigned {
             sender: Address::random(),
             nonce: U256::from(0),
             max_priority_fee_per_gas: U256::from(1),
-            ..UserOperation::random()
+            ..UserOperationSigned::random()
         };
-        let uo_hash = mempool.add(uo.clone(), &ep, &chain_id).unwrap();
+        uo_hash = uo.hash(&ep, chain_id);
+        assert_eq!(
+            mempool.add(UserOperation::from_user_operation_signed(uo_hash, uo.clone())).unwrap(),
+            uo_hash
+        );
         let code_hashes = vec![CodeHash { address: Address::random(), hash: H256::random() }];
         mempool.set_code_hashes(&uo_hash, code_hashes.clone()).unwrap();
 

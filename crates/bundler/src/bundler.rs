@@ -160,9 +160,7 @@ where
         info!(
             "Creating a new bundle with {} user operations: {:?}",
             uos.len(),
-            uos.iter()
-                .map(|uo| uo.hash(&self.entry_point, &self.chain.id().into()))
-                .collect::<Vec<UserOperationHash>>()
+            uos.iter().map(|uo| uo.hash).collect::<Vec<UserOperationHash>>()
         );
         trace!("Bundle content: {uos:?}");
 
@@ -177,6 +175,7 @@ where
     ///
     /// # Arguments
     /// * `client` - A provider that implements [Middleware](Middleware) trait
+    /// * `uos` - Vector of [UserOperations](UserOperation)
     ///
     /// # Returns
     /// * `TypedTransaction` - A [TypedTransaction](TypedTransaction)
@@ -200,8 +199,12 @@ where
             self.beneficiary
         };
 
-        let mut tx: TypedTransaction =
-            ep.handle_ops(uos.clone().into_iter().map(Into::into).collect(), beneficiary).tx;
+        let mut tx: TypedTransaction = ep
+            .handle_ops(
+                uos.clone().into_iter().map(|uo| uo.user_operation.into()).collect(),
+                beneficiary,
+            )
+            .tx;
 
         match Chain::from_id(self.chain.id()).named() {
             // Mumbai
@@ -520,7 +523,7 @@ mod test {
 
         let eth_client = Arc::new(Provider::<Ws>::connect(anvil.ws_endpoint()).await?);
         let ep_address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse::<Address>()?;
-        let wallet = Wallet::from_phrase(KEY_PHRASE, &anvil.chain_id().into(), true)?;
+        let wallet = Wallet::from_phrase(KEY_PHRASE, anvil.chain_id(), true)?;
 
         // Create a bundler and connect to the Anvil
         let bundler = Bundler::new(
@@ -558,7 +561,7 @@ mod test {
             "{}/.silius/0x129D197b2a989C6798601A49D89a4AEC822A17a3",
             std::env::var("HOME").unwrap()
         );
-        let wallet = Wallet::from_file(dir.into(), &U256::from(5), true)?;
+        let wallet = Wallet::from_file(dir.into(), 5, true)?;
 
         let bundler = Bundler::new(
             wallet.clone(),

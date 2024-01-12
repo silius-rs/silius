@@ -32,7 +32,7 @@ use silius_primitives::{
     provider::BlockStream,
     reputation::ReputationEntry,
     simulation::CodeHash,
-    UserOperation, UserOperationHash, Wallet,
+    UserOperationHash, UserOperationSigned, Wallet,
 };
 use silius_rpc::{
     debug_api::{DebugApiServer, DebugApiServerImpl},
@@ -106,17 +106,17 @@ where
         eth_client_version,
     );
 
-    let chain_id = eth_client.get_chainid().await?;
-    let chain_conn = Chain::from(chain_id.as_u64());
+    let chain_id = eth_client.get_chainid().await?.as_u64();
+    let chain_conn = Chain::from(chain_id);
 
     let wallet: Wallet;
     if args.send_bundle_mode == SendStrategy::Flashbots {
-        wallet = Wallet::from_file(args.mnemonic_file.into(), &chain_id, true)
+        wallet = Wallet::from_file(args.mnemonic_file.into(), chain_id, true)
             .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
         info!("Wallet Signer {:?}", wallet.signer);
         info!("Flashbots Signer {:?}", wallet.flashbots_signer);
     } else {
-        wallet = Wallet::from_file(args.mnemonic_file.into(), &chain_id, false)
+        wallet = Wallet::from_file(args.mnemonic_file.into(), chain_id, false)
             .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
         info!("{:?}", wallet.signer);
     }
@@ -190,7 +190,7 @@ where
                 args.min_priority_fee_per_gas,
             );
             let mempool = Mempool::new(
-                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
@@ -284,7 +284,7 @@ where
                 args.min_priority_fee_per_gas,
             );
             let mempool = Mempool::new(
-                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+                Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
                 Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
@@ -473,11 +473,11 @@ pub fn create_wallet(args: CreateWalletArgs) -> eyre::Result<()> {
     let path = unwrap_path_or_home(args.output_path)?;
 
     if args.flashbots_key {
-        let wallet = Wallet::build_random(path, &args.chain_id, true)?;
+        let wallet = Wallet::build_random(path, args.chain_id, true)?;
         info!("Wallet signer {:?}", wallet.signer);
         info!("Flashbots signer {:?}", wallet.flashbots_signer);
     } else {
-        let wallet = Wallet::build_random(path, &args.chain_id, false)?;
+        let wallet = Wallet::build_random(path, args.chain_id, false)?;
         info!("Wallet signer {:?}", wallet.signer);
     }
 

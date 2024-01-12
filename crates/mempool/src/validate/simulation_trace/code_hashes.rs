@@ -100,17 +100,15 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
         let hashes: &mut Vec<CodeHash> = &mut vec![];
         self.get_code_hashes(addrs, hashes, &helper.entry_point.eth_client()).await?;
 
-        let uo_hash = uo.hash(&helper.entry_point.address(), &helper.chain.id().into());
-
-        match mempool.has_code_hashes(&uo_hash) {
+        match mempool.has_code_hashes(&uo.hash) {
             Ok(true) => {
                 // 2nd simulation
                 let hashes_prev = mempool
-                    .get_code_hashes(&uo_hash)
+                    .get_code_hashes(&uo.hash)
                     .map_err(|err| SimulationError::Other { inner: err.to_string() })?;
                 debug!(
                     "Veryfing {:?} code hashes in 2nd simulation: {:?} vs {:?}",
-                    uo_hash, hashes, hashes_prev
+                    uo.hash, hashes, hashes_prev
                 );
                 if !equal_code_hashes(hashes, &hashes_prev) {
                     return Err(SimulationError::CodeHashes {});

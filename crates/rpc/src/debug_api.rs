@@ -4,7 +4,7 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use silius_primitives::{
     reputation::{ReputationEntry, StakeInfoResponse},
-    BundlerMode, UserOperation,
+    BundlerMode, UserOperationRequest,
 };
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -46,9 +46,10 @@ pub trait DebugApi {
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<Vec<UserOperation>>` - A vector of [UserOperations](UserOperation) returned
+    /// * `RpcResult<Vec<UserOperation>>` - A vector of [UserOperations](UserOperationRequest)
+    ///   returned
     #[method(name = "dumpMempool")]
-    async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperation>>;
+    async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperationRequest>>;
 
     /// Set the reputations for the given array of [ReputationEntry](ReputationEntry)
     ///

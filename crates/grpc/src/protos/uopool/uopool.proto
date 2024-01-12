@@ -83,7 +83,7 @@ message UserOperationHashRequest{
 }
 
 message GetUserOperationByHashResponse{
-    types.UserOperation user_operation = 1;
+    types.UserOperationSigned user_operation = 1;
     types.H160 entry_point = 2;
     types.H256 transaction_hash = 3;
     types.H256 block_hash = 4;
