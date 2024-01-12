@@ -97,7 +97,7 @@ where
         p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
         Self {
-            id: mempool_id(&entry_point.address(), &chain.id().into()),
+            id: mempool_id(&entry_point.address(), chain.id()),
             entry_point,
             validator,
             mempool,
@@ -220,10 +220,7 @@ where
                 {
                     self.remove_user_operation_by_entity(&address);
                 }
-                return Err(MempoolError {
-                    hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
-                    kind: err.into(),
-                });
+                return Err(MempoolError { hash: uo.hash, kind: err.into() });
             }
         };
 
@@ -234,7 +231,7 @@ where
             sd.unbounded_send((uo.clone(), res.verified_block))
                 .expect("Failed to send user operation to publish channel")
         };
-        match self.mempool.add(uo.clone(), &self.entry_point.address(), &self.chain.id().into()) {
+        match self.mempool.add(uo.clone()) {
             Ok(uo_hash) => {
                 // TODO: find better way to do it atomically
                 if let Some(code_hashes) = res.code_hashes {
@@ -263,10 +260,7 @@ where
 
                 Ok(uo_hash)
             }
-            Err(e) => Err(MempoolError {
-                hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
-                kind: e,
-            }),
+            Err(e) => Err(MempoolError { hash: uo.hash, kind: e }),
         }
     }
 
@@ -310,8 +304,6 @@ where
                 continue;
             }
 
-            let uo_hash = uo.hash(&self.entry_point.address(), &self.chain.id().into());
-
             let p_opt = get_address(&uo.paymaster_and_data.0);
             let f_opt = get_address(&uo.init_code.0);
 
@@ -329,9 +321,10 @@ where
 
             match (p_st, f_st) {
                 (Status::BANNED, _) | (_, Status::BANNED) => {
-                    self.mempool.remove(&uo_hash).map_err(|err| {
+                    self.mempool.remove(&uo.hash).map_err(|err| {
                         format_err!(
-                            "Removing a banned user operation {uo_hash:?} failed with error: {err:?}",
+                            "Removing a banned user operation {:?} failed with error: {err:?}",
+                            uo.hash,
                         )
                     })?;
                     continue;
@@ -355,7 +348,7 @@ where
                         UserOperationValidatorMode::SimulationTrace,
                 )
                 .await;
-            debug!("Second validation for userop {:?} result: {:?}", uo_hash, val_out);
+            debug!("Second validation for userop {:?} result: {:?}", uo.hash, val_out);
 
             match val_out {
                 Ok(val_out) => {
@@ -406,9 +399,9 @@ where
                     gas_total = gas_total_new;
                 }
                 Err(_) => {
-                    self.mempool.remove(&uo_hash).map_err(|err| {
+                    self.mempool.remove(&uo.hash).map_err(|err| {
                         format_err!(
-                            "Removing a user operation {uo_hash:?} with 2nd failed simulation failed with error: {err:?}",
+                            "Removing a user operation {:?} with 2nd failed simulation failed with error: {err:?}", uo.hash,
                         )
                     })?;
                     continue;
@@ -459,33 +452,27 @@ where
                 UserOperationValidatorMode::SimulationTrace.into(),
             )
             .await
-            .map_err(|err| MempoolError {
-                hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
-                kind: err.into(),
-            })?;
+            .map_err(|err| MempoolError { hash: uo.hash, kind: err.into() })?;
 
-        match self.entry_point.simulate_execution(uo.clone()).await {
+        match self.entry_point.simulate_execution(uo.user_operation.clone()).await {
             Ok(_) => {}
             Err(err) => {
                 return Err(MempoolError {
-                    hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+                    hash: uo.hash,
                     kind: SimulationError::Execution { inner: err.to_string() }.into(),
                 })
             }
         }
 
-        let exec_res = match self.entry_point.simulate_handle_op(uo.clone()).await {
+        let exec_res = match self.entry_point.simulate_handle_op(uo.user_operation.clone()).await {
             Ok(res) => res,
             Err(err) => {
-                return Err(MempoolError {
-                    hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
-                    kind: SimulationError::from(err).into(),
-                })
+                return Err(MempoolError { hash: uo.hash, kind: SimulationError::from(err).into() })
             }
         };
 
         let base_fee_per_gas = self.base_fee_per_gas().await.map_err(|err| MempoolError {
-            hash: uo.hash(&self.entry_point.address(), &self.chain.id().into()),
+            hash: uo.hash,
             kind: MempoolErrorKind::Provider { inner: err.to_string() },
         })?;
         let call_gas_limit = calculate_call_gas_limit(

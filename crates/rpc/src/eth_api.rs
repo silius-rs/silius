@@ -2,8 +2,8 @@ pub use crate::eth::EthApiServerImpl;
 use ethers::types::{Address, U64};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use silius_primitives::{
-    UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
-    UserOperationPartial, UserOperationReceipt,
+    UserOperationByHash, UserOperationGasEstimation, UserOperationHash, UserOperationReceipt,
+    UserOperationRequest,
 };
 
 /// The ERC-4337 `eth` namespace RPC methods trait
@@ -27,7 +27,7 @@ pub trait EthApi {
     /// Send a [UserOperation](UserOperation).
     ///
     /// # Arguments
-    /// * `user_operation: UserOperation` - The [UserOperation](UserOperation) to be sent.
+    /// * `user_operation: UserOperation` - The [UserOperation](UserOperationRequest) to be sent.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
@@ -35,7 +35,7 @@ pub trait EthApi {
     #[method(name = "sendUserOperation")]
     async fn send_user_operation(
         &self,
-        user_operation: UserOperation,
+        user_operation: UserOperationRequest,
         entry_point: Address,
     ) -> RpcResult<UserOperationHash>;
 
@@ -44,8 +44,8 @@ pub trait EthApi {
     /// See [How ERC-4337 Gas Estimation Works](https://www.alchemy.com/blog/erc-4337-gas-estimation).
     ///
     /// # Arguments
-    /// * `user_operation: [UserOperationPartial](UserOperationPartial)` - A [partial user
-    ///   operation](UserOperationPartial) for which to estimate the gas.
+    /// * `user_operation: [UserOperation](UserOperationRequest)` - User operation for which to
+    ///   estimate the gas.
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
@@ -54,7 +54,7 @@ pub trait EthApi {
     #[method(name = "estimateUserOperationGas")]
     async fn estimate_user_operation_gas(
         &self,
-        user_operation: UserOperationPartial,
+        user_operation: UserOperationRequest,
         entry_point: Address,
     ) -> RpcResult<UserOperationGasEstimation>;
 

@@ -1,12 +1,12 @@
 use super::utils::{
-    WrapAddress, WrapCodeHashVec, WrapReputationEntry, WrapUserOpSet, WrapUserOperation,
-    WrapUserOperationHash,
+    WrapAddress, WrapCodeHashVec, WrapReputationEntry, WrapUserOpSet, WrapUserOperationHash,
+    WrapUserOperationSigned,
 };
 use reth_db::{table, TableType};
 
 table!(
     /// Stores the user operations
-    ( UserOperations ) WrapUserOperationHash | WrapUserOperation
+    ( UserOperations ) WrapUserOperationHash | WrapUserOperationSigned
 );
 
 table!(

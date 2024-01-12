@@ -7,7 +7,7 @@ use ethers::{
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use serde::{Deserialize, Serialize};
 use silius_primitives::{
-    reputation::ReputationEntry, simulation::CodeHash, UserOperation, UserOperationHash,
+    reputation::ReputationEntry, simulation::CodeHash, UserOperationHash, UserOperationSigned,
 };
 use std::{collections::HashSet, fmt::Debug};
 
@@ -108,7 +108,7 @@ construct_wrap_hash!(Address, WrapAddress, 20);
 construct_wrap_hash!(UserOperationHash, WrapUserOperationHash, 32);
 
 construct_wrap_struct!(CodeHash, WrapCodeHash);
-construct_wrap_struct!(UserOperation, WrapUserOperation);
+construct_wrap_struct!(UserOperationSigned, WrapUserOperationSigned);
 construct_wrap_struct!(ReputationEntry, WrapReputationEntry);
 
 impl<'de> Decoder<'de> for WrapUserOperationHash {

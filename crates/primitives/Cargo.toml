@@ -26,7 +26,7 @@ futures-util = { workspace = true }
 tokio = { workspace = true }
 
 # misc
-educe = { version = "0.5.9", features = ["Debug", "Default"] }
+derive_more = "0.99.17"
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
 lazy_static = { workspace = true }

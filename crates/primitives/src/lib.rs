@@ -19,7 +19,7 @@ pub use mempool::Mode as UoPoolMode;
 pub use p2p::{PooledUserOps, UserOperationsWithEntryPoint};
 pub use user_operation::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
-    UserOperationPartial, UserOperationReceipt,
+    UserOperationReceipt, UserOperationRequest, UserOperationSigned,
 };
 pub use utils::get_address;
 pub use wallet::Wallet;

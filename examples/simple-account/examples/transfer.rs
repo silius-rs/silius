@@ -10,7 +10,7 @@ use examples_simple_account::{
 };
 use reqwest;
 use silius_contracts::EntryPoint;
-use silius_primitives::{constants::entry_point::ADDRESS, UserOperation, Wallet as UoWallet};
+use silius_primitives::{constants::entry_point::ADDRESS, UserOperationSigned, Wallet as UoWallet};
 use silius_tests::common::gen::SimpleAccountFactory;
 use std::{env, sync::Arc, time::Duration};
 
@@ -59,7 +59,7 @@ async fn main() -> eyre::Result<()> {
         let execution =
             SimpleAccountExecute::new(address, parse_ether(TRANSFER_VALUE)?, Bytes::default());
 
-        let user_op = UserOperation {
+        let user_op = UserOperationSigned {
             sender: address,
             nonce,
             init_code: Bytes::default(),
@@ -72,12 +72,12 @@ async fn main() -> eyre::Result<()> {
             paymaster_and_data: Bytes::new(),
             signature: Bytes::default(),
         };
-        let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), &chain_id.into(), false)?;
+        let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), chain_id, false)?;
         let user_op = uo_wallet
-            .sign_uo(&user_op, &ADDRESS.to_string().parse::<Address>()?, &chain_id.into())
+            .sign_user_operation(&user_op, &ADDRESS.to_string().parse::<Address>()?, chain_id)
             .await?;
 
-        let value = serde_json::to_value(&user_op).unwrap();
+        let value = serde_json::to_value(&user_op.user_operation).unwrap();
 
         let req_body = Request {
             jsonrpc: "2.0".into(),
@@ -98,23 +98,26 @@ async fn main() -> eyre::Result<()> {
         let v = serde_json::from_str::<Response<EstimateResult>>(&res)?;
         println!("json: {:?}", v);
 
-        let user_op = UserOperation {
+        let user_op = UserOperationSigned {
             pre_verification_gas: v.result.pre_verification_gas.saturating_add(U256::from(1000)),
             verification_gas_limit: v.result.verification_gas_limit.saturating_mul(U256::from(2)),
             call_gas_limit: v.result.call_gas_limit.saturating_mul(U256::from(2)),
             max_priority_fee_per_gas: priority_fee,
             max_fee_per_gas: gas_price,
-            ..user_op
+            ..user_op.user_operation
         };
         let user_op = uo_wallet
-            .sign_uo(&user_op, &ADDRESS.to_string().parse::<Address>()?, &chain_id.into())
+            .sign_user_operation(&user_op, &ADDRESS.to_string().parse::<Address>()?, chain_id)
             .await?;
 
         let send_body = Request {
             jsonrpc: "2.0".into(),
             id: 1,
             method: "eth_sendUserOperation".into(),
-            params: vec![serde_json::to_value(&user_op).unwrap(), ADDRESS.to_string().into()],
+            params: vec![
+                serde_json::to_value(&user_op.user_operation).unwrap(),
+                ADDRESS.to_string().into(),
+            ],
         };
         let post =
             reqwest::Client::builder().build()?.post(bundler_url).json(&send_body).send().await?;

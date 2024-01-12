@@ -34,7 +34,7 @@ use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
     reputation::ReputationEntry,
     simulation::CodeHash,
-    UserOperation, UserOperationHash,
+    UserOperation, UserOperationHash, UserOperationSigned,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -54,6 +54,7 @@ where
 {
     pub client: Arc<M>,
     pub _geth: GethInstance,
+    pub chain_id: u64,
     pub entry_point: DeployedContract<EntryPointContract<M>>,
     pub paymaster: DeployedContract<TestOpcodesAccount<M>>,
     pub opcodes_factory: DeployedContract<TestOpcodesAccountFactory<M>>,
@@ -76,7 +77,7 @@ type DatabaseContext = TestContext<
 
 type MemoryContext = TestContext<
     ClientType,
-    Arc<RwLock<HashMap<UserOperationHash, UserOperation>>>,
+    Arc<RwLock<HashMap<UserOperationHash, UserOperationSigned>>>,
     Arc<RwLock<HashMap<Address, HashSet<UserOperationHash>>>>,
     Arc<RwLock<HashMap<Address, HashSet<UserOperationHash>>>>,
     Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
@@ -156,6 +157,7 @@ async fn setup_database() -> eyre::Result<DatabaseContext> {
     Ok(DatabaseContext {
         client: client.clone(),
         _geth,
+        chain_id,
         entry_point: ep,
         paymaster,
         opcodes_factory,
@@ -179,6 +181,7 @@ async fn setup_memory() -> eyre::Result<MemoryContext> {
     Ok(MemoryContext {
         client: client.clone(),
         _geth,
+        chain_id,
         entry_point: ep,
         paymaster,
         opcodes_factory,
@@ -227,7 +230,7 @@ async fn create_test_user_operation<M, T, Y, X, Z, H, R>(
     init_code: Bytes,
     init_func: Bytes,
     factory_address: Address,
-) -> eyre::Result<UserOperation>
+) -> eyre::Result<UserOperationSigned>
 where
     M: Middleware + 'static,
     T: UserOperationAct,
@@ -262,7 +265,7 @@ where
 
     let sender = Address::from_slice(address);
 
-    Ok(UserOperation {
+    Ok(UserOperationSigned {
         sender,
         nonce: U256::zero(),
         init_code,
@@ -281,7 +284,7 @@ fn existing_storage_account_user_operation<M, T, Y, X, Z, H, R>(
     context: &TestContext<M, T, Y, X, Z, H, R>,
     validate_rule: String,
     pm_rule: String,
-) -> UserOperation
+) -> UserOperationSigned
 where
     M: Middleware + 'static,
     T: UserOperationAct,
@@ -296,7 +299,7 @@ where
     paymaster_and_data.extend_from_slice(pm_rule.as_bytes());
 
     let sig = Bytes::from(validate_rule.as_bytes().to_vec());
-    UserOperation {
+    UserOperationSigned {
         sender: context.storage_account.address,
         nonce: U256::zero(),
         init_code: Bytes::default(),
@@ -313,7 +316,7 @@ where
 
 async fn validate<M, T, Y, X, Z, H, R>(
     context: &TestContext<M, T, Y, X, Z, H, R>,
-    uo: UserOperation,
+    uo: UserOperationSigned,
 ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
 where
     M: Middleware + 'static,
@@ -327,7 +330,10 @@ where
     context
         .validator
         .validate_user_operation(
-            &uo,
+            &UserOperation::from_user_operation_signed(
+                uo.hash(&context.entry_point.address, context.chain_id),
+                uo.clone(),
+            ),
             &context.mempool,
             &context.reputation,
             UserOperationValidatorMode::Simulation | UserOperationValidatorMode::SimulationTrace,
@@ -663,7 +669,7 @@ macro_rules! fail_with_unstaked_paymaster_returning_context {
             paymaster_and_data.extend_from_slice(pm.address.as_bytes());
             paymaster_and_data.extend_from_slice("postOp-context".as_bytes());
 
-            let uo = UserOperation {
+            let uo = UserOperationSigned {
                 sender: acct.address,
                 nonce: U256::zero(),
                 init_code: Bytes::default(),
@@ -705,7 +711,7 @@ macro_rules! fail_with_validation_recursively_calls_handle_ops {
             let acct = deploy_test_recursion_account(c.client.clone(), c.entry_point.address)
                 .await
                 .expect("deploy succeed");
-            let uo = UserOperation {
+            let uo = UserOperationSigned {
                 sender: acct.address,
                 nonce: U256::zero(),
                 init_code: Bytes::default(),

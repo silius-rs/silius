@@ -16,7 +16,7 @@ use silius_grpc::{
 use silius_primitives::{
     constants::bundler::BUNDLE_INTERVAL,
     reputation::{ReputationEntry, StakeInfoResponse},
-    BundlerMode, UserOperation,
+    BundlerMode, UserOperation, UserOperationRequest,
 };
 use tonic::Request;
 
@@ -77,21 +77,25 @@ impl DebugApiServer for DebugApiServerImpl {
     }
 
     /// Sending an [GetAllRequest](GetAllRequest) to the UoPool gRPC server
-    /// to get all of the [UserOperation](UserOperation) in the mempool.
+    /// to get all of the [UserOperation](UserOperationRequest) in the mempool.
     ///
     /// # Arguments
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<Vec<UserOperation>>` - An array of [UserOperation](UserOperation)
-    async fn dump_mempool(&self, ep: Address) -> RpcResult<Vec<UserOperation>> {
+    /// * `RpcResult<Vec<UserOperation>>` - An array of [UserOperation](UserOperationRequest)
+    async fn dump_mempool(&self, ep: Address) -> RpcResult<Vec<UserOperationRequest>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
         let req = Request::new(GetAllRequest { ep: Some(ep.into()) });
 
         let res = uopool_grpc_client.get_all(req).await.map_err(JsonRpcError::from)?.into_inner();
 
-        let mut uos: Vec<UserOperation> = res.uos.iter().map(|uo| uo.clone().into()).collect();
+        let mut uos: Vec<UserOperationRequest> = res
+            .uos
+            .iter()
+            .map(|uo| UserOperation::from(uo.clone()).user_operation.into())
+            .collect();
         uos.sort_by(|a, b| a.nonce.cmp(&b.nonce));
         Ok(uos)
     }

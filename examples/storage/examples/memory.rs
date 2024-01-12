@@ -13,7 +13,7 @@ use silius_primitives::{
     provider::create_http_provider,
     reputation::ReputationEntry,
     simulation::CodeHash,
-    UserOperation, UserOperationHash,
+    UserOperationHash, UserOperationSigned,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -33,7 +33,7 @@ async fn main() -> eyre::Result<()> {
         let chain = Chain::dev();
         let entry_point = EntryPoint::new(provider.clone(), ep);
         let mempool = Mempool::new(
-            Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperation>::default())),
+            Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
             Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
             Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
             Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),

@@ -26,6 +26,21 @@ message SupportedEntryPoint {
 }
 
 message UserOperation {
+    types.H256 hash = 1;
+    types.H160 sender = 2;
+    PbU256 nonce = 3;
+    bytes init_code = 4;
+    bytes call_data = 5;
+    PbU256 call_gas_limit = 6;
+    PbU256 verification_gas_limit = 7;
+    PbU256 pre_verification_gas = 8;
+    PbU256 max_fee_per_gas = 9;
+    PbU256 max_priority_fee_per_gas = 10;
+    bytes paymaster_and_data = 11;
+    bytes signature = 12;
+}
+
+message UserOperationSigned {
     types.H160 sender = 1;
     PbU256 nonce = 2;
     bytes init_code = 3;

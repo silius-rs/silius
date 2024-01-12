@@ -13,7 +13,7 @@ use ethers::{
 };
 use silius_contracts::EntryPoint;
 use silius_mempool::{validate::validator::new_canonical, UoPool};
-use silius_primitives::{UserOperation, Wallet as UoWallet};
+use silius_primitives::{UserOperationSigned, Wallet as UoWallet};
 use std::sync::Arc;
 
 async fn setup_basic() -> eyre::Result<(
@@ -92,7 +92,7 @@ macro_rules! estimate_gas_with_init_code {
 
             let (_gas_price, priority_fee) = client.estimate_eip1559_fees(None).await?;
             let nonce = client.get_transaction_count(address, None).await?;
-            let user_op = UserOperation {
+            let user_op = UserOperationSigned {
                 sender: address,
                 nonce,
                 init_code: Bytes::from(init_code),
@@ -106,9 +106,9 @@ macro_rules! estimate_gas_with_init_code {
                 signature: Bytes::default(),
             };
 
-            let uo_wallet = UoWallet::from_phrase(SEED_PHRASE, &chain_id.into(), false)?;
+            let uo_wallet = UoWallet::from_phrase(SEED_PHRASE, chain_id, false)?;
             let user_op =
-                uo_wallet.sign_uo(&user_op, &entry_point.address, &chain_id.into()).await?;
+                uo_wallet.sign_user_operation(&user_op, &entry_point.address, chain_id).await?;
 
             let _ = uopool.estimate_user_operation_gas(&user_op).await.expect("estimate done");
             Ok(())

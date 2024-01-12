@@ -92,7 +92,7 @@ where
         &self,
         ep: &Address,
     ) -> tonic::Result<StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>> {
-        let m_id = mempool_id(ep, &U256::from(self.chain.id()));
+        let m_id = mempool_id(ep, self.chain.id());
         self.uopools
             .read()
             .get(&m_id)
@@ -425,7 +425,7 @@ where
             let mut entrypoint_channels: EntrypointChannels = Vec::new();
 
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
-                let id = mempool_id(&ep, &U256::from(chain.id()));
+                let id = mempool_id(&ep, chain.id());
                 let (waiting_to_pub_sd, waiting_to_pub_rv) = unbounded::<(UserOperation, U256)>();
                 let uo_builder = UoPoolBuilder::new(
                     eth_client.clone(),
@@ -531,7 +531,7 @@ where
             });
         } else {
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
-                let id = mempool_id(&ep, &U256::from(chain.id()));
+                let id = mempool_id(&ep, chain.id());
                 let uo_builder = UoPoolBuilder::new(
                     eth_client.clone(),
                     ep,

@@ -1,9 +1,9 @@
 use crate::gen::entry_point_api::{self, EntryPointAPICalls};
 use ethers::{abi::AbiDecode, types::Bytes};
-use silius_primitives::UserOperation;
+use silius_primitives::UserOperationSigned;
 
-impl From<UserOperation> for entry_point_api::UserOperation {
-    fn from(uo: UserOperation) -> Self {
+impl From<UserOperationSigned> for entry_point_api::UserOperation {
+    fn from(uo: UserOperationSigned) -> Self {
         Self {
             sender: uo.sender,
             nonce: uo.nonce,
@@ -20,7 +20,7 @@ impl From<UserOperation> for entry_point_api::UserOperation {
     }
 }
 
-impl From<entry_point_api::UserOperation> for UserOperation {
+impl From<entry_point_api::UserOperation> for UserOperationSigned {
     fn from(uo: entry_point_api::UserOperation) -> Self {
         Self {
             sender: uo.sender,
@@ -38,7 +38,7 @@ impl From<entry_point_api::UserOperation> for UserOperation {
     }
 }
 
-pub fn parse_from_input_data(data: Bytes) -> Option<Vec<UserOperation>> {
+pub fn parse_from_input_data(data: Bytes) -> Option<Vec<UserOperationSigned>> {
     EntryPointAPICalls::decode(data).ok().and_then(|call| match call {
         EntryPointAPICalls::HandleOps(ops) => {
             Some(ops.ops.into_iter().map(|op| op.into()).collect())

@@ -1,5 +1,5 @@
 use crate::config::Metadata;
-use silius_primitives::UserOperation;
+use silius_primitives::UserOperationSigned;
 use ssz_rs::{List, Serialize, Vector};
 use std::io;
 
@@ -169,7 +169,7 @@ pub struct PooledUserOpHashes {
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
 pub struct PooledUserOpsByHash {
-    hashes: List<UserOperation, 1024>,
+    hashes: List<UserOperationSigned, 1024>,
 }
 
 #[derive(Clone, Default)]
