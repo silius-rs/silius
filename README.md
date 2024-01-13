@@ -12,7 +12,7 @@
     <img src="./docs/images/banner.png" width="450">
 </p>
 
-For more information: https://hackmd.io/@Vid201/aa-bundler-rust
+For more information: <https://hackmd.io/@Vid201/aa-bundler-rust>
 
 <i>This project is still under active development.</i>
 
@@ -74,35 +74,38 @@ docker run --net=host -v ./bundler-spec-tests/keys/0xf39Fd6e51aad88F6F4ce6aB8827
 
 ## Supported networks
 
-Bundler was tested on the following networks and Silius provides some public endpoints for testing. If you have any problems with the endpoint, you are welcomed to fire an [issue](https://github.com/silius-rs/silius/issues/new).
+Silius was tested on the following networks, and some public endpoints are available for testing. If you have problems with any endpoint below, you are welcome to fire an [issue](https://github.com/silius-rs/silius/issues/new).
 
-| Chain         | Supported Status | Public RPC URL   | 
+| Chain         | Supported Status | Public RPC URL   |
 | :--------:    | :-------: | :-------: |
 | Ethereum | :heavy_check_mark:| :soon: |
-| Ethereum Goerli | :heavy_check_mark: |  https://rpc.silius.xyz/api/v1/chain/ethereum-goerli |
-| Ethereum Sepolia| :heavy_check_mark: | https://rpc.silius.xyz/api/v1/chain/ethereum-sepolia |
-| Ethereum Holesky| :heavy_check_mark: | https://rpc.silius.xyz/api/v1/chain/ethereum-holesky |
+| Ethereum Goerli | :heavy_check_mark: |  <https://rpc.silius.xyz/api/v1/chain/ethereum-goerli> |
+| Ethereum Sepolia| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-sepolia> |
+| Ethereum Holesky| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-holesky> |
 | Polygon | :x: | :soon: |
-| Polygon Mumbai| :heavy_check_mark:  | https://rpc.silius.xyz/api/v1/chain/polygon-mumbai |
+| Polygon Mumbai| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mumbai> |
 | Linea | :x: | :soon: |
-| Linea Goerli | :x:  | https://rpc.silius.xyz/api/v1/chain/linea-goerli |
+| Linea Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-goerli> |
 | Optimism | :x: | :soon: |
-| Optimism Goerli | :x: | https://rpc.silius.xyz/api/v1/chain/optimism-goerli |
-| Optimism Sepolia | :x: | https://rpc.silius.xyz/api/v1/chain/optimism-sepolia |
+| Optimism Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-goerli> |
+| Optimism Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-sepolia> |
 | Arbitrum | :x: | :soon: |
-| Arbitrum Goerli | :x: | https://rpc.silius.xyz/api/v1/chain/arbitrum-goerli |
-| Arbitrum Sepolia | :x: | https://rpc.silius.xyz/api/v1/chain/arbitrum-sepolia |
+| Arbitrum Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-goerli> |
+| Arbitrum Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-sepolia> |
 | BSC | :x: | :soon: |
-| BSC Testnet | :x: | https://rpc.silius.xyz/api/v1/chain/bsc-testnet |
+| BSC Testnet | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/bsc-testnet> |
 | Base | :x: | :soon: |
-| Base Goerli | :x: | https://rpc.silius.xyz/api/v1/chain/base-goerli |
-| Base Sepolia | :x: | https://rpc.silius.xyz/api/v1/chain/base-sepolia |
+| Base Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-goerli> |
+| Base Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-sepolia> |
 | Avalanche | :x: | :soon: |
-| Avalanche Fuji | :x: | https://rpc.silius.xyz/api/v1/chain/avalanche-fuji |
+| Avalanche Fuji | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/avalanche-fuji> |
+
+Bundler's account: `0x0a4E15d25E97e747bD568979A3B7dbEb95970Eb3`
 
 **You can also try the Silius on any other EVM network, but you may encounter some problems (e.g., gas calculating differences on L2s) - please use it at our own risk! You are always welcome to open up a new issue when you meet any problem.** :warning:
 
 ## Supported entry point
+
 The address of the entry point smart contract is the same on all EVM networks.
 | Address    | Version   | Commit    | Audited   |
 | :--------: | :-------: | :-------: | :-------: |
@@ -154,8 +157,8 @@ The best place for the discussion is the dedicated [Telegram group](https://t.me
 
 This project is dual-licensed under Apache 2.0 and MIT terms:
 
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+- MIT License ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 ## Donations
 

@@ -24,6 +24,7 @@ use silius_primitives::{
         entry_point, flashbots_relay_endpoints,
         p2p::{NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME},
         storage::DATABASE_FOLDER_NAME,
+        supported_chains::CHAINS,
         validation::reputation::{
             BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
         },
@@ -491,18 +492,12 @@ where
     M: Middleware + Clone + 'static,
 {
     if let Some(chain) = chain {
-        match chain {
-            NamedChain::Mainnet |
-            NamedChain::Goerli |
-            NamedChain::Sepolia |
-            NamedChain::PolygonMumbai |
-            NamedChain::Dev => {}
-            _ => {
-                warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                warn!("Chain {:?} is not officially supported yet! You could possibly meet a lot of problems with silius. Use at your own risk!!", chain);
-                warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            }
+        if !CHAINS.contains(&chain) {
+            warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            warn!("Chain {:?} is not officially supported yet! You could possibly meet a lot of problems with silius. Use at your own risk!!", chain);
+            warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         }
+
         let chain: Chain = chain.into();
 
         let chain_id = eth_client.get_chainid().await?.as_u64();

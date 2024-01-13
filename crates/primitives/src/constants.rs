@@ -79,18 +79,25 @@ pub mod flashbots_relay_endpoints {
 
 /// Supported chains
 pub mod supported_chains {
-    pub const SUPPORTED_CHAINS: [u64; 5] = [MAINNET, GOERLI, SEPOLIA, DEV, MUMBAI];
+    use alloy_chains::NamedChain;
 
-    // dev
-    pub const DEV: u64 = 1337;
-
-    // ethereum
-    pub const MAINNET: u64 = 1;
-    pub const GOERLI: u64 = 5;
-    pub const SEPOLIA: u64 = 11155111;
-
-    // polygon
-    pub const MUMBAI: u64 = 80001;
+    pub const CHAINS: [NamedChain; 15] = [
+        NamedChain::Dev,
+        NamedChain::Mainnet,
+        NamedChain::Goerli,
+        NamedChain::Sepolia,
+        NamedChain::Holesky,
+        NamedChain::PolygonMumbai,
+        NamedChain::LineaTestnet,
+        NamedChain::OptimismGoerli,
+        NamedChain::OptimismSepolia,
+        NamedChain::ArbitrumGoerli,
+        NamedChain::ArbitrumSepolia,
+        NamedChain::BinanceSmartChainTestnet,
+        NamedChain::BaseGoerli,
+        NamedChain::BaseSepolia,
+        NamedChain::AvalancheFuji,
+    ];
 }
 
 /// RPC
