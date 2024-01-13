@@ -1,4 +1,4 @@
-use alloy_chains::Chain;
+use alloy_chains::{Chain, NamedChain};
 use ethers::{
     prelude::{LocalWallet, SignerMiddleware},
     providers::Middleware,
@@ -12,9 +12,8 @@ use ethers_flashbots::{
 };
 use silius_contracts::entry_point::EntryPointAPI;
 use silius_primitives::{
-    bundler::SendStrategy,
-    constants::{flashbots_relay_endpoints, supported_chains},
-    UserOperation, UserOperationHash, Wallet,
+    bundler::SendStrategy, constants::flashbots_relay_endpoints, UserOperation, UserOperationHash,
+    Wallet,
 };
 use std::{sync::Arc, time::Duration};
 use tracing::{info, trace};
@@ -75,13 +74,13 @@ where
         relay_endpoints: Option<Vec<String>>,
         min_balance: U256,
     ) -> eyre::Result<Self> {
-        if !(chain.id() == supported_chains::MAINNET ||
-            chain.id() == supported_chains::GOERLI ||
-            chain.id() == supported_chains::SEPOLIA) &&
-            send_bundle_mode == SendStrategy::Flashbots
-        {
-            panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia");
-        };
+        if send_bundle_mode == SendStrategy::Flashbots {
+            match chain.named().expect("Flashbots is only supported on Mainnet, Goerli and Sepolia")
+            {
+                NamedChain::Mainnet | NamedChain::Goerli | NamedChain::Sepolia => {}
+                _ => panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia"),
+            }
+        }
 
         match send_bundle_mode {
             SendStrategy::EthClient => {
@@ -204,9 +203,9 @@ where
         let mut tx: TypedTransaction =
             ep.handle_ops(uos.clone().into_iter().map(Into::into).collect(), beneficiary).tx;
 
-        match self.chain.id() {
+        match Chain::from_id(self.chain.id()).named() {
             // Mumbai
-            supported_chains::MUMBAI => {
+            Some(NamedChain::PolygonMumbai) => {
                 tx.set_nonce(nonce).set_chain_id(self.chain.id());
             }
             // All other surpported networks, including Mainnet, Goerli
