@@ -1,10 +1,8 @@
 // Code adapted from: https://github.com/ledgerwatch/interfaces/blob/master/src/lib.rs#L1
 pub mod types {
-
     use arrayref::array_ref;
     use ethers::types::{Address, Bloom, U256};
     use prost::bytes::Buf;
-    use silius_primitives::{reputation::Status, UserOperationHash};
     use std::str::FromStr;
 
     tonic::include_proto!("types");
@@ -73,7 +71,7 @@ pub mod types {
         }
     }
 
-    impl From<H256> for UserOperationHash {
+    impl From<H256> for silius_primitives::UserOperationHash {
         fn from(val: H256) -> Self {
             Self::from(ethers::types::H256::from(val))
         }
@@ -97,19 +95,27 @@ pub mod types {
         fn from(user_operation: silius_primitives::UserOperation) -> Self {
             Self {
                 hash: Some(user_operation.hash.into()),
-                sender: Some(user_operation.sender.into()),
-                nonce: Some(user_operation.nonce.into()),
-                init_code: prost::bytes::Bytes::copy_from_slice(user_operation.init_code.as_ref()),
-                call_data: prost::bytes::Bytes::copy_from_slice(user_operation.call_data.as_ref()),
-                call_gas_limit: Some(user_operation.call_gas_limit.into()),
-                verification_gas_limit: Some(user_operation.verification_gas_limit.into()),
-                pre_verification_gas: Some(user_operation.pre_verification_gas.into()),
-                max_fee_per_gas: Some(user_operation.max_fee_per_gas.into()),
-                max_priority_fee_per_gas: Some(user_operation.max_priority_fee_per_gas.into()),
-                paymaster_and_data: prost::bytes::Bytes::copy_from_slice(
-                    user_operation.paymaster_and_data.as_ref(),
-                ),
-                signature: prost::bytes::Bytes::copy_from_slice(user_operation.signature.as_ref()),
+                uo: Some(UserOperationSigned {
+                    sender: Some(user_operation.sender.into()),
+                    nonce: Some(user_operation.nonce.into()),
+                    init_code: prost::bytes::Bytes::copy_from_slice(
+                        user_operation.init_code.as_ref(),
+                    ),
+                    call_data: prost::bytes::Bytes::copy_from_slice(
+                        user_operation.call_data.as_ref(),
+                    ),
+                    call_gas_limit: Some(user_operation.call_gas_limit.into()),
+                    verification_gas_limit: Some(user_operation.verification_gas_limit.into()),
+                    pre_verification_gas: Some(user_operation.pre_verification_gas.into()),
+                    max_fee_per_gas: Some(user_operation.max_fee_per_gas.into()),
+                    max_priority_fee_per_gas: Some(user_operation.max_priority_fee_per_gas.into()),
+                    paymaster_and_data: prost::bytes::Bytes::copy_from_slice(
+                        user_operation.paymaster_and_data.as_ref(),
+                    ),
+                    signature: prost::bytes::Bytes::copy_from_slice(
+                        user_operation.signature.as_ref(),
+                    ),
+                }),
             }
         }
     }
@@ -121,66 +127,15 @@ pub mod types {
                     if let Some(hash) = user_operation.hash {
                         hash.into()
                     } else {
-                        UserOperationHash::default()
+                        silius_primitives::UserOperationHash::default()
                     }
                 },
-                user_operation: silius_primitives::UserOperationSigned {
-                    sender: {
-                        if let Some(sender) = user_operation.sender {
-                            sender.into()
-                        } else {
-                            Address::zero()
-                        }
-                    },
-                    nonce: {
-                        if let Some(nonce) = user_operation.nonce {
-                            nonce.into()
-                        } else {
-                            U256::zero()
-                        }
-                    },
-                    init_code: user_operation.init_code.into(),
-                    call_data: user_operation.call_data.into(),
-                    call_gas_limit: {
-                        if let Some(call_gas_limit) = user_operation.call_gas_limit {
-                            call_gas_limit.into()
-                        } else {
-                            U256::zero()
-                        }
-                    },
-                    verification_gas_limit: {
-                        if let Some(verification_gas_limit) = user_operation.verification_gas_limit
-                        {
-                            verification_gas_limit.into()
-                        } else {
-                            U256::zero()
-                        }
-                    },
-                    pre_verification_gas: {
-                        if let Some(pre_verification_gas) = user_operation.pre_verification_gas {
-                            pre_verification_gas.into()
-                        } else {
-                            U256::zero()
-                        }
-                    },
-                    max_fee_per_gas: {
-                        if let Some(max_fee_per_gas) = user_operation.max_fee_per_gas {
-                            max_fee_per_gas.into()
-                        } else {
-                            U256::zero()
-                        }
-                    },
-                    max_priority_fee_per_gas: {
-                        if let Some(max_priority_fee_per_gas) =
-                            user_operation.max_priority_fee_per_gas
-                        {
-                            max_priority_fee_per_gas.into()
-                        } else {
-                            U256::zero()
-                        }
-                    },
-                    paymaster_and_data: user_operation.paymaster_and_data.into(),
-                    signature: user_operation.signature.into(),
+                user_operation: {
+                    if let Some(uo) = user_operation.uo {
+                        uo.into()
+                    } else {
+                        silius_primitives::UserOperationSigned::default()
+                    }
                 },
             }
         }
@@ -273,7 +228,7 @@ pub mod types {
                 addr: Some(reputation_entry.address.into()),
                 uo_seen: reputation_entry.uo_seen,
                 uo_included: reputation_entry.uo_included,
-                stat: match Status::from(reputation_entry.status) {
+                stat: match silius_primitives::reputation::Status::from(reputation_entry.status) {
                     silius_primitives::reputation::Status::OK => ReputationStatus::Ok,
                     silius_primitives::reputation::Status::THROTTLED => ReputationStatus::Throttled,
                     silius_primitives::reputation::Status::BANNED => ReputationStatus::Banned,
@@ -401,8 +356,8 @@ pub mod types {
         }
     }
 
-    impl From<UserOperationHash> for H256 {
-        fn from(value: UserOperationHash) -> Self {
+    impl From<silius_primitives::UserOperationHash> for H256 {
+        fn from(value: silius_primitives::UserOperationHash) -> Self {
             Self::from(value.0)
         }
     }
