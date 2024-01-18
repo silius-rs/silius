@@ -41,5 +41,6 @@ dirs = "5.0.1"
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }
 log = "0.4.20"
+serde_json = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

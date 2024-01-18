@@ -18,7 +18,7 @@ use ssz_rs::List;
 use std::{cmp::Ord, ops::Deref, slice::Windows};
 
 /// User operation with hash
-#[derive(AsRef, Deref, Debug, Clone)]
+#[derive(AsRef, Deref, Debug, Clone, Serialize, Deserialize)]
 pub struct UserOperation {
     /// Hash of the user operation
     pub hash: UserOperationHash,
