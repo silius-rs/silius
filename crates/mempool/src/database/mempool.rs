@@ -81,6 +81,7 @@ macro_rules! impl_add_remove_user_op_hash {
                     } else {
                         tx.put::<UserOperationsBySender>(address.clone().into(), uo_hash_set)?;
                     }
+                    tx.commit()?;
                     Ok(true)
                 } else {
                     Ok(false)
