@@ -55,6 +55,10 @@ pub enum Commands {
     /// Create wallet for bundling component
     #[command(name = "create-wallet")]
     CreateWallet(commands::CreateWalletCommand),
+
+    /// For debug purposes (dump user operations from database ...)
+    #[command(subcommand, name = "debug")]
+    Debug(commands::DebugCommand),
 }
 
 pub fn run() -> eyre::Result<()> {
@@ -82,6 +86,7 @@ pub fn run() -> eyre::Result<()> {
                     Commands::UoPool(command) => command.execute().await,
                     Commands::Rpc(command) => command.execute().await,
                     Commands::CreateWallet(command) => command.execute(),
+                    Commands::Debug(command) => command.execute(),
                 }
             };
 

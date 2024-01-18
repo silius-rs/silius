@@ -6876,6 +6876,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.1",
  "pin-utils",
+ "serde_json",
  "silius-bundler",
  "silius-contracts",
  "silius-grpc",
