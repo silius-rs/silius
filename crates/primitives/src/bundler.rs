@@ -19,7 +19,7 @@ pub enum Mode {
 #[strum(serialize_all = "kebab_case")]
 pub enum SendStrategy {
     /// Sends the bundle to the Ethereum execution client
-    EthClient,
+    EthereumClient,
     /// Sends the bundle to the Flashbots relay
     Flashbots,
 }

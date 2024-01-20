@@ -9,17 +9,18 @@ use ethers::{
     types::{Address, H256, U256},
 };
 use parking_lot::Mutex;
-use silius_bundler::Bundler;
-use silius_primitives::{bundler::SendStrategy, UserOperation, Wallet};
+use silius_bundler::{Bundler, SendBundleOp};
+use silius_primitives::{UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::{error, info};
 
-pub struct BundlerService<M>
+pub struct BundlerService<M, S>
 where
     M: Middleware + Clone + 'static,
+    S: SendBundleOp + Clone + 'static,
 {
-    pub bundlers: Vec<Bundler<M>>,
+    pub bundlers: Vec<Bundler<M, S>>,
     pub running: Arc<Mutex<bool>>,
     pub uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
 }
@@ -29,12 +30,13 @@ fn is_running(running: Arc<Mutex<bool>>) -> bool {
     *r
 }
 
-impl<M> BundlerService<M>
+impl<M, S> BundlerService<M, S>
 where
     M: Middleware + Clone + 'static,
+    S: SendBundleOp + Clone + 'static,
 {
     pub fn new(
-        bundlers: Vec<Bundler<M>>,
+        bundlers: Vec<Bundler<M, S>>,
         uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     ) -> Self {
         Self { bundlers, running: Arc::new(Mutex::new(false)), uopool_grpc_client }
@@ -57,7 +59,7 @@ where
         for bundler in self.bundlers.iter() {
             let uos =
                 Self::get_user_operations(&self.uopool_grpc_client, &bundler.entry_point).await?;
-            let tx_hash = bundler.send_next_bundle(&uos).await?;
+            let tx_hash = bundler.send_bundle(&uos).await?;
 
             tx_hashes.push(tx_hash)
         }
@@ -107,7 +109,7 @@ where
                         .await
                         {
                             Ok(bundle) => {
-                                if let Err(e) = bundler_own.send_next_bundle(&bundle).await {
+                                if let Err(e) = bundler_own.send_bundle(&bundle).await {
                                     error!("Error while sending bundle: {e:?}");
                                 }
                             }
@@ -123,9 +125,10 @@ where
 }
 
 #[async_trait]
-impl<M> bundler_server::Bundler for BundlerService<M>
+impl<M, S> bundler_server::Bundler for BundlerService<M, S>
 where
     M: Middleware + Clone + 'static,
+    S: SendBundleOp + Clone + 'static,
 {
     async fn set_bundler_mode(
         &self,
@@ -159,35 +162,33 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn bundler_service_run<M>(
+pub fn bundler_service_run<M, S>(
     addr: SocketAddr,
     wallet: Wallet,
     eps: Vec<Address>,
-    eth_client: Arc<M>,
     chain: Chain,
     beneficiary: Address,
     min_balance: U256,
     bundle_interval: u64,
+    eth_client: Arc<M>,
+    client: Arc<S>,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
-    send_bundle_mode: SendStrategy,
-    relay_endpoints: Option<Vec<String>>,
 ) where
     M: Middleware + Clone + 'static,
+    S: SendBundleOp + Clone + 'static,
 {
-    let bundlers: Vec<Bundler<M>> = eps
-        .iter()
+    let bundlers: Vec<Bundler<M, S>> = eps
+        .into_iter()
         .map(|ep| {
             Bundler::new(
                 wallet.clone(),
-                eth_client.clone(),
                 beneficiary,
-                *ep,
+                ep,
                 chain,
-                send_bundle_mode,
-                relay_endpoints.clone(),
                 min_balance,
+                eth_client.clone(),
+                client.clone(),
             )
-            .expect("Failed to create bundler")
         })
         .collect();
 

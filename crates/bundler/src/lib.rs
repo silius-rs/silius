@@ -2,8 +2,9 @@
 #![allow(dead_code)]
 
 mod bundler;
+mod ethereum;
+mod flashbots;
 
-#[cfg(test)]
-mod mock_relay;
-
-pub use bundler::Bundler;
+pub use bundler::{Bundler, SendBundleOp};
+pub use ethereum::EthereumClient;
+pub use flashbots::FlashbotsClient;
