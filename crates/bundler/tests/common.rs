@@ -12,6 +12,9 @@ use std::{sync::Arc, time::Duration};
 
 pub const INIT_BLOCK: u64 = 17832062;
 
+// Testing key
+pub const KEY_PHRASE: &str = "test test test test test test test test test test test junk";
+
 #[rpc(server, namespace = "eth")]
 pub trait MockFlashbotsRelay {
     #[method(name = "sendBundle")]

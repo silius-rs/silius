@@ -7,6 +7,7 @@ use crate::{
 use alloy_chains::{Chain, NamedChain};
 use ethers::{providers::Middleware, types::Address};
 use parking_lot::RwLock;
+use silius_bundler::{EthereumClient, FlashbotsClient};
 use silius_contracts::EntryPoint;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
@@ -125,22 +126,51 @@ where
     let uopool_grpc_client = UoPoolClient::connect(uopool_grpc_listen_address).await?;
     info!("Connected to uopool gRPC service");
 
-    bundler_service_run(
-        SocketAddr::new(args.bundler_addr, args.bundler_port),
-        wallet,
-        entry_points,
-        eth_client,
-        chain_conn,
-        args.beneficiary,
-        args.min_balance,
-        args.bundle_interval,
-        uopool_grpc_client,
-        args.send_bundle_mode,
-        match args.send_bundle_mode {
-            SendStrategy::EthClient => None,
-            SendStrategy::Flashbots => Some(vec![flashbots_relay_endpoints::FLASHBOTS.into()]),
-        },
-    );
+    match args.send_bundle_mode {
+        SendStrategy::EthereumClient => {
+            let client = Arc::new(EthereumClient::new(eth_client.clone(), wallet.clone()));
+            bundler_service_run(
+                SocketAddr::new(args.bundler_addr, args.bundler_port),
+                wallet,
+                entry_points,
+                chain_conn,
+                args.beneficiary,
+                args.min_balance,
+                args.bundle_interval,
+                eth_client,
+                client,
+                uopool_grpc_client,
+            );
+        }
+        SendStrategy::Flashbots => {
+            match chain_conn
+                .named()
+                .expect("Flashbots is only supported on Mainnet, Goerli and Sepolia")
+            {
+                NamedChain::Mainnet | NamedChain::Goerli | NamedChain::Sepolia => {}
+                _ => panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia"),
+            }
+
+            let client = Arc::new(FlashbotsClient::new(
+                eth_client.clone(),
+                Some(vec![flashbots_relay_endpoints::FLASHBOTS.into()]),
+                wallet.clone(),
+            )?);
+            bundler_service_run(
+                SocketAddr::new(args.bundler_addr, args.bundler_port),
+                wallet,
+                entry_points,
+                chain_conn,
+                args.beneficiary,
+                args.min_balance,
+                args.bundle_interval,
+                eth_client,
+                client,
+                uopool_grpc_client,
+            );
+        }
+    }
+
     info!("Started bundler gRPC service at {:?}:{:?}", args.bundler_addr, args.bundler_port);
 
     Ok(())

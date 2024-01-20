@@ -61,8 +61,8 @@ pub struct BundlerArgs {
 
     /// Sets the send bundle mode.
     ///
-    /// By default, this option is set to `eth-client`.
-    #[clap(long, default_value = "eth-client", value_parser=parse_send_bundle_mode)]
+    /// By default, this option is set to `ethereum-client`.
+    #[clap(long, default_value = "ethereum-client", value_parser=parse_send_bundle_mode)]
     pub send_bundle_mode: SendStrategy,
 }
 
@@ -325,7 +325,7 @@ mod tests {
                     .unwrap(),
                 min_balance: U256::from(100000000000000000_u64),
                 bundle_interval: 10,
-                send_bundle_mode: SendStrategy::EthClient,
+                send_bundle_mode: SendStrategy::EthereumClient,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
             },
