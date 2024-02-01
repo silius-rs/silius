@@ -66,6 +66,10 @@ pub struct BundlerArgs {
     /// By default, this option is set to `ethereum-client`.
     #[clap(long, default_value = "ethereum-client", value_parser=parse_send_bundle_mode)]
     pub send_bundle_mode: SendStrategy,
+
+    /// Indicates whether the access list is enabled.
+    #[clap(long)]
+    pub enable_access_list: bool,
 }
 
 /// UoPool CLI args
@@ -352,6 +356,7 @@ mod tests {
                 send_bundle_mode: SendStrategy::EthereumClient,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
+                enable_access_list: false,
             },
             BundlerArgs::try_parse_from(args).unwrap()
         );
