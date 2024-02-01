@@ -78,26 +78,26 @@ Silius was tested on the following networks, and some public endpoints are avail
 
 | Chain         | Supported Status | Public RPC URL   |
 | :--------:    | :-------: | :-------: |
-| Ethereum | :heavy_check_mark:| :soon: |
+| Ethereum | :heavy_check_mark:| <https://rpc.silius.xyz/api/v1/chain/ethereum-mainnet> |
 | Ethereum Goerli | :heavy_check_mark: |  <https://rpc.silius.xyz/api/v1/chain/ethereum-goerli> |
 | Ethereum Sepolia| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-sepolia> |
 | Ethereum Holesky| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-holesky> |
-| Polygon | :x: | :soon: |
+| Polygon | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mainnet> |
 | Polygon Mumbai| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mumbai> |
-| Linea | :x: | :soon: |
+| Linea | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-mainnet> |
 | Linea Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-goerli> |
-| Optimism | :x: | :soon: |
+| Optimism | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-mainnet> |
 | Optimism Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-goerli> |
 | Optimism Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-sepolia> |
-| Arbitrum | :x: | :soon: |
+| Arbitrum | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-mainnet> |
 | Arbitrum Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-goerli> |
 | Arbitrum Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-sepolia> |
-| BSC | :x: | :soon: |
+| BSC | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/bsc-mainnet> |
 | BSC Testnet | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/bsc-testnet> |
-| Base | :x: | :soon: |
+| Base | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-mainnet> |
 | Base Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-goerli> |
 | Base Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-sepolia> |
-| Avalanche | :x: | :soon: |
+| Avalanche | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/avalanche-mainnet> |
 | Avalanche Fuji | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/avalanche-fuji> |
 
 Bundler's account: `0x0a4E15d25E97e747bD568979A3B7dbEb95970Eb3`
