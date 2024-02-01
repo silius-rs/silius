@@ -103,5 +103,8 @@ impl<F: Future<Output = MethodResponse>> Future for MetricsFuture<F> {
 pub fn describe_json_rpc_metrics() {
     describe_counter!(RPC_REQUEST, "The number of json rpc requests so far");
     describe_counter!(RPC_REQUEST_SUCCESS, "The number of successful json rpc requests so far");
-    describe_counter!(RPC_REQUEST_FAILED, "The number of failed json rpc requests so far")
+    describe_counter!(RPC_REQUEST_FAILED, "The number of failed json rpc requests so far");
+    counter!(RPC_REQUEST).absolute(0);
+    counter!(RPC_REQUEST_SUCCESS).absolute(0);
+    counter!(RPC_REQUEST_FAILED).absolute(0);
 }
