@@ -129,5 +129,12 @@ pub fn describe_mempool_metrics() {
     describe_counter!(
         REPUTATION_SET_ENTRY_ERROR,
         "The number of errors when setting a reputation entry"
-    )
+    );
+    counter!(MEMPOOL_ADD_ERROR).absolute(0);
+    counter!(MEMPOOL_REMOVE_ERROR).absolute(0);
+    counter!(REPUTATION_SET_ENTRY_ERROR).absolute(0);
+    gauge!(MEMPOOL_SIZE).set(0f64);
+    gauge!(REPUTATION_UO_SEEN).set(0f64);
+    gauge!(REPUTATION_UO_INCLUDED).set(0f64);
+    gauge!(REPUTATION_STATUS).set(0f64);
 }

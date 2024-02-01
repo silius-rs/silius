@@ -71,4 +71,7 @@ pub fn describe_grpc_metrics() {
     describe_counter!(GRPC_REQUEST, "grpc request count");
     describe_counter!(GRPC_REQUEST_SUCCESS, "grpc request success count");
     describe_counter!(GRPC_REQUEST_FAILED, "grpc request failed count");
+    counter!(GRPC_REQUEST).absolute(0);
+    counter!(GRPC_REQUEST_SUCCESS).absolute(0);
+    counter!(GRPC_REQUEST_FAILED).absolute(0);
 }
