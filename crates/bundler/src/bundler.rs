@@ -1,4 +1,4 @@
-use alloy_chains::{Chain, NamedChain};
+use alloy_chains::Chain;
 use ethers::{
     providers::Middleware,
     signers::Signer,
@@ -45,6 +45,8 @@ where
     pub eth_client: Arc<M>,
     /// Client that sends the bundle to some network
     pub client: Arc<S>,
+    /// Whether add access list into tx
+    pub enable_access_list: bool,
 }
 
 impl<M, S> Bundler<M, S>
@@ -56,6 +58,7 @@ where
     ///
     /// # Returns
     /// * `Self` - A new `Bundler` instance
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         wallet: Wallet,
         beneficiary: Address,
@@ -64,8 +67,18 @@ where
         min_balance: U256,
         eth_client: Arc<M>,
         client: Arc<S>,
+        enable_access_list: bool,
     ) -> Self {
-        Self { wallet, beneficiary, entry_point, chain, min_balance, eth_client, client }
+        Self {
+            wallet,
+            beneficiary,
+            entry_point,
+            chain,
+            min_balance,
+            eth_client,
+            client,
+            enable_access_list,
+        }
     }
 
     /// Functions that generates a bundle of user operations (i.e.,
@@ -95,34 +108,30 @@ where
             )
             .tx;
 
-        match Chain::from_id(self.chain.id()).named() {
-            // Mumbai
-            Some(NamedChain::PolygonMumbai) => {
-                tx.set_nonce(nonce).set_chain_id(self.chain.id());
-            }
-            // All other surpported networks, including Mainnet, Goerli
-            _ => {
-                let accesslist = self.eth_client.create_access_list(&tx, None).await?.access_list;
-                tx.set_access_list(accesslist.clone());
-                let estimated_gas = self.eth_client.estimate_gas(&tx, None).await?;
-
-                let (max_fee_per_gas, max_priority_fee) =
-                    self.eth_client.estimate_eip1559_fees(None).await?;
-
-                tx = TypedTransaction::Eip1559(Eip1559TransactionRequest {
-                    to: tx.to().cloned(),
-                    from: Some(self.wallet.signer.address()),
-                    data: tx.data().cloned(),
-                    chain_id: Some(U64::from(self.chain.id())),
-                    max_priority_fee_per_gas: Some(max_priority_fee),
-                    max_fee_per_gas: Some(max_fee_per_gas),
-                    gas: Some(estimated_gas),
-                    nonce: Some(nonce),
-                    value: None,
-                    access_list: accesslist,
-                });
-            }
+        let accesslist = if self.enable_access_list {
+            let accesslist = self.eth_client.create_access_list(&tx, None).await?.access_list;
+            tx.set_access_list(accesslist.clone());
+            accesslist
+        } else {
+            Default::default()
         };
+        let estimated_gas = self.eth_client.estimate_gas(&tx, None).await?;
+
+        let (max_fee_per_gas, max_priority_fee) =
+            self.eth_client.estimate_eip1559_fees(None).await?;
+
+        tx = TypedTransaction::Eip1559(Eip1559TransactionRequest {
+            to: tx.to().cloned(),
+            from: Some(self.wallet.signer.address()),
+            data: tx.data().cloned(),
+            chain_id: Some(U64::from(self.chain.id())),
+            max_priority_fee_per_gas: Some(max_priority_fee),
+            max_fee_per_gas: Some(max_fee_per_gas),
+            gas: Some(estimated_gas),
+            nonce: Some(nonce),
+            value: None,
+            access_list: accesslist,
+        });
 
         Ok(tx)
     }

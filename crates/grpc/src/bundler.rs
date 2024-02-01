@@ -175,6 +175,7 @@ pub fn bundler_service_run<M, S>(
     client: Arc<S>,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
     enable_metrics: bool,
+    enable_access_list: bool,
 ) where
     M: Middleware + Clone + 'static,
     S: SendBundleOp + Clone + 'static,
@@ -190,6 +191,7 @@ pub fn bundler_service_run<M, S>(
                 min_balance,
                 eth_client.clone(),
                 client.clone(),
+                enable_access_list,
             )
         })
         .collect();

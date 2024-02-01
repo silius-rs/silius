@@ -93,6 +93,7 @@ async fn setup() -> eyre::Result<TestContext<Provider<Ws>, FlashbotsClient<Provi
         U256::from(100000000000000000u64),
         eth_client,
         client,
+        true,
     );
 
     Ok(TestContext { bundler, _entry_point: ep_address, _anvil: anvil })

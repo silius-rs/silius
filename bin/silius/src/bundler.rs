@@ -152,6 +152,7 @@ where
                 client,
                 uopool_grpc_client,
                 metrics_args.enable_metrics,
+                args.enable_access_list,
             );
         }
         SendStrategy::Flashbots => {
@@ -180,6 +181,7 @@ where
                 client,
                 uopool_grpc_client,
                 metrics_args.enable_metrics,
+                args.enable_access_list,
             );
         }
     }
