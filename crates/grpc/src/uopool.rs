@@ -358,8 +358,30 @@ where
 
         let res = Response::new(SetReputationResponse {
             res: match uopool.set_reputation(req.rep.iter().map(|re| re.clone().into()).collect()) {
-                Ok(_) => SetReputationResult::SetReputation as i32,
-                Err(_) => SetReputationResult::NotSetReputation as i32,
+                Ok(_) => SetReputationResult::Set as i32,
+                Err(_) => SetReputationResult::NotSet as i32,
+            },
+        });
+
+        Ok(res)
+    }
+
+    async fn add_mempool(
+        &self,
+        req: Request<AddMempoolRequest>,
+    ) -> Result<Response<AddMempoolResponse>, Status> {
+        let req = req.into_inner();
+
+        let ep = parse_addr(req.ep)?;
+        let mut uopool = self.get_uopool(&ep)?;
+
+        let res = Response::new(AddMempoolResponse {
+            res: match uopool
+                .add_user_operations(req.uos.into_iter().map(|uo| uo.into()).collect())
+                .await
+            {
+                Ok(_) => AddMempoolResult::AddedMempool as i32,
+                Err(_) => AddMempoolResult::NotAddedMempool as i32,
             },
         });
 

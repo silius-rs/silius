@@ -57,8 +57,8 @@ message GetAllReputationResponse {
 }
 
 enum SetReputationResult {
-    SET_REPUTATION = 0;
-    NOT_SET_REPUTATION = 1;
+    SET = 0;
+    NOT_SET = 1;
 }
 
 message SetReputationRequest {
@@ -68,6 +68,20 @@ message SetReputationRequest {
 
 message SetReputationResponse {
     SetReputationResult res = 1;
+}
+
+enum AddMempoolResult {
+    ADDED_MEMPOOL = 0;
+    NOT_ADDED_MEMPOOL = 1;
+}
+
+message AddMempoolRequest {
+    repeated types.UserOperation uos = 1;
+    types.H160 ep = 2;
+}
+
+message AddMempoolResponse {
+    AddMempoolResult res = 1;
 }
 
 message GetSortedRequest{
@@ -131,4 +145,5 @@ service UoPool {
     rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
     rpc GetAllReputation(GetAllReputationRequest) returns (GetAllReputationResponse);
     rpc SetReputation(SetReputationRequest) returns (SetReputationResponse);
+    rpc AddMempool(AddMempoolRequest) returns (AddMempoolResponse);
 }

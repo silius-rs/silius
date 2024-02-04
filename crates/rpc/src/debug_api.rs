@@ -40,14 +40,30 @@ pub trait DebugApi {
     #[method(name = "clearState")]
     async fn clear_state(&self) -> RpcResult<ResponseSuccess>;
 
-    /// Get all [UserOperations](UserOperation) of the mempool
+    /// Set the mempool for the given array of [UserOperation](UserOperationRequest)
+    ///
+    /// # Arguments
+    /// * `user_operations: Vec<UserOperationRequest>` - The [UserOperation](UserOperationRequest)
+    ///   to be set.
+    /// * `entry_point: Address` - The address of the entry point.
+    ///
+    /// # Returns
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    #[method(name = "addUserOps")]
+    async fn add_user_ops(
+        &self,
+        user_operations: Vec<UserOperationRequest>,
+        entry_point: Address,
+    ) -> RpcResult<ResponseSuccess>;
+
+    /// Get all [UserOperations](UserOperationRequest) of the mempool
     ///
     /// # Arguments
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<Vec<UserOperation>>` - A vector of [UserOperations](UserOperationRequest)
-    ///   returned
+    /// * `RpcResult<Vec<UserOperationRequest>>` - A vector of
+    ///   [UserOperations](UserOperationRequest) returned
     #[method(name = "dumpMempool")]
     async fn dump_mempool(&self, entry_point: Address) -> RpcResult<Vec<UserOperationRequest>>;
 
