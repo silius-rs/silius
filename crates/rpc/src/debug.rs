@@ -9,14 +9,14 @@ use jsonrpsee::{
     types::{error::INTERNAL_ERROR_CODE, ErrorObjectOwned},
 };
 use silius_grpc::{
-    bundler_client::BundlerClient, uo_pool_client::UoPoolClient, GetAllReputationRequest,
-    GetAllRequest, GetStakeInfoRequest, Mode as GrpcMode, SetModeRequest, SetReputationRequest,
-    SetReputationResult,
+    bundler_client::BundlerClient, uo_pool_client::UoPoolClient, AddMempoolRequest,
+    GetAllReputationRequest, GetAllRequest, GetStakeInfoRequest, Mode as GrpcMode, SetModeRequest,
+    SetReputationRequest, SetReputationResult,
 };
 use silius_primitives::{
     constants::bundler::BUNDLE_INTERVAL,
     reputation::{ReputationEntry, StakeInfoResponse},
-    BundlerMode, UserOperation, UserOperationRequest,
+    BundlerMode, UserOperation, UserOperationRequest, UserOperationSigned,
 };
 use tonic::Request;
 
@@ -76,6 +76,52 @@ impl DebugApiServer for DebugApiServerImpl {
         Ok(ResponseSuccess::Ok)
     }
 
+    /// Set the mempool for the given array of [UserOperation](UserOperationRequest)
+    /// and send it to the UoPool gRPC service through the
+    /// [AddMempoolRequest](SetReputationRequest).
+    ///
+    /// # Arguments
+    /// * `user_operations: Vec<UserOperationRequest>` - The [UserOperation](UserOperationRequest)
+    ///   to be set.
+    /// * `entry_point: Address` - The address of the entry point.
+    ///
+    /// # Returns
+    /// * `RpcResult<ResponseSuccess>` - Ok
+    async fn add_user_ops(
+        &self,
+        user_operations: Vec<UserOperationRequest>,
+        ep: Address,
+    ) -> RpcResult<ResponseSuccess> {
+        let mut uopool_grpc_client = self.uopool_grpc_client.clone();
+
+        let res = uopool_grpc_client
+            .get_chain_id(Request::new(()))
+            .await
+            .map_err(JsonRpcError::from)?
+            .into_inner();
+
+        uopool_grpc_client
+            .add_mempool(Request::new(AddMempoolRequest {
+                uos: user_operations
+                    .iter()
+                    .map(|uo| {
+                        let uo: UserOperationSigned = uo.clone().into();
+                        UserOperation::from_user_operation_signed(
+                            uo.hash(&ep, res.chain_id),
+                            uo.clone(),
+                        )
+                        .into()
+                    })
+                    .collect(),
+                ep: Some(ep.into()),
+            }))
+            .await
+            .map_err(JsonRpcError::from)?
+            .into_inner();
+
+        Ok(ResponseSuccess::Ok)
+    }
+
     /// Sending an [GetAllRequest](GetAllRequest) to the UoPool gRPC server
     /// to get all of the [UserOperation](UserOperationRequest) in the mempool.
     ///
@@ -83,7 +129,7 @@ impl DebugApiServer for DebugApiServerImpl {
     /// * `entry_point: Address` - The address of the entry point.
     ///
     /// # Returns
-    /// * `RpcResult<Vec<UserOperation>>` - An array of [UserOperation](UserOperationRequest)
+    /// * `RpcResult<Vec<UserOperationRequest>>` - An array of [UserOperation](UserOperationRequest)
     async fn dump_mempool(&self, ep: Address) -> RpcResult<Vec<UserOperationRequest>> {
         let mut uopool_grpc_client = self.uopool_grpc_client.clone();
 
@@ -126,7 +172,7 @@ impl DebugApiServer for DebugApiServerImpl {
         let res =
             uopool_grpc_client.set_reputation(req).await.map_err(JsonRpcError::from)?.into_inner();
 
-        if res.res == SetReputationResult::SetReputation as i32 {
+        if res.res == SetReputationResult::Set as i32 {
             return Ok(ResponseSuccess::Ok);
         }
 

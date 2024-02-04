@@ -165,6 +165,28 @@ where
         self.reputation.clear();
     }
 
+    /// Adds bulk of [UserOperations](UserOperation) into the mempool.
+    /// The function first validates the [UserOperations](UserOperation) by calling
+    /// [UoPool::validate_user_operations](UoPool::validate_user_operations).
+    ///
+    /// # Arguments
+    /// `user_operations` - The array of [UserOperations](UserOperation) to add
+    ///
+    /// # Returns
+    /// `Result<(), MempoolError>` - Ok if the [UserOperations](UserOperation) are added
+    /// successfully into the mempool
+    pub async fn add_user_operations(
+        &mut self,
+        user_operations: Vec<UserOperation>,
+    ) -> Result<(), MempoolError> {
+        for uo in user_operations {
+            let res = self.validate_user_operation(&uo).await;
+            self.add_user_operation(uo, res).await?;
+        }
+
+        Ok(())
+    }
+
     /// Validates a single [UserOperation](UserOperation) and returns the validation outcome by
     /// calling [UserOperationValidator::validate_user_operation](UserOperationValidator::validate_user_operation)
     ///
