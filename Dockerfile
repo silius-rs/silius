@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.73.0 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.76.0 AS chef
 WORKDIR /app
 
 LABEL org.opencontainers.image.source=https://github.com/silius-rs/silius

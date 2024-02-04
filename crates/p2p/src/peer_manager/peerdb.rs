@@ -1,16 +1,6 @@
-use crate::config::Metadata;
+use super::peer::peer_info::{ConnectionStatus, PeerInfo};
 use libp2p::PeerId;
 use std::collections::HashMap;
-
-pub enum ConnectionStatus {
-    Connected,
-    Disconnected,
-}
-
-pub struct PeerInfo {
-    connection_status: ConnectionStatus,
-    _metadata: Option<Metadata>, // TODO: need to handle metadata updates
-}
 
 #[derive(Default)]
 pub struct PeerDB {

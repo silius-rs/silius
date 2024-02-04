@@ -2,7 +2,7 @@ use ethers::types::{Address, H256, U256};
 use silius_primitives::{simulation::CodeHash, UserOperationSigned};
 use std::{collections::HashMap, ops::Deref};
 
-pub fn equal_code_hashes(hashes: &Vec<CodeHash>, hashes_prev: &Vec<CodeHash>) -> bool {
+pub fn equal_code_hashes(hashes: &[CodeHash], hashes_prev: &Vec<CodeHash>) -> bool {
     if hashes_prev.len() != hashes.len() {
         return false;
     }

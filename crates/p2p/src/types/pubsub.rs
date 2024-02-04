@@ -1,22 +1,16 @@
-use libp2p::gossipsub::{
-    Behaviour, ConfigBuilder, DataTransform, IdentTopic, Message, MessageAuthenticity, MessageId,
-    RawMessage, TopicHash, ValidationMode, WhitelistSubscriptionFilter,
-};
-use sha2::{Digest, Sha256};
-use silius_primitives::constants::p2p::{
-    MAX_GOSSIP_SNAP_SIZE, MESSAGE_DOMAIN_VALID_SNAPPY, SSZ_SNAPPY_ENCODING, TOPIC_PREFIX,
-    USER_OPS_WITH_ENTRY_POINT_TOPIC,
-};
+use super::topics::{create_whitelist_filter, topic};
+use crate::{config::gossipsub_config, service::behaviour::Gossipsub};
+use libp2p::gossipsub::{DataTransform, Message, MessageAuthenticity, RawMessage, TopicHash};
+use silius_primitives::{constants::p2p::GOSSIP_MAX_SIZE, VerifiedUserOperation};
 use snap::raw::{decompress_len, Decoder, Encoder};
-use std::{
-    collections::HashSet,
-    io::{Error, ErrorKind},
-};
+use std::io::{Error, ErrorKind};
 
-pub type Gossipsub = Behaviour<SnappyTransform, WhitelistSubscriptionFilter>;
+#[derive(Debug, PartialEq)]
+pub enum PubsubMessage {
+    UserOperation(VerifiedUserOperation),
+}
 
-// Highly inspired by https://github.com/sigp/lighthouse/blob/stable/beacon_node/lighthouse_network/src/types/pubsub.rs#L45-L103
-// Implements the `DataTransform` trait of gossipsub to employ snappy compression
+/// Implements the `DataTransform` trait of gossipsub to employ snappy compression
 pub struct SnappyTransform {
     /// Sets the maximum size we allow gossipsub messages to decompress to.
     max_size_per_message: usize,
@@ -30,7 +24,7 @@ impl SnappyTransform {
 
 impl Default for SnappyTransform {
     fn default() -> Self {
-        SnappyTransform { max_size_per_message: MAX_GOSSIP_SNAP_SIZE }
+        SnappyTransform { max_size_per_message: GOSSIP_MAX_SIZE }
     }
 }
 
@@ -77,52 +71,14 @@ impl DataTransform for SnappyTransform {
     }
 }
 
-pub fn create_whitelist_filter(mempool_ids: Vec<String>) -> WhitelistSubscriptionFilter {
-    let mut possible_hashes: HashSet<TopicHash> = HashSet::new();
-    for mempool_id in mempool_ids {
-        let topic = topic(&mempool_id);
-        possible_hashes.insert(topic.into());
-    }
-    WhitelistSubscriptionFilter(possible_hashes)
-}
-
-pub fn topic(mempool_id: &str) -> IdentTopic {
-    IdentTopic::new(format!(
-        "/{TOPIC_PREFIX:}/{mempool_id}/{USER_OPS_WITH_ENTRY_POINT_TOPIC:}/{SSZ_SNAPPY_ENCODING:}"
-    ))
-}
-
-pub fn message_id_fn(message: &Message) -> MessageId {
-    let topic_bytes = message.topic.as_str().as_bytes();
-    let topic_len_bytes = topic_bytes.len().to_le_bytes();
-
-    let mut vec: Vec<u8> = Vec::with_capacity(
-        MESSAGE_DOMAIN_VALID_SNAPPY.len() +
-            topic_len_bytes.len() +
-            topic_bytes.len() +
-            message.data.len(),
-    );
-    vec.extend_from_slice(&MESSAGE_DOMAIN_VALID_SNAPPY);
-    vec.extend_from_slice(&topic_len_bytes);
-    vec.extend_from_slice(topic_bytes);
-    vec.extend_from_slice(&message.data);
-
-    Sha256::digest(vec)[..20].into()
-}
-
 /// Creates a gossipsub instance with the given mempool ids
-pub fn create_gossisub(mempool_ids: Vec<String>) -> Result<Gossipsub, String> {
+pub fn create_gossipsub(mempool_ids: Vec<String>) -> Result<Gossipsub, String> {
     let filter = create_whitelist_filter(mempool_ids.clone());
-    let gs_config = ConfigBuilder::default()
-        .validate_messages()
-        .validation_mode(ValidationMode::Anonymous)
-        .message_id_fn(message_id_fn)
-        .build()
-        .map_err(|err| err.to_string())?;
-    let snappy_transform = SnappyTransform::new(MAX_GOSSIP_SNAP_SIZE);
+    let config = gossipsub_config();
+    let snappy_transform = SnappyTransform::new(GOSSIP_MAX_SIZE);
     let mut gossipsub = Gossipsub::new_with_subscription_filter_and_transform(
         MessageAuthenticity::Anonymous,
-        gs_config,
+        config,
         None,
         filter,
         snappy_transform,

@@ -1,9 +1,16 @@
-use super::{
-    handler::{Handler, HandlerEvent, OutboundInfo},
-    models::{Request, RequestId, Response},
-    BoundError,
+pub mod codec;
+pub mod handler;
+pub mod methods;
+pub mod outbound;
+pub mod protocol;
+
+use self::{
+    handler::{Error, HandlerEvent, OutboundInfo, RPCHandler, RequestContainer, ResponseContainer},
+    methods::{RPCResponse, RequestId},
+    outbound::OutboundRequest,
+    protocol::InboundRequest,
 };
-use futures::channel::oneshot;
+use futures::channel::oneshot::Sender;
 use libp2p::{
     swarm::{
         dial_opts::DialOpts, ConnectionClosed, ConnectionDenied, ConnectionId, DialFailure,
@@ -12,6 +19,7 @@ use libp2p::{
     },
     PeerId,
 };
+use silius_primitives::constants::p2p::RESP_TIMEOUT;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::{atomic::AtomicU64, Arc},
@@ -21,56 +29,36 @@ use std::{
 
 /// The event of the request-response protocol.
 #[derive(Debug)]
-pub enum Event {
+pub enum RPCEvent {
     Request {
         peer_id: PeerId,
-        request: Request,
-        request_id: RequestId,
-        response_sender: oneshot::Sender<Response>,
+        request: InboundRequest,
+        req_id: RequestId,
+        sender: Sender<RPCResponse>,
     },
     Response {
         peer_id: PeerId,
-        request_id: RequestId,
-        response: Response,
-    },
-    OutboundFailure {
-        peer_id: PeerId,
-        request_id: RequestId,
-        error: OutboundFailure,
+        req_id: RequestId,
+        response: RPCResponse,
     },
     InboundFailure {
         peer_id: PeerId,
-        request_id: RequestId,
-        error: InboundFailure,
+        req_id: RequestId,
+        err: InboundFailure,
+    },
+    OutboundFailure {
+        peer_id: PeerId,
+        req_id: RequestId,
+        err: OutboundFailure,
     },
     ResponseSent {
         peer_id: PeerId,
-        request_id: RequestId,
+        req_id: RequestId,
     },
     UpgradeFailure {
         peer_id: PeerId,
-        request_id: RequestId,
+        req_id: RequestId,
     },
-}
-
-#[derive(Debug)]
-pub enum OutboundFailure {
-    /// A dialing attempt failed.
-    DialFailure,
-    /// The request timed out before a response was received.
-    ///
-    /// It is not known whether the request may have been
-    /// received (and processed) by the remote peer.
-    Timeout,
-    /// The connection closed before a response was received.
-    ///
-    /// It is not known whether the request may have been
-    /// received (and processed) by the remote peer.
-    ConnectionClosed,
-    /// The remote supports none of the requested protocols.
-    UnsupportedProtocols,
-    /// Error happended while handleing the outbound
-    BoundError(BoundError),
 }
 
 #[derive(Debug)]
@@ -90,38 +78,77 @@ pub enum InboundFailure {
     /// being passed to [`Behaviour::send_response`].
     ResponseOmission,
     /// Error happended while handling the inbound
-    BoundError(BoundError),
-}
-#[derive(Debug)]
-pub struct Config {
-    pub request_timeout: Duration,
+    Error(Error),
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self { request_timeout: Duration::from_secs(10) }
+#[derive(Debug)]
+pub enum OutboundFailure {
+    /// A dialing attempt failed.
+    DialFailure,
+    /// The request timed out before a response was received.
+    ///
+    /// It is not known whether the request may have been
+    /// received (and processed) by the remote peer.
+    Timeout,
+    /// The connection closed before a response was received.
+    ///
+    /// It is not known whether the request may have been
+    /// received (and processed) by the remote peer.
+    ConnectionClosed,
+    /// The remote supports none of the requested protocols.
+    UnsupportedProtocols,
+    /// Error happended while handling the outbound
+    Error(Error),
+}
+
+/// A connection with inbound and outbound request id.
+struct Connection {
+    id: ConnectionId,
+    /// Pending inbound responses for previously sent requests on this
+    /// connection.
+    pending_inbound_responses: HashSet<RequestId>,
+    /// Pending outbound responses where corresponding inbound requests have
+    /// been received on this connection and emitted via `poll` but have not yet
+    /// been answered.
+    pending_outbound_responses: HashSet<RequestId>,
+}
+
+impl Connection {
+    fn new(id: ConnectionId) -> Self {
+        Self {
+            id,
+            pending_inbound_responses: Default::default(),
+            pending_outbound_responses: Default::default(),
+        }
     }
 }
-pub struct Behaviour {
-    /// Configuration for the request-response protocol.
-    config: Config,
+
+pub struct RPC {
+    /// Timeout for response.
+    resp_timeout: Duration,
     /// The next (local) request ID.
     next_request_id: RequestId,
     /// The next (inbound) request ID.
     next_inbound_id: Arc<AtomicU64>,
     /// The next (outbound) request ID
     /// pending events to return from `Poll`
-    pending_events: VecDeque<ToSwarm<Event, OutboundInfo>>,
+    pending_events: VecDeque<ToSwarm<RPCEvent, OutboundInfo>>,
     /// The set of connected peers and their connections.
     connected: HashMap<PeerId, Vec<Connection>>,
     /// The set of pending outbound requests for each peer.
     pending_outbound_requests: HashMap<PeerId, Vec<OutboundInfo>>,
 }
 
-impl Behaviour {
-    pub fn new(config: Config) -> Self {
+impl Default for RPC {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RPC {
+    pub fn new() -> Self {
         Self {
-            config,
+            resp_timeout: Duration::from_secs(RESP_TIMEOUT),
             next_request_id: RequestId(1),
             next_inbound_id: Arc::new(AtomicU64::new(1)),
             pending_events: VecDeque::new(),
@@ -129,33 +156,12 @@ impl Behaviour {
             pending_outbound_requests: HashMap::new(),
         }
     }
+
     /// Returns the next request ID.
     fn next_request_id(&mut self) -> RequestId {
         let request_id = self.next_request_id;
         self.next_request_id.0 += 1;
         request_id
-    }
-
-    /// Send a request to the given peer.
-    pub fn send_request(&mut self, peer: &PeerId, request: Request) -> RequestId {
-        let request_id = self.next_request_id();
-        let request = OutboundInfo { request, request_id };
-
-        if let Some(request) = self.try_send_request(peer, request) {
-            self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(*peer).build() });
-            self.pending_outbound_requests.entry(*peer).or_default().push(request);
-        }
-
-        request_id
-    }
-
-    /// Send a response to the given peer.
-    pub fn send_response(
-        &mut self,
-        sender: oneshot::Sender<Response>,
-        response: Response,
-    ) -> Result<(), Response> {
-        sender.send(response)
     }
 
     /// Try to send a request to the given peer.
@@ -164,9 +170,9 @@ impl Behaviour {
             if connections.is_empty() {
                 return Some(request);
             }
-            let id = (request.request_id.0 as usize) % connections.len();
+            let id = (request.req_id.0 as usize) % connections.len();
             let conn = &mut connections[id];
-            conn.pending_inbound_responses.insert(request.request_id);
+            conn.pending_inbound_responses.insert(request.req_id);
             self.pending_events.push_back(ToSwarm::NotifyHandler {
                 peer_id: *peer,
                 handler: NotifyHandler::One(conn.id),
@@ -177,6 +183,41 @@ impl Behaviour {
             Some(request)
         }
     }
+
+    /// Send a request to the given peer.
+    pub fn send_request(&mut self, peer: &PeerId, request: OutboundRequest) -> RequestId {
+        let req_id = self.next_request_id();
+        let request = OutboundInfo { req_id, request };
+
+        if let Some(request) = self.try_send_request(peer, request) {
+            self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(*peer).build() });
+            self.pending_outbound_requests.entry(*peer).or_default().push(request);
+        }
+
+        req_id
+    }
+
+    /// Send a response to the given peer.
+    pub fn send_response(
+        &mut self,
+        sender: Sender<RPCResponse>,
+        response: RPCResponse,
+    ) -> Result<(), RPCResponse> {
+        sender.send(response)
+    }
+
+    /// Returns a mutable reference to the connection in `self.connected`
+    /// corresponding to the given [`PeerId`] and [`ConnectionId`].
+    fn get_connection_mut(
+        &mut self,
+        peer: &PeerId,
+        connection: ConnectionId,
+    ) -> Option<&mut Connection> {
+        self.connected
+            .get_mut(peer)
+            .and_then(|connections| connections.iter_mut().find(|c| c.id == connection))
+    }
+
     /// Remove pending outbound response for the given peer and connection.
     ///
     /// Returns `true` if the provided connection to the given peer is still
@@ -209,18 +250,6 @@ impl Behaviour {
             .unwrap_or(false)
     }
 
-    /// Returns a mutable reference to the connection in `self.connected`
-    /// corresponding to the given [`PeerId`] and [`ConnectionId`].
-    fn get_connection_mut(
-        &mut self,
-        peer: &PeerId,
-        connection: ConnectionId,
-    ) -> Option<&mut Connection> {
-        self.connected
-            .get_mut(peer)
-            .and_then(|connections| connections.iter_mut().find(|c| c.id == connection))
-    }
-
     fn on_connection_closed(
         &mut self,
         ConnectionClosed { peer_id, connection_id, remaining_established, .. }: ConnectionClosed,
@@ -241,19 +270,19 @@ impl Behaviour {
             self.connected.remove(&peer_id);
         }
 
-        for request_id in connection.pending_outbound_responses {
-            self.pending_events.push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
+        for req_id in connection.pending_outbound_responses {
+            self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::InboundFailure {
                 peer_id,
-                request_id,
-                error: InboundFailure::ConnectionClosed,
+                req_id,
+                err: InboundFailure::ConnectionClosed,
             }));
         }
 
-        for request_id in connection.pending_inbound_responses {
-            self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
+        for req_id in connection.pending_inbound_responses {
+            self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::OutboundFailure {
                 peer_id,
-                request_id,
-                error: OutboundFailure::ConnectionClosed,
+                req_id,
+                err: OutboundFailure::ConnectionClosed,
             }));
         }
     }
@@ -268,20 +297,23 @@ impl Behaviour {
             // another, concurrent dialing attempt ongoing.
             if let Some(pending) = self.pending_outbound_requests.remove(&peer_id) {
                 for request in pending {
-                    self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
-                        peer_id,
-                        request_id: request.request_id,
-                        error: OutboundFailure::DialFailure,
-                    }));
+                    self.pending_events.push_back(ToSwarm::GenerateEvent(
+                        RPCEvent::OutboundFailure {
+                            peer_id,
+                            req_id: request.req_id,
+                            err: OutboundFailure::DialFailure,
+                        },
+                    ));
                 }
             }
         }
     }
 }
 
-impl NetworkBehaviour for Behaviour {
-    type ConnectionHandler = Handler;
-    type ToSwarm = Event;
+impl NetworkBehaviour for RPC {
+    type ConnectionHandler = RPCHandler;
+    type ToSwarm = RPCEvent;
+
     fn handle_established_inbound_connection(
         &mut self,
         connection_id: ConnectionId,
@@ -289,7 +321,7 @@ impl NetworkBehaviour for Behaviour {
         _local_addr: &libp2p::Multiaddr,
         _remote_addr: &libp2p::Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(Handler::new(connection_id, self.config.request_timeout, self.next_inbound_id.clone()))
+        Ok(RPCHandler::new(self.next_inbound_id.clone(), connection_id, self.resp_timeout))
     }
 
     fn handle_established_outbound_connection(
@@ -299,7 +331,7 @@ impl NetworkBehaviour for Behaviour {
         _addr: &libp2p::Multiaddr,
         _role_override: libp2p::core::Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        Ok(Handler::new(connection_id, self.config.request_timeout, self.next_inbound_id.clone()))
+        Ok(RPCHandler::new(self.next_inbound_id.clone(), connection_id, self.resp_timeout))
     }
 
     fn handle_pending_inbound_connection(
@@ -328,96 +360,93 @@ impl NetworkBehaviour for Behaviour {
         event: THandlerOutEvent<Self>,
     ) {
         match event {
-            HandlerEvent::Request { request, request_id, response_sender } => {
-                let message = Event::Request { peer_id, request_id, request, response_sender };
+            HandlerEvent::Request(RequestContainer { req_id, request, sender }) => {
+                let message = RPCEvent::Request { req_id, peer_id, request, sender };
                 self.pending_events.push_back(ToSwarm::GenerateEvent(message));
 
                 match self.get_connection_mut(&peer_id, connection_id) {
                     Some(connection) => {
-                        connection.pending_outbound_responses.insert(request_id);
+                        connection.pending_outbound_responses.insert(req_id);
                     }
                     // Connection closed after `Event::Request` has been emitted.
                     None => {
                         self.pending_events.push_back(ToSwarm::GenerateEvent(
-                            Event::InboundFailure {
+                            RPCEvent::InboundFailure {
                                 peer_id,
-                                request_id,
-                                error: InboundFailure::ConnectionClosed,
+                                req_id,
+                                err: InboundFailure::ConnectionClosed,
                             },
                         ));
                     }
                 }
             }
-            HandlerEvent::Response { response, request_id } => {
-                self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
+            HandlerEvent::Response(ResponseContainer { req_id, response }) => {
+                self.remove_pending_inbound_response(&peer_id, connection_id, &req_id);
 
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::Response {
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::Response {
                     peer_id,
-                    request_id,
+                    req_id,
                     response,
                 }));
             }
-            HandlerEvent::InboundTimeout(request_id) => {
-                self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
+            HandlerEvent::InboundTimeout(req_id) => {
+                self.remove_pending_inbound_response(&peer_id, connection_id, &req_id);
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::InboundFailure {
                     peer_id,
-                    request_id,
-                    error: InboundFailure::Timeout,
+                    req_id,
+                    err: InboundFailure::Timeout,
                 }))
             }
-            HandlerEvent::InboundError { request_id, error } => {
-                self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
+            HandlerEvent::InboundError { req_id, err } => {
+                self.remove_pending_inbound_response(&peer_id, connection_id, &req_id);
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::InboundFailure {
                     peer_id,
-                    request_id,
-                    error: InboundFailure::BoundError(error),
+                    req_id,
+                    err: InboundFailure::Error(err),
                 }))
             }
-            HandlerEvent::OutboundError { request_id, error } => {
-                self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
+            HandlerEvent::OutboundError { req_id, err } => {
+                self.remove_pending_outbound_response(&peer_id, connection_id, req_id);
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::OutboundFailure {
                     peer_id,
-                    request_id,
-                    error: OutboundFailure::BoundError(error),
+                    req_id,
+                    err: OutboundFailure::Error(err),
                 }))
             }
             HandlerEvent::DialUpgradeTimeout(_) => {}
-            HandlerEvent::ResponseSent(request_id) => {
-                self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
+            HandlerEvent::ResponseSent(req_id) => {
+                self.remove_pending_outbound_response(&peer_id, connection_id, req_id);
 
                 self.pending_events
-                    .push_back(ToSwarm::GenerateEvent(Event::ResponseSent { peer_id, request_id }));
+                    .push_back(ToSwarm::GenerateEvent(RPCEvent::ResponseSent { peer_id, req_id }));
             }
-            HandlerEvent::ResponseOmission(request_id) => {
-                self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
+            HandlerEvent::ResponseOmission(req_id) => {
+                self.remove_pending_outbound_response(&peer_id, connection_id, req_id);
 
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::InboundFailure {
                     peer_id,
-                    request_id,
-                    error: InboundFailure::ResponseOmission,
+                    req_id,
+                    err: InboundFailure::ResponseOmission,
                 }));
             }
-            HandlerEvent::OutboundTimeout(request_id) => {
-                self.remove_pending_outbound_response(&peer_id, connection_id, request_id);
+            HandlerEvent::OutboundTimeout(req_id) => {
+                self.remove_pending_outbound_response(&peer_id, connection_id, req_id);
 
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::OutboundFailure {
                     peer_id,
-                    request_id,
-                    error: OutboundFailure::Timeout,
+                    req_id,
+                    err: OutboundFailure::Timeout,
                 }));
             }
-            HandlerEvent::OutboundUnsurpportedProtocol(request_id) => {
+            HandlerEvent::OutboundUnsuportedProtocol(req_id) => {
                 let removed =
-                    self.remove_pending_inbound_response(&peer_id, connection_id, &request_id);
-                debug_assert!(
-                    removed,
-                    "Expect request_id to be pending before failing to connect.",
-                );
+                    self.remove_pending_inbound_response(&peer_id, connection_id, &req_id);
+                debug_assert!(removed, "Expect req_id to be pending before failing to connect.",);
 
-                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
+                self.pending_events.push_back(ToSwarm::GenerateEvent(RPCEvent::OutboundFailure {
                     peer_id,
-                    request_id,
-                    error: OutboundFailure::UnsupportedProtocols,
+                    req_id,
+                    err: OutboundFailure::UnsupportedProtocols,
                 }));
             }
         }
@@ -459,27 +488,5 @@ impl NetworkBehaviour for Behaviour {
             return Poll::Ready(ev);
         }
         Poll::Pending
-    }
-}
-
-/// A connection with inbound and outbound request id.
-struct Connection {
-    id: ConnectionId,
-    /// Pending outbound responses where corresponding inbound requests have
-    /// been received on this connection and emitted via `poll` but have not yet
-    /// been answered.
-    pending_outbound_responses: HashSet<RequestId>,
-    /// Pending inbound responses for previously sent requests on this
-    /// connection.
-    pending_inbound_responses: HashSet<RequestId>,
-}
-
-impl Connection {
-    fn new(id: ConnectionId) -> Self {
-        Self {
-            id,
-            pending_outbound_responses: Default::default(),
-            pending_inbound_responses: Default::default(),
-        }
     }
 }

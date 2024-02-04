@@ -25,7 +25,6 @@ use silius_primitives::{
     bundler::SendStrategy,
     constants::{
         entry_point, flashbots_relay_endpoints,
-        p2p::{NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME},
         storage::DATABASE_FOLDER_NAME,
         supported_chains::CHAINS,
         validation::reputation::{
@@ -210,28 +209,24 @@ where
         eth_client_version
     );
 
-    let chain_id = Chain::from(eth_client.get_chainid().await?.as_u64());
-
+    let chain = Chain::from(eth_client.get_chainid().await?.as_u64());
     let datadir = unwrap_path_or_home(args.datadir)?;
-
-    let node_key_file = match args.p2p_opts.node_key.clone() {
-        Some(key_file) => key_file,
-        None => datadir.join(NODE_KEY_FILE_NAME),
-    };
-    let node_enr_file = match args.p2p_opts.node_enr.clone() {
-        Some(enr_file) => enr_file,
-        None => datadir.join(NODE_ENR_FILE_NAME),
+    let p2p_config = if args.p2p_opts.enable_p2p {
+        Some(args.p2p_opts.to_config(&chain, &datadir))
+    } else {
+        None
     };
 
     let entrypoint_api = EntryPoint::new(
         eth_client.clone(),
         Address::from_str(entry_point::ADDRESS).expect("address should be valid"),
     );
+
     match (args.uopool_mode, args.storage_type) {
         (silius_primitives::UoPoolMode::Standard, StorageType::Memory) => {
             let validator = new_canonical(
                 entrypoint_api,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 args.min_priority_fee_per_gas,
             );
@@ -264,16 +259,12 @@ where
                 entry_points,
                 eth_client,
                 block_streams,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 mempool,
                 reputation,
                 validator,
-                args.p2p_opts.enable_p2p,
-                node_key_file,
-                node_enr_file,
-                args.p2p_opts.to_config(),
-                args.p2p_opts.bootnodes,
+                p2p_config,
                 metrics_args.enable_metrics,
             )
             .await?;
@@ -282,7 +273,7 @@ where
         (silius_primitives::UoPoolMode::Standard, StorageType::Database) => {
             let validator = new_canonical(
                 entrypoint_api,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 args.min_priority_fee_per_gas,
             );
@@ -316,16 +307,12 @@ where
                 entry_points,
                 eth_client,
                 block_streams,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 mempool,
                 reputation,
                 validator,
-                args.p2p_opts.enable_p2p,
-                node_key_file,
-                node_enr_file,
-                args.p2p_opts.to_config(),
-                args.p2p_opts.bootnodes,
+                p2p_config,
                 metrics_args.enable_metrics,
             )
             .await?;
@@ -334,7 +321,7 @@ where
         (silius_primitives::UoPoolMode::Unsafe, StorageType::Memory) => {
             let validator = new_canonical_unsafe(
                 entrypoint_api,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 args.min_priority_fee_per_gas,
             );
@@ -367,16 +354,12 @@ where
                 entry_points,
                 eth_client,
                 block_streams,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 mempool,
                 reputation,
                 validator,
-                args.p2p_opts.enable_p2p,
-                node_key_file,
-                node_enr_file,
-                args.p2p_opts.to_config(),
-                args.p2p_opts.bootnodes,
+                p2p_config,
                 metrics_args.enable_metrics,
             )
             .await?;
@@ -385,7 +368,7 @@ where
         (silius_primitives::UoPoolMode::Unsafe, StorageType::Database) => {
             let validator = new_canonical_unsafe(
                 entrypoint_api,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 args.min_priority_fee_per_gas,
             );
@@ -419,16 +402,12 @@ where
                 entry_points,
                 eth_client,
                 block_streams,
-                chain_id,
+                chain,
                 args.max_verification_gas,
                 mempool,
                 reputation,
                 validator,
-                args.p2p_opts.enable_p2p,
-                node_key_file,
-                node_enr_file,
-                args.p2p_opts.to_config(),
-                args.p2p_opts.bootnodes,
+                p2p_config,
                 metrics_args.enable_metrics,
             )
             .await?;

@@ -1,18 +1,16 @@
-use crate::{
-    config::{Config, ListenAddr},
-    enr::{build_enr, keypair_to_combined},
-    network::{Network, NetworkEvent},
-};
 use alloy_chains::Chain;
 use futures::channel::mpsc::unbounded;
-use libp2p::identity::Keypair;
+use silius_p2p::{
+    config::{gossipsub_config, Config},
+    listen_addr::{ListenAddr, ListenAddress},
+    service::{Network, NetworkEvent},
+};
+use silius_primitives::constants::p2p::TARGET_PEERS;
 use std::{
     net::{Ipv4Addr, TcpListener},
     time::Duration,
 };
-mod enr;
-mod pubsub;
-mod req_rep;
+use tempdir::TempDir;
 
 pub fn get_available_port() -> Option<u16> {
     let unused_port: u16;
@@ -33,43 +31,53 @@ pub fn get_available_port() -> Option<u16> {
 }
 
 fn build_p2p_instance() -> eyre::Result<Network> {
-    let key = Keypair::generate_secp256k1();
+    let dir = TempDir::new("test-silius-p2p").unwrap();
+    let node_key_file = dir.path().join("node_key");
+    let node_enr_file = dir.path().join("node_enr");
+
     let available_port = get_available_port().unwrap();
+    let listen_addr = ListenAddress::V4(ListenAddr {
+        addr: Ipv4Addr::LOCALHOST,
+        udp_port: available_port,
+        tcp_port: available_port,
+    });
+
+    let chain = Chain::dev();
+
     let config = Config {
-        listen_addr: crate::config::ListenAddress::Ipv4(ListenAddr {
-            addr: Ipv4Addr::LOCALHOST,
-            udp_port: available_port,
-            tcp_port: available_port,
-        }),
+        node_key_file,
+        node_enr_file,
+        listen_addr: listen_addr.clone(),
         ipv4_addr: Some(Ipv4Addr::LOCALHOST),
         ipv6_addr: None,
         enr_udp4_port: Some(available_port),
         enr_tcp4_port: Some(available_port),
         enr_udp6_port: None,
         enr_tcp6_port: None,
+        gs_config: gossipsub_config(),
+        discv5_config: discv5::ConfigBuilder::new(listen_addr.to_listen_config()).build(),
+        chain: chain.clone(),
+        target_peers: TARGET_PEERS,
+        bootnodes: vec![],
     };
-    let listen_addrs = config.listen_addr.to_multi_addr();
+
     let (_, rv) = unbounded();
     let (sd, _) = unbounded();
-    let enr = build_enr(&keypair_to_combined(key.clone())?, &config).unwrap();
-    let mut network = Network::new(
-        enr,
-        key,
-        config,
-        vec![(Chain::from(5), Default::default(), rv, sd)],
-        Duration::from_secs(10),
-        30,
-    )?;
-    for listen_addr in listen_addrs {
+
+    let mut network = Network::new(config, vec![(chain, Default::default(), rv, sd)])?;
+
+    for listen_addr in listen_addr.to_multi_addr() {
         println!("listen on {listen_addr:?}");
         network.listen_on(listen_addr)?;
     }
+
     Ok(network)
 }
 
 pub async fn build_connnected_p2p_pair() -> eyre::Result<(Network, Network)> {
     let mut peer1 = build_p2p_instance()?;
     let mut peer2 = build_p2p_instance()?;
+
     // let the two nodes set up listeners
     let peer1_fut = async {
         loop {
@@ -93,8 +101,10 @@ pub async fn build_connnected_p2p_pair() -> eyre::Result<(Network, Network)> {
         _  = tokio::time::sleep(Duration::from_millis(500)) => {}
         _ = joined => {}
     }
+
     let peer2_enr = peer2.local_enr();
     println!("peer1 dial peer2");
     peer1.dial(peer2_enr)?;
+
     Ok((peer1, peer2))
 }

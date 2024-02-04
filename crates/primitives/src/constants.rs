@@ -88,7 +88,7 @@ pub mod supported_chains {
         NamedChain::Sepolia,
         NamedChain::Holesky,
         NamedChain::PolygonMumbai,
-        NamedChain::LineaTestnet,
+        NamedChain::LineaGoerli,
         NamedChain::OptimismGoerli,
         NamedChain::OptimismSepolia,
         NamedChain::ArbitrumGoerli,
@@ -124,22 +124,50 @@ pub mod storage {
 
 /// P2P
 pub mod p2p {
+    use std::net::Ipv4Addr;
+
+    /// The default IP address.
+    pub const IPV4_ADDRESS: Ipv4Addr = Ipv4Addr::UNSPECIFIED;
+    /// The default UDP port for discovery.
+    pub const UDP_PORT: u16 = 9000;
+    /// The default TCP port for libp2p services.
+    pub const TCP_PORT: u16 = 9000;
     /// The default path for storing the node p2p key
     pub const NODE_KEY_FILE_NAME: &str = "p2p/node-key";
     /// The default path for storing the node enr
     pub const NODE_ENR_FILE_NAME: &str = "p2p/node-enr";
-    /// The prefix protocol id for request-response protocol
-    pub const REQREP_PROTOCOL_PREFIX: &str = "/account_abstraction/req";
+    /// Default target peers.
+    pub const TARGET_PEERS: usize = 10;
+    /// Default ping interval.
+    pub const PING_INTERVAL: u64 = 10;
+    /// Request message size maximum
+    pub const REQUEST_SIZE_MAXIMUM: u64 = 1024 * 1024; // bytes
+    /// Response message size maximum
+    pub const RESPONSE_SIZE_MAXIMUM: u64 = 10 * 1024 * 1024; // bytes
+    /// The protocol prefix for request-response protocol
+    pub const PROTOCOL_PREFIX: &str = "/account_abstraction/req";
     /// The topic hash prefix for gossisub protocol
     pub const TOPIC_PREFIX: &str = "account_abstraction";
-    /// The user operation with entrypoint topic for gossipsub protocol
-    pub const USER_OPS_WITH_ENTRY_POINT_TOPIC: &str = "user_ops_with_entry_point";
+    /// User operations topic for gossipsub protocol
+    pub const USER_OPERATIONS_TOPIC: &str = "user_operations";
     /// The snappy encoding for gossipsub protocol
     pub const SSZ_SNAPPY_ENCODING: &str = "ssz_snappy";
-    /// The maximum size of a gossipsub message
-    pub const MAX_GOSSIP_SNAP_SIZE: usize = 1048576; // bytes
+    /// The maximum size of a uncompressed gossipsub message
+    pub const GOSSIP_MAX_SIZE: usize = 1048576; // bytes
+    /// The maximum number of user operations in a single request
+    pub const MAX_OPS_PER_REQUEST: usize = 4096;
+    /// The maximum time for complete response transfer
+    pub const RESP_TIMEOUT: u64 = 10; // seconds
+    /// The maximum time to wait for first byte of request response (time-to-first-byte)
+    pub const TTFB_TIMEOUT: usize = 5; // seconds
+    /// The amount of time to maintain a request context of pooled hashes
+    pub const POOLED_HASHES_CONTEXT_TIMEOUT: usize = 10; // seconds
+    /// The maximum amount of supported mempools
+    pub const MAX_SUPPORTED_MEMPOOLS: usize = 1024;
     /// 4-byte domain for gossip message-id isolation of *invalid* snappy messages
     pub const MESSAGE_DOMAIN_INVALID_SNAPPY: [u8; 4] = [0, 0, 0, 0];
     /// 4-byte domain for gossip message-id isolation of *valid* snappy messages
     pub const MESSAGE_DOMAIN_VALID_SNAPPY: [u8; 4] = [1, 0, 0, 0];
+    /// The maximum length for the IPFS CID string.
+    pub const MAX_IPFS_CID_LENGTH: usize = 256;
 }

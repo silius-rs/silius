@@ -1,3 +1,6 @@
+pub mod enr;
+pub mod enr_ext;
+
 use crate::config::Config;
 use discv5::{
     enr::{CombinedKey, NodeId},
@@ -10,6 +13,16 @@ use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
 type QueryResult = Result<Vec<Enr>, discv5::QueryError>;
+
+pub enum EventStream {
+    /// Awaiting an event stream to be generated. This is required due to the poll nature of
+    /// `Discovery`
+    Awaiting(Pin<Box<dyn Future<Output = Result<mpsc::Receiver<Event>, discv5::Error>> + Send>>),
+    /// The future has completed.
+    Present(mpsc::Receiver<Event>),
+    // The future has failed or discv5 has been disabled. There are no events from discv5.
+    InActive,
+}
 
 pub struct Discovery {
     /// Core discv5 service.
@@ -25,22 +38,13 @@ pub struct Discovery {
     event_stream: EventStream,
 }
 
-pub enum EventStream {
-    /// Awaiting an event stream to be generated. This is required due to the poll nature of
-    /// `Discovery`
-    Awaiting(Pin<Box<dyn Future<Output = Result<mpsc::Receiver<Event>, discv5::Error>> + Send>>),
-    /// The future has completed.
-    Present(mpsc::Receiver<Event>),
-    // The future has failed or discv5 has been disabled. There are no events from discv5.
-    InActive,
-}
-
 impl Discovery {
     pub fn new(enr: Enr, key: CombinedKey, config: Config) -> eyre::Result<Self> {
-        let config = ConfigBuilder::new(config.to_listen_config()).build();
+        let config = ConfigBuilder::new(config.listen_addr.to_listen_config()).build();
         let discovery: Discv5<_> = Discv5::new(enr, key, config).map_err(|e| eyre::anyhow!(e))?;
 
         let event_stream_fut = discovery.event_stream().boxed();
+
         Ok(Self {
             discovery,
             active_queries: Default::default(),
@@ -121,6 +125,7 @@ impl NetworkBehaviour for Discovery {
         };
         Poll::Pending
     }
+
     fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm) {}
 
     fn on_connection_handler_event(
