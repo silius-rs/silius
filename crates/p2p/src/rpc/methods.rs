@@ -1,21 +1,23 @@
-use crate::config::Metadata;
-use silius_primitives::UserOperationSigned;
+use silius_primitives::{
+    constants::p2p::{MAX_IPFS_CID_LENGTH, MAX_OPS_PER_REQUEST, MAX_SUPPORTED_MEMPOOLS},
+    VerifiedUserOperation,
+};
 use ssz_rs::{List, Serialize, Vector};
-use std::io;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Request {
-    Status(Status),
-    GoodbyeReason(GoodbyeReason),
-    Ping(Ping),
-    GetMetadata(GetMetadata),
-    PooledUserOpHashesReq(PooledUserOpHashesReq),
-    PooledUserOpsByHashReq(PooledUserOpsByHashReq),
+/// Metadata of a node/peer.
+#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
+pub struct MetaData {
+    /// The sequence number of the metadata (incremente when data updated).
+    pub seq_number: u64,
+    /// List of all supported mempools (canonical and alt).
+    pub supported_mempools: List<Vector<u8, MAX_IPFS_CID_LENGTH>, MAX_SUPPORTED_MEMPOOLS>,
 }
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct Status {
-    supported_mempool: List<[u8; 32], 1024>,
+pub struct StatusMessage {
+    chain_id: u64,
+    block_hash: [u8; 32],
+    block_number: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -84,31 +86,19 @@ impl Ping {
 }
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct Pong {
-    data: u64,
-}
-
-impl Pong {
-    pub fn new(data: u64) -> Self {
-        Self { data }
-    }
+pub struct PooledUserOpHashesRequest {
+    cursor: [u8; 32],
 }
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct PooledUserOpHashesReq {
-    mempool: [u8; 32],
-    offset: u64,
-}
-
-#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct PooledUserOpsByHashReq {
-    hashes: List<Vector<u8, 32>, 1024>,
+pub struct PooledUserOpsByHashRequest {
+    hashes: List<Vector<u8, 32>, MAX_OPS_PER_REQUEST>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct GetMetadata;
+pub struct MetaDataRequest;
 
-impl ssz_rs::Serializable for GetMetadata {
+impl ssz_rs::Serializable for MetaDataRequest {
     fn is_variable_size() -> bool {
         false
     }
@@ -117,100 +107,63 @@ impl ssz_rs::Serializable for GetMetadata {
     }
 }
 
-impl ssz_rs::Serialize for GetMetadata {
+impl ssz_rs::Serialize for MetaDataRequest {
     fn serialize(&self, _buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
         Ok(0)
     }
 }
 
-impl ssz_rs::Deserialize for GetMetadata {
+impl ssz_rs::Deserialize for MetaDataRequest {
     fn deserialize(_encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
     where
         Self: Sized,
     {
-        Ok(GetMetadata)
+        Ok(MetaDataRequest)
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RequestId(pub(crate) u64);
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Response {
-    Status(Status),
-    GoodbyeReason(GoodbyeReason),
-    Pong(Pong),
-    Metadata(Metadata),
-    PooledUserOpHashes(PooledUserOpHashes),
-    PooledUserOpsByHash(PooledUserOpsByHash),
+pub enum RPCResponse {
+    Status(StatusMessage),
+    Goodbye(GoodbyeReason),
+    Pong(Ping),
+    MetaData(MetaData),
+    PooledUserOpHashes(PooledUserOpHashesResponse),
+    PooledUserOpsByHash(PooledUserOpsByHashResponse),
 }
 
-impl Response {
+#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
+pub struct PooledUserOpHashesResponse {
+    hashes: List<[u8; 32], MAX_OPS_PER_REQUEST>,
+    next_cursor: [u8; 32],
+}
+
+#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
+pub struct PooledUserOpsByHashResponse {
+    hashes: List<VerifiedUserOperation, MAX_OPS_PER_REQUEST>,
+}
+
+impl RPCResponse {
     pub fn serialize(self) -> Result<Vec<u8>, ssz_rs::SerializeError> {
         let mut buffer = Vec::new();
         match self {
-            Response::Status(status) => status.serialize(&mut buffer),
-            Response::GoodbyeReason(reason) => reason.serialize(&mut buffer),
-            Response::Pong(pong) => pong.serialize(&mut buffer),
-            Response::Metadata(metadata) => metadata.serialize(&mut buffer),
-            Response::PooledUserOpHashes(pooled_user_op_hashes) => {
+            RPCResponse::Status(status) => status.serialize(&mut buffer),
+            RPCResponse::Goodbye(reason) => reason.serialize(&mut buffer),
+            RPCResponse::Pong(pong) => pong.serialize(&mut buffer),
+            RPCResponse::MetaData(metadata) => metadata.serialize(&mut buffer),
+            RPCResponse::PooledUserOpHashes(pooled_user_op_hashes) => {
                 pooled_user_op_hashes.serialize(&mut buffer)
             }
-            Response::PooledUserOpsByHash(pooled_user_ops_by_hash) => {
+            RPCResponse::PooledUserOpsByHash(pooled_user_ops_by_hash) => {
                 pooled_user_ops_by_hash.serialize(&mut buffer)
             }
         }?;
         Ok(buffer)
     }
 }
-
-#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct PooledUserOpHashes {
-    more_flag: u64,
-    hashes: List<[u8; 32], 1024>,
-}
-
-#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct PooledUserOpsByHash {
-    hashes: List<UserOperationSigned, 1024>,
-}
-
-#[derive(Clone, Default)]
-pub struct SSZSnappyCodec<Req, Res> {
-    phantom: std::marker::PhantomData<(Req, Res)>,
-}
-
-#[derive(Debug)]
-pub enum BoundError {
-    IoError(io::Error),
-    SSZError(snap::Error),
-    DeserializeError(ssz_rs::DeserializeError),
-    SerializeError(ssz_rs::SerializeError),
-}
-
-impl From<io::Error> for BoundError {
-    fn from(value: io::Error) -> Self {
-        BoundError::IoError(value)
-    }
-}
-
-impl From<snap::Error> for BoundError {
-    fn from(value: snap::Error) -> Self {
-        BoundError::SSZError(value)
-    }
-}
-
-impl From<ssz_rs::DeserializeError> for BoundError {
-    fn from(value: ssz_rs::DeserializeError) -> Self {
-        BoundError::DeserializeError(value)
-    }
-}
-
-impl From<ssz_rs::SerializeError> for BoundError {
-    fn from(value: ssz_rs::SerializeError) -> Self {
-        BoundError::SerializeError(value)
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct RequestId(pub(crate) u64);
 
 #[cfg(test)]
 mod tests {
@@ -219,7 +172,7 @@ mod tests {
     use std::io::Write;
 
     #[test]
-    fn serilize() {
+    fn serialize() {
         let ping = Ping::new(1);
         let mut buffer = Vec::new();
         ping.serialize(&mut buffer).unwrap();

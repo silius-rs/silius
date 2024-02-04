@@ -1,9 +1,18 @@
+use super::{
+    methods::{
+        GoodbyeReason, MetaDataRequest, Ping, PooledUserOpHashesRequest,
+        PooledUserOpsByHashRequest, StatusMessage,
+    },
+    outbound::OutboundRequest,
+};
+use futures::future::{ready, Ready};
 use lazy_static::lazy_static;
-use silius_primitives::constants::p2p::REQREP_PROTOCOL_PREFIX;
+use libp2p::{core::UpgradeInfo, InboundUpgrade, Stream};
+use silius_primitives::constants::p2p::PROTOCOL_PREFIX;
 use std::fmt::Display;
 
 lazy_static! {
-    pub static ref SUPPORTED_PROTOCOL: Vec<ProtocolId> = vec![
+    pub static ref SUPPORTED_PROTOCOLS: Vec<ProtocolId> = vec![
         ProtocolId::new(Protocol::Status),
         ProtocolId::new(Protocol::Goodbye),
         ProtocolId::new(Protocol::Ping),
@@ -30,7 +39,7 @@ impl Display for Protocol {
             Protocol::Goodbye => "goodbye",
             Protocol::Ping => "ping",
             Protocol::MetaData => "metadata",
-            Protocol::PooledUserOpHashes => "pooled_user_ops_hashes",
+            Protocol::PooledUserOpHashes => "pooled_user_op_hashes",
             Protocol::PooledUserOpsByHash => "pooled_user_ops_by_hash",
         };
         f.write_str(result)
@@ -39,8 +48,8 @@ impl Display for Protocol {
 
 #[derive(Clone, Debug)]
 pub struct ProtocolId {
-    /// The RPC message type/name.
-    pub message_name: Protocol,
+    /// The protocol name.
+    pub protocol: Protocol,
 
     /// The version of the RPC.
     pub version: Version,
@@ -48,17 +57,21 @@ pub struct ProtocolId {
     /// The encoding of the RPC.
     pub encoding: Encoding,
 
+    ///
     protocol_id: String,
 }
 
+impl AsRef<str> for ProtocolId {
+    fn as_ref(&self) -> &str {
+        &self.protocol_id
+    }
+}
+
 impl ProtocolId {
-    pub fn new(message_name: Protocol) -> Self {
-        let protocol_id = format!(
-            "{REQREP_PROTOCOL_PREFIX}/{message_name}/{}/{}",
-            Version::V1,
-            Encoding::SSZSnappy
-        );
-        Self { message_name, version: Version::V1, encoding: Encoding::SSZSnappy, protocol_id }
+    pub fn new(protocol: Protocol) -> Self {
+        let protocol_id =
+            format!("{PROTOCOL_PREFIX}/{protocol}/{}/{}", Version::V1, Encoding::SSZSnappy);
+        Self { protocol, version: Version::V1, encoding: Encoding::SSZSnappy, protocol_id }
     }
 }
 
@@ -84,19 +97,51 @@ impl Display for Encoding {
     }
 }
 
-impl AsRef<str> for ProtocolId {
-    fn as_ref(&self) -> &str {
-        &self.protocol_id
+#[derive(Debug, Clone, PartialEq)]
+pub enum InboundRequest {
+    Status(StatusMessage),
+    Goodbye(GoodbyeReason),
+    Ping(Ping),
+    MetaData(MetaDataRequest),
+    PooledUserOpHashes(PooledUserOpHashesRequest),
+    PooledUserOpsByHash(PooledUserOpsByHashRequest),
+}
+
+impl PartialEq<OutboundRequest> for InboundRequest {
+    fn eq(&self, _other: &OutboundRequest) -> bool {
+        matches!(self, _other)
+    }
+}
+
+/// The inbound upgrade for the request-response protocol.
+pub struct InboundProtocolUpgrade;
+
+impl UpgradeInfo for InboundProtocolUpgrade {
+    type Info = ProtocolId;
+    type InfoIter = Vec<Self::Info>;
+
+    fn protocol_info(&self) -> Self::InfoIter {
+        SUPPORTED_PROTOCOLS.clone()
+    }
+}
+
+impl InboundUpgrade<Stream> for InboundProtocolUpgrade {
+    type Error = ();
+    type Output = (Stream, Self::Info);
+    type Future = Ready<Result<Self::Output, Self::Error>>;
+
+    fn upgrade_inbound(self, socket: Stream, info: Self::Info) -> Self::Future {
+        ready(Ok((socket, info)))
     }
 }
 
 #[cfg(test)]
-mod test {
-    use super::SUPPORTED_PROTOCOL;
+mod tests {
+    use super::SUPPORTED_PROTOCOLS;
 
     #[test]
-    fn test_protoco() {
-        let protocols = SUPPORTED_PROTOCOL
+    fn test_protocol() {
+        let protocols = SUPPORTED_PROTOCOLS
             .iter()
             .map(|protocol_id| protocol_id.protocol_id.clone())
             .collect::<Vec<_>>();
@@ -107,7 +152,7 @@ mod test {
                 "/account_abstraction/req/goodbye/1/ssz_snappy",
                 "/account_abstraction/req/ping/1/ssz_snappy",
                 "/account_abstraction/req/metadata/1/ssz_snappy",
-                "/account_abstraction/req/pooled_user_ops_hashes/1/ssz_snappy",
+                "/account_abstraction/req/pooled_user_op_hashes/1/ssz_snappy",
                 "/account_abstraction/req/pooled_user_ops_by_hash/1/ssz_snappy"
             ]
         )

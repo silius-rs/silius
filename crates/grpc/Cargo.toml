@@ -22,7 +22,6 @@ silius-primitives = { workspace = true }
 
 # eth
 alloy-chains = { workspace = true }
-discv5 = { workspace = true }
 ethers = { workspace = true }
 
 # grpc
@@ -34,9 +33,6 @@ tonic = { version = "0.10.2", default-features = false, features = [
     "transport",
 ] }
 tower = { version = "0.4.13" }
-
-# p2p
-libp2p-identity = "0.2.8"
 
 # async
 async-trait = { workspace = true }

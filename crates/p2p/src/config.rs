@@ -1,61 +1,26 @@
-use discv5::ListenConfig;
-use libp2p::{multiaddr::Protocol, Multiaddr};
-use ssz_rs::Bitvector;
-use std::net::{Ipv4Addr, Ipv6Addr};
-
-const DEFAULT_UDP_PORT: u16 = 9000;
-const DEFAULT_TCP_PORT: u16 = 9000;
-
-#[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct Metadata {
-    pub seq_number: u64,
-    pub mempool_nets: Bitvector<64>,
-}
-
-/// The address to listen on for incoming connections.
-/// Ip could be ipv4 or ipv6
-#[derive(Clone, Debug)]
-pub struct ListenAddr<Ip> {
-    pub addr: Ip,
-    pub udp_port: u16,
-    pub tcp_port: u16,
-}
-
-/// Variant of ListenAddr that can be ipv4, ipv6 or dual.
-#[derive(Clone, Debug)]
-pub enum ListenAddress {
-    Ipv4(ListenAddr<Ipv4Addr>),
-    Ipv6(ListenAddr<Ipv6Addr>),
-    Dual(ListenAddr<Ipv4Addr>, ListenAddr<Ipv6Addr>),
-}
-
-impl ListenAddress {
-    pub fn to_multi_addr(&self) -> Vec<Multiaddr> {
-        match self {
-            ListenAddress::Ipv4(v) => vec![Multiaddr::from(v.addr).with(Protocol::Tcp(v.tcp_port))],
-            ListenAddress::Ipv6(v) => vec![Multiaddr::from(v.addr).with(Protocol::Tcp(v.tcp_port))],
-            ListenAddress::Dual(ipv4, ipv6) => {
-                vec![
-                    Multiaddr::from(ipv4.addr).with(Protocol::Tcp(ipv4.tcp_port)),
-                    Multiaddr::from(ipv6.addr).with(Protocol::Tcp(ipv6.tcp_port)),
-                ]
-            }
-        }
-    }
-}
-
-impl Default for ListenAddress {
-    fn default() -> Self {
-        Self::Ipv4(ListenAddr {
-            addr: Ipv4Addr::UNSPECIFIED,
-            udp_port: DEFAULT_UDP_PORT,
-            tcp_port: DEFAULT_TCP_PORT,
-        })
-    }
-}
+use crate::listen_addr::{ListenAddr, ListenAddress};
+use alloy_chains::Chain;
+use discv5::{Enr, ListenConfig};
+use libp2p::gossipsub;
+use sha2::{Digest, Sha256};
+use silius_primitives::constants::p2p::{
+    IPV4_ADDRESS, MESSAGE_DOMAIN_VALID_SNAPPY, NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME,
+    TARGET_PEERS, TCP_PORT, UDP_PORT,
+};
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    path::PathBuf,
+};
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// File to store the node's key.
+    pub node_key_file: PathBuf,
+
+    /// File to store the node's enr.
+    pub node_enr_file: PathBuf,
+
+    /// The listening address for p2p.
     pub listen_addr: ListenAddress,
 
     /// The ipv4 address to broadcast to peers about which address we are listening on.
@@ -75,37 +40,184 @@ pub struct Config {
 
     /// The tcp6 port to broadcast to peers in order to reach back for libp2p services.
     pub enr_tcp6_port: Option<u16>,
+
+    /// Gossipsub configuration.
+    pub gs_config: gossipsub::Config,
+
+    /// Discv5 configuration.
+    pub discv5_config: discv5::Config,
+
+    /// Chain the p2p network is connected on.
+    pub chain: Chain,
+
+    /// Target number of peers.
+    pub target_peers: usize,
+
+    /// List of bootnodes.
+    pub bootnodes: Vec<Enr>,
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let gs_config = gossipsub::ConfigBuilder::default().build().expect("valid config");
+        let discv5_config =
+            discv5::ConfigBuilder::new(ListenConfig::Ipv4 { ip: IPV4_ADDRESS, port: UDP_PORT })
+                .build();
+
         Self {
-            listen_addr: ListenAddress::Ipv4(ListenAddr {
-                addr: Ipv4Addr::UNSPECIFIED,
-                udp_port: DEFAULT_UDP_PORT,
-                tcp_port: DEFAULT_TCP_PORT,
+            node_key_file: PathBuf::from(NODE_KEY_FILE_NAME),
+            node_enr_file: PathBuf::from(NODE_ENR_FILE_NAME),
+            listen_addr: ListenAddress::V4(ListenAddr {
+                addr: IPV4_ADDRESS,
+                udp_port: UDP_PORT,
+                tcp_port: TCP_PORT,
             }),
-            ipv4_addr: Some(Ipv4Addr::UNSPECIFIED),
+            ipv4_addr: Some(IPV4_ADDRESS),
             ipv6_addr: None,
-            enr_udp4_port: Some(DEFAULT_UDP_PORT),
-            enr_tcp4_port: None,
+            enr_udp4_port: Some(UDP_PORT),
+            enr_tcp4_port: Some(TCP_PORT),
             enr_udp6_port: None,
             enr_tcp6_port: None,
+            gs_config,
+            discv5_config,
+            chain: Chain::dev(),
+            target_peers: TARGET_PEERS,
+            bootnodes: vec![],
         }
     }
 }
 
-impl Config {
-    pub fn to_listen_config(&self) -> ListenConfig {
-        match &self.listen_addr {
-            ListenAddress::Ipv4(v) => ListenConfig::Ipv4 { ip: v.addr, port: v.udp_port },
-            ListenAddress::Ipv6(v) => ListenConfig::Ipv6 { ip: v.addr, port: v.udp_port },
-            ListenAddress::Dual(ipv4, ipv6) => ListenConfig::DualStack {
-                ipv4: ipv4.addr,
-                ipv4_port: ipv4.udp_port,
-                ipv6: ipv6.addr,
-                ipv6_port: ipv6.udp_port,
-            },
-        }
+/// Builder for constructing p2p config
+pub struct ConfigBuilder {
+    config: Config,
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
+}
+
+impl ConfigBuilder {
+    /// Create a new config builder.
+    pub fn new() -> Self {
+        Self { config: Config::default() }
+    }
+
+    /// Builds the config.
+    pub fn build(self) -> Config {
+        self.config
+    }
+
+    /// Set the node key file.
+    pub fn node_key_file(mut self, node_key_file: PathBuf) -> Self {
+        self.config.node_key_file = node_key_file;
+        self
+    }
+
+    /// Set the node enr file.
+    pub fn node_enr_file(mut self, node_enr_file: PathBuf) -> Self {
+        self.config.node_enr_file = node_enr_file;
+        self
+    }
+
+    /// Set the listen address.
+    pub fn listen_addr(mut self, listen_addr: ListenAddress) -> Self {
+        self.config.listen_addr = listen_addr;
+        self
+    }
+
+    /// Set the ipv4 address.
+    pub fn ipv4_addr(mut self, ipv4_addr: Option<Ipv4Addr>) -> Self {
+        self.config.ipv4_addr = ipv4_addr;
+        self
+    }
+
+    /// Set the ipv6 address.
+    pub fn ipv6_addr(mut self, ipv6_addr: Option<Ipv6Addr>) -> Self {
+        self.config.ipv6_addr = ipv6_addr;
+        self
+    }
+
+    /// Set the udp4 port.
+    pub fn enr_udp4_port(mut self, enr_udp4_port: Option<u16>) -> Self {
+        self.config.enr_udp4_port = enr_udp4_port;
+        self
+    }
+
+    /// Set the tcp4 port.
+    pub fn enr_tcp4_port(mut self, enr_tcp4_port: Option<u16>) -> Self {
+        self.config.enr_tcp4_port = enr_tcp4_port;
+        self
+    }
+
+    /// Set the udp6 port.
+    pub fn enr_udp6_port(mut self, enr_udp6_port: Option<u16>) -> Self {
+        self.config.enr_udp6_port = enr_udp6_port;
+        self
+    }
+
+    /// Set the tcp6 port.
+    pub fn enr_tcp6_port(mut self, enr_tcp6_port: Option<u16>) -> Self {
+        self.config.enr_tcp6_port = enr_tcp6_port;
+        self
+    }
+
+    /// Set the gossipsub configuration.
+    pub fn gs_config(mut self, gs_config: gossipsub::Config) -> Self {
+        self.config.gs_config = gs_config;
+        self
+    }
+
+    /// Set the discv5 configuration.
+    pub fn discv5_config(mut self, discv5_config: discv5::Config) -> Self {
+        self.config.discv5_config = discv5_config;
+        self
+    }
+
+    /// Set the chain.
+    pub fn chain(mut self, chain: Chain) -> Self {
+        self.config.chain = chain;
+        self
+    }
+
+    /// Set the target number of peers.
+    pub fn target_peers(mut self, target_peers: usize) -> Self {
+        self.config.target_peers = target_peers;
+        self
+    }
+
+    /// Set the bootnodes.
+    pub fn bootnodes(mut self, bootnodes: Vec<Enr>) -> Self {
+        self.config.bootnodes = bootnodes;
+        self
+    }
+}
+
+/// Create a `GossipsubConfig`.
+pub fn gossipsub_config() -> gossipsub::Config {
+    let message_id_fn = |message: &gossipsub::Message| {
+        let topic_bytes = message.topic.as_str().as_bytes();
+        let topic_len_bytes = topic_bytes.len().to_le_bytes();
+
+        let mut vec: Vec<u8> = Vec::with_capacity(
+            MESSAGE_DOMAIN_VALID_SNAPPY.len() +
+                topic_len_bytes.len() +
+                topic_bytes.len() +
+                message.data.len(),
+        );
+        vec.extend_from_slice(&MESSAGE_DOMAIN_VALID_SNAPPY);
+        vec.extend_from_slice(&topic_len_bytes);
+        vec.extend_from_slice(topic_bytes);
+        vec.extend_from_slice(&message.data);
+
+        Sha256::digest(vec)[..20].into()
+    };
+
+    gossipsub::ConfigBuilder::default()
+        .validate_messages()
+        .validation_mode(gossipsub::ValidationMode::Anonymous)
+        .message_id_fn(message_id_fn)
+        .build()
+        .expect("valid config")
 }

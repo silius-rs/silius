@@ -64,4 +64,5 @@ ethers = { workspace = true }
 
 # misc
 env_logger = "0.10.1"
+tempdir = "0.3.7"
 test-log = "0.2.14"

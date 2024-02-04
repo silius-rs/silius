@@ -1,5 +1,5 @@
-use crate::enr::EnrExt;
 use discv5::Enr;
+use silius_p2p::discovery::enr_ext::EnrExt;
 use std::str::FromStr;
 
 #[test]

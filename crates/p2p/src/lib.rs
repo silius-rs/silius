@@ -1,11 +1,9 @@
-pub mod behaviour;
+// This crate is heavilty inspired by the lighthouse p2p crate: https://github.com/sigp/lighthouse/tree/stable/beacon_node/lighthouse_network
+
 pub mod config;
 pub mod discovery;
-pub mod enr;
-pub mod gossipsub;
-pub mod network;
+pub mod listen_addr;
 pub mod peer_manager;
-pub mod request_response;
-
-#[cfg(test)]
-mod tests;
+pub mod rpc;
+pub mod service;
+pub mod types;

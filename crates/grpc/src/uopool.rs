@@ -7,14 +7,12 @@ use crate::{
 };
 use alloy_chains::Chain;
 use async_trait::async_trait;
-use discv5::Enr;
 use ethers::{
     providers::Middleware,
     types::{Address, U256},
 };
 use eyre::Result;
 use futures::{channel::mpsc::unbounded, StreamExt};
-use libp2p_identity::{secp256k1, Keypair};
 use parking_lot::RwLock;
 use silius_mempool::{
     mempool_id, validate::validator::StandardUserOperationValidator, HashSetOp, Mempool,
@@ -25,14 +23,10 @@ use silius_mempool::{
 use silius_metrics::grpc::MetricsLayer;
 use silius_p2p::{
     config::Config,
-    enr::{build_enr, keypair_to_combined},
-    network::{EntrypointChannels, Network},
+    service::{MempoolChannels, Network},
 };
 use silius_primitives::{provider::BlockStream, UserOperation};
-use std::{
-    collections::HashMap, env, net::SocketAddr, os::unix::prelude::PermissionsExt, path::PathBuf,
-    str::FromStr, sync::Arc, time::Duration,
-};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{debug, error, info};
 
@@ -420,11 +414,7 @@ pub async fn uopool_service_run<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>(
     mempool: Mempool<T, Y, X, Z>,
     reputation: Reputation<H, R>,
     validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
-    p2p_enabled: bool,
-    node_key_file: PathBuf,
-    node_enr_file: PathBuf,
-    config: Config,
-    bootnodes: Vec<Enr>,
+    p2p_config: Option<Config>,
     enable_metrics: bool,
 ) -> Result<()>
 where
@@ -445,8 +435,9 @@ where
         let mut m_map =
             HashMap::<MempoolId, UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>>::new();
 
-        if p2p_enabled {
-            let mut entrypoint_channels: EntrypointChannels = Vec::new();
+        // setup p2p
+        if let Some(config) = p2p_config {
+            let mut mempool_channels: MempoolChannels = Vec::new();
 
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
                 let id = mempool_id(&ep, chain.id());
@@ -477,73 +468,23 @@ where
                     }
                 });
                 m_map.insert(id, uo_builder);
-                entrypoint_channels.push((chain, ep, waiting_to_pub_rv, p2p_userop_sd))
+                mempool_channels.push((chain, ep, waiting_to_pub_rv, p2p_userop_sd))
             }
 
-            let discovery_secret = if node_key_file.exists() {
-                let content =
-                    std::fs::read(node_key_file).expect("discovery secret file currupted");
-                Keypair::from_protobuf_encoding(&content).expect("discovery secret file currupted")
-            } else if let Ok(p2p_private_seed) = env::var("P2P_PRIVATE_SEED") {
-                // Mostly test purpose
-                let private_bytes = p2p_private_seed.as_bytes().to_vec();
-                let keypair: secp256k1::Keypair =
-                    secp256k1::SecretKey::try_from_bytes(private_bytes)
-                        .expect("Env P2P_PRIVATE_SEED is not valid private bytes")
-                        .into();
-                keypair.into()
-            } else {
-                info!("The p2p spec private key doesn't exist. Creating one now!");
-
-                let keypair = Keypair::generate_secp256k1();
-                std::fs::create_dir_all(node_key_file.parent().expect("Key file path error"))
-                    .expect("Creating key file directory failed");
-                std::fs::write(
-                    node_key_file.clone(),
-                    keypair.to_protobuf_encoding().expect("Discovery secret encoding failed"),
-                )
-                .expect("Discovery secret writing failed");
-                std::fs::set_permissions(node_key_file, std::fs::Permissions::from_mode(0o600))
-                    .expect("Setting key file permission failed");
-
-                keypair
-            };
-
-            let enr = if node_enr_file.exists() {
-                let content = std::fs::read_to_string(node_enr_file).expect("enr file currupted");
-                Enr::from_str(&content).expect("enr file currupted")
-            } else {
-                let combined_key =
-                    keypair_to_combined(discovery_secret.clone()).expect("key error");
-                let enr = build_enr(&combined_key, &config).expect("enr building failed");
-                std::fs::create_dir_all(node_enr_file.parent().expect("Key file path error"))
-                    .expect("Creating key file directory failed");
-                std::fs::write(node_enr_file, enr.to_base64()).expect("enr writing failed");
-                enr
-            };
-            info!("Enr: {}", enr);
-
             let listen_addrs = config.listen_addr.to_multi_addr();
-            let mut p2p_network = Network::new(
-                enr,
-                discovery_secret,
-                config,
-                entrypoint_channels,
-                Duration::from_secs(10),
-                30,
-            )
-            .expect("p2p network init failed");
+            let mut p2p_network =
+                Network::new(config.clone(), mempool_channels).expect("p2p network init failed");
 
             for listen_addr in listen_addrs.into_iter() {
                 info!("P2P node listened on {}", listen_addr);
                 p2p_network.listen_on(listen_addr).expect("Listen on p2p network failed");
             }
 
-            if bootnodes.is_empty() {
+            if config.bootnodes.is_empty() {
                 info!("Start p2p mode without bootnodes");
             }
 
-            for enr in bootnodes {
+            for enr in config.bootnodes.into_iter() {
                 info!("Trying to dial p2p node {enr:}");
                 p2p_network.dial(enr).expect("Dial bootnode failed");
             }
@@ -571,6 +512,7 @@ where
                 m_map.insert(id, uo_builder);
             }
         };
+
         let uopool_map = Arc::new(RwLock::new(m_map));
         let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
             M,
@@ -584,6 +526,7 @@ where
             SimCk,
             SimTrCk,
         >::new(uopool_map, chain));
+
         if enable_metrics {
             builder.layer(MetricsLayer).add_service(svc).serve(addr).await
         } else {

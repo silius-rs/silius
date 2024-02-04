@@ -2,25 +2,29 @@ use crate::utils::{
     parse_address, parse_duration, parse_enr, parse_label_value, parse_send_bundle_mode,
     parse_u256, parse_uopool_mode,
 };
-use alloy_chains::NamedChain;
+use alloy_chains::{Chain, NamedChain};
 use clap::{Parser, ValueEnum};
 use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use silius_metrics::label::LabelValue;
-use silius_p2p::config::{Config, ListenAddr};
+use silius_p2p::{
+    config::{gossipsub_config, Config, ConfigBuilder},
+    listen_addr::{ListenAddr, ListenAddress},
+};
 use silius_primitives::{
     bundler::SendStrategy,
     constants::{
         bundler::BUNDLE_INTERVAL,
         grpc::{BUNDLER_PORT, MEMPOOL_PORT},
+        p2p::{NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME},
         rpc::{HTTP_PORT, WS_PORT},
     },
     UoPoolMode,
 };
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::Duration,
 };
 
@@ -281,22 +285,35 @@ pub struct P2PArgs {
 }
 
 impl P2PArgs {
-    /// Convert the P2POpts to [silius_p2p::config::Config]
-    pub fn to_config(&self) -> Config {
-        // TODO: support ipv6
-        Config {
-            listen_addr: silius_p2p::config::ListenAddress::Ipv4(ListenAddr {
-                addr: self.p2p_listen_address,
-                udp_port: self.udp4_port,
-                tcp_port: self.tcp4_port,
-            }),
-            ipv4_addr: self.p2p_broadcast_address,
-            ipv6_addr: None,
-            enr_udp4_port: Some(self.udp4_port),
-            enr_tcp4_port: Some(self.tcp4_port),
-            enr_udp6_port: None,
-            enr_tcp6_port: None,
-        }
+    /// Convert the P2PArgs to [silius_p2p::config::Config]
+    pub fn to_config(&self, chain: &Chain, datadir: &Path) -> Config {
+        let listen_addr = ListenAddress::V4(ListenAddr {
+            addr: self.p2p_listen_address,
+            udp_port: self.udp4_port,
+            tcp_port: self.tcp4_port,
+        });
+
+        let config_builder = ConfigBuilder::new()
+            .node_key_file(if let Some(file) = self.node_key.clone() {
+                file
+            } else {
+                datadir.join(NODE_KEY_FILE_NAME)
+            })
+            .node_enr_file(if let Some(file) = self.node_enr.clone() {
+                file
+            } else {
+                datadir.join(NODE_ENR_FILE_NAME)
+            })
+            .listen_addr(listen_addr.clone())
+            .ipv4_addr(self.p2p_broadcast_address)
+            .enr_tcp4_port(Some(self.tcp4_port))
+            .enr_udp4_port(Some(self.udp4_port))
+            .chain(*chain)
+            .bootnodes(self.bootnodes.clone())
+            .gs_config(gossipsub_config())
+            .discv5_config(discv5::ConfigBuilder::new(listen_addr.to_listen_config()).build());
+
+        config_builder.build()
     }
 }
 
