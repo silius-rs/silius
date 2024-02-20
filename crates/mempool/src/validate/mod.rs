@@ -119,7 +119,7 @@ macro_rules! sanity_check_impls {
     ( $( $name:ident )+ ) => {
         #[allow(non_snake_case)]
         #[async_trait::async_trait]
-        impl<M: Middleware,  $($name : SanityCheck<M>,)+ > SanityCheck<M> for ($($name,)+)
+        impl<M: Middleware, $($name : SanityCheck<M>,)+> SanityCheck<M> for ($($name,)+)
         {
             async fn check_user_operation<T, Y, X, Z, H, R>(
                 &self,
@@ -143,6 +143,7 @@ macro_rules! sanity_check_impls {
         }
     };
 }
+
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for () {
     async fn check_user_operation<T, Y, X, Z, H, R>(
@@ -164,7 +165,7 @@ impl<M: Middleware> SanityCheck<M> for () {
     }
 }
 
-// These macro enable people to chain sanity check implementations.:
+// These macro enable people to chain sanity check implementations:
 // `(SanityCheck1, SanityCheck2, SanityCheck3, ...).check_user_operation(uo, mempool, reputation,
 // helper)`` SanityCheck1,2,3 could be any data type which implement SanityCheck trait.
 sanity_check_impls! { A }
@@ -203,11 +204,12 @@ pub trait SimulationCheck: Send + Sync {
         helper: &mut SimulationHelper,
     ) -> Result<(), SimulationError>;
 }
+
 macro_rules! simulation_check_impls {
     ( $( $name:ident )+ ) => {
         #[allow(non_snake_case)]
         #[async_trait::async_trait]
-        impl<$($name : SimulationCheck,)+ > SimulationCheck for ($($name,)+)
+        impl<$($name : SimulationCheck,)+> SimulationCheck for ($($name,)+)
         {
             fn check_user_operation(
                 &self,
@@ -223,15 +225,19 @@ macro_rules! simulation_check_impls {
     };
 }
 
-// These macro enable people to chain simulation check implementations.:
+// These macro enable people to chain simulation check implementations:
 // `(SimulationCheck1, SimulationCheck2, SimulationCheck3, ...).check_user_operation(uo, helper)``
-// SimulationChekc1,2,3 could be any data type which implement SimulationCheck trait.
-simulation_check_impls! {A}
-simulation_check_impls! {A B}
-simulation_check_impls! {A B C}
-simulation_check_impls! {A B C D}
-simulation_check_impls! {A B C D E}
-simulation_check_impls! {A B C D E F}
+// SimulationCheck1,2,3 could be any data type which implement SimulationCheck trait.
+simulation_check_impls! { A }
+simulation_check_impls! { A B }
+simulation_check_impls! { A B C }
+simulation_check_impls! { A B C D }
+simulation_check_impls! { A B C D F }
+simulation_check_impls! { A B C D F G }
+simulation_check_impls! { A B C D F G I }
+simulation_check_impls! { A B C D F G I J }
+simulation_check_impls! { A B C D F G I J K }
+simulation_check_impls! { A B C D F G I J K L }
 
 /// The [UserOperation](UserOperation) simulation trace check helper trait.
 pub struct SimulationTraceHelper<'a, M: Middleware + Send + Sync + 'static> {
@@ -283,6 +289,7 @@ pub trait SimulationTraceCheck<M: Middleware>: Send + Sync {
         H: HashSetOp,
         R: ReputationEntryOp;
 }
+
 macro_rules! simulation_trace_check_impls {
     ( $( $name:ident )+ ) => {
         #[allow(non_snake_case)]
@@ -311,6 +318,7 @@ macro_rules! simulation_trace_check_impls {
         }
     };
 }
+
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for () {
     async fn check_user_operation<T, Y, X, Z, H, R>(
@@ -332,7 +340,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for () {
     }
 }
 
-// These macro enable people to chain simulation check implementations.:
+// These macro enable people to chain simulation check implementations:
 // `(SimulationTraceCheck1, SimulationTraceCheck2, SimulationTraceCheck3,
 // ...).check_user_operation(uo, mempool, reputeation helper)`` SimulationTraceCheck1,2,3 could be
 // any data type which implement SimulationTraceCheck trait.

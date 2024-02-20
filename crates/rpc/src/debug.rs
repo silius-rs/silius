@@ -230,7 +230,6 @@ impl DebugApiServer for DebugApiServerImpl {
     /// This is useful for testing or in situations where waiting for the next scheduled bundle is
     /// not desirable.
     ///
-    ///
     /// # Returns
     /// * `RpcResult<H256>` - The hash of the bundle that was sent.
     async fn send_bundle_now(&self) -> RpcResult<H256> {
