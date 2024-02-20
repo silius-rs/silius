@@ -137,7 +137,7 @@ make lint
 make test
 ```
 
-Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [b9f192f39298e6586729d40f29e3098c92e5c0b9](https://github.com/eth-infinitism/bundler-spec-tests/tree/b9f192f39298e6586729d40f29e3098c92e5c0b9)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [08cbbfcb9e37b84c0ef9e546975f88fa638cac61](https://github.com/eth-infinitism/bundler-spec-tests/tree/08cbbfcb9e37b84c0ef9e546975f88fa638cac61)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
 
 ## Contact
 

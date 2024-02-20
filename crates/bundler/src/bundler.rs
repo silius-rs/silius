@@ -143,10 +143,10 @@ where
     ///
     /// # Returns
     /// * `H256` - The hash
-    pub async fn send_bundle(&self, uos: &Vec<UserOperation>) -> eyre::Result<H256> {
+    pub async fn send_bundle(&self, uos: &Vec<UserOperation>) -> eyre::Result<Option<H256>> {
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");
-            return Ok(H256::default());
+            return Ok(None);
         };
 
         info!(
@@ -167,6 +167,6 @@ where
             self.beneficiary
         );
 
-        Ok(hash)
+        Ok(Some(hash))
     }
 }

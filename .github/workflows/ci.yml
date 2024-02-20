@@ -99,7 +99,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: eth-infinitism/bundler-spec-tests
-          ref: 'b9f192f39298e6586729d40f29e3098c92e5c0b9'
+          ref: '08cbbfcb9e37b84c0ef9e546975f88fa638cac61'
           submodules: true
 
       - uses: actions/checkout@v4

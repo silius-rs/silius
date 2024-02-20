@@ -54,8 +54,8 @@ where
         Ok(uos)
     }
 
-    pub async fn send_bundles(&self) -> eyre::Result<H256> {
-        let mut tx_hashes: Vec<H256> = vec![];
+    pub async fn send_bundles(&self) -> eyre::Result<Option<H256>> {
+        let mut tx_hashes: Vec<Option<H256>> = vec![];
 
         for bundler in self.bundlers.iter() {
             let uos =
@@ -67,7 +67,7 @@ where
 
         // FIXME: Because currently the bundler support multiple bundler and
         // we don't have a way to know which bundler is the one that is
-        Ok(tx_hashes.into_iter().next().expect("Must have at least one tx hash"))
+        Ok(tx_hashes.into_iter().next().expect("At least one bundler must be present"))
     }
 
     pub fn stop_bundling(&self) {
@@ -158,7 +158,27 @@ where
             .send_bundles()
             .await
             .map_err(|e| tonic::Status::internal(format!("Send bundle now with error: {e:?}")))?;
-        Ok(Response::new(SendBundleNowResponse { res: Some(res.into()) }))
+
+        if let Some(tx_hash) = res {
+            // wait for the tx to be mined
+            loop {
+                let tx_receipt = self
+                    .bundlers
+                    .first()
+                    .expect("Must have at least one bundler")
+                    .eth_client
+                    .get_transaction_receipt(tx_hash)
+                    .await;
+                if let Ok(tx_receipt) = tx_receipt {
+                    if tx_receipt.is_some() {
+                        break;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        }
+
+        Ok(Response::new(SendBundleNowResponse { res: Some(res.unwrap_or_default().into()) }))
     }
 }
 

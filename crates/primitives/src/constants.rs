@@ -56,6 +56,11 @@ pub mod validation {
         pub const THROTTLING_SLACK: u64 = 10;
         pub const BAN_SLACK: u64 = 50;
     }
+
+    /// Simulation
+    pub mod simulation {
+        pub const MIN_EXTRA_GAS: u64 = 2000;
+    }
 }
 
 /// Flashbots relay endpoints

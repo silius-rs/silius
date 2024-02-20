@@ -3,7 +3,9 @@ use super::{
         call_gas::CallGas, entities::Entities, max_fee::MaxFee, paymaster::Paymaster,
         sender::Sender, unstaked_entities::UnstakedEntities, verification_gas::VerificationGas,
     },
-    simulation::{signature::Signature, timestamp::Timestamp},
+    simulation::{
+        signature::Signature, timestamp::Timestamp, verification_extra_gas::VerificationExtraGas,
+    },
     simulation_trace::{
         call_stack::CallStack, code_hashes::CodeHashes, external_contracts::ExternalContracts,
         gas::Gas, opcodes::Opcodes, storage_access::StorageAccess,
@@ -35,14 +37,14 @@ use tracing::debug;
 pub type StandardValidator<M> = StandardUserOperationValidator<
     M,
     (Sender, VerificationGas, CallGas, MaxFee, Paymaster, Entities, UnstakedEntities),
-    (Signature, Timestamp),
+    (Signature, Timestamp, VerificationExtraGas),
     (Gas, Opcodes, ExternalContracts, StorageAccess, CallStack, CodeHashes),
 >;
 
 type UnsafeValidator<M> = StandardUserOperationValidator<
     M,
     (Sender, VerificationGas, CallGas, MaxFee, Paymaster, Entities, UnstakedEntities),
-    (Signature, Timestamp),
+    (Signature, Timestamp, VerificationExtraGas),
     (),
 >;
 
@@ -115,7 +117,7 @@ pub fn new_canonical<M: Middleware + 'static>(
             Entities,
             UnstakedEntities,
         ),
-        (Signature, Timestamp),
+        (Signature, Timestamp, VerificationExtraGas),
         (Gas, Opcodes, ExternalContracts, StorageAccess, CallStack, CodeHashes),
     )
 }
@@ -138,7 +140,7 @@ pub fn new_canonical_unsafe<M: Middleware + Clone + 'static>(
             Entities,
             UnstakedEntities,
         ),
-        (Signature, Timestamp),
+        (Signature, Timestamp, VerificationExtraGas),
         (),
     )
 }
