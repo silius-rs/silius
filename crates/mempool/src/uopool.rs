@@ -1,8 +1,8 @@
 use crate::{
+    estimate::estimate_user_op_gas,
     mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
     mempool_id,
     reputation::{HashSetOp, ReputationEntryOp},
-    utils::calculate_call_gas_limit,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
@@ -19,6 +19,7 @@ use eyre::format_err;
 use futures::channel::mpsc::UnboundedSender;
 use silius_contracts::{
     entry_point::UserOperationEventFilter, utils::parse_from_input_data, EntryPoint,
+    EntryPointError,
 };
 use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
@@ -31,6 +32,7 @@ use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, trace};
 
 const FILTER_MAX_DEPTH: u64 = 10;
+const PRE_VERIFICATION_SAFE_RESERVE: u64 = 1_000;
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove,
 /// validate, and serves data requests from the [RPC API](EthApiServer). Architecturally, the
@@ -465,47 +467,40 @@ where
         &self,
         uo: &UserOperation,
     ) -> Result<UserOperationGasEstimation, MempoolError> {
-        let val_out = self
-            .validator
-            .validate_user_operation(
-                uo,
-                &self.mempool,
-                &self.reputation,
-                UserOperationValidatorMode::SimulationTrace.into(),
-            )
-            .await
-            .map_err(|err| MempoolError { hash: uo.hash, kind: err.into() })?;
-
-        match self.entry_point.simulate_execution(uo.user_operation.clone()).await {
-            Ok(_) => {}
-            Err(err) => {
-                return Err(MempoolError {
-                    hash: uo.hash,
-                    kind: SimulationError::Execution { inner: err.to_string() }.into(),
-                })
-            }
-        }
-
-        let exec_res = match self.entry_point.simulate_handle_op(uo.user_operation.clone()).await {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(MempoolError { hash: uo.hash, kind: SimulationError::from(err).into() })
-            }
-        };
-
-        let base_fee_per_gas = self.base_fee_per_gas().await.map_err(|err| MempoolError {
-            hash: uo.hash,
-            kind: MempoolErrorKind::Provider { inner: err.to_string() },
-        })?;
-        let call_gas_limit = calculate_call_gas_limit(
-            exec_res.paid,
-            exec_res.pre_op_gas,
-            uo.max_fee_per_gas.min(uo.max_priority_fee_per_gas + base_fee_per_gas),
-        );
+        let (verification_gas_limit, call_gas_limit) =
+            estimate_user_op_gas(&uo.user_operation, &self.entry_point).await.map_err(
+                |e| match e {
+                    EntryPointError::FailedOp(f) => MempoolError {
+                        hash: uo.hash,
+                        kind: MempoolErrorKind::InvalidUserOperation(
+                            InvalidMempoolUserOperationError::Simulation(
+                                SimulationError::Validation { inner: format!("{f:?}") },
+                            ),
+                        ),
+                    },
+                    EntryPointError::ExecutionReverted(e) => MempoolError {
+                        hash: uo.hash,
+                        kind: MempoolErrorKind::InvalidUserOperation(
+                            InvalidMempoolUserOperationError::Simulation(
+                                SimulationError::Execution { inner: e },
+                            ),
+                        ),
+                    },
+                    EntryPointError::Provider { inner } => {
+                        MempoolError { hash: uo.hash, kind: MempoolErrorKind::Provider { inner } }
+                    }
+                    _ => MempoolError {
+                        hash: uo.hash,
+                        kind: MempoolErrorKind::Other { inner: format!("{e:?}") },
+                    },
+                },
+            )?;
 
         Ok(UserOperationGasEstimation {
-            pre_verification_gas: Overhead::default().calculate_pre_verification_gas(uo),
-            verification_gas_limit: val_out.verification_gas_limit,
+            pre_verification_gas: Overhead::default()
+                .calculate_pre_verification_gas(uo)
+                .saturating_add(PRE_VERIFICATION_SAFE_RESERVE.into()),
+            verification_gas_limit,
             call_gas_limit,
         })
     }

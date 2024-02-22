@@ -15,6 +15,10 @@ pub enum EntryPointError {
     #[error("{0}")]
     FailedOp(FailedOp),
 
+    /// execution reverted
+    #[error("execution reverted: {0}")]
+    ExecutionReverted(String),
+
     /// There is no revert when there should be
     #[error("{function} should revert")]
     NoRevert {
@@ -129,23 +133,25 @@ impl EntryPointError {
         Err(Self::Provider { inner: format!("middleware error: {err:?}") })
     }
 }
-
+// ethers-rs could not handle `require (true, "reason")` or `revert("test failed")` well in this
+// case revert with `require` error would ends up with error event signature `0x08c379a0`
+// we need to handle it manually
+pub fn decode_revert_string(data: Bytes) -> Option<String> {
+    let (error_sig, reason) = data.split_at(4);
+    if error_sig == [0x08, 0xc3, 0x79, 0xa0] {
+        <String as AbiDecode>::decode(reason).ok()
+    } else {
+        None
+    }
+}
 pub fn decode_revert_error(data: Bytes) -> Result<EntryPointAPIErrors, EntryPointError> {
     let decoded = EntryPointAPIErrors::decode(data.as_ref());
     match decoded {
         Ok(res) => Ok(res),
         Err(e) => {
-            // ethers-rs could not handle `require (true, "reason")` well in this case
-            // revert with `require` error would ends up with error event signature `0x08c379a0`
-            // we need to handle it manually
-            let (error_sig, reason) = data.split_at(4);
-            if error_sig == [0x08, 0xc3, 0x79, 0xa0] {
-                return <String as AbiDecode>::decode(reason)
-                    .map(EntryPointAPIErrors::RevertString)
-                    .map_err(|e| EntryPointError::Decode {
-                        inner: format!("data field can't be deserialized to revert error: {e:?}",),
-                    });
-            }
+            if let Some(error_str) = decode_revert_string(data) {
+                return Ok(EntryPointAPIErrors::RevertString(error_str));
+            };
 
             Err(EntryPointError::Decode {
                 inner: format!(

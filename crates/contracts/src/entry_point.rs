@@ -15,16 +15,18 @@ use super::{
     },
     tracer::JS_TRACER,
 };
-use crate::{error::decode_revert_error, gen::ExecutionResult};
+use crate::{error::decode_revert_error, executor_tracer::EXECUTOR_TRACER, gen::ExecutionResult};
 use ethers::{
     prelude::{ContractError, Event},
     providers::Middleware,
     types::{
-        Address, Bytes, GethDebugTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
-        GethTrace, TransactionRequest, U256,
+        spoof, transaction::eip2718::TypedTransaction, Address, Bytes, GethDebugTracerType,
+        GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TransactionRequest, U256,
     },
 };
 use std::sync::Arc;
+
+const UINT96_MAX: u128 = 5192296858534827628530496329220095;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SimulateValidationResult {
@@ -123,6 +125,43 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         timeout: None,
                     },
                     state_overrides: None,
+                },
+            )
+            .await
+            .map_err(|e| {
+                EntryPointError::from_middleware_error::<M>(e).expect_err("trace err is expected")
+            })?;
+
+        Ok(res)
+    }
+
+    pub async fn simulate_handle_op_trace<U: Into<UserOperation>>(
+        &self,
+        uo: U,
+    ) -> Result<GethTrace, EntryPointError> {
+        let uo = uo.into();
+        let max_fee_per_gas = uo.max_fee_per_gas;
+        let call = self.entry_point_api.simulate_handle_op(uo, Address::zero(), Bytes::default());
+        let mut tx: TypedTransaction = call.tx;
+        tx.set_from(Address::zero());
+        tx.set_gas_price(max_fee_per_gas);
+        tx.set_gas(u64::MAX);
+        let res = self
+            .eth_client
+            .debug_trace_call(
+                tx,
+                None,
+                GethDebugTracingCallOptions {
+                    tracing_options: GethDebugTracingOptions {
+                        disable_storage: None,
+                        disable_stack: None,
+                        enable_memory: None,
+                        enable_return_data: None,
+                        tracer: Some(GethDebugTracerType::JsTracer(EXECUTOR_TRACER.into())),
+                        tracer_config: None,
+                        timeout: None,
+                    },
+                    state_overrides: Some(spoof::balance(Address::zero(), UINT96_MAX.into())),
                 },
             )
             .await
