@@ -7007,6 +7007,7 @@ dependencies = [
  "alloy-chains",
  "async-trait",
  "bin-layout",
+ "const-hex",
  "enumset",
  "ethers 2.0.8",
  "eyre",

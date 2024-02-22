@@ -5,6 +5,7 @@ mod builder;
 #[cfg(feature = "mdbx")]
 mod database;
 pub mod error;
+mod estimate;
 mod memory;
 mod mempool;
 pub mod metrics;
