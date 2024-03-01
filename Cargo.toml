@@ -49,7 +49,7 @@ silius-rpc = { version = "0.4.0-alpha", path = "crates/rpc", default-features = 
 silius-tests = { version = "0.4.0-alpha", path = "tests", default-features = false }
 
 # eth
-alloy-chains = "0.1.7"
+alloy-chains = "0.1.14"
 discv5 = { version = "0.4.0", features = ["libp2p"] }
 ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc", features = [
     "ws",
