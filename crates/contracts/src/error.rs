@@ -133,6 +133,7 @@ impl EntryPointError {
         Err(Self::Provider { inner: format!("middleware error: {err:?}") })
     }
 }
+
 // ethers-rs could not handle `require (true, "reason")` or `revert("test failed")` well in this
 // case revert with `require` error would ends up with error event signature `0x08c379a0`
 // we need to handle it manually
@@ -144,6 +145,7 @@ pub fn decode_revert_string(data: Bytes) -> Option<String> {
         None
     }
 }
+
 pub fn decode_revert_error(data: Bytes) -> Result<EntryPointAPIErrors, EntryPointError> {
     let decoded = EntryPointAPIErrors::decode(data.as_ref());
     match decoded {
