@@ -87,18 +87,17 @@ Silius was tested on the following networks, and some public endpoints are avail
 | Linea | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-mainnet> |
 | Linea Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-goerli> |
 | Optimism | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-mainnet> |
-| Optimism Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-goerli> |
 | Optimism Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-sepolia> |
 | Arbitrum | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-mainnet> |
-| Arbitrum Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-goerli> |
 | Arbitrum Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-sepolia> |
 | BSC | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/bsc-mainnet> |
 | BSC Testnet | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/bsc-testnet> |
 | Base | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-mainnet> |
-| Base Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-goerli> |
 | Base Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/base-sepolia> |
 | Avalanche | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/avalanche-mainnet> |
 | Avalanche Fuji | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/avalanche-fuji> |
+| Blast | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/blast-mainnet> |
+| Blast Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/blast-sepolia> |
 
 Bundler's account: `0x0a4E15d25E97e747bD568979A3B7dbEb95970Eb3`
 
