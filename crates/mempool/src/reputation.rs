@@ -261,8 +261,8 @@ impl Reputation {
         Ok(())
     }
 
-    /// Increases the number of times an entity successfully inlucdes a
-    /// [UserOperation](UserOperation) in a block
+    /// Increases the number of times an entity successfully includes a
+    /// user operation in a block.
     ///
     /// # Arguments
     /// * `addr` - The address to increment
@@ -383,7 +383,7 @@ impl Reputation {
         })
     }
 
-    /// Update an entity's status when the [UserOperation](UserOperation) is reverted
+    /// Update an entity's status when the user operation is reverted.
     ///
     /// # Arguments
     /// * `addr` - The address to update
@@ -449,10 +449,10 @@ impl Reputation {
 
         Ok(())
     }
-    /// Set the [reputation](ReputationEntries) of an entity
+    /// Set the [Reputation Entry](ReputationEntry) of an entity
     ///
     /// # Arguments
-    /// * `entries` - The [reputation entries](ReputationEntries) to set
+    /// * `entries` - The [Reputation Entries](ReputationEntry) to set
     ///
     /// # Returns
     /// * `Ok(())` if the entries were set successfully
@@ -464,10 +464,10 @@ impl Reputation {
         Ok(())
     }
 
-    /// Get all [reputation entries](ReputationEntries)
+    /// Get all [Reputation Entries](ReputationEntry)
     ///
     /// # Returns
-    /// * All [reputation entries](ReputationEntries)
+    /// * All [Reputation Entries](ReputationEntry)
     pub fn get_all(&self) -> Result<Vec<ReputationEntry>, ReputationError> {
         Ok(self
             .entities
@@ -496,7 +496,7 @@ impl Reputation {
         }
     }
 
-    /// Clear all [reputation entries](ReputationEntries)
+    /// Clear all [Reputation Entries](ReputationEntry)
     pub fn clear(&mut self) {
         self.entities.clear();
     }

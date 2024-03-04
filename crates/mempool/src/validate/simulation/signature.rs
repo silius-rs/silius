@@ -9,12 +9,11 @@ use silius_primitives::UserOperation;
 pub struct Signature;
 
 impl SimulationCheck for Signature {
-    /// The [check_user_operation] method implementation that validates the signature of the user
-    /// operation.
+    /// The method implementation that validates the signature of the user operation.
     ///
     /// # Arguments
     /// `_uo` - Not used in this check
-    /// `helper` - The [SimulationHelper](crate::validate::SimulationHelper)
+    /// `helper` - The [SimulationHelper]
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.

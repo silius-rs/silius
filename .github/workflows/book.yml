@@ -1,0 +1,86 @@
+on:
+  push:
+    branches:
+      - main
+
+name: book and docs
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: Install mdbook
+        run: |
+          mkdir mdbook
+          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.14/mdbook-v0.4.14-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=./mdbook
+          echo $(pwd)/mdbook >> $GITHUB_PATH
+
+      - name: Install mdbook-template
+        run: |
+          mkdir mdbook-template
+          curl -sSL https://github.com/sgoudham/mdbook-template/releases/latest/download/mdbook-template-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=./mdbook-template
+          echo $(pwd)/mdbook-template >> $GITHUB_PATH
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build book
+        run: mdbook build
+
+      - name: Build docs
+        run: cargo docs
+        env:
+          # Keep in sync with ./ci.yml:jobs.docs
+          RUSTDOCFLAGS:
+            --cfg docsrs --show-type-layout --generate-link-to-definition --enable-index-page
+            -Zunstable-options
+
+      - name: Move docs to book folder
+        run: |
+          mv target/doc target/book/docs
+
+      - name: Archive artifact
+        shell: sh
+        run: |
+          chmod -c -R +rX "target/book" |
+          while read line; do
+             echo "::warning title=Invalid file permissions automatically fixed::$line"
+          done
+          tar \
+            --dereference --hard-dereference \
+            --directory "target/book" \
+            -cvf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git \
+            --exclude=.github \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

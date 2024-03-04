@@ -93,7 +93,7 @@ impl CallStack {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
-    /// The [check_user_operation] method implementation that performs the call stack trace check.
+    /// The method implementation that performs the call stack trace check.
     ///
     /// # Arguments
     /// `_uo` - Not used in this check

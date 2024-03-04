@@ -1,0 +1,27 @@
+[book]
+authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
+language = "en"
+multilingual = false
+src = "book"
+title = "Silius Book"
+description = "A book about Silius"
+
+[output.html]
+theme = "book/theme"
+git-repository-url = "https://github.com/silius-rs/silius"
+default-theme = "ayu"
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 1
+
+[build]
+build-dir = "target/book"
+
+[preprocessor.template]
+before = ["links"]
+
+[preprocessor.index]
+
+[preprocessor.links]

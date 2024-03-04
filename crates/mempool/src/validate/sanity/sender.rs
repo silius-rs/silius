@@ -12,7 +12,7 @@ pub struct Sender;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for Sender {
-    /// The [check_user_operation] method implementation that performs the check for the sender of
+    /// The method implementation that performs the check for the sender of
     /// the [UserOperation](UserOperation).
     ///
     /// # Arguments

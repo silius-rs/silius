@@ -24,11 +24,11 @@ impl<M> SendBundleOp for ConditionalClient<M>
 where
     M: Middleware + 'static,
 {
-    /// Send a bundle of [UserOperations](UserOperation) to the Ethereum execution client
+    /// Send a bundle of user operations to the Ethereum execution client
     /// over conditional RPC method.
     ///
     /// # Arguments
-    /// * `bundle` - Bundle of [UserOperations](UserOperation)
+    /// * `bundle` - Bundle of user operations as [TypedTransaction](TypedTransaction).
     /// * 'storage_map' - Storage map
     ///
     /// # Returns

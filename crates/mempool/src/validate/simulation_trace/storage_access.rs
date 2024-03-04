@@ -94,7 +94,7 @@ impl StorageAccess {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
-    /// The [check_user_operation] method implementation that checks if the user operation access
+    /// The method implementation that checks if the user operation access
     /// storage other than the one associated with itself.
     ///
     /// # Arguments

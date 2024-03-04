@@ -70,8 +70,7 @@ impl Entities {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for Entities {
-    /// The [check_user_operation] method implementation that performs the sanity check for the
-    /// staked entities.
+    /// The method implementation that performs the sanity check for the staked entities.
     ///
     /// # Arguments
     /// `uo` - The user operation to be checked.

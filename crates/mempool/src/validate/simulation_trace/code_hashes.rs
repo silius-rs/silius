@@ -63,7 +63,7 @@ impl CodeHashes {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
-    /// The [check_user_operation] method implementation that checks the code hashes
+    /// The method implementation that checks the code hashes.
     ///
     /// # Arguments
     /// `uo` - The user operation to check

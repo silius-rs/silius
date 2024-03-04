@@ -64,8 +64,7 @@ impl UnstakedEntities {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
-    /// The [check_user_operation] method implementation that performs the sanity check for the
-    /// unstaked entities.
+    /// The method implementation that performs the sanity check for the unstaked entities.
     ///
     /// # Arguments
     /// `uo` - The user operation to be checked.

@@ -11,8 +11,7 @@ pub struct Paymaster;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for Paymaster {
-    /// The [check_user_operation] method implementation that performs the sanity check on the
-    /// paymaster.
+    /// The method implementation that performs the sanity check on the paymaster.
     ///
     /// # Arguments
     /// `uo` - The user operation to be checked.
