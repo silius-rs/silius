@@ -46,7 +46,7 @@ type UnsafeValidator<M> = StandardUserOperationValidator<
     (),
 >;
 
-/// Standard implementation of [UserOperationValidator](UserOperationValidator).
+/// Standard implementation of [UserOperationValidator].
 pub struct StandardUserOperationValidator<M: Middleware + 'static, SanCk, SimCk, SimTrCk>
 where
     SanCk: SanityCheck<M>,
@@ -83,11 +83,11 @@ where
     }
 }
 
-/// Creates a new [StandardUserOperationValidator](StandardUserOperationValidator)
+/// Creates a new [StandardUserOperationValidator]
 /// with the default sanity checks and simulation checks for canonical mempool.
 ///
 /// # Arguments
-/// `entry_point` - [EntryPoint](EntryPoint) object.
+/// `entry_point` - [EntryPoint] object.
 /// `chain` - A [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID.
 /// `max_verification_gas` - max verification gas that bundler would accept for one user operation
 /// `min_priority_fee_per_gas` - min priority fee per gas that bundler would accept for one user
@@ -96,7 +96,7 @@ where
 /// operation
 ///
 /// # Returns
-/// A new [StandardUserOperationValidator](StandardUserOperationValidator).
+/// A new [StandardUserOperationValidator].
 pub fn new_canonical<M: Middleware + 'static>(
     entry_point: EntryPoint<M>,
     chain: Chain,
@@ -218,16 +218,15 @@ where
     SimTrCk: SimulationTraceCheck<M>,
 {
     /// Validates a [UserOperation](UserOperation) via the
-    /// [simulate_validation](crate::entry_point::EntryPoint::simulate_validation) method of the
-    /// [entry_point](crate::entry_point::EntryPoint). The function also optionally performs
+    /// [simulate_validation](silius_contracts::entry_point::EntryPoint::simulate_validation) method
+    /// of the entry point. The function also optionally performs
     /// sanity checks and simulation checks if the
     /// [UserOperationValidatorMode](UserOperationValidatorMode) contains the respective flags.
     ///
     /// # Arguments
     /// `uo` - [UserOperation](UserOperation) to validate.
-    /// `mempool` - [MempoolBox](crate::mempool::MempoolBox) to check for duplicate
-    /// [UserOperation](UserOperation)s. `reputation` -
-    /// [ReputationBox](crate::reputation::ReputationBox).
+    /// `mempool` - [Mempool](Mempool) object.
+    /// `reputation` - [Reputation](Reputation) object.
     /// `mode` - [UserOperationValidatorMode](UserOperationValidatorMode) flag.
     ///
     /// # Returns

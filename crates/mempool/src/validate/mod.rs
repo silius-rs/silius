@@ -57,7 +57,7 @@ pub trait UserOperationValidator: Send + Sync {
     ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>;
 }
 
-/// The [UserOperation](UserOperation) sanity check helper trait.
+/// The [UserOperation] sanity check helper trait.
 pub struct SanityHelper<'a, M: Middleware + 'static> {
     entry_point: &'a EntryPoint<M>,
     chain: Chain,
@@ -148,7 +148,7 @@ sanity_check_impls! { A B C D F G I J }
 sanity_check_impls! { A B C D F G I J K }
 sanity_check_impls! { A B C D F G I J K L }
 
-/// The [UserOperation](UserOperation) simulation check helper trait.
+/// The [UserOperation] simulation check helper trait.
 pub struct SimulationHelper<'a> {
     simulate_validation_result: &'a SimulateValidationResult,
     valid_after: Option<U256>,
@@ -208,7 +208,7 @@ simulation_check_impls! { A B C D F G I J }
 simulation_check_impls! { A B C D F G I J K }
 simulation_check_impls! { A B C D F G I J K L }
 
-/// The [UserOperation](UserOperation) simulation trace check helper trait.
+/// The [UserOperation] simulation trace check helper trait.
 pub struct SimulationTraceHelper<'a, M: Middleware + Send + Sync + 'static> {
     entry_point: &'a EntryPoint<M>,
     chain: Chain,

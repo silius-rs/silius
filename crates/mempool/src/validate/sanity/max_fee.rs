@@ -16,7 +16,7 @@ pub struct MaxFee {
 
 #[async_trait::async_trait]
 impl<M: Middleware> SanityCheck<M> for MaxFee {
-    /// The [check_user_operation] method implementation that checks the max fee
+    /// The method implementation that checks the max fee.
     ///
     /// # Arguments
     /// `uo` - The user operation to check

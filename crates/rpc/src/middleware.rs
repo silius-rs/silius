@@ -16,7 +16,7 @@ use std::{
 };
 use tower::{Layer, Service};
 
-/// The proxy layer for the [json rpc server](JsonRpcServer)
+/// The proxy layer for the JSON-RPC server.
 #[derive(Clone, Debug)]
 pub struct ProxyJsonRpcLayer {
     /// The address of the Ethereum execution client

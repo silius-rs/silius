@@ -65,7 +65,7 @@ pub enum RPCEvent {
 pub enum InboundFailure {
     /// The inbound request timed out, either while reading the
     /// incoming request or before a response is sent, e.g. if
-    /// [`Behaviour::send_response`] is not called in a
+    /// [`libp2p::request_response::Behaviour`] is not called in a
     /// timely manner.
     Timeout,
     /// The connection closed before a response could be send.
@@ -74,8 +74,8 @@ pub enum InboundFailure {
     /// by the remote.
     UnsupportedProtocols,
     /// The local peer failed to respond to an inbound request
-    /// due to the [`ResponseChannel`] being dropped instead of
-    /// being passed to [`Behaviour::send_response`].
+    /// due to the [`libp2p::request_response::ResponseChannel`] being dropped instead of
+    /// being passed to [`libp2p::request_response::Behaviour::send_response`].
     ResponseOmission,
     /// Error happended while handling the inbound
     Error(Error),

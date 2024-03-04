@@ -15,7 +15,7 @@ pub struct Opcodes;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
-    /// The [check_user_operation] method implementation that checks the use of forbidden opcodes
+    /// The method implementation that checks the use of forbidden opcodes
     ///
     /// # Arguments
     /// `_uo` - Not used

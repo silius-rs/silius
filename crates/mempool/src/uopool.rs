@@ -37,9 +37,9 @@ const FILTER_MAX_DEPTH: u64 = 10;
 const PRE_VERIFICATION_SAFE_RESERVE_PERC: u64 = 10; // percentage how higher pre verification gas we return
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove,
-/// validate, and serves data requests from the [RPC API](EthApiServer). Architecturally, the
-/// [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves
-/// requests from the [RPC API](EthApiServer).
+/// validate, and serves data requests from the RPC API. Architecturally, the
+/// [UoPool](UoPool) is the backend service managed by the user operation service and serves
+/// requests from the RPC API.
 pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     /// The unique ID of the mempool
     pub id: MempoolId,
@@ -49,9 +49,9 @@ pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     pub entry_point: EntryPoint<M>,
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
-    /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
+    /// The [Mempool](Mempool) object
     pub mempool: Mempool,
-    /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
+    /// The [Reputation](Reputation) object
     pub reputation: Reputation,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
@@ -67,8 +67,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// # Arguments
     /// `entry_point` - The [EntryPoint](EntryPoint) contract object
     /// `validator` - The [UserOperationValidator](UserOperationValidator) object
-    /// `mempool` - The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    /// `reputation` - The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
+    /// `mempool` - The [Mempool](Mempool) object
+    /// `reputation` - The [Reputation](Reputation) object
     /// `eth_client` - The Ethereum client [Middleware](ethers::providers::Middleware)
     /// `max_verification_gas` - The maximum gas limit for [UserOperation](UserOperation) gas
     /// verification. `chain` - The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
@@ -157,8 +157,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     }
 
     /// Adds bulk of [UserOperations](UserOperation) into the mempool.
-    /// The function first validates the [UserOperations](UserOperation) by calling
-    /// [UoPool::validate_user_operations](UoPool::validate_user_operations).
+    /// The function first validates the [UserOperations](UserOperation).
     ///
     /// # Arguments
     /// `user_operations` - The array of [UserOperations](UserOperation) to add
@@ -204,8 +203,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     }
 
     /// Adds a single validated user operation into the pool
-    /// Indirectly invoked by [EthApiServer::send_user_operation](EthApiServer::send_user_operation)
-    /// via [UoPoolService::add](UoPoolService::add) to add a [UserOperation](UserOperation) into
+    /// Indirectly invoked by RPC API via gRPC sevice to add a [UserOperation](UserOperation) into
     /// the mempool The function first validates the [UserOperation](UserOperation) by calling
     /// [UoPool::validate_user_operation](UoPool::validate_user_operation). If
     /// [UserOperation](UserOperation) passes the validation, then adds it into the mempool by
@@ -660,7 +658,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         Err(format_err!("No user operation found"))
     }
 
-    /// Removes the [UserOperation](UserOperation) from the [UserOperationQueue](UserOperationQueue)
+    /// Removes the [UserOperation](UserOperation) from the user operation mempool
     /// given the [UserOperationHash](UserOperationHash).
     ///
     /// # Arguments
@@ -679,7 +677,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     }
 
     /// Removes multiple [UserOperations](UserOperation) from the
-    /// [UserOperationQueue](UserOperationQueue) given an array of
+    /// user operation mempool given an array of
     /// [UserOperation](UserOperation).
     ///
     /// # Arguments

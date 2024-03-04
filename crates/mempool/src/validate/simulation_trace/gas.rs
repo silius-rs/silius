@@ -11,7 +11,7 @@ pub struct Gas;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for Gas {
-    /// The [check_user_operation] method implementation that checks if the user operation runs out
+    /// The method implementation that checks if the user operation runs out
     /// of gas
     ///
     /// # Arguments

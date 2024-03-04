@@ -14,10 +14,10 @@ use tracing::{info, trace};
 /// A trait for sending the bundler of user operations
 #[async_trait::async_trait]
 pub trait SendBundleOp: Send + Sync + 'static {
-    /// Send a bundle of [UserOperations](UserOperation).
+    /// Send a bundle of user operations.
     ///
     /// # Arguments
-    /// * `bundle` - Bundle of [UserOperations](UserOperation)
+    /// * `bundle` - Bundle of user operations as [TypedTransaction](TypedTransaction).
     /// * 'storage_map' - Storage map
     ///
     /// # Returns

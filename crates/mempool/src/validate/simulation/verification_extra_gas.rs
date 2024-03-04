@@ -9,11 +9,11 @@ use silius_primitives::{constants::validation::simulation::MIN_EXTRA_GAS, UserOp
 pub struct VerificationExtraGas;
 
 impl SimulationCheck for VerificationExtraGas {
-    /// The [check_user_operation] method implementation validates the needed extra gas.
+    /// The method implementation validates the needed extra gas.
     ///
     /// # Arguments
     /// `uo` - Not used in this check
-    /// `helper` - The [SimulationHelper](crate::validate::SimulationHelper)
+    /// `helper` - The [SimulationHelper]
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.

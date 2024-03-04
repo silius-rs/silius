@@ -41,7 +41,7 @@ pub mod validation {
     }
 
     /// Reputation
-    /// https://github.com/eth-infinitism/account-abstraction/blob/develop/eip/EIPS/eip-aa-rules.md#constants
+    /// <https://github.com/eth-infinitism/account-abstraction/blob/develop/eip/EIPS/eip-aa-rules.md#constants>
     pub mod reputation {
         pub const MIN_UNSTAKE_DELAY: u64 = 86400;
         // pub const MIN_STAKE_VALUE - Adjustable per chain value, Equivalent to ~$1000 in native

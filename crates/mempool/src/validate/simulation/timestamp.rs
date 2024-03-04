@@ -10,12 +10,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct Timestamp;
 
 impl SimulationCheck for Timestamp {
-    /// The [check_user_operation] method implementation that checks the timestamp of the
-    /// [UserOperation](UserOperation).
+    /// The method implementation that checks the timestamp of the user operation.
     ///
     /// # Arguments
     /// `_uo` - Not used in this check
-    /// `helper` - The [SimulationHelper](crate::validate::SimulationHelper)
+    /// `helper` - The [SimulationHelper]
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.

@@ -165,11 +165,12 @@ impl JsonRpcServer {
         }
     }
 
-    /// Start the [json RPC server](JsonRpcServer)
+    /// Starts the JSON-RPC server.
     ///
     /// # Returns
     /// * `Result<(Option<ServerHandle>, Option<ServerHandle>), Error>` - The
-    ///   [handle]((Option<ServerHandle>, Option<ServerHandle>)) of the HTTP and WS servers.
+    ///   [ServerHandle]((`Option<ServerHandle>`, `Option<ServerHandle>`)) of the HTTP and WS
+    ///   servers.
     pub async fn start(&self) -> eyre::Result<(Option<ServerHandle>, Option<ServerHandle>)> {
         let http_handle = if self.http {
             let service = ServiceBuilder::new()

@@ -96,7 +96,7 @@ pub trait DebugApi {
     /// Set the bundling mode.
     ///
     /// # Arguments
-    /// * `mode: BundlerMode` - The [BundlingMode](BundlingMode) to be set.
+    /// * `mode: BundlerMode` - The [BundlerMode](BundlerMode) to be set.
     ///
     /// # Returns
     /// * `RpcResult<ResponseSuccess>` - Ok

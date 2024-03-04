@@ -54,6 +54,13 @@ lint:
 	cargo sort --check --workspace --grouped
 	cargo +nightly udeps --workspace
 
+mdbook:
+	mdbook build
+	mdbook watch --open
+
+doc:
+	cargo docs --open
+
 run-geth:
 	cd bundler-spec-tests && docker compose up -d && cd ..
 

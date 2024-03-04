@@ -23,7 +23,7 @@ pub fn equal_code_hashes(hashes: &[CodeHash], hashes_prev: &Vec<CodeHash>) -> bo
     true
 }
 
-/// Struct to calculate the pre-verification gas of a [UserOperation](UserOperation)
+/// Struct to calculate the pre-verification gas of a user operation
 // https://github.com/eth-infinitism/bundler/blob/main/packages/sdk/src/calcPreVerificationGas.ts#L44-L51
 pub struct Overhead {
     pub fixed: U256,
@@ -51,8 +51,8 @@ impl Default for Overhead {
 
 impl Overhead {
     /// Calculates the pre-verification gas of a [UserOperation](UserOperationSigned)
-    /// The function first packs the [UserOperation](UserOperationSigned) by calling the
-    /// [pack](UserOperation::pack) method, then extracts the call data for gas calculation.
+    /// The function first packs the [UserOperation](UserOperationSigned), then extracts the call
+    /// data for gas calculation.
     ///
     /// # Arguments
     /// `uo` - The [UserOperation](UserOperationSigned) to calculate the pre-verification gas for

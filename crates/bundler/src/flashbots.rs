@@ -23,10 +23,10 @@ where
     M: Middleware + 'static,
 {
     // TODO: add more relay endpoints support
-    /// Send a bundle of [UserOperations](UserOperation) to the Flashbots relay.
+    /// Send a bundle of user operations to the Flashbots relay.
     ///
     /// # Arguments
-    /// * `uos` - Bundler of [UserOperations](UserOperation)
+    /// * `bundle` - Bundle of user operations as [TypedTransaction](TypedTransaction).
     /// * 'storage_map' - Storage map
     ///
     /// # Returns
