@@ -149,7 +149,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                             // an external (non-entity contract) is allowed if either The account
                             // already exists or There is an initCode and the factory contract is
                             // staked
-                            if !(uo.init_code.is_empty() ||
+                            if !(uo.factory.is_zero() ||
                                 uo.sender == stake_info_l.address &&
                                     stake_info[FACTORY_LEVEL].is_staked())
                             {

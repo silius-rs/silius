@@ -1,5 +1,5 @@
 use crate::{
-    validate::{SimulationCheck, SimulationHelper},
+    validate::{utils::unpack_account_validation_data, SimulationCheck, SimulationHelper},
     SimulationError,
 };
 use silius_contracts::entry_point::SimulateValidationResult;
@@ -23,11 +23,14 @@ impl SimulationCheck for Signature {
         helper: &mut SimulationHelper,
     ) -> Result<(), SimulationError> {
         let sig_check = match helper.simulate_validation_result {
-            SimulateValidationResult::ValidationResult(res) => res.return_info.2,
-            SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.2,
+            SimulateValidationResult::ValidationResult(res) => {
+                let validation_data =
+                    unpack_account_validation_data(res.return_info.account_validation_data);
+                validation_data.sig_authorizer.is_zero()
+            }
         };
 
-        if sig_check {
+        if !sig_check {
             return Err(SimulationError::Signature {});
         }
 

@@ -33,15 +33,19 @@ message UserOperation {
 message UserOperationSigned {
     types.H160 sender = 1;
     PbU256 nonce = 2;
-    bytes init_code = 3;
-    bytes call_data = 4;
-    PbU256 call_gas_limit = 5;
-    PbU256 verification_gas_limit = 6;
-    PbU256 pre_verification_gas = 7;
-    PbU256 max_fee_per_gas = 8;
-    PbU256 max_priority_fee_per_gas = 9;
-    bytes paymaster_and_data = 10;
-    bytes signature = 11;
+    types.H160 factory = 4;
+    bytes factory_data = 5;
+    bytes call_data = 6;
+    PbU256 call_gas_limit = 7;
+    PbU256 verification_gas_limit = 8;
+    PbU256 pre_verification_gas = 9;
+    PbU256 max_fee_per_gas = 10;
+    PbU256 max_priority_fee_per_gas = 11;
+    types.H160 paymaster = 12;
+    PbU256 paymaster_verification_gas_limit = 13;
+    PbU256 paymaster_post_op_gas_limit = 14;
+    bytes paymaster_data = 15;
+    bytes signature = 16;
 }
 
 enum ReputationStatus {

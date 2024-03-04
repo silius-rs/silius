@@ -23,10 +23,8 @@ impl SimulationCheck for VerificationExtraGas {
         helper: &mut SimulationHelper,
     ) -> Result<(), SimulationError> {
         let pre_op_gas = match helper.simulate_validation_result {
-            SimulateValidationResult::ValidationResult(res) => res.return_info.0,
-            SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.0,
+            SimulateValidationResult::ValidationResult(res) => res.return_info.pre_op_gas,
         };
-
         let extra_gas = uo.verification_gas_limit - (pre_op_gas - uo.pre_verification_gas);
 
         if extra_gas.as_u64() < MIN_EXTRA_GAS {

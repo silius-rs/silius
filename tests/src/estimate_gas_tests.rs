@@ -7,12 +7,12 @@ use alloy_chains::Chain;
 use ethers::{
     providers::Middleware,
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
-    types::{transaction::eip2718::TypedTransaction, Bytes, H160, U256},
+    types::{transaction::eip2718::TypedTransaction, Address, Bytes, H160, U256},
     utils::GethInstance,
 };
 use silius_contracts::EntryPoint;
 use silius_mempool::{validate::validator::new_canonical, UoPool};
-use silius_primitives::{UoPoolMode, UserOperationSigned, Wallet as UoWallet};
+use silius_primitives::{unpack_init_code, UoPoolMode, UserOperationSigned, Wallet as UoWallet};
 use std::sync::Arc;
 
 async fn setup_basic() -> eyre::Result<(
@@ -78,20 +78,25 @@ async fn estimate_with_zero() -> eyre::Result<()> {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
+    let (factory, factory_data) = unpack_init_code(&init_code);
 
     let (gas_price, priority_fee) = client.estimate_eip1559_fees(None).await?;
     let nonce = client.get_transaction_count(address, None).await?;
     let user_op = UserOperationSigned {
         sender: address,
         nonce,
-        init_code: Bytes::from(init_code),
+        factory,
+        factory_data,
         call_data: Bytes::from(call_data),
         call_gas_limit: U256::from(1),
         verification_gas_limit: U256::from(1000000u64),
         pre_verification_gas: U256::from(1),
         max_fee_per_gas: gas_price,
         max_priority_fee_per_gas: priority_fee,
-        paymaster_and_data: Bytes::new(),
+        paymaster: Address::default(),
+        paymaster_verification_gas_limit: 0.into(),
+        paymaster_post_op_gas_limit: 0.into(),
+        paymaster_data: Bytes::default(),
         signature: Bytes::default(),
     };
 

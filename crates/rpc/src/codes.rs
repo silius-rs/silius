@@ -7,5 +7,5 @@ pub const STAKE_TOO_LOW: i32 = -32505;
 pub const SIGNATURE_AGGREGATOR: i32 = -32506;
 pub const SIGNATURE: i32 = -32507;
 pub const EXECUTION: i32 = -32521;
-pub const USER_OPERATION_HASH: i32 = -32601;
+pub const USER_OPERATION_HASH: i32 = -32602;
 pub const SANITY: i32 = -32602;

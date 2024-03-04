@@ -1,4 +1,4 @@
-use self::gen::{
+pub use self::gen::{
     EntryPointContract, SimpleAccountFactory, TestCoin, TestOpcodesAccount,
     TestOpcodesAccountFactory, TestRecursionAccount, TestRulesAccountFactory, TestStorageAccount,
     TestStorageAccountFactory, TracerTest,
@@ -30,11 +30,12 @@ pub mod gen;
 pub const SEED_PHRASE: &str = "test test test test test test test test test test test junk";
 pub type ClientType = NonceManagerMiddleware<SignerMiddleware<Provider<Http>, LocalWallet>>;
 
-pub struct DeployedContract<C> {
+#[derive(Debug, Clone)]
+pub struct DeployedContract<C: Clone> {
     contract: C,
     pub address: Address,
 }
-impl<C> DeployedContract<C> {
+impl<C: Clone> DeployedContract<C> {
     pub fn new(contract: C, addr: Address) -> Self {
         Self { contract, address: addr }
     }

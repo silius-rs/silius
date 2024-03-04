@@ -28,7 +28,7 @@ use silius_mempool::{
 };
 use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
-    UserOperation, UserOperationSigned,
+    unpack_init_code, UserOperation, UserOperationSigned,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -156,11 +156,11 @@ async fn setup_memory() -> eyre::Result<TestContext<ClientType>> {
         reputation,
     })
 }
-async fn create_storage_factory_init_code(
+async fn create_storage_factory_init_code<M: Middleware + 'static>(
     salt: u64,
     init_func: String,
+    c: &TestContext<M>,
 ) -> eyre::Result<(Bytes, Bytes)> {
-    let c = setup_database().await?;
     let contract: &BaseContract = c.storage_factory.contract().deref().deref();
     let func = contract.abi().function("create")?;
     let init_func =
@@ -173,8 +173,10 @@ async fn create_storage_factory_init_code(
     Ok((init_code.into(), init_func.into()))
 }
 
-async fn create_opcode_factory_init_code(init_func: String) -> eyre::Result<(Bytes, Bytes)> {
-    let c = setup_database().await?;
+async fn create_opcode_factory_init_code<M: Middleware + 'static>(
+    init_func: String,
+    c: &TestContext<M>,
+) -> eyre::Result<(Bytes, Bytes)> {
     let contract: &BaseContract = c.opcodes_factory.contract().deref().deref();
     let token = vec![Token::String(init_func)];
     let func = contract.abi().function("create")?;
@@ -198,14 +200,17 @@ async fn create_test_user_operation<M>(
 where
     M: Middleware + 'static,
 {
-    let paymaster_and_data = if let Some(rule) = pm_rule {
-        let mut data = vec![];
-        data.extend_from_slice(context.paymaster.address.as_bytes());
-        data.extend_from_slice(rule.as_bytes());
-        Bytes::from(data)
-    } else {
-        Bytes::default()
-    };
+    let (paymaster, paymaster_verification_gas_limit, paymaster_post_op_gas_limit, paymaster_data) =
+        if let Some(rule) = pm_rule {
+            (
+                context.paymaster.address,
+                1000000.into(),
+                1000000.into(),
+                Bytes::from(rule.as_bytes().to_vec()),
+            )
+        } else {
+            (Address::zero(), 0.into(), 0.into(), Bytes::default())
+        };
 
     let sig = Bytes::from(validate_rule.as_bytes().to_vec());
 
@@ -222,18 +227,23 @@ where
     );
 
     let sender = Address::from_slice(address);
+    let (factory, factory_data) = unpack_init_code(&init_code);
 
     Ok(UserOperationSigned {
         sender,
         nonce: U256::zero(),
-        init_code,
+        factory,
+        factory_data,
         call_data: Bytes::default(),
         call_gas_limit: 1000000.into(),
         verification_gas_limit: 1000000.into(),
         pre_verification_gas: 50000.into(),
         max_fee_per_gas: U256::zero(),
         max_priority_fee_per_gas: U256::zero(),
-        paymaster_and_data,
+        paymaster,
+        paymaster_verification_gas_limit,
+        paymaster_post_op_gas_limit,
+        paymaster_data,
         signature: sig,
     })
 }
@@ -246,22 +256,26 @@ fn existing_storage_account_user_operation<M>(
 where
     M: Middleware + 'static,
 {
-    let mut paymaster_and_data = vec![];
-    paymaster_and_data.extend_from_slice(context.paymaster.address.as_bytes());
-    paymaster_and_data.extend_from_slice(pm_rule.as_bytes());
-
+    let paymaster = context.paymaster.address;
+    let paymaster_verification_gas_limit = 1000000.into();
+    let paymaster_post_op_gas_limit = 1000000.into();
+    let paymaster_data = Bytes::from(pm_rule.as_bytes().to_vec());
     let sig = Bytes::from(validate_rule.as_bytes().to_vec());
     UserOperationSigned {
         sender: context.storage_account.address,
         nonce: U256::zero(),
-        init_code: Bytes::default(),
+        factory: Default::default(),
+        factory_data: Bytes::default(),
         call_data: Bytes::default(),
         call_gas_limit: 1000000.into(),
         verification_gas_limit: 1000000.into(),
         pre_verification_gas: 50000.into(),
         max_fee_per_gas: U256::zero(),
         max_priority_fee_per_gas: U256::zero(),
-        paymaster_and_data: Bytes::from(paymaster_and_data),
+        paymaster,
+        paymaster_verification_gas_limit,
+        paymaster_post_op_gas_limit,
+        paymaster_data,
         signature: sig,
     }
 }
@@ -308,6 +322,7 @@ where
     )
     .await
     .expect("Create test user operation failed.");
+    println!("{uo:?} !!!!");
     validate(&context, uo).await
 }
 
@@ -324,9 +339,11 @@ macro_rules! accept_plain_request {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("".into()).await.unwrap();
-
             let c = $setup;
+
+            let (init_code, init_func) =
+                create_opcode_factory_init_code("".into(), &c).await.unwrap();
+
             test_user_operation(
                 &c,
                 "".into(),
@@ -348,10 +365,10 @@ macro_rules! reject_unkown_rule {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("".into())
-                .await
-                .unwrap();
             let c = $setup;
+
+            let (init_code, init_func) =
+                create_opcode_factory_init_code("".into(), &c).await.unwrap();
             let res = test_user_operation(
                 &c,
                 "<unknown-rule>".into(),
@@ -361,11 +378,8 @@ macro_rules! reject_unkown_rule {
                 c.opcodes_factory.address,
             )
             .await;
-            assert!(matches!(
-                res,
-                Err(InvalidMempoolUserOperationError::Simulation(SimulationError::Validation { inner })) if inner.contains("unknown-rule")
-            ));
-
+            // 756e6b6e6f776e2072756c65 is the utf8 encode of "unknown-rule"
+            assert!(format!("{res:?}").contains("756e6b6e6f776e2072756c65"));
             Ok(())
         }
     };
@@ -377,10 +391,11 @@ macro_rules! fail_with_bad_opcode_in_ctr {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("coinbase".into())
+            let c = $setup;
+
+            let (init_code, init_func) = create_opcode_factory_init_code("coinbase".into(), &c)
                 .await
                 .unwrap();
-            let c = $setup;
             let res = test_user_operation(
                 &c,
                 "".into(),
@@ -406,10 +421,11 @@ macro_rules! fail_with_bad_opcode_in_paymaster {
     ($setup:expr, $name: ident) => {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
-            let (init_code, init_func) = create_opcode_factory_init_code("".into())
+            let c = $setup;
+
+            let (init_code, init_func) = create_opcode_factory_init_code("".into(), &c)
                 .await
                 .unwrap();
-            let c = $setup;
             let res = test_user_operation(
                 &c,
                 "".into(),
@@ -439,7 +455,7 @@ macro_rules! fail_with_bad_opcode_in_validation {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_opcode_factory_init_code("".into())
+            let (init_code, init_func) = create_opcode_factory_init_code("".into(), &c)
                 .await
                 .unwrap();
 
@@ -475,7 +491,7 @@ macro_rules!fail_if_create_too_many {
         #[tokio::test]
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
-            let (init_code, init_func) = create_opcode_factory_init_code("".into())
+            let (init_code, init_func) = create_opcode_factory_init_code("".into(), &c)
                 .await
                 .unwrap();
 
@@ -506,7 +522,7 @@ macro_rules! fail_referencing_self_token {
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
             let (init_code, init_func) =
-                create_storage_factory_init_code(0, "".into()).await.unwrap();
+                create_storage_factory_init_code(0, "".into(), &c).await.unwrap();
 
             let res = test_user_operation(
                 &c,
@@ -612,14 +628,18 @@ macro_rules! fail_with_unstaked_paymaster_returning_context {
             let uo = UserOperationSigned {
                 sender: acct.address,
                 nonce: U256::zero(),
-                init_code: Bytes::default(),
+                factory: Default::default(),
+                factory_data: Bytes::default(),
                 call_data: Bytes::default(),
                 call_gas_limit: U256::zero(),
                 verification_gas_limit: 50000.into(),
                 pre_verification_gas: U256::zero(),
                 max_fee_per_gas: U256::zero(),
                 max_priority_fee_per_gas: U256::zero(),
-                paymaster_and_data: Bytes::from(paymaster_and_data),
+                paymaster: pm.address,
+                paymaster_verification_gas_limit: 1000000.into(),
+                paymaster_post_op_gas_limit: 1000000.into(),
+                paymaster_data: Bytes::from("postOp-context".as_bytes().to_vec()),
                 signature: Bytes::default(),
             };
 
@@ -654,14 +674,18 @@ macro_rules! fail_with_validation_recursively_calls_handle_ops {
             let uo = UserOperationSigned {
                 sender: acct.address,
                 nonce: U256::zero(),
-                init_code: Bytes::default(),
+                factory: Default::default(),
+                factory_data: Bytes::default(),
                 call_data: Bytes::default(),
                 call_gas_limit: U256::zero(),
                 verification_gas_limit: 50000.into(),
                 pre_verification_gas: 50000.into(),
                 max_fee_per_gas: U256::zero(),
                 max_priority_fee_per_gas: U256::zero(),
-                paymaster_and_data: Bytes::default(),
+                paymaster: Address::default(),
+                paymaster_verification_gas_limit: 0.into(),
+                paymaster_post_op_gas_limit: 0.into(),
+                paymaster_data: Bytes::default(),
                 signature: Bytes::from("handleOps".as_bytes().to_vec()),
             };
 
@@ -692,7 +716,7 @@ macro_rules! succeed_with_inner_revert {
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
             let (init_code, init_func) =
-                create_storage_factory_init_code(0, "".into()).await.unwrap();
+                create_storage_factory_init_code(0, "".into(), &c).await.unwrap();
             test_user_operation(
                 &c,
                 "inner-revert".into(),
@@ -717,7 +741,7 @@ macro_rules! fail_with_inner_oog_revert {
         async fn $name() -> eyre::Result<()> {
             let c = $setup;
             let (init_code, init_func) =
-                create_storage_factory_init_code(0, "".into()).await.unwrap();
+                create_storage_factory_init_code(0, "".into(), &c).await.unwrap();
 
             let res = test_user_operation(
                 &c,

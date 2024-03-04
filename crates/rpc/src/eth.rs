@@ -88,7 +88,6 @@ impl EthApiServer for EthApiServerImpl {
             ),
             ep: Some(ep.into()),
         });
-
         let res = uopool_grpc_client.add(req).await.map_err(JsonRpcError::from)?.into_inner();
 
         if res.res == AddResult::Added as i32 {

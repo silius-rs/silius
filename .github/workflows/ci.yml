@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: eth-infinitism/bundler-spec-tests
-          ref: '08cbbfcb9e37b84c0ef9e546975f88fa638cac61'
+          ref: '0d3dad23b02d16f42830815a697f48fca467dd5a'
           submodules: true
 
       - uses: actions/checkout@v4
@@ -112,7 +112,7 @@ jobs:
 
       - run: pip install jq yq
 
-      - run: pdm install && git submodule update --init --recursive && cd @account-abstraction && git fetch --all --tags && git checkout v0.6.0 && yarn && yarn compile && cd ../spec && yarn && yarn build && cd ..
+      - run: pdm install && git submodule update --init --recursive && cd @account-abstraction && git fetch --all --tags && git checkout v0.7.0 && yarn && yarn compile && cd ../spec && yarn && yarn build && cd ..
   
       - uses: actions/download-artifact@v3
         with:

@@ -32,11 +32,11 @@ impl SimulationCheck for Timestamp {
                 .as_secs(),
         );
 
-        if valid_until < now {
+        if valid_until < now && valid_until != 0.into() {
             return Err(SimulationError::Timestamp { inner: "already expired".into() });
         }
 
-        if valid_until <= now + EXPIRATION_TIMESTAMP_DIFF {
+        if valid_until <= now + EXPIRATION_TIMESTAMP_DIFF && valid_until != 0.into() {
             return Err(SimulationError::Timestamp { inner: "expires too soon".into() });
         }
 

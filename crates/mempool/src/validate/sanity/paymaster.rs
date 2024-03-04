@@ -3,8 +3,8 @@ use crate::{
     validate::{SanityCheck, SanityHelper},
     Reputation, SanityError,
 };
-use ethers::{providers::Middleware, types::U256};
-use silius_primitives::{get_address, UserOperation};
+use ethers::providers::Middleware;
+use silius_primitives::UserOperation;
 
 #[derive(Clone)]
 pub struct Paymaster;
@@ -27,25 +27,21 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
         _reputation: &Reputation,
         helper: &SanityHelper<M>,
     ) -> Result<(), SanityError> {
-        if !uo.paymaster_and_data.is_empty() {
-            if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                let code = helper
-                    .entry_point
-                    .eth_client()
-                    .get_code(addr, None)
-                    .await
-                    .map_err(|e| SanityError::Provider { inner: e.to_string() })?;
+        if !uo.paymaster.is_zero() {
+            let code = helper
+                .entry_point
+                .eth_client()
+                .get_code(uo.paymaster, None)
+                .await
+                .map_err(|e| SanityError::Provider { inner: e.to_string() })?;
 
-                if !code.is_empty() {
-                    let deposit_info = helper.entry_point.get_deposit_info(&addr).await?;
+            if !code.is_empty() {
+                let deposit_info = helper.entry_point.get_deposit_info(&uo.paymaster).await?;
 
-                    if U256::from(deposit_info.deposit) >= uo.max_fee_per_gas {
-                        return Ok(());
-                    }
+                if deposit_info.deposit >= uo.max_fee_per_gas {
+                    return Ok(());
                 }
             }
-
-            return Err(SanityError::Paymaster { inner: "Problem with paymaster".into() });
         }
 
         Ok(())

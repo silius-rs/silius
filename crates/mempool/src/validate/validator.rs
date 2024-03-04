@@ -264,10 +264,8 @@ where
 
             out.valid_after = sim_helper.valid_after;
         }
-
         out.pre_fund = extract_pre_fund(&sim_res);
         out.verification_gas_limit = extract_verification_gas_limit(&sim_res);
-
         let block_number = self
             .entry_point
             .eth_client()

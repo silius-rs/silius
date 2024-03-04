@@ -265,6 +265,12 @@ impl From<EntryPointError> for SimulationError {
     fn from(err: EntryPointError) -> Self {
         match err {
             EntryPointError::FailedOp(op) => SimulationError::Execution { inner: op.to_string() },
+            EntryPointError::FailedOpWithRevert(op) => {
+                SimulationError::Execution { inner: op.to_string() }
+            }
+            EntryPointError::PostOpReverted(op) => {
+                SimulationError::Execution { inner: op.to_string() }
+            }
             EntryPointError::Provider { inner } => SimulationError::Provider { inner },
             _ => SimulationError::Other { inner: err.to_string() },
         }

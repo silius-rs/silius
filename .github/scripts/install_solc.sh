@@ -4,7 +4,7 @@ set -eo pipefail
 
 # install solc
 
-SOLC_VERSION="v0.8.20"
+SOLC_VERSION="v0.8.23"
 
 wget -c "https://github.com/ethereum/solidity/releases/download/$SOLC_VERSION/solc-static-linux"
 mv solc-static-linux /usr/local/bin/solc
