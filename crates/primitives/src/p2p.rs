@@ -1,6 +1,6 @@
 //! P2P primitives
 
-use crate::UserOperationSigned;
+use crate::{UserOperationPacked, UserOperationSigned};
 use ethers::types::{Address, U256 as EthersU256};
 use ssz_rs::{Vector, U256};
 use ssz_rs_derive::Serializable;
@@ -8,7 +8,7 @@ use ssz_rs_derive::Serializable;
 /// P2P message type
 #[derive(Clone, Debug, Default, Serializable, PartialEq)]
 pub struct VerifiedUserOperation {
-    user_operation: UserOperationSigned,
+    user_operation: UserOperationPacked,
     entry_point: Vector<u8, 20>,
     verified_at_block_hash: U256,
 }
@@ -24,14 +24,14 @@ impl VerifiedUserOperation {
         let verified_at_block_hash = U256::from_bytes_le(buf);
 
         Self {
-            user_operation,
+            user_operation: user_operation.into(),
             entry_point: <Vector<u8, 20>>::try_from(entry_point.as_bytes().to_vec())
                 .expect("entrypoint address is valid"),
             verified_at_block_hash,
         }
     }
 
-    pub fn user_operation(self) -> UserOperationSigned {
+    pub fn user_operation(self) -> UserOperationPacked {
         self.user_operation
     }
 
