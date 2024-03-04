@@ -54,6 +54,9 @@ lint:
 	cargo sort --check --workspace --grouped
 	cargo +nightly udeps --workspace
 
+doc:
+	cargo doc --workspace --no-deps
+
 run-geth:
 	cd bundler-spec-tests && docker compose up -d && cd ..
 
