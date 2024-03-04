@@ -34,9 +34,7 @@ fn is_validation_oog<T: ToString>(err: T) -> bool {
     let s = err.to_string();
     s.contains("validation OOG") ||
         s.contains("return data out of bounds") ||
-        s.contains("AA40 over verificationGasLimit") ||
-        s.contains("AA41 too little verificationGas") ||
-        s.contains("AA51 prefund below actualGasCost") ||
+        s.contains("AA26 over verificationGasLimit") ||
         s.contains("AA13 initCode failed or OOG") ||
         s.contains("AA23 reverted (or OOG)") ||
         s.contains("AA33 reverted (or OOG")

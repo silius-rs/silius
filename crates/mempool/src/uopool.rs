@@ -19,19 +19,17 @@ use ethers::{
 use eyre::format_err;
 use futures::channel::mpsc::UnboundedSender;
 use silius_contracts::{
-    entry_point::UserOperationEventFilter, utils::parse_from_input_data, EntryPoint,
-    EntryPointError,
+    utils::parse_from_input_data, EntryPoint, EntryPointError, UserOperationEventFilter,
 };
 use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
-    get_address,
     reputation::{ReputationEntry, StakeInfo, StakeInfoResponse, Status},
     simulation::StorageMap,
     UoPoolMode, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, trace};
 
 const FILTER_MAX_DEPTH: u64 = 10;
 const PRE_VERIFICATION_SAFE_RESERVE_PERC: u64 = 10; // percentage how higher pre verification gas we return
@@ -251,21 +249,20 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                         Err(e) => error!("Failed to set code hashes for user operation {uo_hash:?} with error: {e:?}"),
                     }
                 }
-                info!("{uo_hash:?} added to the mempool {:?}", self.id);
                 trace!("{uo:?} added to the mempool {:?}", self.id);
 
                 // update reputation
                 self.reputation
                     .increment_seen(&uo.sender)
                     .map_err(|e| MempoolError { hash: uo_hash, kind: e.into() })?;
-                if let Some(f_addr) = get_address(&uo.init_code) {
+                if !uo.factory.is_zero() {
                     self.reputation
-                        .increment_seen(&f_addr)
+                        .increment_seen(&uo.factory)
                         .map_err(|e| MempoolError { hash: uo_hash, kind: e.into() })?;
                 }
-                if let Some(p_addr) = get_address(&uo.paymaster_and_data) {
+                if !uo.paymaster.is_zero() {
                     self.reputation
-                        .increment_seen(&p_addr)
+                        .increment_seen(&uo.paymaster)
                         .map_err(|e| MempoolError { hash: uo_hash, kind: e.into() })?;
                 }
 
@@ -317,20 +314,15 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 continue;
             }
 
-            let p_opt = get_address(&uo.paymaster_and_data.0);
-            let f_opt = get_address(&uo.init_code.0);
+            let p_st = Status::from(self.reputation.get_status(&uo.paymaster).map_err(|err| {
+                format_err!("Error getting reputation status with error: {err:?}")
+            })?);
+            let f_st = Status::from(self.reputation.get_status(&uo.factory).map_err(|err| {
+                format_err!("Error getting reputation status with error: {err:?}")
+            })?);
 
-            let p_st = Status::from(
-                self.reputation.get_status_from_bytes(&uo.paymaster_and_data).map_err(|err| {
-                    format_err!("Error getting reputation status with error: {err:?}")
-                })?,
-            );
-            let f_st = Status::from(self.reputation.get_status_from_bytes(&uo.init_code).map_err(
-                |err| format_err!("Error getting reputation status with error: {err:?}"),
-            )?);
-
-            let p_c = p_opt.map(|p| staked_entity_c.get(&p).cloned().unwrap_or(0)).unwrap_or(0);
-            let f_c = f_opt.map(|f| staked_entity_c.get(&f).cloned().unwrap_or(0)).unwrap_or(0);
+            let p_c = staked_entity_c.get(&uo.paymaster).cloned().unwrap_or(0);
+            let f_c = staked_entity_c.get(&uo.factory).cloned().unwrap_or(0);
 
             match (p_st, f_st) {
                 (Status::BANNED, _) | (_, Status::BANNED) => {
@@ -392,26 +384,29 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                         break;
                     }
 
-                    if let Some(p) = p_opt {
-                        let balance = match paymaster_dep.get(&p) {
+                    if !uo.paymaster.is_zero() {
+                        let balance = match paymaster_dep.get(&uo.paymaster) {
                             Some(n) => *n,
-                            None => self.entry_point.balance_of(&p).await.map_err(|err| {
-                                format_err!(
-                                    "Getting balance of paymaster {p:?} failed with error: {err:?}",
+                            None => {
+                                self.entry_point.balance_of(&uo.paymaster).await.map_err(|err| {
+                                    format_err!(
+                                    "Getting balance of paymaster {:?} failed with error: {err:?}",uo.paymaster
                                 )
-                            })?,
+                                })?
+                            }
                         };
 
                         if balance.lt(&val_out.pre_fund) {
                             continue;
                         }
 
-                        staked_entity_c.entry(p).and_modify(|c| *c += 1).or_insert(1);
-                        paymaster_dep.insert(p, balance.saturating_sub(val_out.pre_fund));
+                        staked_entity_c.entry(uo.paymaster).and_modify(|c| *c += 1).or_insert(1);
+                        paymaster_dep
+                            .insert(uo.paymaster, balance.saturating_sub(val_out.pre_fund));
                     }
 
-                    if let Some(f) = f_opt {
-                        staked_entity_c.entry(f).and_modify(|c| *c += 1).or_insert(1);
+                    if !uo.factory.is_zero() {
+                        staked_entity_c.entry(uo.factory).and_modify(|c| *c += 1).or_insert(1);
                     }
 
                     gas_total = gas_total_new;
@@ -561,11 +556,12 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     ) -> eyre::Result<Option<(UserOperationEventFilter, LogMeta)>> {
         let mut event: Option<(UserOperationEventFilter, LogMeta)> = None;
         let latest_block = self.entry_point.eth_client().get_block_number().await?;
+        let from_block = latest_block.saturating_sub(FILTER_MAX_DEPTH.into());
         let filter = self
             .entry_point
             .entry_point_api()
             .event::<UserOperationEventFilter>()
-            .from_block(latest_block - FILTER_MAX_DEPTH)
+            .from_block(from_block)
             .topic1(uo_hash.0);
         let res: Vec<(UserOperationEventFilter, LogMeta)> = filter.query_with_meta().await?;
         // It is possible have two same user operatation in same bundle
@@ -605,7 +601,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 })
             {
                 return Ok(UserOperationByHash {
-                    user_operation: uo,
+                    user_operation: uo.into(),
                     entry_point: ep,
                     transaction_hash: log_meta.transaction_hash,
                     block_hash: log_meta.block_hash,
@@ -649,7 +645,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                     success: event.success,
                     tx_receipt: tx_receipt.clone(),
                     logs: tx_receipt.logs.into_iter().collect(),
-                    paymaster: get_address(&uo.user_operation.paymaster_and_data),
+                    paymaster: uo.user_operation.paymaster,
                     reason: String::new(), // TODO: this must be set to revert reason
                 });
             }
@@ -692,12 +688,12 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             // update reputations
             self.reputation.increment_included(&uo.sender).ok();
 
-            if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                self.reputation.increment_included(&addr).ok();
+            if !uo.paymaster.is_zero() {
+                self.reputation.increment_included(&uo.paymaster).ok();
             }
 
-            if let Some(addr) = get_address(&uo.init_code) {
-                self.reputation.increment_included(&addr).ok();
+            if !uo.factory.is_zero() {
+                self.reputation.increment_included(&uo.factory).ok();
             }
         }
 

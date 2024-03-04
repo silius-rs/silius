@@ -96,14 +96,14 @@ impl<M: Middleware> SanityCheck<M> for Entities {
         self.check_throttled(SENDER, &sender, &status, helper, mempool, reputation)?;
 
         // factory
-        if let Some(factory) = factory {
+        if !uo.factory.is_zero() {
             let status = self.get_status(&factory, helper, reputation)?;
             self.check_banned(FACTORY, &factory, &status)?;
             self.check_throttled(FACTORY, &factory, &status, helper, mempool, reputation)?;
         }
 
         // paymaster
-        if let Some(paymaster) = paymaster {
+        if !paymaster.is_zero() {
             let status = self.get_status(&paymaster, helper, reputation)?;
             self.check_banned(PAYMASTER, &paymaster, &status)?;
             self.check_throttled(PAYMASTER, &paymaster, &status, helper, mempool, reputation)?;

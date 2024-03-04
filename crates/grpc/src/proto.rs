@@ -98,8 +98,9 @@ pub mod types {
                 uo: Some(UserOperationSigned {
                     sender: Some(user_operation.sender.into()),
                     nonce: Some(user_operation.nonce.into()),
-                    init_code: prost::bytes::Bytes::copy_from_slice(
-                        user_operation.init_code.as_ref(),
+                    factory: Some(user_operation.factory.into()),
+                    factory_data: prost::bytes::Bytes::copy_from_slice(
+                        user_operation.factory_data.as_ref(),
                     ),
                     call_data: prost::bytes::Bytes::copy_from_slice(
                         user_operation.call_data.as_ref(),
@@ -109,8 +110,15 @@ pub mod types {
                     pre_verification_gas: Some(user_operation.pre_verification_gas.into()),
                     max_fee_per_gas: Some(user_operation.max_fee_per_gas.into()),
                     max_priority_fee_per_gas: Some(user_operation.max_priority_fee_per_gas.into()),
-                    paymaster_and_data: prost::bytes::Bytes::copy_from_slice(
-                        user_operation.paymaster_and_data.as_ref(),
+                    paymaster: Some(user_operation.paymaster.into()),
+                    paymaster_verification_gas_limit: Some(
+                        user_operation.paymaster_verification_gas_limit.into(),
+                    ),
+                    paymaster_post_op_gas_limit: Some(
+                        user_operation.paymaster_post_op_gas_limit.into(),
+                    ),
+                    paymaster_data: prost::bytes::Bytes::copy_from_slice(
+                        user_operation.paymaster_data.as_ref(),
                     ),
                     signature: prost::bytes::Bytes::copy_from_slice(
                         user_operation.signature.as_ref(),
@@ -146,15 +154,25 @@ pub mod types {
             Self {
                 sender: Some(user_operation.sender.into()),
                 nonce: Some(user_operation.nonce.into()),
-                init_code: prost::bytes::Bytes::copy_from_slice(user_operation.init_code.as_ref()),
+                factory: Some(user_operation.factory.into()),
+                factory_data: prost::bytes::Bytes::copy_from_slice(
+                    user_operation.factory_data.as_ref(),
+                ),
                 call_data: prost::bytes::Bytes::copy_from_slice(user_operation.call_data.as_ref()),
                 call_gas_limit: Some(user_operation.call_gas_limit.into()),
                 verification_gas_limit: Some(user_operation.verification_gas_limit.into()),
                 pre_verification_gas: Some(user_operation.pre_verification_gas.into()),
                 max_fee_per_gas: Some(user_operation.max_fee_per_gas.into()),
                 max_priority_fee_per_gas: Some(user_operation.max_priority_fee_per_gas.into()),
-                paymaster_and_data: prost::bytes::Bytes::copy_from_slice(
-                    user_operation.paymaster_and_data.as_ref(),
+                paymaster: Some(user_operation.paymaster.into()),
+                paymaster_verification_gas_limit: Some(
+                    user_operation.paymaster_verification_gas_limit.into(),
+                ),
+                paymaster_post_op_gas_limit: Some(
+                    user_operation.paymaster_post_op_gas_limit.into(),
+                ),
+                paymaster_data: prost::bytes::Bytes::copy_from_slice(
+                    user_operation.paymaster_data.as_ref(),
                 ),
                 signature: prost::bytes::Bytes::copy_from_slice(user_operation.signature.as_ref()),
             }
@@ -178,7 +196,14 @@ pub mod types {
                         U256::zero()
                     }
                 },
-                init_code: user_operation.init_code.into(),
+                factory: {
+                    if let Some(factory) = user_operation.factory {
+                        factory.into()
+                    } else {
+                        Address::zero()
+                    }
+                },
+                factory_data: user_operation.factory_data.into(),
                 call_data: user_operation.call_data.into(),
                 call_gas_limit: {
                     if let Some(call_gas_limit) = user_operation.call_gas_limit {
@@ -216,12 +241,137 @@ pub mod types {
                         U256::zero()
                     }
                 },
-                paymaster_and_data: user_operation.paymaster_and_data.into(),
+                paymaster: {
+                    if let Some(paymaster) = user_operation.paymaster {
+                        paymaster.into()
+                    } else {
+                        Address::zero()
+                    }
+                },
+                paymaster_verification_gas_limit: {
+                    if let Some(paymaster_verification_gas_limit) =
+                        user_operation.paymaster_verification_gas_limit
+                    {
+                        paymaster_verification_gas_limit.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                paymaster_post_op_gas_limit: {
+                    if let Some(paymaster_post_op_gas_limit) =
+                        user_operation.paymaster_post_op_gas_limit
+                    {
+                        paymaster_post_op_gas_limit.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                paymaster_data: user_operation.paymaster_data.into(),
                 signature: user_operation.signature.into(),
             }
         }
     }
-
+    impl From<silius_primitives::RpcUserOperation> for UserOperationSigned {
+        fn from(user_operation: silius_primitives::RpcUserOperation) -> Self {
+            Self {
+                sender: Some(user_operation.sender.into()),
+                nonce: Some(user_operation.nonce.into()),
+                factory: user_operation.factory.map(|a| a.into()),
+                factory_data: prost::bytes::Bytes::copy_from_slice(
+                    user_operation.factory_data.unwrap_or_default().as_ref(),
+                ),
+                call_data: prost::bytes::Bytes::copy_from_slice(user_operation.call_data.as_ref()),
+                call_gas_limit: Some(user_operation.call_gas_limit.into()),
+                verification_gas_limit: Some(user_operation.verification_gas_limit.into()),
+                pre_verification_gas: Some(user_operation.pre_verification_gas.into()),
+                max_fee_per_gas: Some(user_operation.max_fee_per_gas.into()),
+                max_priority_fee_per_gas: Some(user_operation.max_priority_fee_per_gas.into()),
+                paymaster: user_operation.paymaster.map(|a| a.into()),
+                paymaster_verification_gas_limit: user_operation
+                    .paymaster_verification_gas_limit
+                    .map(|a| a.into()),
+                paymaster_post_op_gas_limit: user_operation
+                    .paymaster_post_op_gas_limit
+                    .map(|a| a.into()),
+                paymaster_data: prost::bytes::Bytes::copy_from_slice(
+                    user_operation.paymaster_data.unwrap_or_default().as_ref(),
+                ),
+                signature: prost::bytes::Bytes::copy_from_slice(user_operation.signature.as_ref()),
+            }
+        }
+    }
+    impl From<UserOperationSigned> for silius_primitives::RpcUserOperation {
+        fn from(user_operation: UserOperationSigned) -> Self {
+            Self {
+                sender: {
+                    if let Some(sender) = user_operation.sender {
+                        sender.into()
+                    } else {
+                        Address::zero()
+                    }
+                },
+                nonce: {
+                    if let Some(nonce) = user_operation.nonce {
+                        nonce.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                factory: user_operation.factory.map(|a| a.into()),
+                factory_data: if user_operation.factory_data.is_empty() {
+                    None
+                } else {
+                    Some(user_operation.factory_data.into())
+                },
+                call_data: user_operation.call_data.into(),
+                call_gas_limit: {
+                    if let Some(call_gas_limit) = user_operation.call_gas_limit {
+                        call_gas_limit.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                verification_gas_limit: {
+                    if let Some(verification_gas_limit) = user_operation.verification_gas_limit {
+                        verification_gas_limit.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                pre_verification_gas: {
+                    if let Some(pre_verification_gas) = user_operation.pre_verification_gas {
+                        pre_verification_gas.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                max_fee_per_gas: {
+                    if let Some(max_fee_per_gas) = user_operation.max_fee_per_gas {
+                        max_fee_per_gas.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                max_priority_fee_per_gas: {
+                    if let Some(max_priority_fee_per_gas) = user_operation.max_priority_fee_per_gas
+                    {
+                        max_priority_fee_per_gas.into()
+                    } else {
+                        U256::zero()
+                    }
+                },
+                paymaster: user_operation.paymaster.map(|a| a.into()),
+                paymaster_verification_gas_limit: user_operation
+                    .paymaster_verification_gas_limit
+                    .map(|a| a.into()),
+                paymaster_post_op_gas_limit: user_operation
+                    .paymaster_post_op_gas_limit
+                    .map(|a| a.into()),
+                paymaster_data: Some(user_operation.paymaster_data.into()),
+                signature: user_operation.signature.into(),
+            }
+        }
+    }
     impl From<silius_primitives::reputation::ReputationEntry> for ReputationEntry {
         fn from(reputation_entry: silius_primitives::reputation::ReputationEntry) -> Self {
             Self {

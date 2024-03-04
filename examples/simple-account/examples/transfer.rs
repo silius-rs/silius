@@ -62,14 +62,18 @@ async fn main() -> eyre::Result<()> {
         let user_op = UserOperationSigned {
             sender: address,
             nonce,
-            init_code: Bytes::default(),
+            factory: Default::default(),
+            factory_data: Default::default(),
             call_data: Bytes::from(execution.encode()),
             call_gas_limit: U256::from(1),
             verification_gas_limit: U256::from(1000000u64),
             pre_verification_gas: U256::from(1u64),
             max_fee_per_gas: U256::from(1),
             max_priority_fee_per_gas: priority_fee,
-            paymaster_and_data: Bytes::new(),
+            paymaster: Address::default(),
+            paymaster_verification_gas_limit: 0.into(),
+            paymaster_post_op_gas_limit: 0.into(),
+            paymaster_data: Bytes::default(),
             signature: Bytes::default(),
         };
         let uo_wallet = UoWallet::from_phrase(seed_phrase.as_str(), chain_id, false)?;

@@ -21,7 +21,7 @@ pub struct ExecutorTracerResult {
     #[serde(rename = "userOperationRevertEvent")]
     pub user_op_revert_event: Option<LogInfo>,
     pub output: String,
-    pub error: String,
+    pub error: Option<String>,
 }
 impl TryFrom<GethTrace> for ExecutorTracerResult {
     type Error = eyre::Error;

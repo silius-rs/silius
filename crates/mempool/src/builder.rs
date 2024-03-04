@@ -12,7 +12,7 @@ use ethers::{
 };
 use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
-use silius_contracts::EntryPoint;
+use silius_contracts::{EntryPoint, HandleOpsCall};
 use silius_primitives::{provider::BlockStream, UoPoolMode, UserOperation, UserOperationSigned};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
@@ -80,13 +80,16 @@ where
         if let Some(txs) = txs {
             for tx in txs {
                 if tx.to == Some(uopool.entry_point.address()) {
-                    let dec: Result<(Vec<UserOperationSigned>, Address), _> =
-                        uopool.entry_point.entry_point_api().decode("handleOps", tx.input);
+                    let dec: Result<HandleOpsCall, _> =
+                        <HandleOpsCall as ::ethers::core::abi::AbiDecode>::decode(tx.input);
 
-                    if let Ok((uos, _)) = dec {
+                    if let Ok(calldata) = dec {
                         uopool.remove_user_operations(
-                            uos.iter()
+                            calldata
+                                .ops
+                                .into_iter()
                                 .map(|uo| {
+                                    let uo: UserOperationSigned = uo.into();
                                     UserOperation::from_user_operation_signed(
                                         uo.hash(&uopool.entry_point.address(), uopool.chain.id()),
                                         uo.clone(),

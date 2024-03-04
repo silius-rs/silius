@@ -1,9 +1,11 @@
 //! Basic transaction type for account abstraction (ERC-4337)
-
 mod hash;
 mod request;
 
-use crate::{get_address, utils::as_checksum_addr};
+use crate::{
+    pack_paymaster_fee_data, pack_uint128,
+    utils::{as_checksum_addr, pack_init_code},
+};
 use derive_more::{AsRef, Deref};
 use ethers::{
     abi::AbiEncode,
@@ -67,8 +69,9 @@ pub struct UserOperationSigned {
     /// Nonce (anti replay protection)
     pub nonce: U256,
 
-    /// Init code for the account (needed if account not yet deployed and needs to be created)
-    pub init_code: Bytes,
+    pub factory: Address,
+
+    pub factory_data: Bytes,
 
     /// The data that is passed to the sender during the main execution call
     pub call_data: Bytes,
@@ -89,9 +92,13 @@ pub struct UserOperationSigned {
     /// Maximum priority fee per gas (similar to EIP-1559)
     pub max_priority_fee_per_gas: U256,
 
-    /// Address of paymaster sponsoring the user operation, followed by extra data to send to the
-    /// paymaster (can be empty)
-    pub paymaster_and_data: Bytes,
+    pub paymaster: Address,
+
+    pub paymaster_verification_gas_limit: U256,
+
+    pub paymaster_post_op_gas_limit: U256,
+
+    pub paymaster_data: Bytes,
 
     /// Data passed to the account along with the nonce during the verification step
     pub signature: Bytes,
@@ -104,27 +111,34 @@ struct UserOperationNoSignature {
     pub nonce: U256,
     pub init_code: H256,
     pub call_data: H256,
-    pub call_gas_limit: U256,
-    pub verification_gas_limit: U256,
+    pub account_gas_limit: U256,
     pub pre_verification_gas: U256,
-    pub max_fee_per_gas: U256,
-    pub max_priority_fee_per_gas: U256,
+    pub gas_fee: U256,
     pub paymaster_and_data: H256,
 }
 
 impl From<UserOperationSigned> for UserOperationNoSignature {
     fn from(value: UserOperationSigned) -> Self {
+        let paymaster_and_data: Bytes = pack_paymaster_fee_data(
+            value.paymaster,
+            value.paymaster_verification_gas_limit,
+            value.paymaster_post_op_gas_limit,
+            &value.paymaster_data,
+        )
+        .into();
+        let init_code: Bytes = pack_init_code(value.factory, value.factory_data).into();
+        let gas_fee = pack_uint128(value.max_priority_fee_per_gas, value.max_fee_per_gas).into();
+        let account_gas_limit =
+            pack_uint128(value.verification_gas_limit, value.call_gas_limit).into();
         Self {
             sender: value.sender,
             nonce: value.nonce,
-            init_code: keccak256(value.init_code.deref()).into(),
+            init_code: keccak256(init_code).into(),
             call_data: keccak256(value.call_data.deref()).into(),
-            call_gas_limit: value.call_gas_limit,
-            verification_gas_limit: value.verification_gas_limit,
+            gas_fee,
             pre_verification_gas: value.pre_verification_gas,
-            max_fee_per_gas: value.max_fee_per_gas,
-            max_priority_fee_per_gas: value.max_priority_fee_per_gas,
-            paymaster_and_data: keccak256(value.paymaster_and_data.deref()).into(),
+            account_gas_limit,
+            paymaster_and_data: keccak256(paymaster_and_data.deref()).into(),
         }
     }
 }
@@ -132,7 +146,7 @@ impl From<UserOperationSigned> for UserOperationNoSignature {
 impl UserOperationSigned {
     /// Packs the user operation into bytes
     pub fn pack(&self) -> Bytes {
-        self.clone().encode().into()
+        self.pack_without_signature().0.to_vec().into()
     }
 
     /// Packs the user operation without signature to bytes (used for calculating the hash)
@@ -168,12 +182,6 @@ impl UserOperationSigned {
     /// Sets the nonce of the user operation
     pub fn nonce(mut self, nonce: U256) -> Self {
         self.nonce = nonce;
-        self
-    }
-
-    /// Sets the init code of the user operation
-    pub fn init_code(mut self, init_code: Bytes) -> Self {
-        self.init_code = init_code;
         self
     }
 
@@ -214,8 +222,29 @@ impl UserOperationSigned {
     }
 
     /// Sets the paymaster and data of the user operation
-    pub fn paymaster_and_data(mut self, paymaster_and_data: Bytes) -> Self {
-        self.paymaster_and_data = paymaster_and_data;
+    pub fn paymaster(mut self, paymaster: Address) -> Self {
+        self.paymaster = paymaster;
+        self
+    }
+
+    /// Sets the paymaster and data of the user operation
+    pub fn paymaster_post_op_gas_limit(mut self, paymaster_post_op_gas_limit: U256) -> Self {
+        self.paymaster_post_op_gas_limit = paymaster_post_op_gas_limit;
+        self
+    }
+
+    /// Sets the paymaster and data of the user operation
+    pub fn paymaster_verification_gas_limit(
+        mut self,
+        paymaster_verification_gas_limit: U256,
+    ) -> Self {
+        self.paymaster_verification_gas_limit = paymaster_verification_gas_limit;
+        self
+    }
+
+    /// Sets the paymaster and data of the user operation
+    pub fn paymaster_data(mut self, paymaster_data: Bytes) -> Self {
+        self.paymaster_data = paymaster_data;
         self
     }
 
@@ -226,11 +255,8 @@ impl UserOperationSigned {
     }
 
     /// Gets the entities (optionally if present) involved in the user operation
-    pub fn get_entities(&self) -> (Address, Option<Address>, Option<Address>) {
-        let sender = self.sender;
-        let factory = get_address(&self.init_code);
-        let paymaster = get_address(&self.paymaster_and_data);
-        (sender, factory, paymaster)
+    pub fn get_entities(&self) -> (Address, Address, Address) {
+        (self.sender, self.factory, self.paymaster)
     }
 
     /// Creates random user operation (for testing purposes)
@@ -245,8 +271,10 @@ impl UserOperationSigned {
 }
 
 /// This could be increased if we found bigger bytes, not sure about the proper value right now.
+#[allow(dead_code)]
 const MAXIMUM_SSZ_BYTES_LENGTH: usize = 1024;
 
+#[allow(dead_code)]
 fn btyes_to_list(
     value: &Bytes,
 ) -> Result<List<u8, MAXIMUM_SSZ_BYTES_LENGTH>, ssz_rs::SerializeError> {
@@ -256,23 +284,24 @@ fn btyes_to_list(
 }
 
 impl ssz_rs::Serialize for UserOperationSigned {
-    fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
-        let mut serializer = ssz_rs::__internal::Serializer::default();
-        serializer.with_element(&self.sender.0)?;
-        serializer.with_element(&self.nonce.0)?;
-        serializer.with_element(&btyes_to_list(&self.init_code)?)?;
-        serializer.with_element(&btyes_to_list(&self.call_data)?)?;
-        serializer.with_element(&self.call_gas_limit.0)?;
-        serializer.with_element(&self.verification_gas_limit.0)?;
-        serializer.with_element(&self.pre_verification_gas.0)?;
-        serializer.with_element(&self.max_fee_per_gas.0)?;
-        serializer.with_element(&self.max_priority_fee_per_gas.0)?;
-        serializer.with_element(&btyes_to_list(&self.paymaster_and_data)?)?;
-        serializer.with_element(&btyes_to_list(&self.signature)?)?;
-        serializer.serialize(buffer)
+    fn serialize(&self, _buffer: &mut Vec<u8>) -> Result<usize, ssz_rs::SerializeError> {
+        todo!()
+        // let mut serializer = ssz_rs::__internal::Serializer::default();
+        // serializer.with_element(&self.sender.0)?;
+        // serializer.with_element(&self.nonce.0)?;
+        // serializer.with_element(&btyes_to_list(&self.init_code)?)?;
+        // serializer.with_element(&btyes_to_list(&self.call_data)?)?;
+        // serializer.with_element(&self.call_gas_limit.0)?;
+        // serializer.with_element(&self.verification_gas_limit.0)?;
+        // serializer.with_element(&self.pre_verification_gas.0)?;
+        // serializer.with_element(&self.max_fee_per_gas.0)?;
+        // serializer.with_element(&self.max_priority_fee_per_gas.0)?;
+        // serializer.with_element(&btyes_to_list(&self.paymaster_and_data)?)?;
+        // serializer.with_element(&btyes_to_list(&self.signature)?)?;
+        // serializer.serialize(buffer)
     }
 }
-
+#[allow(dead_code)]
 fn ssz_unpack_bytes_length(
     start: usize,
     encoding: &[u8],
@@ -283,7 +312,7 @@ fn ssz_unpack_bytes_length(
     offsets.push(next_offset as usize);
     Ok(())
 }
-
+#[allow(dead_code)]
 fn ssz_unpack_u256(
     start: usize,
     encoding: &[u8],
@@ -293,7 +322,7 @@ fn ssz_unpack_u256(
     let result = <[u64; 4] as ssz_rs::Deserialize>::deserialize(&encoding[start..end])?;
     Ok((U256(result), encoded_length))
 }
-
+#[allow(dead_code)]
 fn ssz_unpack_bytes(
     bytes_zone: &mut Windows<'_, usize>,
     encoding: &[u8],
@@ -310,103 +339,104 @@ fn ssz_unpack_bytes(
 }
 
 impl ssz_rs::Deserialize for UserOperationSigned {
-    fn deserialize(encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
+    fn deserialize(_encoding: &[u8]) -> Result<Self, ssz_rs::DeserializeError>
     where
         Self: Sized,
     {
-        let mut start = 0;
-        let mut offsets: Vec<usize> = Vec::new();
-        let mut container = Self::default();
+        todo!()
+        // let mut start = 0;
+        // let mut offsets: Vec<usize> = Vec::new();
+        // let mut container = Self::default();
 
-        let byte_read = {
-            let encoded_length = <[u8; 20] as ssz_rs::Serializable>::size_hint();
-            let end = start + encoded_length;
-            let target =
-                encoding.get(start..end).ok_or(ssz_rs::DeserializeError::ExpectedFurtherInput {
-                    provided: encoding.len() - start,
-                    expected: encoded_length,
-                })?;
-            let result = <[u8; 20] as ssz_rs::Deserialize>::deserialize(target)?;
-            container.sender = Address::from_slice(&result);
-            encoded_length
-        };
-        start += byte_read;
+        // let byte_read = {
+        //     let encoded_length = <[u8; 20] as ssz_rs::Serializable>::size_hint();
+        //     let end = start + encoded_length;
+        //     let target =
+        //         encoding.get(start..end).ok_or(ssz_rs::DeserializeError::ExpectedFurtherInput {
+        //             provided: encoding.len() - start,
+        //             expected: encoded_length,
+        //         })?;
+        //     let result = <[u8; 20] as ssz_rs::Deserialize>::deserialize(target)?;
+        //     container.sender = Address::from_slice(&result);
+        //     encoded_length
+        // };
+        // start += byte_read;
 
-        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
-        container.nonce = value;
-        start += byte_read;
+        // let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        // container.nonce = value;
+        // start += byte_read;
 
-        // init code
-        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
-        start += 4usize;
+        // // init code
+        // ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        // start += 4usize;
 
-        // cal data
-        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
-        start += 4usize;
+        // // cal data
+        // ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        // start += 4usize;
 
-        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
-        container.call_gas_limit = value;
-        start += byte_read;
+        // let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        // container.call_gas_limit = value;
+        // start += byte_read;
 
-        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
-        container.verification_gas_limit = value;
-        start += byte_read;
+        // let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        // container.verification_gas_limit = value;
+        // start += byte_read;
 
-        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
-        container.pre_verification_gas = value;
-        start += byte_read;
+        // let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        // container.pre_verification_gas = value;
+        // start += byte_read;
 
-        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
-        container.max_fee_per_gas = value;
-        start += byte_read;
+        // let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        // container.max_fee_per_gas = value;
+        // start += byte_read;
 
-        let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
-        container.max_priority_fee_per_gas = value;
-        start += byte_read;
+        // let (value, byte_read) = ssz_unpack_u256(start, encoding)?;
+        // container.max_priority_fee_per_gas = value;
+        // start += byte_read;
 
-        // paymaster and data
-        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
-        start += 4usize;
+        // // paymaster and data
+        // ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        // start += 4usize;
 
-        // signature
-        ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
-        start += 4usize;
+        // // signature
+        // ssz_unpack_bytes_length(start, encoding, &mut offsets)?;
+        // start += 4usize;
 
-        let mut total_bytes_read = start;
-        offsets.push(encoding.len());
-        let mut bytes_zone = offsets.windows(2);
+        // let mut total_bytes_read = start;
+        // offsets.push(encoding.len());
+        // let mut bytes_zone = offsets.windows(2);
 
-        // init code
-        let (init_code, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
-        total_bytes_read += length;
-        container.init_code = init_code;
+        // // init code
+        // let (init_code, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        // total_bytes_read += length;
+        // container.init_code = init_code;
 
-        let (call_data, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
-        total_bytes_read += length;
-        container.call_data = call_data;
+        // let (call_data, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        // total_bytes_read += length;
+        // container.call_data = call_data;
 
-        let (paymaster_data, length) =
-            ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
-        total_bytes_read += length;
-        container.paymaster_and_data = paymaster_data;
+        // let (paymaster_data, length) =
+        //     ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        // total_bytes_read += length;
+        // container.paymaster_and_data = paymaster_data;
 
-        let (signature, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
-        total_bytes_read += length;
-        container.signature = signature;
+        // let (signature, length) = ssz_unpack_bytes(&mut bytes_zone, encoding, total_bytes_read)?;
+        // total_bytes_read += length;
+        // container.signature = signature;
 
-        if total_bytes_read > encoding.len() {
-            return Err(ssz_rs::DeserializeError::ExpectedFurtherInput {
-                provided: encoding.len(),
-                expected: total_bytes_read,
-            });
-        }
-        if total_bytes_read < encoding.len() {
-            return Err(ssz_rs::DeserializeError::AdditionalInput {
-                provided: encoding.len(),
-                expected: total_bytes_read,
-            });
-        }
-        Ok(container)
+        // if total_bytes_read > encoding.len() {
+        //     return Err(ssz_rs::DeserializeError::ExpectedFurtherInput {
+        //         provided: encoding.len(),
+        //         expected: total_bytes_read,
+        //     });
+        // }
+        // if total_bytes_read < encoding.len() {
+        //     return Err(ssz_rs::DeserializeError::AdditionalInput {
+        //         provided: encoding.len(),
+        //         expected: total_bytes_read,
+        //     });
+        // }
+        // Ok(container)
     }
 }
 
@@ -440,11 +470,71 @@ pub struct UserOperationReceipt {
     pub tx_receipt: TransactionReceipt,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcUserOperation {
+    /// Sender of the user operation
+    #[serde(serialize_with = "as_checksum_addr")]
+    pub sender: Address,
+    pub nonce: U256,
+    pub factory: Option<Address>,
+    pub factory_data: Option<Bytes>,
+    pub call_data: Bytes,
+    pub call_gas_limit: U256,
+    pub verification_gas_limit: U256,
+    pub pre_verification_gas: U256,
+    pub max_fee_per_gas: U256,
+    pub max_priority_fee_per_gas: U256,
+    pub paymaster: Option<Address>,
+    pub paymaster_verification_gas_limit: Option<U256>,
+    pub paymaster_post_op_gas_limit: Option<U256>,
+    pub paymaster_data: Option<Bytes>,
+    pub signature: Bytes,
+}
+
+impl From<UserOperationSigned> for RpcUserOperation {
+    fn from(value: UserOperationSigned) -> Self {
+        Self {
+            sender: value.sender,
+            nonce: value.nonce,
+            factory: if value.factory.is_zero() { None } else { Some(value.factory) },
+            factory_data: if value.factory_data.is_empty() {
+                None
+            } else {
+                Some(value.factory_data)
+            },
+            call_data: value.call_data,
+            call_gas_limit: value.call_gas_limit,
+            verification_gas_limit: value.verification_gas_limit,
+            pre_verification_gas: value.pre_verification_gas,
+            max_fee_per_gas: value.max_fee_per_gas,
+            max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+            paymaster: if value.paymaster.is_zero() { None } else { Some(value.paymaster) },
+            paymaster_verification_gas_limit: if value.paymaster_verification_gas_limit.is_zero() {
+                None
+            } else {
+                Some(value.paymaster_verification_gas_limit)
+            },
+            paymaster_post_op_gas_limit: if value.paymaster_post_op_gas_limit.is_zero() {
+                None
+            } else {
+                Some(value.paymaster_post_op_gas_limit)
+            },
+            paymaster_data: if value.paymaster_data.is_empty() {
+                None
+            } else {
+                Some(value.paymaster_data)
+            },
+            signature: value.signature,
+        }
+    }
+}
+
 /// Struct that is returned from the RPC endpoint eth_getUserOperationByHash
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationByHash {
-    pub user_operation: UserOperationSigned,
+    pub user_operation: RpcUserOperation,
     #[serde(serialize_with = "as_checksum_addr")]
     pub entry_point: Address,
     pub transaction_hash: H256,
@@ -472,30 +562,34 @@ mod tests {
             UserOperationSigned::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
             UserOperationSigned::default().sender("0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap()).call_gas_limit(200_000.into()).verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_fee_per_gas(3_000_000_000_u64.into()).max_priority_fee_per_gas(1_000_000_000.into()).signature("0x7cb39607585dee8e297d0d7a669ad8c5e43975220b6773c10a138deadbc8ec864981de4b9b3c735288a217115fb33f8326a61ddabc60a534e3b5536515c70f931c".parse().unwrap()),
         ];
-        assert_eq!(uos[0].pack(), "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000186a000000000000000000000000000000000000000000000000000000000000052080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".parse::<Bytes>().unwrap());
-        assert_eq!(uos[1].pack(), "0x0000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000030d4000000000000000000000000000000000000000000000000000000000000186a0000000000000000000000000000000000000000000000000000000000000520800000000000000000000000000000000000000000000000000000000b2d05e00000000000000000000000000000000000000000000000000000000003b9aca0000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000417cb39607585dee8e297d0d7a669ad8c5e43975220b6773c10a138deadbc8ec864981de4b9b3c735288a217115fb33f8326a61ddabc60a534e3b5536515c70f931c00000000000000000000000000000000000000000000000000000000000000".parse::<Bytes>().unwrap());
+        assert_eq!(uos[0].pack(), "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000186a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000052080000000000000000000000003b9aca0000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".parse::<Bytes>().unwrap());
+        assert_eq!(uos[1].pack(), "0x0000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c0000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000186a000000000000000000000000000030d4000000000000000000000000000000000000000000000000000000000000052080000000000000000000000003b9aca00000000000000000000000000b2d05e00c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".parse::<Bytes>().unwrap());
     }
 
     #[test]
     fn user_operation_signed_pack_without_signature() {
-        let uos =  vec![
+        let uos = vec![
             UserOperationSigned::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
             UserOperationSigned {
                 sender: "0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap(),
                 nonce: 1.into(),
-                init_code: Bytes::default(),
+                factory: Default::default(),
+                factory_data: Bytes::default(),
                 call_data: "0xb61d27f60000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c00000000000000000000000000000000000000000000000000005af3107a400000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
                 call_gas_limit: 33_100.into(),
                 verification_gas_limit: 60_624.into(),
                 pre_verification_gas: 44_056.into(),
                 max_fee_per_gas: 1_695_000_030_u64.into(),
                 max_priority_fee_per_gas: 1_695_000_000.into(),
-                paymaster_and_data: Bytes::default(),
+                paymaster: Address::default(),
+                paymaster_verification_gas_limit: U256::zero(),
+                paymaster_post_op_gas_limit: U256::zero(),
+                paymaster_data: Bytes::default(),
                 signature: "0x37540ca4f91a9f08993ba4ebd4b7473902f69864c98951f9db8cb47b78764c1a13ad46894a96dc0cad68f9207e49b4dbb897f25f47f040cec2a636a8201c1cd71b".parse().unwrap(),
             },
         ];
-        assert_eq!(uos[0].pack_without_signature(), "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000186a000000000000000000000000000000000000000000000000000000000000052080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003b9aca00c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".parse::<Bytes>().unwrap());
-        assert_eq!(uos[1].pack_without_signature(), "0x0000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c0000000000000000000000000000000000000000000000000000000000000001c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470f7def7aeb687d6992b466243b713223689982cefca0f91a1f5c5f60adb532b93000000000000000000000000000000000000000000000000000000000000814c000000000000000000000000000000000000000000000000000000000000ecd0000000000000000000000000000000000000000000000000000000000000ac18000000000000000000000000000000000000000000000000000000006507a5de000000000000000000000000000000000000000000000000000000006507a5c0c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".parse::<Bytes>().unwrap());
+        assert_eq!(uos[0].pack_without_signature(), "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000186a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000052080000000000000000000000003b9aca0000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".parse::<Bytes>().unwrap());
+        assert_eq!(uos[1].pack_without_signature(), "0x0000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c0000000000000000000000000000000000000000000000000000000000000001c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470f7def7aeb687d6992b466243b713223689982cefca0f91a1f5c5f60adb532b930000000000000000000000000000ecd00000000000000000000000000000814c000000000000000000000000000000000000000000000000000000000000ac180000000000000000000000006507a5c00000000000000000000000006507a5dec5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470".parse::<Bytes>().unwrap());
     }
 
     #[test]
@@ -503,29 +597,33 @@ mod tests {
         let uos =  vec![
             UserOperationSigned::default().verification_gas_limit(100_000.into()).pre_verification_gas(21_000.into()).max_priority_fee_per_gas(1_000_000_000.into()),
             UserOperationSigned {
-                sender: "0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap(),
+                sender:    "0x9c5754De1443984659E1b3a8d1931D83475ba29C".parse().unwrap(),
                 nonce: U256::zero(),
-                init_code: "0x9406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+                factory: "0x9406cc6185a346906296840746125a0e44976454".parse().unwrap(),
+                factory_data: "545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
                 call_data: "0xb61d27f60000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c00000000000000000000000000000000000000000000000000005af3107a400000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
                 call_gas_limit: 33_100.into(),
                 verification_gas_limit: 361_460.into(),
                 pre_verification_gas: 44_980.into(),
+                max_priority_fee_per_gas: 1_000_000_000.into(),
                 max_fee_per_gas: 1_695_000_030_u64.into(),
-                max_priority_fee_per_gas: 1_695_000_000.into(),
-                paymaster_and_data: Bytes::default(),
+                paymaster: Address::default(),
+                paymaster_verification_gas_limit: U256::zero(),
+                paymaster_post_op_gas_limit: U256::zero(),
+                paymaster_data: Bytes::default(),
                 signature: "0xebfd4657afe1f1c05c1ec65f3f9cc992a3ac083c424454ba61eab93152195e1400d74df01fc9fa53caadcb83a891d478b713016bcc0c64307c1ad3d7ea2e2d921b".parse().unwrap(),
             },
         ];
         assert_eq!(
             uos[0].hash(&"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(), 80_001),
-            "0x95418c07086df02ff6bc9e8bdc150b380cb761beecc098630440bcec6e862702"
+            "0xa3932640cfe5f15f0dbcfe33152f588c9f9d50c8ada6b77e8b75a8fb97b4ae73"
                 .parse::<H256>()
                 .unwrap()
                 .into()
         );
         assert_eq!(
             uos[1].hash(&"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap(), 80_001),
-            "0x7c1b8c9df49a9e09ecef0f0fe6841d895850d29820f9a4b494097764085dcd7e"
+            "0xc71f951ede5f5ccc2e7fca1329a76cea1288b55360211e1da47a8dc5f42c573f"
                 .parse::<H256>()
                 .unwrap()
                 .into()
@@ -533,18 +631,23 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "0.7.0 is not supported yet"]
     fn user_operation_signed_ssz() {
         let uo = UserOperationSigned {
-            sender: "0x1F9090AAE28B8A3DCEADF281B0F12828E676C326".parse().unwrap(),
+            sender:    "0x1F9090AAE28B8A3DCEADF281B0F12828E676C326".parse().unwrap(),
             nonce: 100.into(),
-            init_code: "0x9406cc6185a346906296840746125a0e449764545fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+            factory: "0x9406cc6185a346906296840746125a0e44976454".parse().unwrap(),
+            factory_data: "5fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
             call_data: "0xb61d27f60000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c00000000000000000000000000000000000000000000000000005af3107a400000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
             call_gas_limit: 100000.into(),
             verification_gas_limit: 361_460.into(),
             pre_verification_gas: 44_980.into(),
             max_fee_per_gas: 1_695_000_030.into(),
             max_priority_fee_per_gas: 1_695_000_000.into(),
-            paymaster_and_data: "0x1f".parse().unwrap(),
+            paymaster: Address::default(),
+            paymaster_verification_gas_limit: U256::zero(),
+            paymaster_post_op_gas_limit: U256::zero(),
+            paymaster_data: "0x1f".parse().unwrap(),
             signature: "0xebfd4657afe1f1c05c1ec65f3f9cc992a3ac083c424454ba61eab93152195e1400d74df01fc9fa53caadcb83a891d478b713016bcc0c64307c1ad3d7ea2e2d921b".parse().unwrap(),
         };
         let mut encoded = Vec::new();
@@ -558,14 +661,15 @@ mod tests {
 
         assert_eq!(uo_decode.sender, uo.sender);
         assert_eq!(uo_decode.nonce, uo.nonce);
-        assert_eq!(uo_decode.init_code, uo.init_code);
+        assert_eq!(uo_decode.factory, uo.factory);
+        assert_eq!(uo_decode.factory_data, uo.factory_data);
         assert_eq!(uo_decode.call_data, uo.call_data);
         assert_eq!(uo_decode.call_gas_limit, uo.call_gas_limit);
         assert_eq!(uo_decode.verification_gas_limit, uo.verification_gas_limit);
         assert_eq!(uo_decode.pre_verification_gas, uo.pre_verification_gas);
         assert_eq!(uo_decode.max_fee_per_gas, uo.max_fee_per_gas);
         assert_eq!(uo_decode.max_priority_fee_per_gas, uo.max_priority_fee_per_gas);
-        assert_eq!(uo_decode.paymaster_and_data, uo.paymaster_and_data);
+        assert_eq!(uo_decode.paymaster_data, uo.paymaster_data);
         assert_eq!(uo_decode.signature, uo.signature);
     }
 }

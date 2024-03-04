@@ -160,20 +160,24 @@ pub mod tests {
     fn pre_verification_gas_calculation() {
         let gas_oh = Overhead::default();
         let uo = UserOperationSigned {
-            sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
+            sender:    "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::zero(),
-            init_code: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b3bf2c3e70000000000000000000000001d9a2cb3638c2fc8bf9c01d088b79e75cd188b17000000000000000000000000789d9058feecf1948af429793e7f1eb4a75db2220000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+            factory: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b".parse().unwrap(),
+            factory_data: "3bf2c3e70000000000000000000000001d9a2cb3638c2fc8bf9c01d088b79e75cd188b17000000000000000000000000789d9058feecf1948af429793e7f1eb4a75db2220000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
             call_data: "0x80c5c7d0000000000000000000000000ab7e2cbfcfb6a5f33a75ad745c3e5fb48d689b5400000000000000000000000000000000000000000000000002c68af0bb14000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
             call_gas_limit: 21900.into(),
             verification_gas_limit: 1218343.into(),
             pre_verification_gas: 50780.into(),
             max_fee_per_gas: 10064120791_u64.into(),
             max_priority_fee_per_gas: 1620899097.into(),
-            paymaster_and_data: Bytes::default(),
+            paymaster: Address::default(),
+            paymaster_verification_gas_limit: U256::zero(),
+            paymaster_post_op_gas_limit: U256::zero(),
+            paymaster_data: Bytes::default(),
             signature: "0x4e69eb5e02d47ba28878655d61c59c20c3e9a2e6905381305626f6a5a2892ec12bd8dd59179f0642731e0e853af54a71ce422a1a234548c9dd1c559bd07df4461c".parse().unwrap(),
         };
 
-        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 45340.into());
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 41932.into());
     }
 
     #[test]
@@ -182,18 +186,22 @@ pub mod tests {
         let uo = UserOperationSigned {
             sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::max_value(),
-            init_code: Bytes::from(vec![255; 1024]), // Large init_code
-            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            factory: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b".parse().unwrap(),
+            factory_data: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]),    // Large call_data
             call_gas_limit: U256::max_value(),
             verification_gas_limit: U256::max_value(),
             pre_verification_gas: U256::max_value(),
             max_fee_per_gas: U256::max_value(),
             max_priority_fee_per_gas: U256::max_value(),
-            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
-            signature: Bytes::from(vec![255; 1024]),          // Large signature
+            paymaster: Address::default(),
+            paymaster_verification_gas_limit: U256::zero(),
+            paymaster_post_op_gas_limit: U256::zero(),
+            paymaster_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),      // Large signature
         };
 
-        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 110020.into());
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 43276.into());
     }
 
     #[test]
@@ -210,18 +218,22 @@ pub mod tests {
         let uo = UserOperationSigned {
             sender: "0xAB7e2cbFcFb6A5F33A75aD745C3E5fB48d689B54".parse().unwrap(),
             nonce: U256::max_value(),
-            init_code: Bytes::from(vec![255; 1024]), // Large init_code
-            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            factory: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b".parse().unwrap(),
+            factory_data: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]),    // Large call_data
             call_gas_limit: U256::max_value(),
             verification_gas_limit: U256::max_value(),
             pre_verification_gas: U256::max_value(),
             max_fee_per_gas: U256::max_value(),
             max_priority_fee_per_gas: U256::max_value(),
-            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
-            signature: Bytes::from(vec![255; 1024]),          // Large signature
+            paymaster: Address::default(),
+            paymaster_verification_gas_limit: U256::zero(),
+            paymaster_post_op_gas_limit: U256::zero(),
+            paymaster_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),      // Large signature
         };
 
-        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 1549132.into());
+        assert_eq!(gas_oh.calculate_pre_verification_gas(&uo), 132928.into());
     }
 
     /// This test occurred overflow when previous `calculate_pre_verification_gas` is used.
@@ -241,15 +253,19 @@ pub mod tests {
         let uo = UserOperationSigned {
             sender: Address::default(),
             nonce: U256::max_value(),
-            init_code: Bytes::from(vec![255; 1024]), // Large init_code
-            call_data: Bytes::from(vec![255; 1024]), // Large call_data
+            factory: "0xe19e9755942bb0bd0cccce25b1742596b8a8250b".parse().unwrap(),
+            factory_data: Bytes::from(vec![255; 1024]), // Large init_code
+            call_data: Bytes::from(vec![255; 1024]),    // Large call_data
             call_gas_limit: U256::max_value(),
             verification_gas_limit: U256::max_value(),
             pre_verification_gas: U256::max_value(),
             max_fee_per_gas: U256::max_value(),
             max_priority_fee_per_gas: U256::max_value(),
-            paymaster_and_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
-            signature: Bytes::from(vec![255; 1024]),          // Large signature
+            paymaster: Address::default(),
+            paymaster_verification_gas_limit: U256::zero(),
+            paymaster_post_op_gas_limit: U256::zero(),
+            paymaster_data: Bytes::from(vec![255; 1024]), // Large paymaster_and_data
+            signature: Bytes::from(vec![255; 1024]),      // Large signature
         };
 
         // This test is mainly to check if the function can handle the overflow scenario without

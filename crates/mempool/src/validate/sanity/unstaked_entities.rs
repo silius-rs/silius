@@ -110,7 +110,7 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
         }
 
         // factory
-        if let Some(factory) = factory {
+        if !factory.is_zero() {
             // [STO-040] - UserOperation may not use an entity address
             // (factory/paymaster/aggregator) that is used as an "account" in another UserOperation
             // in the mempool
@@ -138,7 +138,7 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
         }
 
         // paymaster
-        if let Some(paymaster) = paymaster {
+        if !paymaster.is_zero() {
             // [STO-040] - UserOperation may not use an entity address
             // (factory/paymaster/aggregator) that is used as an "account" in another UserOperation
             // in the mempool

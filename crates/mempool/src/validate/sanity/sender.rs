@@ -38,11 +38,10 @@ impl<M: Middleware> SanityCheck<M> for Sender {
             .map_err(|e| SanityError::Provider { inner: e.to_string() })?;
 
         // check if sender or init code
-        if (code.is_empty() && uo.init_code.is_empty()) ||
-            (!code.is_empty() && !uo.init_code.is_empty())
+        if (code.is_empty() && uo.factory.is_zero()) || (!code.is_empty() && !uo.factory.is_zero())
         {
             return Err(SanityError::Sender {
-                inner: format!("sender {0} is an existing contract, or the initCode {1} is not empty (but not both)", uo.sender, uo.init_code),
+                inner: format!("sender {0} is an existing contract, or the initCode {1} is not empty (but not both)", uo.sender, uo.factory),
             });
         }
 

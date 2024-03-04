@@ -371,10 +371,10 @@ impl Mempool {
         let uo_hash = uo.hash;
         self.user_operations.add(uo)?;
         self.user_operations_by_sender.add(&sender, uo_hash)?;
-        if let Some(factory) = factory {
+        if !factory.is_zero() {
             self.user_operations_by_entity.add(&factory, uo_hash)?;
         }
-        if let Some(paymaster) = paymaster {
+        if !paymaster.is_zero() {
             self.user_operations_by_entity.add(&paymaster, uo_hash)?;
         }
         Ok(uo_hash)
@@ -437,11 +437,11 @@ impl Mempool {
 
         self.user_operations_by_sender.remove_uo_hash(&sender, uo_hash)?;
 
-        if let Some(factory) = factory {
+        if !factory.is_zero() {
             self.user_operations_by_entity.remove_uo_hash(&factory, uo_hash)?;
         }
 
-        if let Some(paymaster) = paymaster {
+        if !paymaster.is_zero() {
             self.user_operations_by_entity.remove_uo_hash(&paymaster, uo_hash)?;
         }
 

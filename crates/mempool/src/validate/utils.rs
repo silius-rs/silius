@@ -1,9 +1,25 @@
 use ethers::types::{Address, U256};
 use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame};
 use silius_primitives::{
-    constants::validation::entities::NUMBER_OF_LEVELS, get_address, reputation::StakeInfo,
+    constants::validation::entities::NUMBER_OF_LEVELS, reputation::StakeInfo,
     simulation::StorageMap, UserOperation,
 };
+
+#[derive(Debug)]
+pub struct AccountValidationData {
+    pub sig_authorizer: Address,
+    valid_until: U256,
+    valid_after: U256,
+}
+
+pub fn unpack_account_validation_data(data: U256) -> AccountValidationData {
+    let mut b: [u8; 32] = [0; 32];
+    data.to_big_endian(&mut b);
+    let sig_authorizer = Address::from_slice(&b[..20]);
+    let valid_until = U256::from_big_endian(&b[20..26]);
+    let valid_after = U256::from_big_endian(&b[26..32]);
+    AccountValidationData { sig_authorizer, valid_until, valid_after }
+}
 
 /// Helper function to extract the gas limit for verification from the simulation result
 ///
@@ -14,8 +30,7 @@ use silius_primitives::{
 /// The gas limit for verification
 pub fn extract_verification_gas_limit(sim_res: &SimulateValidationResult) -> U256 {
     match sim_res {
-        SimulateValidationResult::ValidationResult(res) => res.return_info.0,
-        SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.0,
+        SimulateValidationResult::ValidationResult(res) => res.return_info.pre_op_gas,
     }
 }
 
@@ -28,8 +43,7 @@ pub fn extract_verification_gas_limit(sim_res: &SimulateValidationResult) -> U25
 /// The pre-fund for verification
 pub fn extract_pre_fund(sim_res: &SimulateValidationResult) -> U256 {
     match sim_res {
-        SimulateValidationResult::ValidationResult(res) => res.return_info.1,
-        SimulateValidationResult::ValidationResultWithAggregation(res) => res.return_info.1,
+        SimulateValidationResult::ValidationResult(res) => res.return_info.prefund,
     }
 }
 
@@ -43,10 +57,9 @@ pub fn extract_pre_fund(sim_res: &SimulateValidationResult) -> U256 {
 pub fn extract_timestamps(sim_res: &SimulateValidationResult) -> (U256, U256) {
     match sim_res {
         SimulateValidationResult::ValidationResult(res) => {
-            (res.return_info.3.into(), res.return_info.4.into())
-        }
-        SimulateValidationResult::ValidationResultWithAggregation(res) => {
-            (res.return_info.3.into(), res.return_info.4.into())
+            let validation_data =
+                unpack_account_validation_data(res.return_info.account_validation_data);
+            (validation_data.valid_until, validation_data.valid_after)
         }
     }
 }
@@ -65,27 +78,28 @@ pub fn extract_stake_info(
 ) -> [StakeInfo; NUMBER_OF_LEVELS] {
     let (f_info, s_info, p_info) = match sim_res {
         SimulateValidationResult::ValidationResult(res) => {
-            (res.factory_info, res.sender_info, res.paymaster_info)
-        }
-        SimulateValidationResult::ValidationResultWithAggregation(res) => {
-            (res.factory_info, res.sender_info, res.paymaster_info)
+            (res.factory_info.clone(), res.sender_info.clone(), res.paymaster_info.clone())
         }
     };
 
     [
         // factory
         StakeInfo {
-            address: get_address(&uo.init_code).unwrap_or(Address::zero()),
-            stake: f_info.0,
-            unstake_delay: f_info.1,
+            address: uo.factory,
+            stake: f_info.stake,
+            unstake_delay: f_info.unstake_delay_sec,
         },
         // account
-        StakeInfo { address: uo.sender, stake: s_info.0, unstake_delay: s_info.1 },
+        StakeInfo {
+            address: uo.sender,
+            stake: s_info.stake,
+            unstake_delay: s_info.unstake_delay_sec,
+        },
         // paymaster
         StakeInfo {
-            address: get_address(&uo.paymaster_and_data).unwrap_or(Address::zero()),
-            stake: p_info.0,
-            unstake_delay: p_info.1,
+            address: uo.paymaster,
+            stake: p_info.stake,
+            unstake_delay: p_info.unstake_delay_sec,
         },
     ]
 }

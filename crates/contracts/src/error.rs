@@ -1,4 +1,4 @@
-use crate::gen::{EntryPointAPIErrors, FailedOp};
+use crate::gen::{EntryPointAPIErrors, FailedOp, FailedOpWithRevert, PostOpReverted};
 use ethers::{
     abi::AbiDecode,
     providers::{JsonRpcError, Middleware, MiddlewareError, ProviderError},
@@ -14,6 +14,12 @@ pub enum EntryPointError {
     /// Failed user operation error
     #[error("{0}")]
     FailedOp(FailedOp),
+
+    #[error("{0}")]
+    FailedOpWithRevert(FailedOpWithRevert),
+
+    #[error("{0}")]
+    PostOpReverted(PostOpReverted),
 
     /// execution reverted
     #[error("execution reverted: {0}")]
@@ -53,6 +59,20 @@ pub enum EntryPointError {
         /// The inner error message
         inner: String,
     },
+}
+
+impl From<EntryPointAPIErrors> for EntryPointError {
+    fn from(value: EntryPointAPIErrors) -> Self {
+        match value {
+            EntryPointAPIErrors::FailedOp(e) => EntryPointError::FailedOp(e),
+            EntryPointAPIErrors::FailedOpWithRevert(e) => EntryPointError::FailedOpWithRevert(e),
+            EntryPointAPIErrors::PostOpReverted(e) => EntryPointError::PostOpReverted(e),
+            EntryPointAPIErrors::SenderAddressResult(e) => {
+                EntryPointError::Other { inner: format!("sender address result {e:?}") }
+            }
+            EntryPointAPIErrors::RevertString(e) => EntryPointError::ExecutionReverted(e),
+        }
+    }
 }
 
 impl EntryPointError {

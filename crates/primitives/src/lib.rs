@@ -18,8 +18,11 @@ pub use bundler::Mode as BundlerMode;
 pub use mempool::Mode as UoPoolMode;
 pub use p2p::VerifiedUserOperation;
 pub use user_operation::{
-    UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
-    UserOperationReceipt, UserOperationRequest, UserOperationSigned,
+    RpcUserOperation, UserOperation, UserOperationByHash, UserOperationGasEstimation,
+    UserOperationHash, UserOperationReceipt, UserOperationRequest, UserOperationSigned,
 };
-pub use utils::get_address;
+pub use utils::{
+    get_address, pack_init_code, pack_paymaster_fee_data, pack_uint128, unpack_init_code,
+    unpack_paymaster_fee_data, unpack_uint128,
+};
 pub use wallet::Wallet;
