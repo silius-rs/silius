@@ -115,7 +115,7 @@ impl From<UserOperationSigned> for UserOperationPacked {
             sender: value.sender,
             nonce: value.nonce,
             init_code: if let Some(factory) = value.factory {
-                Bytes::from_static(pack_address_and_data(factory, &value.factory_data))
+                Bytes::from_iter(pack_address_and_data(factory, &value.factory_data))
             } else {
                 Bytes::default()
             },
@@ -124,13 +124,22 @@ impl From<UserOperationSigned> for UserOperationPacked {
             pre_verification_gas: value.pre_verification_gas,
             gas_fees: pack_uint128(value.max_priority_fee_per_gas, value.max_fee_per_gas),
             paymaster_and_data: if let Some(paymaster) = value.paymaster {
-                Bytes::from_static(pack_address_and_data(paymaster, &value.paymaster_data))
+                Bytes::from_iter(pack_address_and_data(paymaster, &value.paymaster_data))
             } else {
                 Bytes::default()
             },
             signature: value.signature,
         }
     }
+}
+
+impl From<UserOperationPacked> for UserOperationSigned {
+    fn from(value: UserOperationPacked) -> Self {
+        Self {
+            
+        }
+    }
+
 }
 
 /// User operation without signature (on-chain representation), used only for signing

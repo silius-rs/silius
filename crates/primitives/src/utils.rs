@@ -43,8 +43,8 @@ where
 }
 
 /// Packs address and data
-pub fn pack_address_and_data(addr: Address, data: &[u8]) -> &[u8] {
-    &[addr.encode(), if data.is_empty() { vec![] } else { data.to_vec() }].concat()
+pub fn pack_address_and_data(addr: Address, data: &[u8]) -> Vec<u8> {
+    [addr.encode(), data.to_vec()].concat()
 }
 
 /// Unpacks address and data from bytes
