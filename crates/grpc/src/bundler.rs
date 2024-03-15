@@ -227,6 +227,5 @@ pub fn bundler_service_run<M, S>(
         } else {
             builder.add_service(svc).serve(addr).await
         }
-        // let route = builder.add_service(svc)
     });
 }

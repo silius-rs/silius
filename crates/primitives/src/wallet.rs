@@ -81,7 +81,9 @@ impl Wallet {
         chain_id: u64,
         flashbots_key: bool,
     ) -> eyre::Result<Self> {
-        let wallet_builder = MnemonicBuilder::<English>::default().phrase(path.to_path_buf());
+        let mnemonic_phrase = fs::read_to_string(path)?;
+
+        let wallet_builder = MnemonicBuilder::<English>::default().phrase(mnemonic_phrase.trim());
 
         let wallet = wallet_builder
             .clone()
