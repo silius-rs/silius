@@ -142,7 +142,7 @@ where
             Err(e) => return Err(eyre::eyre!("Failed to send bundle: {:?}", e)),
         };
 
-        info!("Bundle Received at block: {:?}", pending_bundle.block);
+        info!("Bundle received at block: {:?}", pending_bundle.block);
 
         match pending_bundle.await {
             Ok(bundle_hash) => Ok(bundle_hash),

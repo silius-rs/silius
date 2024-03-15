@@ -80,6 +80,9 @@ pub mod flashbots_relay_endpoints {
 
     // goerli
     pub const FLASHBOTS_GOERLI: &str = "https://relay-goerli.flashbots.net";
+
+    // sepolia
+    pub const FLASHBOTS_SEPOLIA: &str = "https://relay-sepolia.flashbots.net";
 }
 
 /// Supported chains

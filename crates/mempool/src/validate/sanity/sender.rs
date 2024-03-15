@@ -51,7 +51,7 @@ impl<M: Middleware> SanityCheck<M> for Sender {
             (!code.is_empty() && !uo.init_code.is_empty())
         {
             return Err(SanityError::Sender {
-                inner: "sender {uo.sender} is an existing contract, or the initCode {uo.init_code.clone()} is not empty (but not both)".into(),
+                inner: format!("sender {0} is an existing contract, or the initCode {1} is not empty (but not both)", uo.sender, uo.init_code),
             });
         }
 
@@ -76,8 +76,10 @@ impl<M: Middleware> SanityCheck<M> for Sender {
                     )
             {
                 return Err(SanityError::Sender {
-                    inner: "{uo.sender} couldn't replace user operation (gas increase too low)"
-                        .into(),
+                    inner: format!(
+                        "{0} couldn't replace user operation (gas increase too low)",
+                        uo.sender
+                    ),
                 });
             }
         }
