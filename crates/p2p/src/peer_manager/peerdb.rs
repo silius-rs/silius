@@ -8,8 +8,12 @@ pub struct PeerDB {
 }
 
 impl PeerDB {
-    pub fn new() -> Self {
-        Self { peers: HashMap::new() }
+    pub fn new(trusted_peers: Vec<PeerId>) -> Self {
+        let mut peers = HashMap::new();
+        for peer_id in trusted_peers {
+            peers.insert(peer_id, Default::default());
+        }
+        Self { peers }
     }
 
     pub fn new_connected(&mut self, peer_id: PeerId) {

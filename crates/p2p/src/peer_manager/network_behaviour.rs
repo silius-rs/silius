@@ -10,9 +10,10 @@ use tracing::error;
 impl NetworkBehaviour for PeerManager {
     type ConnectionHandler = ConnectionHandler;
     type ToSwarm = PeerManagerEvent;
+
     fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm) {
         if let libp2p::swarm::FromSwarm::ConnectionClosed(close_info) = event {
-            self.peer_db.disconnect(close_info.peer_id);
+            self.network_globals.peers.write().disconnect(close_info.peer_id);
             self.events.push_back(PeerManagerEvent::PeerDisconnected(close_info.peer_id));
         }
     }
@@ -32,7 +33,7 @@ impl NetworkBehaviour for PeerManager {
         _local_addr: &libp2p::Multiaddr,
         _remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        self.peer_db.new_connected(peer);
+        self.network_globals.peers.write().new_connected(peer);
         self.ping_peers.insert(peer);
         self.events.push_back(PeerManagerEvent::PeerConnectedIncoming(peer));
         Ok(ConnectionHandler)
@@ -45,7 +46,7 @@ impl NetworkBehaviour for PeerManager {
         _addr: &libp2p::Multiaddr,
         _role_override: libp2p::core::Endpoint,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        self.peer_db.new_connected(peer);
+        self.network_globals.peers.write().new_connected(peer);
         self.ping_peers.insert(peer);
         self.events.push_back(PeerManagerEvent::PeerConnectedOutgoing(peer));
         Ok(ConnectionHandler)

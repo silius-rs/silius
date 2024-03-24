@@ -7065,6 +7065,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "libp2p-mplex",
+ "parking_lot 0.12.1",
  "sha2 0.10.8",
  "silius-primitives",
  "snap",
