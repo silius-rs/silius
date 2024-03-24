@@ -1,18 +1,20 @@
 mod common;
 
 use crate::common::build_connnected_p2p_pair;
-use alloy_chains::Chain;
 use ethers::types::H160;
-use silius_p2p::{service::NetworkEvent, types::pubsub::PubsubMessage};
-use silius_primitives::{chain::ChainExt, constants::entry_point::ADDRESS, VerifiedUserOperation};
+use silius_p2p::{
+    service::NetworkEvent,
+    types::{pubsub::PubsubMessage, topics::topic},
+};
+use silius_primitives::{chain::ChainSpec, constants::entry_point::ADDRESS, VerifiedUserOperation};
 use std::{str::FromStr, time::Duration};
 
 #[tokio::test]
 async fn pubsub_msg() -> eyre::Result<()> {
-    let chain: Chain = Chain::dev();
+    let chain_spec = ChainSpec::dev();
     let (mut peer1, mut peer2) = build_connnected_p2p_pair().await?;
 
-    let mempool_id = chain.canonical_mempool_id();
+    let mempool_id = chain_spec.canonical_mempools.first().unwrap();
     let res1 = peer1.subscribe(&mempool_id)?;
     let res2 = peer2.subscribe(&mempool_id)?;
     println!("{mempool_id}, {res1:?}, {res2:?}");
@@ -28,7 +30,8 @@ async fn pubsub_msg() -> eyre::Result<()> {
         loop {
             match peer1.next_event().await {
                 NetworkEvent::Subscribe { .. } => {
-                    peer1.publish(user_op.clone(), chain).unwrap();
+                    let topic_hash = topic(&mempool_id).into();
+                    peer1.publish(user_op.clone(), topic_hash).unwrap();
                 }
                 _ => {}
             }

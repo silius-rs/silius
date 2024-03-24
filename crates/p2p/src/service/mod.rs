@@ -9,21 +9,24 @@ use self::{
 use crate::{
     config::Config,
     discovery::{
-        self,
         enr::{build_enr, keypair_to_combined},
-        enr_ext::EnrExt,
+        enr_ext::{CombinedPublicKeyExt, EnrExt},
+        DiscoveredPeers, Discovery,
     },
-    peer_manager::PeerManagerEvent,
+    peer_manager::{PeerManager, PeerManagerEvent},
     rpc::{
         methods::{MetaData, Ping, RPCResponse, RequestId},
         outbound::OutboundRequest,
         protocol::InboundRequest,
-        RPCEvent,
+        RPCEvent, RPC,
     },
     service::utils::save_private_key_to_file,
-    types::{pubsub::PubsubMessage, topics::topic},
+    types::{
+        globals::NetworkGlobals,
+        pubsub::{create_gossipsub, PubsubMessage},
+        topics::topic,
+    },
 };
-use alloy_chains::Chain;
 use discv5::Enr;
 use ethers::types::{Address, U256};
 use futures::channel::{
@@ -41,19 +44,19 @@ use libp2p::{
 };
 use libp2p_mplex::{MaxBufferBehaviour, MplexConfig};
 use silius_primitives::{
-    chain::ChainExt,
     constants::p2p::{MAX_IPFS_CID_LENGTH, MAX_SUPPORTED_MEMPOOLS},
     UserOperation, VerifiedUserOperation,
 };
 use ssz_rs::{Deserialize, List, Serialize, Vector};
 use std::{
     env, io,
+    sync::Arc,
     task::{Context, Poll},
 };
 use tracing::{debug, error, info, warn};
 
 pub type MempoolChannels =
-    Vec<(Chain, Address, UnboundedReceiver<(UserOperation, U256)>, UnboundedSender<UserOperation>)>;
+    Vec<(Address, UnboundedReceiver<(UserOperation, U256)>, UnboundedSender<UserOperation>)>; // entrypoint ...
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -99,8 +102,8 @@ pub enum NetworkEvent {
 /// Other components should interact with Network directly instead of behaviour
 pub struct Network {
     swarm: Swarm<Behaviour>,
+    network_globals: Arc<NetworkGlobals>,
     mempool_channels: MempoolChannels,
-    metadata: MetaData,
 }
 
 impl From<Network> for Swarm<Behaviour> {
@@ -144,12 +147,42 @@ impl Network {
 
         info!("Enr: {}", enr);
 
-        let behaviour = Behaviour::new(
-            enr,
-            combined_key,
-            config.clone(),
-            mempool_channels.iter().map(|(c, _, _, _)| c.canonical_mempool_id().into()).collect(),
-        )?;
+        let canonical_mempools = config.chain_spec.canonical_mempools.clone();
+        let trusted_peers = config.bootnodes.iter().map(|x| x.public_key().as_peer_id()).collect();
+
+        let network_globals = {
+            let mut supported_mempools: List<
+                Vector<u8, MAX_IPFS_CID_LENGTH>,
+                MAX_SUPPORTED_MEMPOOLS,
+            > = List::default();
+
+            for canonical_mempool in canonical_mempools.iter() {
+                let mut mempool_id = canonical_mempool.as_bytes().to_vec();
+                mempool_id.resize_with(MAX_IPFS_CID_LENGTH, Default::default);
+
+                supported_mempools.push(
+                    Vector::try_from(mempool_id)
+                        .expect("canonical mempool id should be equal to 256 bytes"),
+                );
+            }
+
+            // metadata
+            let metadata = MetaData { seq_number: 0, supported_mempools };
+
+            Arc::new(NetworkGlobals::new(
+                enr.clone(),
+                metadata,
+                trusted_peers,
+                config.chain_spec.clone(),
+            ))
+        };
+
+        let gossipsub = create_gossipsub(canonical_mempools).map_err(|e| eyre::anyhow!(e))?;
+        let rpc = RPC::new();
+        let peer_manager = PeerManager::new(network_globals.clone(), config.target_peers);
+        let discovery = Discovery::new(enr, combined_key, config)?;
+
+        let behaviour = Behaviour { peer_manager, rpc, discovery, gossipsub };
 
         // mplex config
         let mut mplex_config = MplexConfig::new();
@@ -168,25 +201,11 @@ impl Network {
             .expect("building p2p behaviour failed")
             .build();
 
-        let mut supported_mempools: List<Vector<u8, MAX_IPFS_CID_LENGTH>, MAX_SUPPORTED_MEMPOOLS> =
-            List::default();
-
-        let mut mempool_id = config.chain.canonical_mempool_id().as_bytes().to_vec();
-        mempool_id.resize_with(MAX_IPFS_CID_LENGTH, Default::default);
-
-        supported_mempools.push(
-            Vector::try_from(mempool_id)
-                .expect("canonical mempool id should be equal to 256 bytes"),
-        );
-
-        // metadata
-        let metadata = MetaData { seq_number: 0, supported_mempools };
-
-        Ok(Self { swarm, mempool_channels, metadata })
+        Ok(Self { swarm, network_globals, mempool_channels })
     }
 
     pub fn metadata(&self) -> MetaData {
-        self.metadata.clone()
+        self.network_globals.local_metadata()
     }
 
     /// handle gossipsub event
@@ -200,12 +219,12 @@ impl Network {
                         return None;
                     }
                 };
-                self.mempool_channels.iter().find_map(|(chain, ep, _, new_coming_uos_ch)| {
+                self.mempool_channels.iter().find_map(|(ep, _, new_coming_uos_ch)| {
                     if *ep == user_op.entry_point() {
                         let uo = user_op.clone().user_operation();
                         new_coming_uos_ch
                             .unbounded_send(UserOperation::from_user_operation_signed(
-                                uo.hash(ep, chain.id()),
+                                uo.hash(ep, self.network_globals.chain_spec().chain.id()),
                                 uo,
                             ))
                             .expect("new user operation channel should be open all the time");
@@ -241,12 +260,12 @@ impl Network {
                 match request {
                     InboundRequest::Ping(_ping) => {
                         // TODO: need to update metadata of peer (based on ping value)
-                        let response = RPCResponse::Pong(Ping::new(self.metadata.seq_number));
+                        let response = RPCResponse::Pong(Ping::new(self.metadata().seq_number));
                         sender.send(response).expect("channel should exist");
                         None
                     }
                     InboundRequest::MetaData(_) => {
-                        let response = RPCResponse::MetaData(self.metadata.clone());
+                        let response = RPCResponse::MetaData(self.metadata());
                         sender.send(response).expect("channel should exist");
                         None
                     }
@@ -261,7 +280,7 @@ impl Network {
     }
 
     // TODO: discovery peer connect
-    fn handle_discovery_event(&self, _event: discovery::DiscoveredPeers) -> Option<NetworkEvent> {
+    fn handle_discovery_event(&self, _event: DiscoveredPeers) -> Option<NetworkEvent> {
         None
     }
 
@@ -271,7 +290,7 @@ impl Network {
             PeerManagerEvent::Ping(peer) => {
                 self.send_request(
                     &peer,
-                    OutboundRequest::Ping(Ping::new(self.metadata.seq_number)),
+                    OutboundRequest::Ping(Ping::new(self.metadata().seq_number)),
                 );
                 None
             }
@@ -286,35 +305,38 @@ impl Network {
     }
 
     pub fn poll_network(&mut self, cx: &mut Context) -> Poll<NetworkEvent> {
-        let mut msg_to_publish: Vec<(VerifiedUserOperation, Chain)> = Vec::new();
+        let mut uos_publish: Vec<VerifiedUserOperation> = Vec::new();
 
-        for (chain, ep, waiting_to_publish_ch, _) in self.mempool_channels.iter_mut() {
+        for (ep, waiting_to_publish_ch, _) in self.mempool_channels.iter_mut() {
             while let Ok(Some((user_op, verified_at_block_hash))) = waiting_to_publish_ch.try_next()
             {
                 info!("Got user operation {user_op:?} from ep {ep:?} verified in {verified_at_block_hash:?} to publish to p2p network!");
                 let user_op =
                     VerifiedUserOperation::new(user_op.user_operation, *ep, verified_at_block_hash);
-                msg_to_publish.push((user_op, *chain));
+                uos_publish.push(user_op);
             }
         }
 
-        for msg in msg_to_publish.into_iter() {
-            match self.publish(msg.0, msg.1) {
-                Ok(_) => {}
-                Err(err) => match err {
-                    PublishError::InsufficientPeers => {
-                        warn!("Currently no peers to publish message");
-                        self.swarm.behaviour_mut().discv5.discover_peers(16usize);
-                    }
-                    e => error!("Error in publish message {e:?}"),
-                },
+        for uo in uos_publish.into_iter() {
+            for canonical_mempool in self.network_globals.chain_spec().canonical_mempools.iter() {
+                let topic_hash: TopicHash = topic(canonical_mempool).into();
+                match self.publish(uo.clone(), topic_hash) {
+                    Ok(_) => {}
+                    Err(err) => match err {
+                        PublishError::InsufficientPeers => {
+                            warn!("Currently no peers to publish message");
+                            self.swarm.behaviour_mut().discovery.discover_peers(16usize);
+                        }
+                        e => error!("Error in publish message {e:?}"),
+                    },
+                }
             }
         }
 
         while let Poll::Ready(Some(swarm_event)) = self.swarm.poll_next_unpin(cx) {
             info!("Swarm event {swarm_event:?}");
             let event_opt = match swarm_event {
-                SwarmEvent::Behaviour(e) => match e {
+                SwarmEvent::Behaviour(event) => match event {
                     behaviour::Event::GossipSub(event) => self.handle_gossipsub_event(event),
                     behaviour::Event::RPC(event) => self.handle_rpc_event(event),
                     behaviour::Event::Discovery(event) => self.handle_discovery_event(event),
@@ -355,23 +377,22 @@ impl Network {
     pub fn publish(
         &mut self,
         user_op: VerifiedUserOperation,
-        chain: Chain,
+        topic_hash: TopicHash,
     ) -> Result<MessageId, PublishError> {
         let mut buf = Vec::new();
         let _ = user_op.serialize(&mut buf).expect("ssz of user ops serialization failed");
-        let topic_hash: TopicHash = topic(chain.canonical_mempool_id()).into();
         self.swarm.behaviour_mut().gossipsub.publish(topic_hash, buf)
     }
 
     /// Dial a peer.
     pub fn dial(&mut self, enr: Enr) -> eyre::Result<()> {
-        let addrs = enr.multiaddr()?;
+        let addrs = enr.multiaddr();
         for addr in addrs {
             self.swarm.dial(addr)?;
         }
         self.swarm
             .behaviour_mut()
-            .discv5
+            .discovery
             .discovery
             .add_enr(enr)
             .map_err(|e| eyre::eyre!(e.to_string()))?;
@@ -390,7 +411,7 @@ impl Network {
 
     /// Return the nodes local ENR.
     pub fn local_enr(&self) -> Enr {
-        self.swarm.behaviour().discv5.local_enr()
+        self.swarm.behaviour().discovery.local_enr()
     }
 
     /// Send a request to a peer.

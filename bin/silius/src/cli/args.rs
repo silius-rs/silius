@@ -14,6 +14,7 @@ use silius_p2p::{
 };
 use silius_primitives::{
     bundler::SendStrategy,
+    chain::ChainSpec,
     constants::{
         bundler::BUNDLE_INTERVAL,
         grpc::{BUNDLER_PORT, MEMPOOL_PORT},
@@ -308,7 +309,7 @@ impl P2PArgs {
             .ipv4_addr(self.p2p_broadcast_address)
             .enr_tcp4_port(Some(self.tcp4_port))
             .enr_udp4_port(Some(self.udp4_port))
-            .chain(*chain)
+            .chain_spec(ChainSpec::from_chain_id(chain.id()))
             .bootnodes(self.bootnodes.clone())
             .gs_config(gossipsub_config())
             .discv5_config(discv5::ConfigBuilder::new(listen_addr.to_listen_config()).build());

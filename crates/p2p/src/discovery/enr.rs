@@ -41,7 +41,7 @@ pub fn build_enr(key: &CombinedKey, config: &Config) -> eyre::Result<Enr> {
         enr_builder.udp6(port);
     }
 
-    enr_builder.add_value("chain_id", &ssz_rs::serialize(&config.chain.id())?);
+    enr_builder.add_value("chain_id", &ssz_rs::serialize(&config.chain_spec.chain.id())?);
 
     let enr = enr_builder.build(key)?;
 

@@ -1,11 +1,13 @@
 use crate::listen_addr::{ListenAddr, ListenAddress};
-use alloy_chains::Chain;
 use discv5::{Enr, ListenConfig};
 use libp2p::gossipsub;
 use sha2::{Digest, Sha256};
-use silius_primitives::constants::p2p::{
-    IPV4_ADDRESS, MESSAGE_DOMAIN_VALID_SNAPPY, NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME,
-    TARGET_PEERS, TCP_PORT, UDP_PORT,
+use silius_primitives::{
+    chain::ChainSpec,
+    constants::p2p::{
+        IPV4_ADDRESS, MESSAGE_DOMAIN_VALID_SNAPPY, NODE_ENR_FILE_NAME, NODE_KEY_FILE_NAME,
+        TARGET_PEERS, TCP_PORT, UDP_PORT,
+    },
 };
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -47,8 +49,8 @@ pub struct Config {
     /// Discv5 configuration.
     pub discv5_config: discv5::Config,
 
-    /// Chain the p2p network is connected on.
-    pub chain: Chain,
+    /// Chain specification the p2p network is connected on.
+    pub chain_spec: ChainSpec,
 
     /// Target number of peers.
     pub target_peers: usize,
@@ -80,7 +82,7 @@ impl Default for Config {
             enr_tcp6_port: None,
             gs_config,
             discv5_config,
-            chain: Chain::dev(),
+            chain_spec: ChainSpec::dev(),
             target_peers: TARGET_PEERS,
             bootnodes: vec![],
         }
@@ -175,9 +177,9 @@ impl ConfigBuilder {
         self
     }
 
-    /// Set the chain.
-    pub fn chain(mut self, chain: Chain) -> Self {
-        self.config.chain = chain;
+    /// Set the chain spec.
+    pub fn chain_spec(mut self, chain_spec: ChainSpec) -> Self {
+        self.config.chain_spec = chain_spec;
         self
     }
 

@@ -1,11 +1,9 @@
 use crate::{
-    config::Config,
     discovery::{self, Discovery},
     peer_manager::{PeerManager, PeerManagerEvent},
     rpc::{self, RPC},
-    types::pubsub::{create_gossipsub, SnappyTransform},
+    types::pubsub::SnappyTransform,
 };
-use discv5::{enr::CombinedKey, Enr};
 use libp2p::{
     gossipsub::{self, WhitelistSubscriptionFilter},
     swarm::NetworkBehaviour,
@@ -54,28 +52,12 @@ impl From<PeerManagerEvent> for Event {
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "Event", event_process = false)]
 pub struct Behaviour {
-    /// Gossipsub protocol
-    pub gossipsub: Gossipsub,
+    /// Peer manager
+    pub peer_manager: PeerManager,
     /// Request/Response protocol
     pub rpc: RPC,
     /// Discovery protocol
-    pub discv5: Discovery,
-    /// Peer manager
-    pub peer_manager: PeerManager,
-}
-
-impl Behaviour {
-    pub fn new(
-        enr: Enr,
-        key: CombinedKey,
-        config: Config,
-        mempool_ids: Vec<String>,
-    ) -> eyre::Result<Self> {
-        let gossipsub = create_gossipsub(mempool_ids).map_err(|e| eyre::anyhow!(e))?;
-        let rpc = RPC::new();
-        let discovery = Discovery::new(enr, key, config.clone())?;
-        let peer_manager = PeerManager::new(config);
-
-        Ok(Self { gossipsub, rpc, discv5: discovery, peer_manager })
-    }
+    pub discovery: Discovery,
+    /// Gossipsub protocol
+    pub gossipsub: Gossipsub,
 }

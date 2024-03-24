@@ -1,11 +1,10 @@
-use alloy_chains::Chain;
 use futures::channel::mpsc::unbounded;
 use silius_p2p::{
     config::{gossipsub_config, Config},
     listen_addr::{ListenAddr, ListenAddress},
     service::{Network, NetworkEvent},
 };
-use silius_primitives::constants::p2p::TARGET_PEERS;
+use silius_primitives::{chain::ChainSpec, constants::p2p::TARGET_PEERS};
 use std::{
     net::{Ipv4Addr, TcpListener},
     time::Duration,
@@ -42,7 +41,7 @@ fn build_p2p_instance() -> eyre::Result<Network> {
         tcp_port: available_port,
     });
 
-    let chain = Chain::dev();
+    let chain_spec = ChainSpec::dev();
 
     let config = Config {
         node_key_file,
@@ -56,7 +55,7 @@ fn build_p2p_instance() -> eyre::Result<Network> {
         enr_tcp6_port: None,
         gs_config: gossipsub_config(),
         discv5_config: discv5::ConfigBuilder::new(listen_addr.to_listen_config()).build(),
-        chain: chain.clone(),
+        chain_spec: chain_spec.clone(),
         target_peers: TARGET_PEERS,
         bootnodes: vec![],
     };
@@ -64,7 +63,7 @@ fn build_p2p_instance() -> eyre::Result<Network> {
     let (_, rv) = unbounded();
     let (sd, _) = unbounded();
 
-    let mut network = Network::new(config, vec![(chain, Default::default(), rv, sd)])?;
+    let mut network = Network::new(config, vec![(Default::default(), rv, sd)])?;
 
     for listen_addr in listen_addr.to_multi_addr() {
         println!("listen on {listen_addr:?}");

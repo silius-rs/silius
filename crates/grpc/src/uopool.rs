@@ -468,7 +468,7 @@ where
                     }
                 });
                 m_map.insert(id, uo_builder);
-                mempool_channels.push((chain, ep, waiting_to_pub_rv, p2p_userop_sd))
+                mempool_channels.push((ep, waiting_to_pub_rv, p2p_userop_sd))
             }
 
             let listen_addrs = config.listen_addr.to_multi_addr();

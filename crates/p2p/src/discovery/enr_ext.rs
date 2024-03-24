@@ -1,31 +1,26 @@
-use discv5::{
-    enr::{
-        k256::{ecdsa::VerifyingKey, CompressedPoint},
-        CombinedKey, CombinedPublicKey,
-    },
-    Enr,
-};
+use discv5::{enr::CombinedPublicKey, Enr};
 use libp2p::{
-    identity::{secp256k1, Keypair, PublicKey},
+    identity::{ed25519, secp256k1, PublicKey},
     multiaddr::Protocol,
     Multiaddr, PeerId,
 };
 
 pub trait EnrExt {
     /// PeerId of the ENR
-    fn peer_id(&self) -> eyre::Result<PeerId>;
+    fn peer_id(&self) -> PeerId;
 
     /// Multiaddr used for dialing
-    fn multiaddr(&self) -> eyre::Result<Vec<Multiaddr>>;
+    fn multiaddr(&self) -> Vec<Multiaddr>;
 }
 
 impl EnrExt for Enr {
-    fn peer_id(&self) -> eyre::Result<PeerId> {
+    fn peer_id(&self) -> PeerId {
         self.public_key().as_peer_id()
     }
 
-    fn multiaddr(&self) -> eyre::Result<Vec<Multiaddr>> {
+    fn multiaddr(&self) -> Vec<Multiaddr> {
         let mut multiaddrs: Vec<Multiaddr> = Vec::new();
+
         if let Some(ipv4) = self.ip4() {
             let mut addr: Multiaddr = ipv4.into();
 
@@ -35,45 +30,31 @@ impl EnrExt for Enr {
             multiaddrs.push(addr);
         }
 
-        Ok(multiaddrs)
+        multiaddrs
     }
-}
-
-pub trait CombinedKeyExt {
-    /// Convert a libp2p Keypair into a discv5 CombinedKey
-    fn from_libp2p_keypair(keypair: Keypair) -> eyre::Result<CombinedKey>;
 }
 
 pub trait CombinedPublicKeyExt {
     /// PeerId of the CombinedPublicKey
-    fn as_peer_id(&self) -> eyre::Result<PeerId>;
-}
-
-impl CombinedKeyExt for CombinedKey {
-    fn from_libp2p_keypair(keypair: Keypair) -> eyre::Result<CombinedKey> {
-        match keypair.try_into_secp256k1() {
-            Ok(key) => {
-                let secret = discv5::enr::k256::ecdsa::SigningKey::from_bytes(
-                    &key.secret().to_bytes().into(),
-                )
-                .expect("libp2p key must be valid");
-                Ok(CombinedKey::Secp256k1(secret))
-            }
-            Err(_) => eyre::bail!("libp2p key must be either secp256k1"),
-        }
-    }
+    fn as_peer_id(&self) -> PeerId;
 }
 
 impl CombinedPublicKeyExt for CombinedPublicKey {
-    fn as_peer_id(&self) -> eyre::Result<PeerId> {
-        let pub_key: PublicKey = match self {
-            CombinedPublicKey::Secp256k1(pk) => {
-                PublicKey::from(secp256k1::PublicKey::try_from_bytes(
-                    <&VerifyingKey as Into<CompressedPoint>>::into(pk).as_slice(),
-                )?)
+    fn as_peer_id(&self) -> PeerId {
+        match self {
+            Self::Secp256k1(pk) => {
+                let pk_bytes = pk.to_sec1_bytes();
+                let libp2p_pk: PublicKey = secp256k1::PublicKey::try_from_bytes(&pk_bytes)
+                    .expect("valid public key")
+                    .into();
+                PeerId::from_public_key(&libp2p_pk)
             }
-            _ => eyre::bail!("Only secp256k1 is supported"),
-        };
-        Ok(PeerId::from_public_key(&pub_key))
+            Self::Ed25519(pk) => {
+                let pk_bytes = pk.to_bytes();
+                let libp2p_pk: PublicKey =
+                    ed25519::PublicKey::try_from_bytes(&pk_bytes).expect("valid public key").into();
+                PeerId::from_public_key(&libp2p_pk)
+            }
+        }
     }
 }
