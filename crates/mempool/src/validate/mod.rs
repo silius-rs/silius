@@ -31,7 +31,7 @@ pub struct UserOperationValidationOutcome {
     pub valid_after: Option<U256>,
     // Simulation trace
     pub code_hashes: Option<Vec<CodeHash>>,
-    pub storage_map: Option<StorageMap>,
+    pub storage_map: StorageMap,
     // the block which the user operation is verified on
     pub verified_block: U256,
 }

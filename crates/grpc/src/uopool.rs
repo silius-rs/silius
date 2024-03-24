@@ -213,7 +213,7 @@ where
                 tonic::Status::internal(format!("Get sorted uos internal error: {e:?}"))
             })?
         };
-        debug!("get sorted user operation {uos:?}");
+
         let uos_valid = {
             let mut uopool = self.get_uopool(&ep)?;
             uopool
@@ -221,7 +221,6 @@ where
                 .await
                 .map_err(|e| tonic::Status::internal(format!("Bundle uos internal error: {e}")))?
         };
-        debug!("get sorted valid user operation {uos_valid:?}");
 
         Ok(Response::new(GetSortedResponse {
             uos: uos_valid.into_iter().map(Into::into).collect(),

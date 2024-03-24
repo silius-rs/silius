@@ -25,6 +25,7 @@ use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
     get_address,
     reputation::{ReputationEntry, StakeInfo, StakeInfoResponse, Status},
+    simulation::StorageMap,
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
@@ -207,9 +208,9 @@ where
                 uo,
                 &self.mempool,
                 &self.reputation,
-                UserOperationValidatorMode::Sanity |
-                    UserOperationValidatorMode::Simulation |
-                    UserOperationValidatorMode::SimulationTrace,
+                UserOperationValidatorMode::Sanity
+                    | UserOperationValidatorMode::Simulation
+                    | UserOperationValidatorMode::SimulationTrace,
             )
             .await
     }
@@ -300,7 +301,7 @@ where
     }
 
     /// Bundles an array of [UserOperations](UserOperation)
-    /// The function first checks the reputations of the entiries, then validate each
+    /// The function first checks the reputations of the entities, then validate each
     /// [UserOperation](UserOperation) by calling
     /// [UoPool::validate_user_operation](UoPool::validate_user_operation).
     /// If the [UserOperations](UserOperation) passes the validation, push it into the `uos_valid`
@@ -310,7 +311,7 @@ where
     /// `uos` - An array of [UserOperations](UserOperation) to bundle
     ///
     /// # Returns
-    /// `Result<Vec<UserOperation>, eyre::Error>` - The bundled [UserOperations](UserOperation).
+    /// `Result<(Vec<UserOperation>, StorageMap), eyre::Error>` - The bundled [UserOperations](UserOperation).
     pub async fn bundle_user_operations(
         &mut self,
         uos: Vec<UserOperation>,
@@ -322,6 +323,7 @@ where
         let mut staked_entity_c = HashMap::new();
 
         let senders_all = uos.iter().map(|uo| uo.sender).collect::<HashSet<_>>();
+        let storage_maps: Vec<StorageMap> = Vec::new();
 
         'uos: for uo in uos {
             if senders.contains(&uo.sender) {
@@ -368,8 +370,8 @@ where
                     &uo,
                     &self.mempool,
                     &self.reputation,
-                    UserOperationValidatorMode::Simulation |
-                        UserOperationValidatorMode::SimulationTrace,
+                    UserOperationValidatorMode::Simulation
+                        | UserOperationValidatorMode::SimulationTrace,
                 )
                 .await;
             debug!("Second validation for userop {:?} result: {:?}", uo.hash, val_out);
@@ -380,13 +382,13 @@ where
                         continue;
                     }
 
-                    if let Some(storage_map) = val_out.storage_map {
-                        for addr in storage_map.keys() {
-                            if *addr != uo.sender && senders_all.contains(addr) {
-                                continue 'uos;
-                            }
+                    for addr in val_out.storage_map.keys() {
+                        if *addr != uo.sender && senders_all.contains(addr) {
+                            continue 'uos;
                         }
                     }
+
+                    storage_maps.push(val_out.storage_map);
 
                     // TODO
                     // it would be better to use estimate_gas instead of call_gas_limit
@@ -436,7 +438,9 @@ where
             senders.insert(uo.sender);
         }
 
-        Ok(uos_valid)
+
+
+        Ok((uos_valid, merge_storage_maps()))
     }
 
     /// Gets the block base fee per gas

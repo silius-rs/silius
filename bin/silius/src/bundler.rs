@@ -8,7 +8,7 @@ use crate::{
 use alloy_chains::{Chain, NamedChain};
 use ethers::{providers::Middleware, types::Address};
 use parking_lot::RwLock;
-use silius_bundler::{EthereumClient, FlashbotsClient};
+use silius_bundler::{ConditionalClient, EthereumClient, FlashbotsClient};
 use silius_contracts::EntryPoint;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
@@ -139,6 +139,23 @@ where
     match args.send_bundle_mode {
         SendStrategy::EthereumClient => {
             let client = Arc::new(EthereumClient::new(eth_client.clone(), wallet.clone()));
+            bundler_service_run(
+                SocketAddr::new(args.bundler_addr, args.bundler_port),
+                wallet,
+                entry_points,
+                chain_conn,
+                args.beneficiary,
+                args.min_balance,
+                args.bundle_interval,
+                eth_client,
+                client,
+                uopool_grpc_client,
+                metrics_args.enable_metrics,
+                args.enable_access_list,
+            );
+        }
+        SendStrategy::Conditional => {
+            let client = Arc::new(ConditionalClient::new(eth_client.clone(), wallet.clone()));
             bundler_service_run(
                 SocketAddr::new(args.bundler_addr, args.bundler_port),
                 wallet,

@@ -58,5 +58,14 @@ pub struct CodeHash {
     pub hash: H256,
 }
 
+/// Entry for storage map
+pub enum StorageMapEntry {
+    /// A root hash
+    RootHash(String),
+    /// Map of slot-value pairs
+    Slots(HashMap<String, String>),
+}
+
 /// Storage map
-pub type StorageMap = HashMap<Address, HashMap<String, String>>;
+#[derive(Debug)]
+pub struct StorageMap(HashMap<Address, StorageMapEntry>);

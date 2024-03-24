@@ -1,9 +1,13 @@
 use ethers::types::{Address, U256};
 use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame};
 use silius_primitives::{
-    constants::validation::entities::NUMBER_OF_LEVELS, get_address, reputation::StakeInfo,
-    simulation::StorageMap, UserOperation,
+    constants::validation::entities::NUMBER_OF_LEVELS,
+    get_address,
+    reputation::StakeInfo,
+    simulation::{StorageMap, StorageMapEntry},
+    UserOperation,
 };
+use std::collections::hash_map::Entry;
 
 /// Helper function to extract the gas limit for verification from the simulation result
 ///
@@ -102,9 +106,47 @@ pub fn extract_storage_map(js_trace: &JsTracerFrame) -> StorageMap {
 
     for l in js_trace.calls_from_entry_point.iter() {
         for (addr, acc) in l.access.iter() {
-            storage_map.insert(*addr, acc.reads.clone());
+            storage_map.insert(*addr, StorageMapEntry::Slots(acc.reads.clone()));
         }
     }
 
     storage_map
+}
+
+/// Helper function to merge multiple storage maps into one.
+///
+/// # Arguments
+/// `storage_maps` - The vector of storage maps to merge
+///
+/// # Returns
+/// The [storage map](StorageMap)
+pub fn merge_storage_maps(storage_maps: Vec<StorageMap>) -> StorageMap {
+    let mut merged_map = StorageMap::default();
+
+    for map in storage_maps {
+        for (addr, entry) in map {
+            let ent = merged_map.entry(addr);
+
+            match ent {
+                Entry::Vacant(_) => {
+                    ent.or_insert(entry);
+                }
+                Entry::Occupied(mut val) => match entry {
+                    StorageMapEntry::RootHash(hash) => {
+                        val.insert(StorageMapEntry::RootHash(hash));
+                    }
+                    StorageMapEntry::Slots(slots) => match val.get() {
+                        StorageMapEntry::RootHash(_) => {}
+                        StorageMapEntry::Slots(sl) => {
+                            for (slot, value) in slots {
+                                sl.insert(slot, value.clone());
+                            }
+                        }
+                    },
+                },
+            }
+        }
+    }
+
+    merged_map
 }
