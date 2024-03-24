@@ -9,7 +9,7 @@ use self::{
 use crate::{
     config::Config,
     discovery::{
-        self,
+        DiscoveredPeers,
         enr::{build_enr, keypair_to_combined},
         enr_ext::EnrExt,
     },
@@ -261,7 +261,7 @@ impl Network {
     }
 
     // TODO: discovery peer connect
-    fn handle_discovery_event(&self, _event: discovery::DiscoveredPeers) -> Option<NetworkEvent> {
+    fn handle_discovery_event(&self, _event: DiscoveredPeers) -> Option<NetworkEvent> {
         None
     }
 
@@ -304,7 +304,7 @@ impl Network {
                 Err(err) => match err {
                     PublishError::InsufficientPeers => {
                         warn!("Currently no peers to publish message");
-                        self.swarm.behaviour_mut().discv5.discover_peers(16usize);
+                        self.swarm.behaviour_mut().discovery.discover_peers(16usize);
                     }
                     e => error!("Error in publish message {e:?}"),
                 },
@@ -371,7 +371,7 @@ impl Network {
         }
         self.swarm
             .behaviour_mut()
-            .discv5
+            .discovery
             .discovery
             .add_enr(enr)
             .map_err(|e| eyre::eyre!(e.to_string()))?;
@@ -390,7 +390,7 @@ impl Network {
 
     /// Return the nodes local ENR.
     pub fn local_enr(&self) -> Enr {
-        self.swarm.behaviour().discv5.local_enr()
+        self.swarm.behaviour().discovery.local_enr()
     }
 
     /// Send a request to a peer.

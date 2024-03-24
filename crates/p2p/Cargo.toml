@@ -44,6 +44,7 @@ sha2 = "0.10.8"
 async-trait = { workspace = true }
 futures = { workspace = true }
 futures-bounded = "0.2.3"
+parking_lot = { workspace = true }
 
 # tokio
 tokio = { workspace = true }

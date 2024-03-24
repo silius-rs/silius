@@ -52,16 +52,17 @@ impl From<PeerManagerEvent> for Event {
 
 /// The behaviour of the p2p network.
 #[derive(NetworkBehaviour)]
-#[behaviour(to_swarm = "Event", event_process = false)]
 pub struct Behaviour {
-    /// Gossipsub protocol
-    pub gossipsub: Gossipsub,
+    /// Hard limit of connections.
+    pub connection_limits: libp2p::connection_limits::Behaviour,
+    /// Peer manager
+    pub peer_manager: PeerManager,
     /// Request/Response protocol
     pub rpc: RPC,
     /// Discovery protocol
-    pub discv5: Discovery,
-    /// Peer manager
-    pub peer_manager: PeerManager,
+    pub discovery: Discovery,
+    /// Gossipsub protocol
+    pub gossipsub: Gossipsub,
 }
 
 impl Behaviour {
@@ -76,6 +77,6 @@ impl Behaviour {
         let discovery = Discovery::new(enr, key, config.clone())?;
         let peer_manager = PeerManager::new(config);
 
-        Ok(Self { gossipsub, rpc, discv5: discovery, peer_manager })
+        Ok(Self { gossipsub, rpc, discovery, peer_manager })
     }
 }
