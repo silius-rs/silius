@@ -27,7 +27,7 @@ use silius_p2p::{
 use silius_primitives::{provider::BlockStream, UoPoolMode, UserOperation};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 type StandardUserPool<M, SanCk, SimCk, SimTrCk> =
     UserOperationPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>;
@@ -181,18 +181,18 @@ where
                 tonic::Status::internal(format!("Get sorted uos internal error: {e:?}"))
             })?
         };
-        debug!("get sorted user operation {uos:?}");
-        let uos_valid = {
+
+        let (uos_valid, storage_map) = {
             let mut uopool = self.get_uopool(&ep)?;
             uopool
                 .bundle_user_operations(uos)
                 .await
                 .map_err(|e| tonic::Status::internal(format!("Bundle uos internal error: {e}")))?
         };
-        debug!("get sorted valid user operation {uos_valid:?}");
 
         Ok(Response::new(GetSortedResponse {
             uos: uos_valid.into_iter().map(Into::into).collect(),
+            storage_map: Some(storage_map.into()),
         }))
     }
 

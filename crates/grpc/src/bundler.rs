@@ -14,7 +14,7 @@ use ethers::{
 use parking_lot::Mutex;
 use silius_bundler::{Bundler, SendBundleOp};
 use silius_metrics::grpc::MetricsLayer;
-use silius_primitives::{UserOperation, Wallet};
+use silius_primitives::{simulation::StorageMap, UserOperation, Wallet};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Request, Response, Status};
 use tracing::{error, info};
@@ -49,12 +49,19 @@ where
     async fn get_user_operations(
         uopool_grpc_client: &UoPoolClient<tonic::transport::Channel>,
         ep: &Address,
-    ) -> eyre::Result<Vec<UserOperation>> {
+    ) -> eyre::Result<(Vec<UserOperation>, StorageMap)> {
         let req = Request::new(GetSortedRequest { ep: Some((*ep).into()) });
         let res = uopool_grpc_client.clone().get_sorted_user_operations(req).await?;
 
-        let uos: Vec<UserOperation> = res.into_inner().uos.into_iter().map(|u| u.into()).collect();
-        Ok(uos)
+        let res = res.into_inner();
+
+        let uos: Vec<UserOperation> = res.uos.into_iter().map(|u| u.into()).collect();
+        let map = match res.storage_map {
+            Some(map) => map.into(),
+            None => StorageMap::default(),
+        };
+
+        Ok((uos, map))
     }
 
     pub async fn send_bundles(&self) -> eyre::Result<(Vec<UserOperation>, Option<H256>)> {
@@ -62,9 +69,9 @@ where
         let mut user_operations: Vec<Vec<UserOperation>> = vec![];
 
         for bundler in self.bundlers.iter() {
-            let uos =
+            let (uos, map) =
                 Self::get_user_operations(&self.uopool_grpc_client, &bundler.entry_point).await?;
-            let tx_hash = bundler.send_bundle(&uos).await?;
+            let tx_hash = bundler.send_bundle(&uos, map).await?;
 
             tx_hashes.push(tx_hash);
             user_operations.push(uos);
@@ -117,8 +124,8 @@ where
                         )
                         .await
                         {
-                            Ok(bundle) => {
-                                if let Err(e) = bundler_own.send_bundle(&bundle).await {
+                            Ok((bundle, map)) => {
+                                if let Err(e) = bundler_own.send_bundle(&bundle, map).await {
                                     error!("Error while sending bundle: {e:?}");
                                 }
                             }

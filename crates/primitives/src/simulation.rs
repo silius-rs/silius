@@ -59,4 +59,8 @@ pub struct CodeHash {
 }
 
 /// Storage map
-pub type StorageMap = HashMap<Address, HashMap<String, String>>;
+#[derive(Debug, Default, Clone)]
+pub struct StorageMap {
+    pub root_hashes: HashMap<Address, H256>,
+    pub slots: HashMap<Address, HashMap<String, String>>,
+}

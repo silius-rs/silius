@@ -51,7 +51,7 @@ silius-tests = { version = "0.4.0-alpha", path = "tests", default-features = fal
 # eth
 alloy-chains = "0.1.14"
 discv5 = { version = "0.4.0", features = ["libp2p"] }
-ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "fa3017715a298728d9fb341933818a5d0d84c2dc", features = [
+ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "5394d899adca736a602e316e6f0c06fdb5aa64b9", features = [
     "ws",
 ] }
 ssz_rs = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
@@ -82,4 +82,4 @@ tracing = "0.1.40"
 [patch.crates-io]
 revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }
 [patch."https://github.com/gakonst/ethers-rs"]
-ethers = { git = "https://github.com/Vid201/ethers-rs", branch = "chore/ws" }
+ethers = { git = "https://github.com/Vid201/ethers-rs", branch = "feat/patch" }

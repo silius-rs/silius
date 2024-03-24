@@ -381,6 +381,47 @@ pub mod types {
             }
         }
     }
+
+    impl From<StorageMap> for silius_primitives::simulation::StorageMap {
+        fn from(value: StorageMap) -> Self {
+            let root_hashes = value.root_hashes;
+            let slots = value.slots;
+
+            Self {
+                root_hashes: root_hashes
+                    .into_iter()
+                    .map(|(k, v)| {
+                        (
+                            Address::from_str(&k).unwrap_or_default(),
+                            ethers::types::H256::from_str(&v).unwrap_or_default(),
+                        )
+                    })
+                    .collect(),
+                slots: slots
+                    .into_iter()
+                    .map(|(k, v)| (Address::from_str(&k).unwrap_or_default(), v.slots))
+                    .collect(),
+            }
+        }
+    }
+
+    impl From<silius_primitives::simulation::StorageMap> for StorageMap {
+        fn from(value: silius_primitives::simulation::StorageMap) -> Self {
+            let root_hashes = value.root_hashes;
+            let slots = value.slots;
+
+            Self {
+                root_hashes: root_hashes
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+                slots: slots
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), StorageSlots { slots: v }))
+                    .collect(),
+            }
+        }
+    }
 }
 
 pub mod uopool {

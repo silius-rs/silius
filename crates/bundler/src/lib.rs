@@ -2,9 +2,11 @@
 #![allow(dead_code)]
 
 mod bundler;
+mod conditional;
 mod ethereum;
 mod flashbots;
 
 pub use bundler::{Bundler, SendBundleOp};
+pub use conditional::ConditionalClient;
 pub use ethereum::EthereumClient;
 pub use flashbots::FlashbotsClient;

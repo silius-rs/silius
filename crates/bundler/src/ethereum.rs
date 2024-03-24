@@ -5,13 +5,13 @@ use ethers::{
     signers::LocalWallet,
     types::{transaction::eip2718::TypedTransaction, H256},
 };
-use silius_primitives::Wallet;
+use silius_primitives::{simulation::StorageMap, Wallet};
 use std::{sync::Arc, time::Duration};
 use tracing::trace;
 
 /// A type alias for the Ethereum Signer client
 #[derive(Clone)]
-pub struct EthereumClient<M>(pub Arc<SignerMiddleware<Arc<M>, LocalWallet>>);
+pub struct EthereumClient<M>(pub SignerMiddleware<Arc<M>, LocalWallet>);
 
 #[async_trait::async_trait]
 impl<M> SendBundleOp for EthereumClient<M>
@@ -22,10 +22,15 @@ where
     ///
     /// # Arguments
     /// * `bundle` - Bundle of [UserOperations](UserOperation)
+    /// * 'storage_map' - Storage map
     ///
     /// # Returns
     /// * `H256` - The transaction hash
-    async fn send_bundle(&self, bundle: TypedTransaction) -> eyre::Result<H256> {
+    async fn send_bundle(
+        &self,
+        bundle: TypedTransaction,
+        _storage_map: StorageMap,
+    ) -> eyre::Result<H256> {
         trace!("Sending transaction to the execution client: {bundle:?}");
 
         let tx = self.0.send_transaction(bundle, None).await?.interval(Duration::from_millis(75));
@@ -53,6 +58,6 @@ where
     /// * `EthereumClient` - A [Ethereum Signer Middleware](EthereumClient)
     pub fn new(eth_client: Arc<M>, wallet: Wallet) -> Self {
         let signer = SignerMiddleware::new(eth_client, wallet.signer);
-        Self(Arc::new(signer))
+        Self(signer)
     }
 }

@@ -16,7 +16,7 @@ use silius_primitives::{
 pub mod sanity;
 pub mod simulation;
 pub mod simulation_trace;
-mod utils;
+pub mod utils;
 pub mod validator;
 
 /// The outcome of a user operation validation.
@@ -29,7 +29,7 @@ pub struct UserOperationValidationOutcome {
     pub valid_after: Option<U256>,
     // Simulation trace
     pub code_hashes: Option<Vec<CodeHash>>,
-    pub storage_map: Option<StorageMap>,
+    pub storage_map: StorageMap,
     // the block which the user operation is verified on
     pub verified_block: U256,
 }

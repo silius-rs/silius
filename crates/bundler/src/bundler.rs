@@ -7,7 +7,7 @@ use ethers::{
     },
 };
 use silius_contracts::entry_point::EntryPointAPI;
-use silius_primitives::{UserOperation, UserOperationHash, Wallet};
+use silius_primitives::{simulation::StorageMap, UserOperation, UserOperationHash, Wallet};
 use std::sync::Arc;
 use tracing::{info, trace};
 
@@ -18,10 +18,15 @@ pub trait SendBundleOp: Send + Sync + 'static {
     ///
     /// # Arguments
     /// * `bundle` - Bundle of [UserOperations](UserOperation)
+    /// * 'storage_map' - Storage map
     ///
     /// # Returns
     /// * `H256` - The hash
-    async fn send_bundle(&self, bundle: TypedTransaction) -> eyre::Result<H256>;
+    async fn send_bundle(
+        &self,
+        bundle: TypedTransaction,
+        storage_map: StorageMap,
+    ) -> eyre::Result<H256>;
 }
 
 /// The `Bundler` struct is used to represent a bundler with necessary properties
@@ -140,10 +145,15 @@ where
     ///
     /// # Arguments
     /// * `uos` - An array of [UserOperations](UserOperation)
+    /// * `storage_map` - Storage map
     ///
     /// # Returns
     /// * `H256` - The hash
-    pub async fn send_bundle(&self, uos: &Vec<UserOperation>) -> eyre::Result<Option<H256>> {
+    pub async fn send_bundle(
+        &self,
+        uos: &Vec<UserOperation>,
+        storage_map: StorageMap,
+    ) -> eyre::Result<Option<H256>> {
         if uos.is_empty() {
             info!("Skipping creating a new bundle, no user operations");
             return Ok(None);
@@ -157,7 +167,7 @@ where
         trace!("Bundle content: {uos:?}");
 
         let bundle = self.create_bundle(uos).await?;
-        let hash = self.client.send_bundle(bundle).await?;
+        let hash = self.client.send_bundle(bundle, storage_map).await?;
 
         info!(
             "Bundle successfully sent, hash: {:?}, account: {:?}, entry point: {:?}, beneficiary: {:?}",

@@ -33,7 +33,6 @@ lazy_static = { workspace = true }
 rustc-hex = "2.1.0"
 serde = { workspace = true }
 serde-hex = "0.1.0"
-serde_json = { workspace = true }
 strum = "0.25.0"
 strum_macros = "0.25.3"
 
