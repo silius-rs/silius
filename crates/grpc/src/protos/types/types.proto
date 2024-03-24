@@ -65,7 +65,7 @@ message GetSupportedEntryPointsResponse {
     repeated H160 eps = 1;
 }
 
-message TransactionReceipt{
+message TransactionReceipt {
     H160 to = 1;
     H160 from = 2;
     H160 contract_address = 3;
@@ -82,7 +82,7 @@ message TransactionReceipt{
     uint64 status = 14;
 }
 
-message Log{
+message Log {
     uint64 block_number = 1;
     H256 block_hash = 2;
     uint64 transaction_index = 3;
@@ -98,4 +98,13 @@ message StakeInfo {
     H160 address = 1;
     uint64 stake = 2;
     uint64 unstake_delay = 3;
+}
+
+message StorageSlots {
+    map<string, string> slots = 1;
+}
+
+message StorageMap {
+    map<string, string> root_hashes = 1;
+    map<string, StorageSlots> slots = 2;
 }

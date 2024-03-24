@@ -31,7 +31,7 @@ impl SimulationCheck for VerificationExtraGas {
 
         if extra_gas.as_u64() < MIN_EXTRA_GAS {
             return Err(SimulationError::Validation {
-                inner: "Verification gas should have extra 2000 gas (has ${extra_gas})".into(),
+                inner: format!("Verification gas should have extra 2000 gas (has ${extra_gas})"),
             });
         }
 

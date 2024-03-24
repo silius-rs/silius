@@ -6,7 +6,7 @@ use ethers::{
     types::{transaction::eip2718::TypedTransaction, H256},
 };
 use ethers_flashbots::{BundleRequest, FlashbotsMiddleware, PendingBundleError, SimulatedBundle};
-use silius_primitives::Wallet;
+use silius_primitives::{simulation::StorageMap, Wallet};
 use std::sync::Arc;
 use tracing::{info, trace};
 use url::Url;
@@ -27,10 +27,15 @@ where
     ///
     /// # Arguments
     /// * `uos` - Bundler of [UserOperations](UserOperation)
+    /// * 'storage_map' - Storage map
     ///
     /// # Returns
     /// * `H256` - The transaction hash of the bundle
-    async fn send_bundle(&self, bundle: TypedTransaction) -> eyre::Result<H256> {
+    async fn send_bundle(
+        &self,
+        bundle: TypedTransaction,
+        _storage_map: StorageMap,
+    ) -> eyre::Result<H256> {
         let bundle_req = self.generate_bundle_req(vec![bundle], false).await?;
 
         match self.simulate_flashbots_bundle(&bundle_req).await {

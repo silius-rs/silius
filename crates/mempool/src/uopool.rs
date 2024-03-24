@@ -4,7 +4,8 @@ use crate::{
     mempool_id,
     utils::div_ceil,
     validate::{
-        UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
+        utils::merge_storage_maps, UserOperationValidationOutcome, UserOperationValidator,
+        UserOperationValidatorMode,
     },
     InvalidMempoolUserOperationError, MempoolError, MempoolErrorKind, MempoolId, Overhead,
     Reputation, ReputationError, SanityError, SimulationError,
@@ -25,6 +26,7 @@ use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
     get_address,
     reputation::{ReputationEntry, StakeInfo, StakeInfoResponse, Status},
+    simulation::StorageMap,
     UoPoolMode, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
@@ -287,7 +289,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     }
 
     /// Bundles an array of [UserOperations](UserOperation)
-    /// The function first checks the reputations of the entiries, then validate each
+    /// The function first checks the reputations of the entities, then validate each
     /// [UserOperation](UserOperation) by calling
     /// [UoPool::validate_user_operation](UoPool::validate_user_operation).
     /// If the [UserOperations](UserOperation) passes the validation, push it into the `uos_valid`
@@ -297,16 +299,18 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// `uos` - An array of [UserOperations](UserOperation) to bundle
     ///
     /// # Returns
-    /// `Result<Vec<UserOperation>, eyre::Error>` - The bundled [UserOperations](UserOperation).
+    /// `Result<(Vec<UserOperation>, StorageMap), eyre::Error>` - The bundled
+    /// [UserOperations](UserOperation).
     pub async fn bundle_user_operations(
         &mut self,
         uos: Vec<UserOperation>,
-    ) -> eyre::Result<Vec<UserOperation>> {
+    ) -> eyre::Result<(Vec<UserOperation>, StorageMap)> {
         let mut uos_valid = vec![];
         let mut senders = HashSet::new();
         let mut gas_total = U256::zero();
         let mut paymaster_dep = HashMap::new();
         let mut staked_entity_c = HashMap::new();
+        let mut storage_maps: Vec<StorageMap> = Vec::new();
 
         let senders_all = uos.iter().map(|uo| uo.sender).collect::<HashSet<_>>();
 
@@ -367,13 +371,18 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                         continue;
                     }
 
-                    if let Some(storage_map) = val_out.storage_map {
-                        for addr in storage_map.keys() {
-                            if *addr != uo.sender && senders_all.contains(addr) {
-                                continue 'uos;
-                            }
+                    for addr in val_out.storage_map.root_hashes.keys() {
+                        if *addr != uo.sender && senders_all.contains(addr) {
+                            continue 'uos;
                         }
                     }
+                    for addr in val_out.storage_map.slots.keys() {
+                        if *addr != uo.sender && senders_all.contains(addr) {
+                            continue 'uos;
+                        }
+                    }
+
+                    storage_maps.push(val_out.storage_map);
 
                     // TODO
                     // it would be better to use estimate_gas instead of call_gas_limit
@@ -423,7 +432,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             senders.insert(uo.sender);
         }
 
-        Ok(uos_valid)
+        Ok((uos_valid, merge_storage_maps(storage_maps)))
     }
 
     /// Gets the block base fee per gas

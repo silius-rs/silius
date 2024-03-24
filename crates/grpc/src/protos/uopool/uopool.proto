@@ -90,6 +90,7 @@ message GetSortedRequest {
 
 message GetSortedResponse {
     repeated types.UserOperation uos = 1;
+    types.StorageMap storage_map = 2;
 }
 
 message UserOperationHashRequest {

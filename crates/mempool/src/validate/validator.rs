@@ -298,7 +298,7 @@ where
                 .await?;
 
             out.code_hashes = sim_helper.code_hashes;
-            out.storage_map = Some(extract_storage_map(&js_trace));
+            out.storage_map = extract_storage_map(&js_trace);
         }
 
         Ok(out)

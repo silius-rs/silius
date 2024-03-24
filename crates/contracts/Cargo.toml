@@ -23,7 +23,7 @@ eyre = { workspace = true }
 lazy_static = { workspace = true }
 regex = "1.10.2"
 serde = { workspace = true }
-serde_json ={ workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
@@ -33,7 +33,7 @@ tokio = { workspace = true }
 [build-dependencies]
 # eth
 ethers = { workspace = true, features = ["solc-full"] }
-ethers-solc = "2.0.8"
+ethers-solc = "2.0.14"
 
 # misc
 eyre = { workspace = true }

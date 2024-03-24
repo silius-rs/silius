@@ -53,6 +53,7 @@ async fn trace_call<M: Middleware + 'static>(
                     timeout: None,
                 },
                 state_overrides: None,
+                block_overrides: None,
             },
         )
         .await?;

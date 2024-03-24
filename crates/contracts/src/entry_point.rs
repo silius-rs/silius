@@ -125,6 +125,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         timeout: None,
                     },
                     state_overrides: None,
+                    block_overrides: None,
                 },
             )
             .await
@@ -162,6 +163,7 @@ impl<M: Middleware + 'static> EntryPoint<M> {
                         timeout: None,
                     },
                     state_overrides: Some(spoof::balance(Address::zero(), UINT96_MAX.into())),
+                    block_overrides: None,
                 },
             )
             .await
