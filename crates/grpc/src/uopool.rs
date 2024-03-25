@@ -28,7 +28,7 @@ use silius_p2p::{
 use silius_primitives::{provider::BlockStream, UserOperation};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 type StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> = UserOperationPool<
     M,
@@ -214,7 +214,7 @@ where
             })?
         };
 
-        let uos_valid = {
+        let (uos_valid, storage_map) = {
             let mut uopool = self.get_uopool(&ep)?;
             uopool
                 .bundle_user_operations(uos)

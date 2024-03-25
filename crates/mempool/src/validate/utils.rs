@@ -106,7 +106,7 @@ pub fn extract_storage_map(js_trace: &JsTracerFrame) -> StorageMap {
 
     for l in js_trace.calls_from_entry_point.iter() {
         for (addr, acc) in l.access.iter() {
-            storage_map.insert(*addr, StorageMapEntry::Slots(acc.reads.clone()));
+            storage_map.slots.insert(*addr, StorageMapEntry::Slots(acc.reads.clone()));
         }
     }
 
@@ -124,8 +124,8 @@ pub fn merge_storage_maps(storage_maps: Vec<StorageMap>) -> StorageMap {
     let mut merged_map = StorageMap::default();
 
     for map in storage_maps {
-        for (addr, entry) in map {
-            let ent = merged_map.entry(addr);
+        for (addr, entry) in map.0 {
+            let ent = merged_map.0.entry(addr);
 
             match ent {
                 Entry::Vacant(_) => {
@@ -135,9 +135,9 @@ pub fn merge_storage_maps(storage_maps: Vec<StorageMap>) -> StorageMap {
                     StorageMapEntry::RootHash(hash) => {
                         val.insert(StorageMapEntry::RootHash(hash));
                     }
-                    StorageMapEntry::Slots(slots) => match val.get() {
+                    StorageMapEntry::Slots(slots) => match val.get_mut() {
                         StorageMapEntry::RootHash(_) => {}
-                        StorageMapEntry::Slots(sl) => {
+                        StorageMapEntry::Slots(ref mut sl) => {
                             for (slot, value) in slots {
                                 sl.insert(slot, value.clone());
                             }

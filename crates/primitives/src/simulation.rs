@@ -58,14 +58,9 @@ pub struct CodeHash {
     pub hash: H256,
 }
 
-/// Entry for storage map
-pub enum StorageMapEntry {
-    /// A root hash
-    RootHash(String),
-    /// Map of slot-value pairs
-    Slots(HashMap<String, String>),
-}
-
 /// Storage map
-#[derive(Debug)]
-pub struct StorageMap(HashMap<Address, StorageMapEntry>);
+#[derive(Debug, Default, Clone)]
+pub struct StorageMap {
+    pub root_hashes: HashMap<Address, H256>,
+    pub slots: HashMap<Address, HashMap<String, String>>,
+}

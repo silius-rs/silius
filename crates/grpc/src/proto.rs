@@ -381,6 +381,22 @@ pub mod types {
             }
         }
     }
+
+    impl From<StorageMap> for silius_primitives::simulation::StorageMap {
+        fn from(value: StorageMap) -> Self {
+            let hashes = value.hashes;
+            let slots = value.slots;
+
+
+            Self {
+            
+            }
+        }
+    }
+
+    impl From<silius_primitives::simulation::StorageMap> for StorageMap {
+
+    }
 }
 
 pub mod uopool {

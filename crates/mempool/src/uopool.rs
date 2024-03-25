@@ -5,6 +5,7 @@ use crate::{
     reputation::{HashSetOp, ReputationEntryOp},
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
+        utils::merge_storage_maps,
     },
     InvalidMempoolUserOperationError, MempoolError, MempoolErrorKind, MempoolId, Overhead,
     Reputation, ReputationError, SanityError, SimulationError,
@@ -315,15 +316,15 @@ where
     pub async fn bundle_user_operations(
         &mut self,
         uos: Vec<UserOperation>,
-    ) -> eyre::Result<Vec<UserOperation>> {
+    ) -> eyre::Result<(Vec<UserOperation>, StorageMap)> {
         let mut uos_valid = vec![];
         let mut senders = HashSet::new();
         let mut gas_total = U256::zero();
         let mut paymaster_dep = HashMap::new();
         let mut staked_entity_c = HashMap::new();
+        let mut storage_maps: Vec<StorageMap> = Vec::new();
 
         let senders_all = uos.iter().map(|uo| uo.sender).collect::<HashSet<_>>();
-        let storage_maps: Vec<StorageMap> = Vec::new();
 
         'uos: for uo in uos {
             if senders.contains(&uo.sender) {
@@ -382,7 +383,12 @@ where
                         continue;
                     }
 
-                    for addr in val_out.storage_map.keys() {
+                    for addr in val_out.storage_map.root_hashes.keys() {
+                        if *addr != uo.sender && senders_all.contains(addr) {
+                            continue 'uos;
+                        }
+                    }
+                    for addr in val_out.storage_map.slots.keys() {
                         if *addr != uo.sender && senders_all.contains(addr) {
                             continue 'uos;
                         }
@@ -438,9 +444,7 @@ where
             senders.insert(uo.sender);
         }
 
-
-
-        Ok((uos_valid, merge_storage_maps()))
+        Ok((uos_valid, merge_storage_maps(storage_maps)))
     }
 
     /// Gets the block base fee per gas

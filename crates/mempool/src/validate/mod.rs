@@ -18,7 +18,7 @@ use silius_primitives::{
 pub mod sanity;
 pub mod simulation;
 pub mod simulation_trace;
-mod utils;
+pub mod utils;
 pub mod validator;
 
 /// The outcome of a user operation validation.
