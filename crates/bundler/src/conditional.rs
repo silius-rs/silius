@@ -1,11 +1,13 @@
 use crate::bundler::SendBundleOp;
 use ethers::{
     middleware::SignerMiddleware,
-    providers::Middleware,
+    providers::{JsonRpcClient, Middleware},
     signers::LocalWallet,
     types::{transaction::eip2718::TypedTransaction, H256},
 };
-use silius_primitives::Wallet;
+use jsonrpsee::types::{Id, Request};
+use serde_json::value::RawValue;
+use silius_primitives::{simulation::StorageMap, Wallet};
 use std::{sync::Arc, time::Duration};
 use tracing::trace;
 
@@ -23,16 +25,24 @@ where
     ///
     /// # Arguments
     /// * `bundle` - Bundle of [UserOperations](UserOperation)
+    /// * 'storage_map' - Storage map
     ///
     /// # Returns
     /// * `H256` - The transaction hash
-    async fn send_bundle(&self, bundle: TypedTransaction) -> eyre::Result<H256> {
-        trace!("Sending transaction to the execution client: {bundle:?}");
+    async fn send_bundle(&self, bundle: TypedTransaction, storage_map: StorageMap) -> eyre::Result<H256> {
+        trace!("Sending transaction to the conditional endpoint: {bundle:?}");
 
-        let tx = self.0.send_transaction(bundle, None).await?.interval(Duration::from_millis(75));
-        let tx_hash = tx.tx_hash();
+        let value = serde_json::to_value(&bundle)?;
+        let req_body = Request::new(
+            "eth_sendRawTransactionConditional".into(),
+            Some(&RawValue::from_string(r#"["hello"]"#.into()).unwrap()),
+            Id::Number(1),
+        );
 
-        let tx_receipt = tx.await?;
+        // let tx = self.0.send_transaction(bundle, None).await?.interval(Duration::from_millis(75));
+        // let tx_hash = tx.tx_hash();
+
+        // let tx_receipt = tx.await?;
 
         trace!("Transaction receipt: {tx_receipt:?}");
 

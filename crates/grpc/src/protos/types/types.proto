@@ -105,6 +105,6 @@ message StorageSlots {
 }
 
 message StorageMap {
-    map<string, string> hashes = 1;
+    map<string, string> root_hashes = 1;
     map<string, StorageSlots> slots = 2;
 }

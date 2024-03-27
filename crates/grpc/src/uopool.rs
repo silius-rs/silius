@@ -224,6 +224,7 @@ where
 
         Ok(Response::new(GetSortedResponse {
             uos: uos_valid.into_iter().map(Into::into).collect(),
+            storage_map: Some(storage_map.into()),
         }))
     }
 

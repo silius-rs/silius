@@ -5,7 +5,7 @@ use ethers::{
     signers::LocalWallet,
     types::{transaction::eip2718::TypedTransaction, H256},
 };
-use silius_primitives::Wallet;
+use silius_primitives::{simulation::StorageMap, Wallet};
 use std::{sync::Arc, time::Duration};
 use tracing::trace;
 
@@ -22,10 +22,11 @@ where
     ///
     /// # Arguments
     /// * `bundle` - Bundle of [UserOperations](UserOperation)
+    /// * 'storage_map' - Storage map
     ///
     /// # Returns
     /// * `H256` - The transaction hash
-    async fn send_bundle(&self, bundle: TypedTransaction) -> eyre::Result<H256> {
+    async fn send_bundle(&self, bundle: TypedTransaction, _storage_map: StorageMap) -> eyre::Result<H256> {
         trace!("Sending transaction to the execution client: {bundle:?}");
 
         let tx = self.0.send_transaction(bundle, None).await?.interval(Duration::from_millis(75));
