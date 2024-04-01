@@ -637,18 +637,30 @@ where
 
     /// Removes multiple [UserOperations](UserOperation) from the
     /// [UserOperationQueue](UserOperationQueue) given an array of
-    /// [UserOperationHash](UserOperationHash).
+    /// [UserOperation](UserOperation).
     ///
     /// # Arguments
-    /// * `uo_hashes` - The array of [UserOperationHash](UserOperationHash) to remove the user
-    ///   operations for.
+    /// * `uos` - The array of [UserOperation](UserOperation).
     ///
     /// # Returns
     /// `Option<()>` - None
-    pub fn remove_user_operations(&mut self, uo_hashes: Vec<UserOperationHash>) {
-        for uo_hash in uo_hashes {
-            self.remove_user_operation(&uo_hash);
+    pub fn remove_user_operations(&mut self, uos: Vec<UserOperation>) -> Option<()> {
+        for uo in uos {
+            self.remove_user_operation(&uo.hash);
+
+            // update reputations
+            self.reputation.increment_included(&uo.sender).ok();
+
+            if let Some(addr) = get_address(&uo.paymaster_and_data) {
+                self.reputation.increment_included(&addr).ok();
+            }
+
+            if let Some(addr) = get_address(&uo.init_code) {
+                self.reputation.increment_included(&addr).ok();
+            }
         }
+
+        None
     }
 
     /// Gets the [StakeInfoResponse](StakeInfoResponse) for entity

@@ -12,11 +12,10 @@ use ethers::{
     providers::Middleware,
     types::{Address, H256, U256},
 };
-use eyre::format_err;
 use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
-use silius_primitives::{get_address, provider::BlockStream, UserOperation, UserOperationSigned};
+use silius_primitives::{provider::BlockStream, UserOperation, UserOperationSigned};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
 
@@ -99,28 +98,14 @@ where
                     if let Ok((uos, _)) = dec {
                         uopool.remove_user_operations(
                             uos.iter()
-                                .map(|uo| uo.hash(&uopool.entry_point.address(), uopool.chain.id()))
+                                .map(|uo| {
+                                    UserOperation::from_user_operation_signed(
+                                        uo.hash(&uopool.entry_point.address(), uopool.chain.id()),
+                                        uo.clone(),
+                                    )
+                                })
                                 .collect(),
                         );
-
-                        for uo in uos {
-                            // update reputations
-                            uopool.reputation.increment_included(&uo.sender).map_err(|e| {
-                                format_err!("Failed to increment sender reputation: {:?}", e)
-                            })?;
-
-                            if let Some(addr) = get_address(&uo.paymaster_and_data) {
-                                uopool.reputation.increment_included(&addr).map_err(|e| {
-                                    format_err!("Failed to increment paymaster reputation: {:?}", e)
-                                })?;
-                            }
-
-                            if let Some(addr) = get_address(&uo.init_code) {
-                                uopool.reputation.increment_included(&addr).map_err(|e| {
-                                    format_err!("Failed to increment factory reputation: {:?}", e)
-                                })?;
-                            }
-                        }
                     }
                 }
             }

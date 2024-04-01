@@ -1,5 +1,8 @@
 use crate::{
-    proto::{bundler::*, uopool::GetSortedRequest},
+    proto::{
+        bundler::*,
+        uopool::{GetSortedRequest, RemoveRequest},
+    },
     uo_pool_client::UoPoolClient,
 };
 use alloy_chains::Chain;
@@ -54,20 +57,25 @@ where
         Ok(uos)
     }
 
-    pub async fn send_bundles(&self) -> eyre::Result<Option<H256>> {
+    pub async fn send_bundles(&self) -> eyre::Result<(Vec<UserOperation>, Option<H256>)> {
         let mut tx_hashes: Vec<Option<H256>> = vec![];
+        let mut user_operations: Vec<Vec<UserOperation>> = vec![];
 
         for bundler in self.bundlers.iter() {
             let uos =
                 Self::get_user_operations(&self.uopool_grpc_client, &bundler.entry_point).await?;
             let tx_hash = bundler.send_bundle(&uos).await?;
 
-            tx_hashes.push(tx_hash)
+            tx_hashes.push(tx_hash);
+            user_operations.push(uos);
         }
 
         // FIXME: Because currently the bundler support multiple bundler and
         // we don't have a way to know which bundler is the one that is
-        Ok(tx_hashes.into_iter().next().expect("At least one bundler must be present"))
+        Ok((
+            user_operations.first().expect("At least one bundler must be present").to_vec(),
+            tx_hashes.into_iter().next().expect("At least one bundler must be present"),
+        ))
     }
 
     pub fn stop_bundling(&self) {
@@ -154,12 +162,12 @@ where
         &self,
         _req: Request<()>,
     ) -> Result<Response<SendBundleNowResponse>, Status> {
-        let res = self
+        let (uos, tx_hash) = self
             .send_bundles()
             .await
             .map_err(|e| tonic::Status::internal(format!("Send bundle now with error: {e:?}")))?;
 
-        if let Some(tx_hash) = res {
+        if let Some(tx_hash) = tx_hash {
             // wait for the tx to be mined
             loop {
                 let tx_receipt = self
@@ -171,6 +179,19 @@ where
                     .await;
                 if let Ok(tx_receipt) = tx_receipt {
                     if tx_receipt.is_some() {
+                        self.uopool_grpc_client
+                            .clone()
+                            .remove(Request::new(RemoveRequest {
+                                uos: uos.into_iter().map(|uo| uo.into()).collect(),
+                                ep: Some(
+                                    self.bundlers
+                                        .first()
+                                        .expect("Must have at least one bundler")
+                                        .entry_point
+                                        .into(),
+                                ),
+                            }))
+                            .await?;
                         break;
                     }
                 }
@@ -178,7 +199,7 @@ where
             }
         }
 
-        Ok(Response::new(SendBundleNowResponse { res: Some(res.unwrap_or_default().into()) }))
+        Ok(Response::new(SendBundleNowResponse { res: Some(tx_hash.unwrap_or_default().into()) }))
     }
 }
 
