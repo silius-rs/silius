@@ -148,7 +148,7 @@ where
         let ep = parse_addr(req.ep)?;
         let mut uopool = self.get_uopool(&ep)?;
 
-        uopool.remove_user_operations(req.hashes.into_iter().map(Into::into).collect());
+        uopool.remove_user_operations(req.uos.into_iter().map(|uo| uo.into()).collect());
 
         Ok(Response::new(()))
     }

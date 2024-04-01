@@ -21,7 +21,7 @@ message AddResponse {
 }
 
 message RemoveRequest {
-    repeated types.H256 hashes = 1;
+    repeated types.UserOperation uos = 1;
     types.H160 ep = 2;
 }
 
@@ -84,19 +84,19 @@ message AddMempoolResponse {
     AddMempoolResult res = 1;
 }
 
-message GetSortedRequest{
+message GetSortedRequest {
     types.H160 ep = 1;
 }
 
-message GetSortedResponse{
+message GetSortedResponse {
     repeated types.UserOperation uos = 1;
 }
 
-message UserOperationHashRequest{
+message UserOperationHashRequest {
     types.H256 hash = 1;
 }
 
-message GetUserOperationByHashResponse{
+message GetUserOperationByHashResponse {
     types.UserOperationSigned user_operation = 1;
     types.H160 entry_point = 2;
     types.H256 transaction_hash = 3;
@@ -104,7 +104,7 @@ message GetUserOperationByHashResponse{
     uint64 block_number = 5;
 }
 
-message GetUserOperationReceiptResponse{
+message GetUserOperationReceiptResponse {
     types.H256 user_operation_hash = 1;
     types.H160 sender = 2;
     types.PbU256 nonce = 3;
