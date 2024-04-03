@@ -144,10 +144,16 @@ pub mod p2p {
     pub const NODE_KEY_FILE_NAME: &str = "p2p/node-key";
     /// The default path for storing the node enr
     pub const NODE_ENR_FILE_NAME: &str = "p2p/node-enr";
+    /// Default number of peers to find on the initial discovery.
+    pub const FIND_NODE_QUERY_CLOSEST_PEERS: usize = 16;
     /// Default target peers.
-    pub const TARGET_PEERS: usize = 10;
-    /// Default ping interval.
-    pub const PING_INTERVAL: u64 = 10;
+    pub const TARGET_PEERS: usize = 50;
+    /// Default heartbeat interval (how often we perform discovery and peer management).
+    pub const HEARTBEAT_INTERVAL: u64 = 30;
+    /// Default outbound ping interval.
+    pub const PING_INTERVAL_OUTBOUND: u64 = 15;
+    /// Default inbound ping interval.
+    pub const PING_INTERVAL_INBOUND: u64 = 20;
     /// Request message size maximum
     pub const REQUEST_SIZE_MAXIMUM: u64 = 1024 * 1024; // bytes
     /// Response message size maximum
