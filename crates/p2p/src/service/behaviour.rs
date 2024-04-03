@@ -13,7 +13,7 @@ pub type Gossipsub = gossipsub::Behaviour<SnappyTransform, WhitelistSubscription
 
 /// Events emitted by the p2p network.
 #[derive(Debug)]
-pub enum Event {
+pub enum BehaviourEvent {
     /// Gossipsub protocol event
     GossipSub(Box<gossipsub::Event>),
     /// Request-response protocol event
@@ -24,33 +24,33 @@ pub enum Event {
     PeerManager(PeerManagerEvent),
 }
 
-impl From<gossipsub::Event> for Event {
+impl From<gossipsub::Event> for BehaviourEvent {
     fn from(value: gossipsub::Event) -> Self {
-        Event::GossipSub(Box::new(value))
+        BehaviourEvent::GossipSub(Box::new(value))
     }
 }
 
-impl From<rpc::RPCEvent> for Event {
+impl From<rpc::RPCEvent> for BehaviourEvent {
     fn from(value: rpc::RPCEvent) -> Self {
-        Event::RPC(value)
+        BehaviourEvent::RPC(value)
     }
 }
 
-impl From<discovery::DiscoveredPeers> for Event {
+impl From<discovery::DiscoveredPeers> for BehaviourEvent {
     fn from(value: discovery::DiscoveredPeers) -> Self {
-        Event::Discovery(value)
+        BehaviourEvent::Discovery(value)
     }
 }
 
-impl From<PeerManagerEvent> for Event {
+impl From<PeerManagerEvent> for BehaviourEvent {
     fn from(value: PeerManagerEvent) -> Self {
-        Event::PeerManager(value)
+        BehaviourEvent::PeerManager(value)
     }
 }
 
 /// The behaviour of the p2p network.
 #[derive(NetworkBehaviour)]
-#[behaviour(to_swarm = "Event", event_process = false)]
+#[behaviour(to_swarm = "BehaviourEvent", event_process = false)]
 pub struct Behaviour {
     /// Peer manager
     pub peer_manager: PeerManager,

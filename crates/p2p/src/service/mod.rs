@@ -15,12 +15,12 @@ use crate::{
     },
     peer_manager::{PeerManager, PeerManagerEvent},
     rpc::{
-        methods::{MetaData, Ping, RPCResponse, RequestId},
+        methods::{MetaData, MetaDataRequest, Ping, RPCResponse, RequestId},
         outbound::OutboundRequest,
         protocol::InboundRequest,
         RPCEvent, RPC,
     },
-    service::utils::save_private_key_to_file,
+    service::{behaviour::BehaviourEvent, utils::save_private_key_to_file},
     types::{
         globals::NetworkGlobals,
         pubsub::{create_gossipsub, PubsubMessage},
@@ -34,22 +34,22 @@ use futures::channel::{
     oneshot::Sender,
 };
 use libp2p::{
-    core::{transport::ListenerId, upgrade},
+    core::upgrade,
     futures::StreamExt,
     gossipsub::{self, MessageId, PublishError, SubscriptionError, TopicHash},
     identity::{secp256k1, Keypair},
     noise,
     swarm::SwarmEvent,
-    Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError,
+    Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_mplex::{MaxBufferBehaviour, MplexConfig};
 use silius_primitives::{
-    constants::p2p::{MAX_IPFS_CID_LENGTH, MAX_SUPPORTED_MEMPOOLS},
+    constants::p2p::{FIND_NODE_QUERY_CLOSEST_PEERS, MAX_IPFS_CID_LENGTH, MAX_SUPPORTED_MEMPOOLS},
     UserOperation, VerifiedUserOperation,
 };
 use ssz_rs::{Deserialize, List, Serialize, Vector};
 use std::{
-    env, io,
+    env,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -60,6 +60,12 @@ pub type MempoolChannels =
 
 #[derive(Debug)]
 pub enum NetworkEvent {
+    /// We successfully connected to a peer.
+    PeerConnectedOutgoing(PeerId),
+    /// A peer successfully connected to us.
+    PeerConnectedIncoming(PeerId),
+    /// A peer was disconnected.
+    PeerDisconnected(PeerId),
     /// A peer successfully connected with us.
     PeerConnected(PeerId),
     /// Gossipsub message from the network
@@ -113,7 +119,7 @@ impl From<Network> for Swarm<Behaviour> {
 }
 
 impl Network {
-    pub fn new(config: Config, mempool_channels: MempoolChannels) -> eyre::Result<Self> {
+    pub async fn new(config: Config, mempool_channels: MempoolChannels) -> eyre::Result<Self> {
         // Handle private key
         let key = if let Some(key) = load_private_key_from_file(&config.node_key_file) {
             key
@@ -177,10 +183,18 @@ impl Network {
             ))
         };
 
-        let gossipsub = create_gossipsub(canonical_mempools).map_err(|e| eyre::anyhow!(e))?;
+        let mut gossipsub = create_gossipsub(canonical_mempools).map_err(|e| eyre::anyhow!(e))?;
+        for bootnode in &config.bootnodes {
+            gossipsub.add_explicit_peer(&bootnode.peer_id());
+        }
+
         let rpc = RPC::new();
-        let peer_manager = PeerManager::new(network_globals.clone(), config.target_peers);
-        let discovery = Discovery::new(enr, combined_key, config)?;
+
+        let peer_manager = PeerManager::new(network_globals.clone());
+
+        let mut discovery =
+            Discovery::new(combined_key, config.clone(), network_globals.clone()).await?;
+        discovery.discover_peers(FIND_NODE_QUERY_CLOSEST_PEERS);
 
         let behaviour = Behaviour { peer_manager, rpc, discovery, gossipsub };
 
@@ -201,7 +215,34 @@ impl Network {
             .expect("building p2p behaviour failed")
             .build();
 
-        Ok(Self { swarm, network_globals, mempool_channels })
+        let mut network = Network { swarm, network_globals, mempool_channels };
+
+        network.start(&config).await?;
+
+        Ok(network)
+    }
+
+    async fn start(&mut self, config: &Config) -> eyre::Result<()> {
+        let listen_addrs = config.listen_addr.to_multi_addr();
+
+        for listen_addr in listen_addrs {
+            let _ = self.swarm.listen_on(listen_addr);
+        }
+
+        for bootnode_enr in &config.bootnodes {
+            for multiaddr in &bootnode_enr.multiaddr() {
+                if !self
+                    .network_globals
+                    .peers
+                    .read()
+                    .is_connected_or_dialing(&bootnode_enr.peer_id())
+                {
+                    let _ = self.swarm.dial(multiaddr.clone());
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn metadata(&self) -> MetaData {
@@ -254,53 +295,74 @@ impl Network {
     }
 
     /// handle reqrep event
-    fn handle_rpc_event(&self, event: RPCEvent) -> Option<NetworkEvent> {
+    fn handle_rpc_event(&mut self, event: RPCEvent) -> Option<NetworkEvent> {
         match event {
-            RPCEvent::Request { peer_id, request, sender, .. } => {
-                match request {
-                    InboundRequest::Ping(_ping) => {
-                        // TODO: need to update metadata of peer (based on ping value)
-                        let response = RPCResponse::Pong(Ping::new(self.metadata().seq_number));
-                        sender.send(response).expect("channel should exist");
-                        None
-                    }
-                    InboundRequest::MetaData(_) => {
-                        let response = RPCResponse::MetaData(self.metadata());
-                        sender.send(response).expect("channel should exist");
-                        None
-                    }
-                    _ => Some(NetworkEvent::RequestMessage { peer_id, request, sender }),
+            RPCEvent::Request { peer_id, request, sender, .. } => match request {
+                InboundRequest::Ping(ping) => {
+                    self.swarm.behaviour_mut().peer_manager.ping_request(&peer_id, ping.data);
+                    sender
+                        .send(RPCResponse::Pong(Ping::new(self.metadata().seq_number)))
+                        .expect("channel should exist");
+                    None
                 }
-            }
-            RPCEvent::Response { peer_id, response, .. } => {
-                Some(NetworkEvent::ResponseMessage { peer_id, response })
-            }
+                InboundRequest::MetaData(_) => {
+                    sender
+                        .send(RPCResponse::MetaData(self.metadata()))
+                        .expect("channel should exist");
+                    None
+                }
+                InboundRequest::Goodbye(_) => None,
+                _ => Some(NetworkEvent::RequestMessage { peer_id, request, sender }),
+            },
+            RPCEvent::Response { peer_id, response, .. } => match response {
+                RPCResponse::Pong(ping) => {
+                    self.swarm.behaviour_mut().peer_manager.pong_response(&peer_id, ping.data);
+                    None
+                }
+                RPCResponse::MetaData(metadata) => {
+                    self.swarm.behaviour_mut().peer_manager.metadata_response(&peer_id, metadata);
+                    None
+                }
+                _ => Some(NetworkEvent::ResponseMessage { peer_id, response }),
+            },
             _ => None,
         }
     }
 
-    // TODO: discovery peer connect
-    fn handle_discovery_event(&self, _event: DiscoveredPeers) -> Option<NetworkEvent> {
+    // handle discovery event
+    fn handle_discovery_event(&mut self, event: DiscoveredPeers) -> Option<NetworkEvent> {
+        self.swarm.behaviour_mut().peer_manager.peers_discovered(event.peers);
         None
     }
 
     /// handle peer manager event
     fn handler_peer_manager_event(&mut self, event: PeerManagerEvent) -> Option<NetworkEvent> {
         match event {
-            PeerManagerEvent::Ping(peer) => {
+            PeerManagerEvent::PeerConnectedIncoming(peer_id) => {
+                Some(NetworkEvent::PeerConnectedIncoming(peer_id))
+            }
+            PeerManagerEvent::PeerConnectedOutgoing(peer_id) => {
+                Some(NetworkEvent::PeerConnectedOutgoing(peer_id))
+            }
+            PeerManagerEvent::PeerDisconnected(peer_id) => {
+                Some(NetworkEvent::PeerDisconnected(peer_id))
+            }
+            PeerManagerEvent::DiscoverPeers(peers_to_find) => {
+                self.swarm.behaviour_mut().discovery.discover_peers(peers_to_find);
+                None
+            }
+            PeerManagerEvent::Ping(peer_id) => {
                 self.send_request(
-                    &peer,
+                    &peer_id,
                     OutboundRequest::Ping(Ping::new(self.metadata().seq_number)),
                 );
                 None
             }
-            PeerManagerEvent::PeerConnectedIncoming(peer) |
-            PeerManagerEvent::PeerConnectedOutgoing(peer) => {
-                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer);
-                Some(NetworkEvent::PeerConnected(peer))
+            PeerManagerEvent::MetaData(peer_id) => {
+                self.send_request(&peer_id, OutboundRequest::MetaData(MetaDataRequest));
+                None
             }
-            PeerManagerEvent::PeerDisconnected(_) => None,
-            PeerManagerEvent::DiscoverPeers(_) => None,
+            _ => None,
         }
     }
 
@@ -325,7 +387,10 @@ impl Network {
                     Err(err) => match err {
                         PublishError::InsufficientPeers => {
                             warn!("Currently no peers to publish message");
-                            self.swarm.behaviour_mut().discovery.discover_peers(16usize);
+                            self.swarm
+                                .behaviour_mut()
+                                .discovery
+                                .discover_peers(FIND_NODE_QUERY_CLOSEST_PEERS);
                         }
                         e => error!("Error in publish message {e:?}"),
                     },
@@ -337,12 +402,11 @@ impl Network {
             info!("Swarm event {swarm_event:?}");
             let event_opt = match swarm_event {
                 SwarmEvent::Behaviour(event) => match event {
-                    behaviour::Event::GossipSub(event) => self.handle_gossipsub_event(event),
-                    behaviour::Event::RPC(event) => self.handle_rpc_event(event),
-                    behaviour::Event::Discovery(event) => self.handle_discovery_event(event),
-                    behaviour::Event::PeerManager(event) => self.handler_peer_manager_event(event),
+                    BehaviourEvent::GossipSub(event) => self.handle_gossipsub_event(event),
+                    BehaviourEvent::RPC(event) => self.handle_rpc_event(event),
+                    BehaviourEvent::Discovery(event) => self.handle_discovery_event(event),
+                    BehaviourEvent::PeerManager(event) => self.handler_peer_manager_event(event),
                 },
-
                 SwarmEvent::NewListenAddr { address, .. } => {
                     Some(NetworkEvent::NewListenAddr(address))
                 }
@@ -359,10 +423,6 @@ impl Network {
         }
 
         Poll::Pending
-    }
-
-    pub fn listen_on(&mut self, addr: Multiaddr) -> Result<ListenerId, TransportError<io::Error>> {
-        self.swarm.listen_on(addr)
     }
 
     pub async fn next_event(&mut self) -> NetworkEvent {
@@ -382,21 +442,6 @@ impl Network {
         let mut buf = Vec::new();
         let _ = user_op.serialize(&mut buf).expect("ssz of user ops serialization failed");
         self.swarm.behaviour_mut().gossipsub.publish(topic_hash, buf)
-    }
-
-    /// Dial a peer.
-    pub fn dial(&mut self, enr: Enr) -> eyre::Result<()> {
-        let addrs = enr.multiaddr();
-        for addr in addrs {
-            self.swarm.dial(addr)?;
-        }
-        self.swarm
-            .behaviour_mut()
-            .discovery
-            .discovery
-            .add_enr(enr)
-            .map_err(|e| eyre::eyre!(e.to_string()))?;
-        Ok(())
     }
 
     /// Subscribe to a topic.

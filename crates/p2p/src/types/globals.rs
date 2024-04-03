@@ -58,4 +58,8 @@ impl NetworkGlobals {
     pub fn chain_spec(&self) -> ChainSpec {
         self.chain_spec.read().clone()
     }
+
+    pub fn connected_or_dialing_peers(&self) -> usize {
+        self.peers.read().connected_or_dialing_peers().count()
+    }
 }

@@ -76,7 +76,7 @@ impl From<GoodbyeReason> for u64 {
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
 pub struct Ping {
-    data: u64,
+    pub data: u64,
 }
 
 impl Ping {

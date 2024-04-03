@@ -471,23 +471,13 @@ where
                 mempool_channels.push((ep, waiting_to_pub_rv, p2p_userop_sd))
             }
 
-            let listen_addrs = config.listen_addr.to_multi_addr();
-            let mut p2p_network =
-                Network::new(config.clone(), mempool_channels).expect("p2p network init failed");
-
-            for listen_addr in listen_addrs.into_iter() {
-                info!("P2P node listened on {}", listen_addr);
-                p2p_network.listen_on(listen_addr).expect("Listen on p2p network failed");
-            }
-
             if config.bootnodes.is_empty() {
-                info!("Start p2p mode without bootnodes");
+                info!("Starting p2p mode without bootnodes");
             }
 
-            for enr in config.bootnodes.into_iter() {
-                info!("Trying to dial p2p node {enr:}");
-                p2p_network.dial(enr).expect("Dial bootnode failed");
-            }
+            let mut p2p_network = Network::new(config.clone(), mempool_channels)
+                .await
+                .expect("p2p network init failed");
 
             tokio::spawn(async move {
                 loop {

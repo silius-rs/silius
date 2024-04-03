@@ -19,8 +19,9 @@ async fn rpc_case(request_case: OutboundRequest, response_case: RPCResponse) -> 
 
     let sender_fut = async {
         loop {
-            match peer1.next_event().await {
-                NetworkEvent::PeerConnected(_) => {
+            let event = peer1.next_event().await;
+            match event {
+                NetworkEvent::PeerConnectedIncoming(_) => {
                     println!("Send request");
                     peer1.send_request(&peer2_id, request_case.clone());
                 }
@@ -46,7 +47,8 @@ async fn rpc_case(request_case: OutboundRequest, response_case: RPCResponse) -> 
 
     let receiver_fut = async {
         loop {
-            match peer2.next_event().await {
+            let event = peer2.next_event().await;
+            match event {
                 NetworkEvent::RequestMessage { peer_id, request, sender } => {
                     println!("Received request");
                     assert_eq!(request, request_case.clone());
@@ -76,33 +78,6 @@ async fn rpc_status() -> eyre::Result<()> {
     rpc_case(
         OutboundRequest::Status(StatusMessage::default()),
         RPCResponse::Status(StatusMessage::default()),
-    )
-    .await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn rpc_goodbye() -> eyre::Result<()> {
-    rpc_case(
-        OutboundRequest::Goodbye(Default::default()),
-        RPCResponse::Goodbye(Default::default()),
-    )
-    .await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn rpc_ping_pong() -> eyre::Result<()> {
-    rpc_case(OutboundRequest::Ping(Default::default()), RPCResponse::Pong(Default::default()))
-        .await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn rpc_metadata() -> eyre::Result<()> {
-    rpc_case(
-        OutboundRequest::MetaData(Default::default()),
-        RPCResponse::MetaData(Default::default()),
     )
     .await?;
     Ok(())

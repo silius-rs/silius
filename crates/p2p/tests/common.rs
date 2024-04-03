@@ -1,3 +1,4 @@
+use discv5::Enr;
 use futures::channel::mpsc::unbounded;
 use silius_p2p::{
     config::{gossipsub_config, Config},
@@ -29,7 +30,7 @@ pub fn get_available_port() -> Option<u16> {
     Some(unused_port)
 }
 
-fn build_p2p_instance() -> eyre::Result<Network> {
+async fn build_p2p_instance(bootnode: Option<Enr>) -> eyre::Result<Network> {
     let dir = TempDir::new("test-silius-p2p").unwrap();
     let node_key_file = dir.path().join("node_key");
     let node_enr_file = dir.path().join("node_enr");
@@ -57,25 +58,20 @@ fn build_p2p_instance() -> eyre::Result<Network> {
         discv5_config: discv5::ConfigBuilder::new(listen_addr.to_listen_config()).build(),
         chain_spec: chain_spec.clone(),
         target_peers: TARGET_PEERS,
-        bootnodes: vec![],
+        bootnodes: if let Some(bootnode) = bootnode { vec![bootnode] } else { vec![] },
     };
 
     let (_, rv) = unbounded();
     let (sd, _) = unbounded();
 
-    let mut network = Network::new(config, vec![(Default::default(), rv, sd)])?;
-
-    for listen_addr in listen_addr.to_multi_addr() {
-        println!("listen on {listen_addr:?}");
-        network.listen_on(listen_addr)?;
-    }
+    let network = Network::new(config, vec![(Default::default(), rv, sd)]).await?;
 
     Ok(network)
 }
 
 pub async fn build_connnected_p2p_pair() -> eyre::Result<(Network, Network)> {
-    let mut peer1 = build_p2p_instance()?;
-    let mut peer2 = build_p2p_instance()?;
+    let mut peer1 = build_p2p_instance(None).await?;
+    let mut peer2 = build_p2p_instance(Some(peer1.local_enr())).await?;
 
     // let the two nodes set up listeners
     let peer1_fut = async {
@@ -97,13 +93,9 @@ pub async fn build_connnected_p2p_pair() -> eyre::Result<(Network, Network)> {
 
     // wait for either both nodes to listen or a timeout
     tokio::select! {
-        _  = tokio::time::sleep(Duration::from_millis(500)) => {}
+        _ = tokio::time::sleep(Duration::from_millis(500)) => {}
         _ = joined => {}
     }
-
-    let peer2_enr = peer2.local_enr();
-    println!("peer1 dial peer2");
-    peer1.dial(peer2_enr)?;
 
     Ok((peer1, peer2))
 }
