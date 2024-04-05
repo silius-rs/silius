@@ -189,9 +189,9 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 uo,
                 &self.mempool,
                 &self.reputation,
-                UserOperationValidatorMode::Sanity
-                    | UserOperationValidatorMode::Simulation
-                    | UserOperationValidatorMode::SimulationTrace,
+                UserOperationValidatorMode::Sanity |
+                    UserOperationValidatorMode::Simulation |
+                    UserOperationValidatorMode::SimulationTrace,
             )
             .await
     }
@@ -350,8 +350,8 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                     &uo,
                     &self.mempool,
                     &self.reputation,
-                    UserOperationValidatorMode::Simulation
-                        | UserOperationValidatorMode::SimulationTrace,
+                    UserOperationValidatorMode::Simulation |
+                        UserOperationValidatorMode::SimulationTrace,
                 )
                 .await;
             debug!("Second validation for userop {:?} result: {:?}", uo.hash, val_out);

@@ -164,6 +164,10 @@ pub async fn estimate_user_op_gas<M: Middleware>(
     let mut r: u64 = u64::MAX;
     let mut f: u64 = 0;
 
+    let mut veri_err = EntryPointError::Other {
+        inner: "Could not find a valid verification gas limit".to_string(),
+    };
+
     while r - l >= FALL_BACK_BINARY_SEARCH_CUT_OFF {
         let m = (l + r) / 2;
         user_op.verification_gas_limit = m.into();
@@ -175,6 +179,7 @@ pub async fn estimate_user_op_gas<M: Middleware>(
                 continue;
             }
             Err(e) => {
+                veri_err = e.clone();
                 if is_prefund_not_paid(&e) {
                     r = m - 1;
                     continue;
@@ -188,9 +193,7 @@ pub async fn estimate_user_op_gas<M: Middleware>(
         }
     }
     if f == 0 {
-        return Err(EntryPointError::Other {
-            inner: "Could not find a valid verification gas limit".to_string(),
-        });
+        return Err(veri_err);
     }
     let out: TraceOutput;
     let mut res: Result<(U256, U256), EntryPointError> = Ok((0u64.into(), 0u64.into()));

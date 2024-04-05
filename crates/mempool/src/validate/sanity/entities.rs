@@ -1,6 +1,6 @@
 use crate::{
-    mempool::{Mempool},
-    reputation::{Reputation},
+    mempool::Mempool,
+    reputation::Reputation,
     validate::{SanityCheck, SanityHelper},
     ReputationError, SanityError,
 };

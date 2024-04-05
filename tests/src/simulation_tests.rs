@@ -18,23 +18,19 @@ use ethers::{
     types::{transaction::eip2718::TypedTransaction, Address, Bytes, U256},
     utils::{parse_units, GethInstance},
 };
-
 use silius_contracts::EntryPoint;
 use silius_mempool::{
     validate::{
         validator::{new_canonical, StandardValidator},
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
-    }, InvalidMempoolUserOperationError,
-    Mempool, Reputation, SimulationError,
+    },
+    InvalidMempoolUserOperationError, Mempool, Reputation, SimulationError,
 };
 use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
     UserOperation, UserOperationSigned,
 };
-use std::{
-    ops::Deref,
-    sync::Arc,
-};
+use std::{ops::Deref, sync::Arc};
 
 struct TestContext<M>
 where

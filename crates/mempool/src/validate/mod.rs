@@ -1,7 +1,6 @@
 //! User operation validator module provides all the necessary traits and types for validations.
 use crate::{
-    mempool::{Mempool},
-    InvalidMempoolUserOperationError, Reputation, SanityError, SimulationError,
+    mempool::Mempool, InvalidMempoolUserOperationError, Reputation, SanityError, SimulationError,
 };
 use alloy_chains::Chain;
 use enumset::{EnumSet, EnumSetType};
