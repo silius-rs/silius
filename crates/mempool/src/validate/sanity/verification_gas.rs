@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{SanityCheck, SanityHelper},
     Overhead, Reputation, SanityError,
 };
@@ -25,21 +24,13 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
     /// # Returns
     /// Nothing if the sanity check is successful, otherwise a [SanityError](SanityError)
     /// is returned.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         _helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         if uo.verification_gas_limit > self.max_verification_gas {
             return Err(SanityError::VerificationGasLimitTooHigh {
                 verification_gas_limit: uo.verification_gas_limit,

@@ -16,8 +16,7 @@ use super::{
     UserOperationValidatorMode,
 };
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     InvalidMempoolUserOperationError, Reputation, SanityError, SimulationError,
 };
 use alloy_chains::Chain;
@@ -236,21 +235,13 @@ where
     /// A [UserOperationValidationOutcome](UserOperationValidationOutcome) if the validation was
     /// successful, otherwise a
     /// [InvalidMempoolUserOperationError](InvalidMempoolUserOperationError).
-    async fn validate_user_operation<T, Y, X, Z, H, R>(
+    async fn validate_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        mempool: &Mempool,
+        reputation: &Reputation,
         mode: EnumSet<UserOperationValidatorMode>,
-    ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError> {
         let mut out: UserOperationValidationOutcome = Default::default();
 
         if mode.contains(UserOperationValidatorMode::Sanity) {

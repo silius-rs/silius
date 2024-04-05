@@ -162,10 +162,10 @@ mod tests {
     #[tokio::test]
     async fn memory_mempool() {
         let mempool = Mempool::new(
-            HashMap::<UserOperationHash, UserOperationSigned>::default(),
-            HashMap::<Address, HashSet<UserOperationHash>>::default(),
-            HashMap::<Address, HashSet<UserOperationHash>>::default(),
-            HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
+            Box::new(HashMap::<UserOperationHash, UserOperationSigned>::default()),
+            Box::new(HashMap::<Address, HashSet<UserOperationHash>>::default()),
+            Box::new(HashMap::<Address, HashSet<UserOperationHash>>::default()),
+            Box::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default()),
         );
         mempool_test_case(mempool);
     }

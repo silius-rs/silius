@@ -1,6 +1,4 @@
 use crate::{
-    mempool::{UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Mempool, Reputation, SimulationError,
 };
@@ -25,21 +23,13 @@ impl<M: Middleware> SimulationTraceCheck<M> for Opcodes {
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         _uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SimulationError> {
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             let level = SELECTORS_INDICES.get(call_info.top_level_method_sig.as_ref()).cloned();
 

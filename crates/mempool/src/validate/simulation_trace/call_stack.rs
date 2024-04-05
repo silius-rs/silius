@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
     Reputation, SimulationError,
 };
@@ -102,21 +101,13 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        reputation: &Reputation,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SimulationError> {
         if helper.stake_info.is_none() {
             helper.stake_info = Some(extract_stake_info(uo, helper.simulate_validation_result));
         }

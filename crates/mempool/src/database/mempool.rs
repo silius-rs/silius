@@ -270,7 +270,12 @@ mod tests {
             DatabaseTable::new(env.clone());
         let uo_ops_codehashes: DatabaseTable<WriteMap, CodeHashes> =
             DatabaseTable::new(env.clone());
-        let mempool = Mempool::new(uo_ops, uo_ops_sender, uo_ops_entity, uo_ops_codehashes);
+        let mempool = Mempool::new(
+            Box::new(uo_ops),
+            Box::new(uo_ops_sender),
+            Box::new(uo_ops_entity),
+            Box::new(uo_ops_codehashes),
+        );
 
         mempool_test_case(mempool);
     }

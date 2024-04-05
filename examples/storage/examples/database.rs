@@ -41,10 +41,10 @@ async fn main() -> eyre::Result<()> {
         let chain = Chain::dev();
         let entry_point = EntryPoint::new(provider.clone(), ep);
         let mempool = Mempool::new(
-            DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
-            DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
-            DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
-            DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
+            Box::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
+            Box::new(DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone())),
+            Box::new(DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone())),
+            Box::new(DatabaseTable::<WriteMap, CodeHashes>::new(env.clone())),
         );
         let reputation = Reputation::new(
             MIN_INCLUSION_RATE_DENOMINATOR,
@@ -54,7 +54,7 @@ async fn main() -> eyre::Result<()> {
             MIN_UNSTAKE_DELAY.into(),
             Arc::new(RwLock::new(HashSet::<Address>::default())),
             Arc::new(RwLock::new(HashSet::<Address>::default())),
-            Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+            Box::new(Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default()))),
         );
         let builder = UoPoolBuilder::new(
             provider.clone(),

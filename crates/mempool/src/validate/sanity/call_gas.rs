@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{SanityCheck, SanityHelper},
     Reputation, SanityError,
 };
@@ -20,21 +19,13 @@ impl<M: Middleware> SanityCheck<M> for CallGas {
     ///
     /// # Returns
     /// None if the sanity check passes, otherwise [SanityError].
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         _helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         // call gas limit is at least the cost of a CALL with non-zero value
         // https://github.com/wolflo/evm-opcodes/blob/main/gas.md#aa-1-call
         // gas_cost = 100 + 9000
