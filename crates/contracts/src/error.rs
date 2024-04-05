@@ -9,7 +9,7 @@ use std::str::FromStr;
 use thiserror::Error;
 
 /// Entry point errors
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum EntryPointError {
     /// Failed user operation error
     #[error("{0}")]

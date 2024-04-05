@@ -16,7 +16,7 @@ use futures::{channel::mpsc::unbounded, StreamExt};
 use parking_lot::RwLock;
 use silius_mempool::{
     mempool_id, validate::validator::StandardUserOperationValidator, Mempool, MempoolErrorKind,
-    MempoolId, Reputation,  SanityCheck, SimulationCheck, SimulationTraceCheck,
+    MempoolId, Reputation, SanityCheck, SimulationCheck, SimulationTraceCheck,
     UoPool as UserOperationPool, UoPoolBuilder,
 };
 use silius_metrics::grpc::MetricsLayer;

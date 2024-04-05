@@ -67,7 +67,7 @@ async fn main() -> eyre::Result<()> {
             call_gas_limit: U256::from(1),
             verification_gas_limit: U256::from(1000000u64),
             pre_verification_gas: U256::from(1),
-            max_fee_per_gas: U256::from(1),
+            max_fee_per_gas: gas_price,
             max_priority_fee_per_gas: priority_fee,
             paymaster_and_data: Bytes::new(),
             signature: Bytes::default(),

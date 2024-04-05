@@ -1,5 +1,5 @@
 use crate::{
-    mempool::{Mempool},
+    mempool::Mempool,
     validate::{utils::extract_stake_info, SimulationTraceCheck, SimulationTraceHelper},
     Reputation, SimulationError,
 };

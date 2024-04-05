@@ -1,5 +1,5 @@
 use crate::{
-    mempool::{Mempool},
+    mempool::Mempool,
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
     Reputation, SanityError,
