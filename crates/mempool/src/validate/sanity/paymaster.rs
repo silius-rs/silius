@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{SanityCheck, SanityHelper},
     Reputation, SanityError,
 };
@@ -22,21 +21,13 @@ impl<M: Middleware> SanityCheck<M> for Paymaster {
     ///
     /// # Returns
     /// None if the sanity check is successful, otherwise a [SanityError] is returned.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         if !uo.paymaster_and_data.is_empty() {
             if let Some(addr) = get_address(&uo.paymaster_and_data) {
                 let code = helper

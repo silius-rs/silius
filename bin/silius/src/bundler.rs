@@ -230,38 +230,78 @@ where
         Address::from_str(entry_point::ADDRESS).expect("address should be valid"),
     );
 
-    match (args.uopool_mode, args.storage_type) {
-        (silius_primitives::UoPoolMode::Standard, StorageType::Memory) => {
+    let (mempool, reputation) = match args.storage_type {
+        StorageType::Database => {
+            let env = Arc::new(
+                init_env::<WriteMap>(datadir.join(DATABASE_FOLDER_NAME)).expect("Init mdbx failed"),
+            );
+            env.create_tables().expect("Create mdbx database tables failed");
+            let mempool = Mempool::new(
+                Box::new(MetricsHandler::new(DatabaseTable::<WriteMap, UserOperations>::new(
+                    env.clone(),
+                ))),
+                Box::new(DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone())),
+                Box::new(DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone())),
+                Box::new(DatabaseTable::<WriteMap, CodeHashes>::new(env.clone())),
+            );
+            let mut reputation = Reputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                args.min_stake,
+                MIN_UNSTAKE_DELAY.into(),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Box::new(MetricsHandler::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(
+                    env.clone(),
+                ))),
+            );
+            for whiteaddr in args.whitelist.iter() {
+                reputation.add_whitelist(whiteaddr);
+            }
+            (mempool, reputation)
+        }
+        StorageType::Memory => {
+            let mempool = Mempool::new(
+                Box::new(Arc::new(RwLock::new(MetricsHandler::new(HashMap::<
+                    UserOperationHash,
+                    UserOperationSigned,
+                >::default())))),
+                Box::new(Arc::new(RwLock::new(
+                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
+                ))),
+                Box::new(Arc::new(RwLock::new(
+                    HashMap::<Address, HashSet<UserOperationHash>>::default(),
+                ))),
+                Box::new(Arc::new(RwLock::new(
+                    HashMap::<UserOperationHash, Vec<CodeHash>>::default(),
+                ))),
+            );
+            let reputation = Reputation::new(
+                MIN_INCLUSION_RATE_DENOMINATOR,
+                THROTTLING_SLACK,
+                BAN_SLACK,
+                args.min_stake,
+                MIN_UNSTAKE_DELAY.into(),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Arc::new(RwLock::new(HashSet::<Address>::default())),
+                Box::new(Arc::new(RwLock::new(MetricsHandler::new(HashMap::<
+                    Address,
+                    ReputationEntry,
+                >::default())))),
+            );
+            (mempool, reputation)
+        }
+    };
+    match args.uopool_mode {
+        silius_primitives::UoPoolMode::Standard => {
             let validator = new_canonical(
                 entrypoint_api,
                 chain,
                 args.max_verification_gas,
                 args.min_priority_fee_per_gas,
             );
-            let mempool = Mempool::new(
-                Arc::new(RwLock::new(MetricsHandler::new(HashMap::<
-                    UserOperationHash,
-                    UserOperationSigned,
-                >::default()))),
-                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
-                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
-                Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
-            );
-            let mut reputation = Reputation::new(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
-                args.min_stake,
-                MIN_UNSTAKE_DELAY.into(),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(MetricsHandler::new(
-                    HashMap::<Address, ReputationEntry>::default(),
-                ))),
-            );
-            for whiteaddr in args.whitelist.iter() {
-                reputation.add_whitelist(whiteaddr);
-            }
+
             uopool_service_run(
                 SocketAddr::new(args.uopool_addr, args.uopool_port),
                 entry_points,
@@ -278,133 +318,13 @@ where
             .await?;
             info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
         }
-        (silius_primitives::UoPoolMode::Standard, StorageType::Database) => {
-            let validator = new_canonical(
-                entrypoint_api,
-                chain,
-                args.max_verification_gas,
-                args.min_priority_fee_per_gas,
-            );
-            let env = Arc::new(
-                init_env::<WriteMap>(datadir.join(DATABASE_FOLDER_NAME)).expect("Init mdbx failed"),
-            );
-            env.create_tables().expect("Create mdbx database tables failed");
-            let mempool = Mempool::new(
-                MetricsHandler::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
-                DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
-                DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
-                DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
-            );
-            let mut reputation = Reputation::new(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
-                args.min_stake,
-                MIN_UNSTAKE_DELAY.into(),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                MetricsHandler::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(
-                    env.clone(),
-                )),
-            );
-            for whiteaddr in args.whitelist.iter() {
-                reputation.add_whitelist(whiteaddr);
-            }
-            uopool_service_run(
-                SocketAddr::new(args.uopool_addr, args.uopool_port),
-                entry_points,
-                eth_client,
-                block_streams,
-                chain,
-                args.max_verification_gas,
-                mempool,
-                reputation,
-                validator,
-                p2p_config,
-                metrics_args.enable_metrics,
-            )
-            .await?;
-            info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
-        }
-        (silius_primitives::UoPoolMode::Unsafe, StorageType::Memory) => {
+        silius_primitives::UoPoolMode::Unsafe => {
             let validator = new_canonical_unsafe(
                 entrypoint_api,
                 chain,
                 args.max_verification_gas,
                 args.min_priority_fee_per_gas,
             );
-            let mempool = Mempool::new(
-                Arc::new(RwLock::new(MetricsHandler::new(HashMap::<
-                    UserOperationHash,
-                    UserOperationSigned,
-                >::default()))),
-                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
-                Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
-                Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
-            );
-            let mut reputation = Reputation::new(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
-                args.min_stake,
-                MIN_UNSTAKE_DELAY.into(),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(MetricsHandler::new(
-                    HashMap::<Address, ReputationEntry>::default(),
-                ))),
-            );
-            for whiteaddr in args.whitelist.iter() {
-                reputation.add_whitelist(whiteaddr);
-            }
-            uopool_service_run(
-                SocketAddr::new(args.uopool_addr, args.uopool_port),
-                entry_points,
-                eth_client,
-                block_streams,
-                chain,
-                args.max_verification_gas,
-                mempool,
-                reputation,
-                validator,
-                p2p_config,
-                metrics_args.enable_metrics,
-            )
-            .await?;
-            info!("Started uopool gRPC service at {:?}:{:?}", args.uopool_addr, args.uopool_port);
-        }
-        (silius_primitives::UoPoolMode::Unsafe, StorageType::Database) => {
-            let validator = new_canonical_unsafe(
-                entrypoint_api,
-                chain,
-                args.max_verification_gas,
-                args.min_priority_fee_per_gas,
-            );
-            let env = Arc::new(
-                init_env::<WriteMap>(datadir.join(DATABASE_FOLDER_NAME)).expect("Init mdbx failed"),
-            );
-            env.create_tables().expect("Create mdbx database tables failed");
-            let mempool = Mempool::new(
-                MetricsHandler::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
-                DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
-                DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
-                DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
-            );
-            let mut reputation = Reputation::new(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
-                args.min_stake,
-                MIN_UNSTAKE_DELAY.into(),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Arc::new(RwLock::new(HashSet::<Address>::default())),
-                MetricsHandler::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(
-                    env.clone(),
-                )),
-            );
-            for whiteaddr in args.whitelist.iter() {
-                reputation.add_whitelist(whiteaddr);
-            }
             uopool_service_run(
                 SocketAddr::new(args.uopool_addr, args.uopool_port),
                 entry_points,

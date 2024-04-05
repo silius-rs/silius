@@ -1,11 +1,12 @@
 use crate::{mempool::ClearOp, ReputationError};
+use dyn_clone::DynClone;
 use ethers::types::{Address, Bytes, U256};
 use parking_lot::RwLock;
 use silius_primitives::{
     get_address,
     reputation::{ReputationEntry, ReputationStatus, StakeInfo, Status},
 };
-use std::{fmt::Debug, ops::Deref, sync::Arc};
+use std::{collections::HashSet, fmt::Debug, ops::Deref, sync::Arc};
 
 /// Trait representing operations on a HashSet.
 pub trait HashSetOp: Default + Sync + Send {
@@ -57,7 +58,7 @@ impl<T: HashSetOp> HashSetOp for Arc<RwLock<T>> {
     }
 }
 /// Trait representing operations on a reputation entry.
-pub trait ReputationEntryOp: ClearOp + Sync + Send {
+pub trait ReputationEntryOp: ClearOp + Sync + Send + Debug + DynClone {
     /// Retrieves the reputation entry associated with the given address.
     ///
     /// # Arguments
@@ -122,6 +123,7 @@ pub trait ReputationEntryOp: ClearOp + Sync + Send {
     /// Returns a vector containing all reputation entries.
     fn get_all(&self) -> Vec<ReputationEntry>;
 }
+dyn_clone::clone_trait_object!(ReputationEntryOp);
 
 impl<T: ReputationEntryOp> ReputationEntryOp for Arc<RwLock<T>> {
     fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationError> {
@@ -149,11 +151,7 @@ impl<T: ReputationEntryOp> ReputationEntryOp for Arc<RwLock<T>> {
 }
 
 #[derive(Debug)]
-pub struct Reputation<H, R>
-where
-    H: HashSetOp,
-    R: ReputationEntryOp,
-{
+pub struct Reputation {
     /// Minimum denominator for calculating the minimum expected inclusions
     min_inclusion_denominator: u64,
     /// Constant for calculating the throttling thrshold
@@ -165,18 +163,14 @@ where
     /// Minimum time requuired to unstake
     min_unstake_delay: U256,
     /// Whitelisted addresses
-    whitelist: H,
+    whitelist: Arc<RwLock<HashSet<Address>>>,
     /// Blacklisted addreses
-    blacklist: H,
+    blacklist: Arc<RwLock<HashSet<Address>>>,
     /// Entities' repuation registry
-    entities: R,
+    entities: Box<dyn ReputationEntryOp>,
 }
 
-impl<H, R> Clone for Reputation<H, R>
-where
-    H: HashSetOp + Clone,
-    R: ReputationEntryOp + Clone,
-{
+impl Clone for Reputation {
     fn clone(&self) -> Self {
         Self {
             min_inclusion_denominator: self.min_inclusion_denominator,
@@ -191,11 +185,7 @@ where
     }
 }
 
-impl<H, R> Reputation<H, R>
-where
-    H: HashSetOp,
-    R: ReputationEntryOp,
-{
+impl Reputation {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         min_inclusion_denominator: u64,
@@ -203,9 +193,9 @@ where
         ban_slack: u64,
         min_stake: U256,
         min_unstake_delay: U256,
-        whitelist: H,
-        blacklist: H,
-        entities: R,
+        whitelist: Arc<RwLock<HashSet<Address>>>,
+        blacklist: Arc<RwLock<HashSet<Address>>>,
+        entities: Box<dyn ReputationEntryOp>,
     ) -> Self {
         Self {
             min_inclusion_denominator,
@@ -512,27 +502,27 @@ where
     }
 }
 
-impl<H, R> Reputation<H, R>
-where
-    H: HashSetOp + Default,
-    R: ReputationEntryOp + Default,
-{
-    pub fn new_default(
-        min_inclusion_denominator: u64,
-        throttling_slack: u64,
-        ban_slack: u64,
-        min_stake: U256,
-        min_unstake_delay: U256,
-    ) -> Self {
-        Self {
-            min_inclusion_denominator,
-            throttling_slack,
-            ban_slack,
-            min_stake,
-            min_unstake_delay,
-            whitelist: H::default(),
-            blacklist: H::default(),
-            entities: R::default(),
-        }
-    }
-}
+// impl<H, R> Reputation<H, R>
+// where
+//     H: HashSetOp + Default,
+//     R: ReputationEntryOp + Default,
+// {
+//     pub fn new_default(
+//         min_inclusion_denominator: u64,
+//         throttling_slack: u64,
+//         ban_slack: u64,
+//         min_stake: U256,
+//         min_unstake_delay: U256,
+//     ) -> Self {
+//         Self {
+//             min_inclusion_denominator,
+//             throttling_slack,
+//             ban_slack,
+//             min_stake,
+//             min_unstake_delay,
+//             whitelist: H::default(),
+//             blacklist: H::default(),
+//             entities: R::default(),
+//         }
+//     }
+// }

@@ -149,11 +149,7 @@ fn div_ceil(numerator: U256, denominator: U256) -> U256 {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-        reputation::{HashSetOp, ReputationEntryOp},
-        Reputation,
-    };
+    use crate::{mempool::Mempool, Reputation};
     use ethers::types::{Address, Bytes, H256, U256};
     use silius_primitives::{
         reputation::{ReputationEntry, Status},
@@ -302,13 +298,7 @@ pub mod tests {
         assert_eq!(div_ceil(U256::from(10), U256::from(3)), 4.into());
     }
 
-    pub fn mempool_test_case<T, Y, X, Z>(mut mempool: Mempool<T, Y, X, Z>)
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-    {
+    pub fn mempool_test_case(mut mempool: Mempool) {
         let ep = Address::random();
         let chain_id = 5_u64;
         let senders = vec![Address::random(), Address::random(), Address::random()];
@@ -425,11 +415,7 @@ pub mod tests {
         assert_eq!(code_hashes, code_hashes_get);
     }
 
-    pub fn reputation_test_case<H, R>(mut reputation: Reputation<H, R>)
-    where
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    pub fn reputation_test_case(mut reputation: Reputation) {
         let mut addrs: Vec<Address> = vec![];
 
         for _ in 0..5 {

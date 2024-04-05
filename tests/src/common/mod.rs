@@ -7,7 +7,7 @@ use ethers::{
     prelude::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
     providers::{Http, Middleware, Provider},
     signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer},
-    types::{Address, TransactionRequest, H160, U256},
+    types::{Address, TransactionRequest, U256},
     utils::{Geth, GethInstance},
 };
 use parking_lot::RwLock;
@@ -154,23 +154,15 @@ pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Ht
 }
 
 #[allow(clippy::type_complexity)]
-pub fn setup_database_mempool_reputation() -> (
-    Mempool<
-        DatabaseTable<WriteMap, UserOperations>,
-        DatabaseTable<WriteMap, UserOperationsBySender>,
-        DatabaseTable<WriteMap, UserOperationsByEntity>,
-        DatabaseTable<WriteMap, silius_mempool::CodeHashes>,
-    >,
-    Reputation<HashSet<H160>, DatabaseTable<WriteMap, EntitiesReputation>>,
-) {
+pub fn setup_database_mempool_reputation() -> (Mempool, Reputation) {
     let dir = TempDir::new("test-silius-db").expect("create tmp");
     let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
     env.create_tables().expect("Create mdbx database tables failed");
     let mempool = Mempool::new(
-        DatabaseTable::<WriteMap, UserOperations>::new(env.clone()),
-        DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone()),
-        DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone()),
-        DatabaseTable::<WriteMap, CodeHashes>::new(env.clone()),
+        Box::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
+        Box::new(DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone())),
+        Box::new(DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone())),
+        Box::new(DatabaseTable::<WriteMap, CodeHashes>::new(env.clone())),
     );
     let reputation = Reputation::new(
         10,
@@ -178,31 +170,22 @@ pub fn setup_database_mempool_reputation() -> (
         10,
         1u64.into(),
         1u64.into(),
-        HashSet::<Address>::default(),
-        HashSet::<Address>::default(),
-        DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone()),
+        Arc::new(RwLock::new(HashSet::<Address>::default())),
+        Arc::new(RwLock::new(HashSet::<Address>::default())),
+        Box::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone())),
     );
     (mempool, reputation)
 }
 
 #[allow(clippy::type_complexity)]
-pub fn setup_memory_mempool_reputation() -> (
-    Mempool<
-        Arc<RwLock<HashMap<UserOperationHash, silius_primitives::UserOperationSigned>>>,
-        Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
-        Arc<RwLock<HashMap<H160, HashSet<UserOperationHash>>>>,
-        Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
-    >,
-    silius_mempool::Reputation<
-        Arc<RwLock<HashSet<H160>>>,
-        Arc<RwLock<HashMap<H160, ReputationEntry>>>,
-    >,
-) {
+pub fn setup_memory_mempool_reputation() -> (Mempool, Reputation) {
     let mempool = Mempool::new(
-        Arc::new(RwLock::new(HashMap::<UserOperationHash, UserOperationSigned>::default())),
-        Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
-        Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default())),
-        Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default())),
+        Box::new(Arc::new(RwLock::new(
+            HashMap::<UserOperationHash, UserOperationSigned>::default(),
+        ))),
+        Box::new(Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default()))),
+        Box::new(Arc::new(RwLock::new(HashMap::<Address, HashSet<UserOperationHash>>::default()))),
+        Box::new(Arc::new(RwLock::new(HashMap::<UserOperationHash, Vec<CodeHash>>::default()))),
     );
     let reputation = Reputation::new(
         10,
@@ -212,7 +195,7 @@ pub fn setup_memory_mempool_reputation() -> (
         1u64.into(),
         Arc::new(RwLock::new(HashSet::<Address>::default())),
         Arc::new(RwLock::new(HashSet::<Address>::default())),
-        Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default())),
+        Box::new(Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default()))),
     );
     (mempool, reputation)
 }

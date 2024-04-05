@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     utils::calculate_valid_gas,
     validate::{SanityCheck, SanityHelper},
     Reputation, SanityError,
@@ -24,21 +23,13 @@ impl<M: Middleware> SanityCheck<M> for Sender {
     /// # Returns
     /// Nothing if the sanity check is successful, otherwise a [SanityError](SanityError)
     /// is returned.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         let code = helper
             .entry_point
             .eth_client()

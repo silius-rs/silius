@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Reputation, SimulationError,
 };
@@ -21,21 +20,13 @@ impl<M: Middleware> SimulationTraceCheck<M> for Gas {
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         _uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SimulationError> {
         // [OP-020] - revert on "out of gas" is forbidden as it can "leak" the gas limit or the
         // current call stack depth
         for call_info in helper.js_trace.calls_from_entry_point.iter() {

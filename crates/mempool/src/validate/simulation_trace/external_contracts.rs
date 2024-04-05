@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Reputation, SimulationError,
 };
@@ -15,21 +14,13 @@ pub struct ExternalContracts;
 
 #[async_trait::async_trait]
 impl<M: Middleware> SimulationTraceCheck<M> for ExternalContracts {
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SimulationError> {
         for call_info in helper.js_trace.calls_from_entry_point.iter() {
             let level = SELECTORS_INDICES.get(call_info.top_level_method_sig.as_ref()).cloned();
 

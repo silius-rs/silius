@@ -1,6 +1,4 @@
 use crate::{
-    mempool::{UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
     validate::{
         validator::StandardUserOperationValidator, SanityCheck, SimulationCheck,
         SimulationTraceCheck,
@@ -19,17 +17,11 @@ use silius_primitives::{provider::BlockStream, UserOperation, UserOperationSigne
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
 
-type StandardUoPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> =
-    UoPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R>;
-pub struct UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+type StandardUoPool<M, SanCk, SimCk, SimTrCk> =
+    UoPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>;
+pub struct UoPoolBuilder<M, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
     SanCk: SanityCheck<M>,
     SimCk: SimulationCheck,
     SimTrCk: SimulationTraceCheck<M>,
@@ -38,23 +30,16 @@ where
     entrypoint_addr: Address,
     chain: Chain,
     max_verification_gas: U256,
-    mempool: Mempool<T, Y, X, Z>,
-    reputation: Reputation<H, R>,
+    mempool: Mempool,
+    reputation: Reputation,
     validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
     // It would be None if p2p is not enabled
     publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
-impl<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
-    UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+impl<M, SanCk, SimCk, SimTrCk> UoPoolBuilder<M, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    T: UserOperationAct + Clone + 'static,
-    Y: UserOperationAddrAct + Clone + 'static,
-    X: UserOperationAddrAct + Clone + 'static,
-    Z: UserOperationCodeHashAct + Clone + 'static,
-    H: HashSetOp + Clone + 'static,
-    R: ReputationEntryOp + Clone + 'static,
     SanCk: SanityCheck<M> + Clone + 'static,
     SimCk: SimulationCheck + Clone + 'static,
     SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
@@ -65,8 +50,8 @@ where
         entrypoint_addr: Address,
         chain: Chain,
         max_verification_gas: U256,
-        mempool: Mempool<T, Y, X, Z>,
-        reputation: Reputation<H, R>,
+        mempool: Mempool,
+        reputation: Reputation,
         validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
         publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
@@ -84,7 +69,7 @@ where
 
     async fn handle_block_update(
         hash: H256,
-        uopool: &mut StandardUoPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>,
+        uopool: &mut StandardUoPool<M, SanCk, SimCk, SimTrCk>,
     ) -> eyre::Result<()> {
         let txs =
             uopool.entry_point.eth_client().get_block_with_txs(hash).await?.map(|b| b.transactions);
@@ -141,10 +126,10 @@ where
         });
     }
 
-    pub fn uopool(&self) -> StandardUoPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> {
+    pub fn uopool(&self) -> StandardUoPool<M, SanCk, SimCk, SimTrCk> {
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
-        UoPool::<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>, T, Y, X, Z, H, R>::new(
+        UoPool::<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>::new(
             entry_point,
             self.validator.clone(),
             self.mempool.clone(),

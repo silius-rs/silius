@@ -1,8 +1,7 @@
 use crate::{
     estimate::estimate_user_op_gas,
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
+    mempool::Mempool,
     mempool_id,
-    reputation::{HashSetOp, ReputationEntryOp},
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
@@ -38,15 +37,7 @@ const PRE_VERIFICATION_SAFE_RESERVE: u64 = 1_000;
 /// validate, and serves data requests from the [RPC API](EthApiServer). Architecturally, the
 /// [UoPool](UoPool) is the backend service managed by the [UoPoolService](UoPoolService) and serves
 /// requests from the [RPC API](EthApiServer).
-pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator, T, Y, X, Z, H, R>
-where
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
-{
+pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     /// The unique ID of the mempool
     pub id: MempoolId,
     /// The [EntryPoint](EntryPoint) contract object
@@ -54,9 +45,9 @@ where
     /// The [UserOperationValidator](UserOperationValidator) object
     pub validator: V,
     /// The [MempoolBox](MempoolBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [Mempool](Mempool) object
-    pub mempool: Mempool<T, Y, X, Z>,
+    pub mempool: Mempool,
     /// The [ReputationBox](ReputationBox) is a [Boxed pointer](https://doc.rust-lang.org/std/boxed/struct.Box.html) to a [ReputationEntry](ReputationEntry) object
-    pub reputation: Reputation<H, R>,
+    pub reputation: Reputation,
     // The maximum gas limit for [UserOperation](UserOperation) gas verification.
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
@@ -65,16 +56,7 @@ where
     p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
 }
 
-impl<M: Middleware + 'static, V: UserOperationValidator, T, Y, X, Z, H, R>
-    UoPool<M, V, T, Y, X, Z, H, R>
-where
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
-{
+impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// Creates a new [UoPool](UoPool) object
     ///
     /// # Arguments
@@ -92,8 +74,8 @@ where
     pub fn new(
         entry_point: EntryPoint<M>,
         validator: V,
-        mempool: Mempool<T, Y, X, Z>,
-        reputation: Reputation<H, R>,
+        mempool: Mempool,
+        reputation: Reputation,
         max_verification_gas: U256,
         chain: Chain,
         p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
@@ -207,9 +189,9 @@ where
                 uo,
                 &self.mempool,
                 &self.reputation,
-                UserOperationValidatorMode::Sanity |
-                    UserOperationValidatorMode::Simulation |
-                    UserOperationValidatorMode::SimulationTrace,
+                UserOperationValidatorMode::Sanity
+                    | UserOperationValidatorMode::Simulation
+                    | UserOperationValidatorMode::SimulationTrace,
             )
             .await
     }
@@ -368,8 +350,8 @@ where
                     &uo,
                     &self.mempool,
                     &self.reputation,
-                    UserOperationValidatorMode::Simulation |
-                        UserOperationValidatorMode::SimulationTrace,
+                    UserOperationValidatorMode::Simulation
+                        | UserOperationValidatorMode::SimulationTrace,
                 )
                 .await;
             debug!("Second validation for userop {:?} result: {:?}", uo.hash, val_out);

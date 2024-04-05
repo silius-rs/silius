@@ -51,24 +51,31 @@ impl ReputationEntryOp for HashMap<Address, ReputationEntry> {
 mod tests {
     use crate::{utils::tests::reputation_test_case, Reputation};
     use ethers::types::{Address, U256};
+    use parking_lot::RwLock;
     use silius_primitives::{
         constants::validation::reputation::{
             BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
         },
         reputation::ReputationEntry,
     };
-    use std::collections::{HashMap, HashSet};
+    use std::{
+        collections::{HashMap, HashSet},
+        sync::Arc,
+    };
 
     #[tokio::test]
     async fn memory_reputation() {
-        let reputation =
-            Reputation::<HashSet<Address>, HashMap<Address, ReputationEntry>>::new_default(
-                MIN_INCLUSION_RATE_DENOMINATOR,
-                THROTTLING_SLACK,
-                BAN_SLACK,
-                U256::from(1),
-                U256::from(0),
-            );
+        let entry: Box<HashMap<Address, ReputationEntry>> = Box::new(HashMap::default());
+        let reputation = Reputation::new(
+            MIN_INCLUSION_RATE_DENOMINATOR,
+            THROTTLING_SLACK,
+            BAN_SLACK,
+            U256::from(1),
+            U256::from(0),
+            Arc::new(RwLock::new(HashSet::<Address>::default())),
+            Arc::new(RwLock::new(HashSet::<Address>::default())),
+            entry,
+        );
         reputation_test_case(reputation);
     }
 }

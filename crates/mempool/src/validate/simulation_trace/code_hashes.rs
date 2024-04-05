@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     utils::equal_code_hashes,
     validate::{SimulationTraceCheck, SimulationTraceHelper},
     Reputation, SimulationError,
@@ -72,21 +71,13 @@ impl<M: Middleware> SimulationTraceCheck<M> for CodeHashes {
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SimulationError] error.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &mut SimulationTraceHelper<M>,
-    ) -> Result<(), SimulationError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SimulationError> {
         // [COD-010] - between the first and the second validations, the EXTCODEHASH value of any
         // visited address, entity or referenced library, may not be changed
 

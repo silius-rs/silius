@@ -1,6 +1,6 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, Reputation, ReputationEntryOp},
+    mempool::{Mempool},
+    reputation::{Reputation},
     validate::{SanityCheck, SanityHelper},
     ReputationError, SanityError,
 };
@@ -19,16 +19,12 @@ pub struct Entities;
 
 impl Entities {
     /// Gets the status for entity.
-    fn get_status<M: Middleware, H, R>(
+    fn get_status<M: Middleware>(
         &self,
         addr: &Address,
         _helper: &SanityHelper<M>,
-        reputation: &Reputation<H, R>,
-    ) -> Result<Status, SanityError>
-    where
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+        reputation: &Reputation,
+    ) -> Result<Status, SanityError> {
         Ok(Status::from(reputation.get_status(addr)?))
     }
 
@@ -50,23 +46,15 @@ impl Entities {
 
     /// [SREP-030] - THROTTLED address is limited to THROTTLED_ENTITY_MEMPOOL_COUNT entries in the
     /// mempool
-    fn check_throttled<M: Middleware, T, Y, X, Z, H, R>(
+    fn check_throttled<M: Middleware>(
         &self,
         entity: &str,
         addr: &Address,
         status: &Status,
         _helper: &SanityHelper<M>,
-        mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+        mempool: &Mempool,
+        _reputation: &Reputation,
+    ) -> Result<(), SanityError> {
         if *status == Status::THROTTLED &&
             (mempool.get_number_by_sender(addr) + mempool.get_number_by_entity(addr)) >=
                 THROTTLED_ENTITY_MEMPOOL_COUNT
@@ -92,21 +80,13 @@ impl<M: Middleware> SanityCheck<M> for Entities {
     ///
     /// # Returns
     /// None if the sanity check is successful, otherwise a [SanityError] is returned.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        mempool: &Mempool,
+        reputation: &Reputation,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         let (sender, factory, paymaster) = uo.get_entities();
 
         // [SREP-040] - an OK staked entity is unlimited by the reputation rule

@@ -1,4 +1,5 @@
 use crate::MempoolErrorKind;
+use dyn_clone::DynClone;
 use ethers::{
     abi::AbiEncode,
     types::{Address, H256, U256},
@@ -307,8 +308,15 @@ pub trait ClearOp {
     fn clear(&mut self);
 }
 
-pub trait UserOperationAct: AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync {}
-impl<T> UserOperationAct for T where T: AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync {}
+pub trait UserOperationAct:
+    AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync + DynClone
+{
+}
+dyn_clone::clone_trait_object!(UserOperationAct);
+impl<T> UserOperationAct for T where
+    T: AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync + Clone
+{
+}
 
 impl<T: ClearOp> ClearOp for Arc<RwLock<T>> {
     fn clear(&mut self) {
@@ -317,59 +325,39 @@ impl<T: ClearOp> ClearOp for Arc<RwLock<T>> {
 }
 
 pub trait UserOperationAddrAct:
-    AddRemoveUserOpHash + UserOperationAddrOp + ClearOp + Send + Sync
+    AddRemoveUserOpHash + UserOperationAddrOp + ClearOp + Send + Sync + DynClone
 {
 }
+dyn_clone::clone_trait_object!(UserOperationAddrAct);
 impl<T> UserOperationAddrAct for T where
-    T: AddRemoveUserOpHash + UserOperationAddrOp + ClearOp + Send + Sync
+    T: AddRemoveUserOpHash + UserOperationAddrOp + ClearOp + Send + Sync + Clone
 {
 }
 
-pub trait UserOperationCodeHashAct: UserOperationCodeHashOp + ClearOp + Send + Sync {}
-impl<T> UserOperationCodeHashAct for T where T: UserOperationCodeHashOp + ClearOp + Send + Sync {}
-
-pub struct Mempool<T, Y, X, Z>
-where
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
+pub trait UserOperationCodeHashAct:
+    UserOperationCodeHashOp + ClearOp + Send + Sync + DynClone
 {
-    user_operations: T,
-    user_operations_by_sender: Y,
-    user_operations_by_entity: X,
-    user_operations_code_hashes: Z,
+}
+dyn_clone::clone_trait_object!(UserOperationCodeHashAct);
+impl<T> UserOperationCodeHashAct for T where
+    T: UserOperationCodeHashOp + ClearOp + Send + Sync + Clone
+{
 }
 
-impl<T, Y, X, Z> Clone for Mempool<T, Y, X, Z>
-where
-    T: UserOperationAct + Clone,
-    Y: UserOperationAddrAct + Clone,
-    X: UserOperationAddrAct + Clone,
-    Z: UserOperationCodeHashAct + Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            user_operations: self.user_operations.clone(),
-            user_operations_by_sender: self.user_operations_by_sender.clone(),
-            user_operations_by_entity: self.user_operations_by_entity.clone(),
-            user_operations_code_hashes: self.user_operations_code_hashes.clone(),
-        }
-    }
+#[derive(Clone)]
+pub struct Mempool {
+    user_operations: Box<dyn UserOperationAct>,
+    user_operations_by_sender: Box<dyn UserOperationAddrAct>,
+    user_operations_by_entity: Box<dyn UserOperationAddrAct>,
+    user_operations_code_hashes: Box<dyn UserOperationCodeHashAct>,
 }
 
-impl<T, Y, X, Z> Mempool<T, Y, X, Z>
-where
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-{
+impl Mempool {
     pub fn new(
-        user_operations: T,
-        user_operations_by_sender: Y,
-        user_operations_by_entity: X,
-        user_operations_code_hashes: Z,
+        user_operations: Box<dyn UserOperationAct>,
+        user_operations_by_sender: Box<dyn UserOperationAddrAct>,
+        user_operations_by_entity: Box<dyn UserOperationAddrAct>,
+        user_operations_code_hashes: Box<dyn UserOperationCodeHashAct>,
     ) -> Self {
         Self {
             user_operations,

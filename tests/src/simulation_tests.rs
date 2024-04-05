@@ -18,39 +18,27 @@ use ethers::{
     types::{transaction::eip2718::TypedTransaction, Address, Bytes, U256},
     utils::{parse_units, GethInstance},
 };
-use parking_lot::RwLock;
+
 use silius_contracts::EntryPoint;
 use silius_mempool::{
     validate::{
         validator::{new_canonical, StandardValidator},
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
-    },
-    CodeHashes, DatabaseTable, EntitiesReputation, HashSetOp, InvalidMempoolUserOperationError,
-    Mempool, Reputation, ReputationEntryOp, SimulationError, UserOperationAct,
-    UserOperationAddrAct, UserOperationCodeHashAct, UserOperations, UserOperationsByEntity,
-    UserOperationsBySender, WriteMap,
+    }, InvalidMempoolUserOperationError,
+    Mempool, Reputation, SimulationError,
 };
 use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
-    reputation::ReputationEntry,
-    simulation::CodeHash,
-    UserOperation, UserOperationHash, UserOperationSigned,
+    UserOperation, UserOperationSigned,
 };
 use std::{
-    collections::{HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
 
-struct TestContext<M, T, Y, X, Z, H, R>
+struct TestContext<M>
 where
     M: Middleware + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
 {
     pub client: Arc<M>,
     pub _geth: GethInstance,
@@ -61,29 +49,9 @@ where
     pub storage_factory: DeployedContract<TestStorageAccountFactory<M>>,
     pub storage_account: DeployedContract<TestRulesAccount<M>>,
     pub validator: StandardValidator<M>,
-    pub mempool: Mempool<T, Y, X, Z>,
-    pub reputation: Reputation<H, R>,
+    pub mempool: Mempool,
+    pub reputation: Reputation,
 }
-
-type DatabaseContext = TestContext<
-    ClientType,
-    DatabaseTable<WriteMap, UserOperations>,
-    DatabaseTable<WriteMap, UserOperationsBySender>,
-    DatabaseTable<WriteMap, UserOperationsByEntity>,
-    DatabaseTable<WriteMap, CodeHashes>,
-    HashSet<Address>,
-    DatabaseTable<WriteMap, EntitiesReputation>,
->;
-
-type MemoryContext = TestContext<
-    ClientType,
-    Arc<RwLock<HashMap<UserOperationHash, UserOperationSigned>>>,
-    Arc<RwLock<HashMap<Address, HashSet<UserOperationHash>>>>,
-    Arc<RwLock<HashMap<Address, HashSet<UserOperationHash>>>>,
-    Arc<RwLock<HashMap<UserOperationHash, Vec<CodeHash>>>>,
-    Arc<RwLock<HashSet<Address>>>,
-    Arc<RwLock<HashMap<Address, ReputationEntry>>>,
->;
 
 async fn setup_basic() -> eyre::Result<(
     Arc<ClientType>,
@@ -143,7 +111,7 @@ async fn setup_basic() -> eyre::Result<(
     ))
 }
 
-async fn setup_database() -> eyre::Result<DatabaseContext> {
+async fn setup_database() -> eyre::Result<TestContext<ClientType>> {
     let (client, ep, chain_id, _geth, paymaster, opcodes_factory, storage_factory, storage_account) =
         setup_basic().await?;
     let (mempool, reputation) = setup_database_mempool_reputation();
@@ -154,7 +122,7 @@ async fn setup_database() -> eyre::Result<DatabaseContext> {
     let validator =
         new_canonical(entry_point, c.clone(), U256::from(3000000_u64), U256::from(1u64));
 
-    Ok(DatabaseContext {
+    Ok(TestContext {
         client: client.clone(),
         _geth,
         chain_id,
@@ -169,7 +137,7 @@ async fn setup_database() -> eyre::Result<DatabaseContext> {
     })
 }
 
-async fn setup_memory() -> eyre::Result<MemoryContext> {
+async fn setup_memory() -> eyre::Result<TestContext<ClientType>> {
     let (client, ep, chain_id, _geth, paymaster, opcodes_factory, storage_factory, storage_account) =
         setup_basic().await?;
     let (mempool, reputation) = setup_memory_mempool_reputation();
@@ -178,7 +146,7 @@ async fn setup_memory() -> eyre::Result<MemoryContext> {
 
     let validator =
         new_canonical(entry_point, c.clone(), U256::from(3000000_u64), U256::from(1u64));
-    Ok(MemoryContext {
+    Ok(TestContext {
         client: client.clone(),
         _geth,
         chain_id,
@@ -223,8 +191,8 @@ async fn create_opcode_factory_init_code(init_func: String) -> eyre::Result<(Byt
     Ok((init_code.into(), init_func.into()))
 }
 
-async fn create_test_user_operation<M, T, Y, X, Z, H, R>(
-    context: &TestContext<M, T, Y, X, Z, H, R>,
+async fn create_test_user_operation<M>(
+    context: &TestContext<M>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
@@ -233,12 +201,6 @@ async fn create_test_user_operation<M, T, Y, X, Z, H, R>(
 ) -> eyre::Result<UserOperationSigned>
 where
     M: Middleware + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
 {
     let paymaster_and_data = if let Some(rule) = pm_rule {
         let mut data = vec![];
@@ -280,19 +242,13 @@ where
     })
 }
 
-fn existing_storage_account_user_operation<M, T, Y, X, Z, H, R>(
-    context: &TestContext<M, T, Y, X, Z, H, R>,
+fn existing_storage_account_user_operation<M>(
+    context: &TestContext<M>,
     validate_rule: String,
     pm_rule: String,
 ) -> UserOperationSigned
 where
     M: Middleware + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
 {
     let mut paymaster_and_data = vec![];
     paymaster_and_data.extend_from_slice(context.paymaster.address.as_bytes());
@@ -314,18 +270,12 @@ where
     }
 }
 
-async fn validate<M, T, Y, X, Z, H, R>(
-    context: &TestContext<M, T, Y, X, Z, H, R>,
+async fn validate<M>(
+    context: &TestContext<M>,
     uo: UserOperationSigned,
 ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
 where
     M: Middleware + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
 {
     context
         .validator
@@ -341,8 +291,8 @@ where
         .await
 }
 
-async fn test_user_operation<M, T, Y, X, Z, H, R>(
-    context: &TestContext<M, T, Y, X, Z, H, R>,
+async fn test_user_operation<M>(
+    context: &TestContext<M>,
     validate_rule: String,
     pm_rule: Option<String>,
     init_code: Bytes,
@@ -351,12 +301,6 @@ async fn test_user_operation<M, T, Y, X, Z, H, R>(
 ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>
 where
     M: Middleware + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
 {
     let uo = create_test_user_operation(
         &context,

@@ -1,6 +1,5 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, ReputationEntryOp},
+    mempool::{Mempool},
     validate::{SanityCheck, SanityHelper},
     Reputation, SanityError,
 };
@@ -25,21 +24,13 @@ impl<M: Middleware> SanityCheck<M> for MaxFee {
     ///
     /// # Returns
     /// None if the check passes, otherwise a [SanityError]
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        _mempool: &Mempool<T, Y, X, Z>,
-        _reputation: &Reputation<H, R>,
+        _mempool: &Mempool,
+        _reputation: &Reputation,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         if uo.max_priority_fee_per_gas > uo.max_fee_per_gas {
             return Err(SanityError::MaxPriorityFeePerGasTooHigh {
                 max_priority_fee_per_gas: uo.max_priority_fee_per_gas,

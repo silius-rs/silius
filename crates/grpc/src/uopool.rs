@@ -15,10 +15,9 @@ use eyre::Result;
 use futures::{channel::mpsc::unbounded, StreamExt};
 use parking_lot::RwLock;
 use silius_mempool::{
-    mempool_id, validate::validator::StandardUserOperationValidator, HashSetOp, Mempool,
-    MempoolErrorKind, MempoolId, Reputation, ReputationEntryOp, SanityCheck, SimulationCheck,
-    SimulationTraceCheck, UoPool as UserOperationPool, UoPoolBuilder, UserOperationAct,
-    UserOperationAddrAct, UserOperationCodeHashAct,
+    mempool_id, validate::validator::StandardUserOperationValidator, Mempool, MempoolErrorKind,
+    MempoolId, Reputation,  SanityCheck, SimulationCheck, SimulationTraceCheck,
+    UoPool as UserOperationPool, UoPoolBuilder,
 };
 use silius_metrics::grpc::MetricsLayer;
 use silius_p2p::{
@@ -30,55 +29,31 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{debug, error, info};
 
-type StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> = UserOperationPool<
-    M,
-    StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
-    T,
-    Y,
-    X,
-    Z,
-    H,
-    R,
->;
+type StandardUserPool<M, SanCk, SimCk, SimTrCk> =
+    UserOperationPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>;
 
-type UoPoolMaps<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> =
-    Arc<RwLock<HashMap<MempoolId, UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>>>>;
+type UoPoolMaps<M, SanCk, SimCk, SimTrCk> =
+    Arc<RwLock<HashMap<MempoolId, UoPoolBuilder<M, SanCk, SimCk, SimTrCk>>>>;
 
-pub struct UoPoolService<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+pub struct UoPoolService<M, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    T: UserOperationAct,
-    Y: UserOperationAddrAct,
-    X: UserOperationAddrAct,
-    Z: UserOperationCodeHashAct,
-    H: HashSetOp,
-    R: ReputationEntryOp,
     SanCk: SanityCheck<M>,
     SimCk: SimulationCheck,
     SimTrCk: SimulationTraceCheck<M>,
 {
-    pub uopools: UoPoolMaps<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>,
+    pub uopools: UoPoolMaps<M, SanCk, SimCk, SimTrCk>,
     pub chain: Chain,
 }
 
-impl<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
-    UoPoolService<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+impl<M, SanCk, SimCk, SimTrCk> UoPoolService<M, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    T: UserOperationAct + Clone + 'static,
-    Y: UserOperationAddrAct + Clone + 'static,
-    X: UserOperationAddrAct + Clone + 'static,
-    Z: UserOperationCodeHashAct + Clone + 'static,
-    H: HashSetOp + Clone + 'static,
-    R: ReputationEntryOp + Clone + 'static,
     SanCk: SanityCheck<M> + Clone + 'static,
     SimCk: SimulationCheck + Clone + 'static,
     SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
 {
-    pub fn new(
-        uopools: UoPoolMaps<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>,
-        chain: Chain,
-    ) -> Self {
+    pub fn new(uopools: UoPoolMaps<M, SanCk, SimCk, SimTrCk>, chain: Chain) -> Self {
         Self { uopools, chain }
     }
 
@@ -86,7 +61,7 @@ where
     fn get_uopool(
         &self,
         ep: &Address,
-    ) -> tonic::Result<StandardUserPool<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>> {
+    ) -> tonic::Result<StandardUserPool<M, SanCk, SimCk, SimTrCk>> {
         let m_id = mempool_id(ep, self.chain.id());
         self.uopools
             .read()
@@ -97,16 +72,9 @@ where
 }
 
 #[async_trait]
-impl<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk> uo_pool_server::UoPool
-    for UoPoolService<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>
+impl<M, SanCk, SimCk, SimTrCk> uo_pool_server::UoPool for UoPoolService<M, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
-    T: UserOperationAct + Clone + 'static,
-    Y: UserOperationAddrAct + Clone + 'static,
-    X: UserOperationAddrAct + Clone + 'static,
-    Z: UserOperationCodeHashAct + Clone + 'static,
-    H: HashSetOp + Clone + 'static,
-    R: ReputationEntryOp + Clone + 'static,
     SanCk: SanityCheck<M> + Clone + 'static,
     SimCk: SimulationCheck + Clone + 'static,
     SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
@@ -404,27 +372,21 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn uopool_service_run<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>(
+pub async fn uopool_service_run<M, SanCk, SimCk, SimTrCk>(
     addr: SocketAddr,
     eps: Vec<Address>,
     eth_client: Arc<M>,
     block_streams: Vec<BlockStream>,
     chain: Chain,
     max_verification_gas: U256,
-    mempool: Mempool<T, Y, X, Z>,
-    reputation: Reputation<H, R>,
+    mempool: Mempool,
+    reputation: Reputation,
     validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
     p2p_config: Option<Config>,
     enable_metrics: bool,
 ) -> Result<()>
 where
     M: Middleware + Clone + 'static,
-    T: UserOperationAct + Clone + 'static,
-    Y: UserOperationAddrAct + Clone + 'static,
-    X: UserOperationAddrAct + Clone + 'static,
-    Z: UserOperationCodeHashAct + Clone + 'static,
-    H: HashSetOp + Clone + 'static,
-    R: ReputationEntryOp + Clone + 'static,
     SanCk: SanityCheck<M> + Clone + 'static,
     SimCk: SimulationCheck + Clone + 'static,
     SimTrCk: SimulationTraceCheck<M> + Clone + 'static,
@@ -432,8 +394,7 @@ where
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();
 
-        let mut m_map =
-            HashMap::<MempoolId, UoPoolBuilder<M, T, Y, X, Z, H, R, SanCk, SimCk, SimTrCk>>::new();
+        let mut m_map = HashMap::<MempoolId, UoPoolBuilder<M, SanCk, SimCk, SimTrCk>>::new();
 
         // setup p2p
         if let Some(config) = p2p_config {
@@ -514,18 +475,9 @@ where
         };
 
         let uopool_map = Arc::new(RwLock::new(m_map));
-        let svc = uo_pool_server::UoPoolServer::new(UoPoolService::<
-            M,
-            T,
-            Y,
-            X,
-            Z,
-            H,
-            R,
-            SanCk,
-            SimCk,
-            SimTrCk,
-        >::new(uopool_map, chain));
+        let svc = uo_pool_server::UoPoolServer::new(
+            UoPoolService::<M, SanCk, SimCk, SimTrCk>::new(uopool_map, chain),
+        );
 
         if enable_metrics {
             builder.layer(MetricsLayer).add_service(svc).serve(addr).await

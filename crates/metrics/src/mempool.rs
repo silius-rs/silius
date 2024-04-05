@@ -12,18 +12,18 @@ const REPUTATION_UO_INCLUDED: &str = "silius_reputation_uo_included";
 const REPUTATION_STATUS: &str = "silius_reputation_status";
 const REPUTATION_SET_ENTRY_ERROR: &str = "silius_reputation_set_entry.error";
 
-#[derive(Clone)]
-pub struct MetricsHandler<S> {
+#[derive(Clone, Debug)]
+pub struct MetricsHandler<S: Clone> {
     inner: S,
 }
 
-impl<S> MetricsHandler<S> {
+impl<S: Clone> MetricsHandler<S> {
     pub fn new(inner: S) -> Self {
         Self { inner }
     }
 }
 
-impl<S: AddRemoveUserOp> AddRemoveUserOp for MetricsHandler<S> {
+impl<S: AddRemoveUserOp + Clone> AddRemoveUserOp for MetricsHandler<S> {
     fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
         match self.inner.add(uo) {
             Ok(res) => {
@@ -54,7 +54,7 @@ impl<S: AddRemoveUserOp> AddRemoveUserOp for MetricsHandler<S> {
     }
 }
 
-impl<S: UserOperationOp> UserOperationOp for MetricsHandler<S> {
+impl<S: UserOperationOp + Clone> UserOperationOp for MetricsHandler<S> {
     fn get_by_uo_hash(
         &self,
         uo_hash: &silius_primitives::UserOperationHash,
@@ -71,13 +71,13 @@ impl<S: UserOperationOp> UserOperationOp for MetricsHandler<S> {
     }
 }
 
-impl<S: ClearOp> ClearOp for MetricsHandler<S> {
+impl<S: ClearOp + Clone> ClearOp for MetricsHandler<S> {
     fn clear(&mut self) {
         self.inner.clear()
     }
 }
 
-impl<S: ReputationEntryOp> ReputationEntryOp for MetricsHandler<S> {
+impl<S: ReputationEntryOp + Clone> ReputationEntryOp for MetricsHandler<S> {
     fn get_entry(
         &self,
         addr: &ethers::types::Address,

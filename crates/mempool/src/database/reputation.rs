@@ -66,6 +66,7 @@ mod tests {
         Reputation,
     };
     use ethers::types::{Address, U256};
+    use parking_lot::RwLock;
     use reth_libmdbx::WriteMap;
     use silius_primitives::constants::validation::reputation::{
         BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
@@ -80,15 +81,16 @@ mod tests {
         let env = init_env::<WriteMap>(dir.into_path()).unwrap();
         env.create_tables().expect("Create mdbx database tables failed");
         let env = Arc::new(env);
-        let entry: DatabaseTable<WriteMap, EntitiesReputation> = DatabaseTable::new(env.clone());
+        let entry: Box<DatabaseTable<WriteMap, EntitiesReputation>> =
+            Box::new(DatabaseTable::new(env.clone()));
         let reputation = Reputation::new(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,
             BAN_SLACK,
             U256::from(1),
             U256::from(0),
-            HashSet::<Address>::default(),
-            HashSet::<Address>::default(),
+            Arc::new(RwLock::new(HashSet::<Address>::default())),
+            Arc::new(RwLock::new(HashSet::<Address>::default())),
             entry,
         );
         reputation_test_case(reputation);

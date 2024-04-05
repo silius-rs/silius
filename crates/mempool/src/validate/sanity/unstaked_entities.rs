@@ -1,6 +1,6 @@
 use crate::{
-    mempool::{Mempool, UserOperationAct, UserOperationAddrAct, UserOperationCodeHashAct},
-    reputation::{HashSetOp, Reputation, ReputationEntryOp},
+    mempool::{Mempool},
+    reputation::{Reputation},
     validate::{SanityCheck, SanityHelper},
     ReputationError, SanityError,
 };
@@ -40,16 +40,12 @@ impl UnstakedEntities {
     }
 
     /// Gets the reputation entry for entity.
-    fn get_entity<M: Middleware, H, R>(
+    fn get_entity<M: Middleware>(
         &self,
         addr: &Address,
         _helper: &SanityHelper<M>,
-        reputation: &Reputation<H, R>,
-    ) -> Result<ReputationEntry, SanityError>
-    where
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+        reputation: &Reputation,
+    ) -> Result<ReputationEntry, SanityError> {
         reputation.get(addr).map_err(|e| e.into())
     }
 
@@ -78,21 +74,13 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
     ///
     /// # Returns
     /// None if the sanity check is successful, otherwise a [SanityError] is returned.
-    async fn check_user_operation<T, Y, X, Z, H, R>(
+    async fn check_user_operation(
         &self,
         uo: &UserOperation,
-        mempool: &Mempool<T, Y, X, Z>,
-        reputation: &Reputation<H, R>,
+        mempool: &Mempool,
+        reputation: &Reputation,
         helper: &SanityHelper<M>,
-    ) -> Result<(), SanityError>
-    where
-        T: UserOperationAct,
-        Y: UserOperationAddrAct,
-        X: UserOperationAddrAct,
-        Z: UserOperationCodeHashAct,
-        H: HashSetOp,
-        R: ReputationEntryOp,
-    {
+    ) -> Result<(), SanityError> {
         let (sender, factory, paymaster) = uo.get_entities();
 
         // [SREP-010] - the "canonical mempool" defines a staked entity if it has MIN_STAKE_VALUE
