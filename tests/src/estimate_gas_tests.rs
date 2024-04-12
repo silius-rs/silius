@@ -12,7 +12,7 @@ use ethers::{
 };
 use silius_contracts::EntryPoint;
 use silius_mempool::{validate::validator::new_canonical, UoPool};
-use silius_primitives::{UserOperationSigned, Wallet as UoWallet};
+use silius_primitives::{UoPoolMode, UserOperationSigned, Wallet as UoWallet};
 use std::sync::Arc;
 
 async fn setup_basic() -> eyre::Result<(
@@ -42,6 +42,7 @@ async fn estimate_with_zero() -> eyre::Result<()> {
     let min_priority_fee_per_gas = 0.into();
     let validator = new_canonical(entry, chain, max_verification_gas, min_priority_fee_per_gas);
     let mut uopool = UoPool::new(
+        UoPoolMode::Standard,
         entry_for_uopool,
         validator,
         mempool,

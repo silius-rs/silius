@@ -13,7 +13,7 @@ use ethers::{
 use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
-use silius_primitives::{provider::BlockStream, UserOperation, UserOperationSigned};
+use silius_primitives::{provider::BlockStream, UoPoolMode, UserOperation, UserOperationSigned};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
 
@@ -26,6 +26,7 @@ where
     SimCk: SimulationCheck,
     SimTrCk: SimulationTraceCheck<M>,
 {
+    mode: UoPoolMode,
     eth_client: Arc<M>,
     entrypoint_addr: Address,
     chain: Chain,
@@ -46,6 +47,7 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        mode: UoPoolMode,
         eth_client: Arc<M>,
         entrypoint_addr: Address,
         chain: Chain,
@@ -56,6 +58,7 @@ where
         publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
     ) -> Self {
         Self {
+            mode,
             eth_client,
             entrypoint_addr,
             chain,
@@ -130,6 +133,7 @@ where
         let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
 
         UoPool::<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>::new(
+            self.mode,
             entry_point,
             self.validator.clone(),
             self.mempool.clone(),
