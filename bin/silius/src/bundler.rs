@@ -304,6 +304,7 @@ where
 
             uopool_service_run(
                 SocketAddr::new(args.uopool_addr, args.uopool_port),
+                args.uopool_mode,
                 entry_points,
                 eth_client,
                 block_streams,
@@ -327,6 +328,7 @@ where
             );
             uopool_service_run(
                 SocketAddr::new(args.uopool_addr, args.uopool_port),
+                args.uopool_mode,
                 entry_points,
                 eth_client,
                 block_streams,

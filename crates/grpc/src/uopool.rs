@@ -24,7 +24,7 @@ use silius_p2p::{
     config::Config,
     service::{MempoolChannels, Network},
 };
-use silius_primitives::{provider::BlockStream, UserOperation};
+use silius_primitives::{provider::BlockStream, UoPoolMode, UserOperation};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{debug, error, info};
@@ -374,6 +374,7 @@ where
 #[allow(clippy::too_many_arguments)]
 pub async fn uopool_service_run<M, SanCk, SimCk, SimTrCk>(
     addr: SocketAddr,
+    mode: UoPoolMode,
     eps: Vec<Address>,
     eth_client: Arc<M>,
     block_streams: Vec<BlockStream>,
@@ -404,6 +405,7 @@ where
                 let id = mempool_id(&ep, chain.id());
                 let (waiting_to_pub_sd, waiting_to_pub_rv) = unbounded::<(UserOperation, U256)>();
                 let uo_builder = UoPoolBuilder::new(
+                    mode,
                     eth_client.clone(),
                     ep,
                     chain,
@@ -449,6 +451,7 @@ where
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
                 let id = mempool_id(&ep, chain.id());
                 let uo_builder = UoPoolBuilder::new(
+                    mode,
                     eth_client.clone(),
                     ep,
                     chain,

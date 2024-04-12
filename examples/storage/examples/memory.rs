@@ -13,7 +13,7 @@ use silius_primitives::{
     provider::create_http_provider,
     reputation::ReputationEntry,
     simulation::CodeHash,
-    UserOperationHash, UserOperationSigned,
+    UoPoolMode, UserOperationHash, UserOperationSigned,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -55,6 +55,7 @@ async fn main() -> eyre::Result<()> {
             Box::new(Arc::new(RwLock::new(HashMap::<Address, ReputationEntry>::default()))),
         );
         let builder = UoPoolBuilder::new(
+            UoPoolMode::Standard,
             provider.clone(),
             ep.clone(),
             chain,

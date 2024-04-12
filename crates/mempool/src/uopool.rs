@@ -2,6 +2,7 @@ use crate::{
     estimate::estimate_user_op_gas,
     mempool::Mempool,
     mempool_id,
+    utils::div_ceil,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
@@ -24,7 +25,7 @@ use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
     get_address,
     reputation::{ReputationEntry, StakeInfo, StakeInfoResponse, Status},
-    UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
+    UoPoolMode, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
 use std::collections::{HashMap, HashSet};
@@ -40,6 +41,8 @@ const PRE_VERIFICATION_SAFE_RESERVE: u64 = 1_000;
 pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     /// The unique ID of the mempool
     pub id: MempoolId,
+    /// User operation pool mode
+    pub mode: UoPoolMode,
     /// The [EntryPoint](EntryPoint) contract object
     pub entry_point: EntryPoint<M>,
     /// The [UserOperationValidator](UserOperationValidator) object
@@ -72,6 +75,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// `Self` - The [UoPool](UoPool) object
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        mode: UoPoolMode,
         entry_point: EntryPoint<M>,
         validator: V,
         mempool: Mempool,
@@ -82,6 +86,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     ) -> Self {
         Self {
             id: mempool_id(&entry_point.address(), chain.id()),
+            mode,
             entry_point,
             validator,
             mempool,
@@ -449,9 +454,14 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         &self,
         uo: &UserOperation,
     ) -> Result<UserOperationGasEstimation, MempoolError> {
-        let (verification_gas_limit, call_gas_limit) =
-            estimate_user_op_gas(&uo.user_operation, &self.entry_point).await.map_err(
-                |e| match e {
+        let pre_verification_gas = Overhead::default()
+            .calculate_pre_verification_gas(uo)
+            .saturating_add(PRE_VERIFICATION_SAFE_RESERVE.into());
+
+        let (verification_gas_limit, call_gas_limit) = match self.mode {
+            UoPoolMode::Standard => estimate_user_op_gas(&uo.user_operation, &self.entry_point)
+                .await
+                .map_err(|e| match e {
                     EntryPointError::FailedOp(f) => MempoolError {
                         hash: uo.hash,
                         kind: MempoolErrorKind::InvalidUserOperation(
@@ -475,13 +485,52 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                         hash: uo.hash,
                         kind: MempoolErrorKind::Other { inner: format!("{e:?}") },
                     },
-                },
-            )?;
+                })?,
+            UoPoolMode::Unsafe => {
+                let ret =
+                    self.entry_point.simulate_handle_op(uo.clone().user_operation).await.map_err(
+                        |e| match e {
+                            EntryPointError::FailedOp(f) => MempoolError {
+                                hash: uo.hash,
+                                kind: MempoolErrorKind::InvalidUserOperation(
+                                    InvalidMempoolUserOperationError::Simulation(
+                                        SimulationError::Validation { inner: format!("{f:?}") },
+                                    ),
+                                ),
+                            },
+                            EntryPointError::ExecutionReverted(e) => MempoolError {
+                                hash: uo.hash,
+                                kind: MempoolErrorKind::InvalidUserOperation(
+                                    InvalidMempoolUserOperationError::Simulation(
+                                        SimulationError::Execution { inner: e },
+                                    ),
+                                ),
+                            },
+                            EntryPointError::Provider { inner } => MempoolError {
+                                hash: uo.hash,
+                                kind: MempoolErrorKind::Provider { inner },
+                            },
+                            _ => MempoolError {
+                                hash: uo.hash,
+                                kind: MempoolErrorKind::Other { inner: format!("{e:?}") },
+                            },
+                        },
+                    )?;
+
+                let verification_gas_limit = div_ceil(
+                    ret.pre_op_gas.saturating_sub(pre_verification_gas).saturating_mul(3.into()),
+                    2.into(),
+                );
+                let call_gas_limit = div_ceil(ret.paid, uo.user_operation.max_fee_per_gas)
+                    .saturating_sub(ret.pre_op_gas)
+                    .saturating_add(35000.into());
+
+                (verification_gas_limit, call_gas_limit)
+            }
+        };
 
         Ok(UserOperationGasEstimation {
-            pre_verification_gas: Overhead::default()
-                .calculate_pre_verification_gas(uo)
-                .saturating_add(PRE_VERIFICATION_SAFE_RESERVE.into()),
+            pre_verification_gas,
             verification_gas_limit,
             call_gas_limit,
         })
