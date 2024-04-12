@@ -2,6 +2,7 @@ use crate::{
     estimate::estimate_user_op_gas,
     mempool::Mempool,
     mempool_id,
+    utils::div_ceil,
     validate::{
         UserOperationValidationOutcome, UserOperationValidator, UserOperationValidatorMode,
     },
@@ -31,7 +32,7 @@ use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, trace};
 
 const FILTER_MAX_DEPTH: u64 = 10;
-const PRE_VERIFICATION_SAFE_RESERVE: u64 = 1_000;
+const PRE_VERIFICATION_SAFE_RESERVE_PERC: u64 = 10; // percentage how higher pre verification gas we return
 
 /// The alternative mempool pool implementation that provides functionalities to add, remove,
 /// validate, and serves data requests from the [RPC API](EthApiServer). Architecturally, the
@@ -478,10 +479,15 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 },
             )?;
 
+        let pre_verification_gas = div_ceil(
+            Overhead::default().calculate_pre_verification_gas(uo).saturating_mul(
+                U256::from(100).saturating_add(PRE_VERIFICATION_SAFE_RESERVE_PERC.into()),
+            ),
+            U256::from(100),
+        );
+
         Ok(UserOperationGasEstimation {
-            pre_verification_gas: Overhead::default()
-                .calculate_pre_verification_gas(uo)
-                .saturating_add(PRE_VERIFICATION_SAFE_RESERVE.into()),
+            pre_verification_gas,
             verification_gas_limit,
             call_gas_limit,
         })

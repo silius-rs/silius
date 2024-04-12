@@ -24,7 +24,7 @@ pub fn equal_code_hashes(hashes: &[CodeHash], hashes_prev: &Vec<CodeHash>) -> bo
 }
 
 /// Struct to calculate the pre-verification gas of a [UserOperation](UserOperation)
-// https://github.com/eth-infinitism/bundler/blob/main/packages/sdk/src/calcPreVerificationGas.ts#L44-L52
+// https://github.com/eth-infinitism/bundler/blob/main/packages/sdk/src/calcPreVerificationGas.ts#L44-L51
 pub struct Overhead {
     pub fixed: U256,
     pub per_user_op: U256,
@@ -101,8 +101,8 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
     // -> (100 / 100) * (gas_price * ( 1 + gas_incr_perc / 100 ))
     // -> (gas_price * ( 100 + gas_incr_perc )) / 100
     // -> (gas_price * ( 100 + gas_incr_perc )) / 100 + rounding_const
-    let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(U256::from(100)));
     let denominator = U256::from(100);
+    let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(denominator));
     div_ceil(numerator, denominator)
 }
 
@@ -136,7 +136,7 @@ pub fn calculate_call_gas_limit(paid: U256, pre_op_gas: U256, fee_per_gas: U256)
 /// let result = div_ceil(U256::from(10), U256::from(3));
 /// assert_eq!(result, U256::from(4));
 /// ```
-fn div_ceil(numerator: U256, denominator: U256) -> U256 {
+pub fn div_ceil(numerator: U256, denominator: U256) -> U256 {
     let rounding_const =
         U256::from(if numerator.checked_rem(denominator).unwrap_or_default() > U256::zero() {
             1
