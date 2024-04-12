@@ -24,7 +24,7 @@ pub fn equal_code_hashes(hashes: &[CodeHash], hashes_prev: &Vec<CodeHash>) -> bo
 }
 
 /// Struct to calculate the pre-verification gas of a [UserOperation](UserOperation)
-// https://github.com/eth-infinitism/bundler/blob/main/packages/sdk/src/calcPreVerificationGas.ts#L44-L52
+// https://github.com/eth-infinitism/bundler/blob/main/packages/sdk/src/calcPreVerificationGas.ts#L44-L51
 pub struct Overhead {
     pub fixed: U256,
     pub per_user_op: U256,
@@ -101,8 +101,8 @@ pub fn calculate_valid_gas(gas_price: U256, gas_incr_perc: U256) -> U256 {
     // -> (100 / 100) * (gas_price * ( 1 + gas_incr_perc / 100 ))
     // -> (gas_price * ( 100 + gas_incr_perc )) / 100
     // -> (gas_price * ( 100 + gas_incr_perc )) / 100 + rounding_const
-    let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(U256::from(100)));
     let denominator = U256::from(100);
+    let numerator = gas_price.saturating_mul(gas_incr_perc.saturating_add(denominator));
     div_ceil(numerator, denominator)
 }
 

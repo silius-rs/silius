@@ -45,6 +45,7 @@ fn is_validation_oog<T: ToString>(err: T) -> bool {
 fn is_execution_oog<T: ToString>(err: T) -> bool {
     err.to_string().contains(EXECUTION_OOG)
 }
+
 fn is_execution_revert<T: ToString>(err: T) -> bool {
     err.to_string().contains(EXECUTION_REVERTED)
 }

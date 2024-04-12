@@ -1,5 +1,6 @@
 use crate::{
     mempool::Mempool,
+    utils::div_ceil,
     validate::{SanityCheck, SanityHelper},
     Overhead, Reputation, SanityError,
 };
@@ -38,7 +39,11 @@ impl<M: Middleware> SanityCheck<M> for VerificationGas {
             });
         }
 
-        let pre_gas = Overhead::default().calculate_pre_verification_gas(uo);
+        // calculate the pvg and allow 10 % deviation
+        let pre_gas = div_ceil(
+            Overhead::default().calculate_pre_verification_gas(uo).saturating_mul(U256::from(90)),
+            U256::from(100),
+        );
         if uo.pre_verification_gas < pre_gas {
             return Err(SanityError::PreVerificationGasTooLow {
                 pre_verification_gas: uo.pre_verification_gas,
