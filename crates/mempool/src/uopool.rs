@@ -454,9 +454,12 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         &self,
         uo: &UserOperation,
     ) -> Result<UserOperationGasEstimation, MempoolError> {
-        let pre_verification_gas = Overhead::default()
-            .calculate_pre_verification_gas(uo)
-            .saturating_add(PRE_VERIFICATION_SAFE_RESERVE.into());
+        let pre_verification_gas = div_ceil(
+            Overhead::default().calculate_pre_verification_gas(uo).saturating_mul(
+                U256::from(100).saturating_add(PRE_VERIFICATION_SAFE_RESERVE_PERC.into()),
+            ),
+            U256::from(100),
+        );
 
         let (verification_gas_limit, call_gas_limit) = match self.mode {
             UoPoolMode::Standard => estimate_user_op_gas(&uo.user_operation, &self.entry_point)
@@ -528,13 +531,6 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                 (verification_gas_limit, call_gas_limit)
             }
         };
-
-        let pre_verification_gas = div_ceil(
-            Overhead::default().calculate_pre_verification_gas(uo).saturating_mul(
-                U256::from(100).saturating_add(PRE_VERIFICATION_SAFE_RESERVE_PERC.into()),
-            ),
-            U256::from(100),
-        );
 
         Ok(UserOperationGasEstimation {
             pre_verification_gas,
