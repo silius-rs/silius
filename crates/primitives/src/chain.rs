@@ -21,7 +21,7 @@ impl ChainSpec {
             1 => Self::mainnet(),
             1337 => Self::dev(),
             5 => Self::goerli(),
-            7762959 => Self::sepolia(),
+            11155111 => Self::sepolia(),
             137 => Self::polygon(),
             80001 => Self::polygon_mumbai(),
             421614 => Self::arbitrum_sepolia(),

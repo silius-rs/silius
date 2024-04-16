@@ -83,6 +83,7 @@ pub fn create_gossipsub(mempool_ids: Vec<String>) -> Result<Gossipsub, String> {
         filter,
         snappy_transform,
     )?;
+
     for mempool_id in mempool_ids {
         let _ = gossipsub.subscribe(&topic(&mempool_id)).map_err(|_| "subscribe error")?;
     }
