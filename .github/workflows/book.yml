@@ -29,6 +29,9 @@ jobs:
         with:
           cache-on-failure: true
 
+      - name: Install solc
+        run: .github/scripts/install_solc.sh
+
       - name: Build book
         run: mdbook build
 
