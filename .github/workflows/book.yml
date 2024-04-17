@@ -24,11 +24,36 @@ jobs:
           curl -sSL https://github.com/sgoudham/mdbook-template/releases/latest/download/mdbook-template-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=./mdbook-template
           echo $(pwd)/mdbook-template >> $GITHUB_PATH
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+          - name: Setup Rust cache
+          uses: Swatinem/rust-cache@v2
+          with:
+            cache-on-failure: true
+  
+      - name: Fetch third-party dependencies
+        run: |
+          make fetch-thirdparty
+  
+      - name: Setup Yarn cache - submodule "thirdparty/account-abstraction"
+        uses: actions/setup-node@v3
         with:
-          cache-on-failure: true
-
+          node-version: '16.17'
+          cache: 'yarn'
+          cache-dependency-path: crates/contracts/thirdparty/account-abstraction
+  
+      - name: Setup Yarn cache - submodule "thirdparty/bundler"
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.17'
+          cache: 'yarn'
+          cache-dependency-path: tests/thirdparty/bundler
+        
+      - name: Setup third-party dependencies
+        run: |
+          make setup-thirdparty
+            
+      - name: Install geth
+        run: .github/scripts/install_geth.sh
+  
       - name: Install solc
         run: .github/scripts/install_solc.sh
 
