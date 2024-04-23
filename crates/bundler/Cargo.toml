@@ -28,7 +28,7 @@ async-trait = { workspace = true }
 tokio = { workspace = true }
 
 # misc
-bytes = "1.5.0"
+bytes = { workspace = true }
 eyre = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }

@@ -4,12 +4,11 @@ use ethers::types::Address;
 use reth_db::{
     cursor::DbCursorRO,
     database::Database,
-    mdbx::EnvironmentKind,
     transaction::{DbTx, DbTxMut},
 };
 use silius_primitives::reputation::ReputationEntry;
 
-impl<E: EnvironmentKind> ClearOp for DatabaseTable<E, EntitiesReputation> {
+impl ClearOp for DatabaseTable<EntitiesReputation> {
     fn clear(&mut self) {
         let tx = self.env.tx_mut().expect("clear database tx should work");
         tx.clear::<EntitiesReputation>().expect("clear succeed");
@@ -17,7 +16,7 @@ impl<E: EnvironmentKind> ClearOp for DatabaseTable<E, EntitiesReputation> {
     }
 }
 
-impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputation> {
+impl ReputationEntryOp for DatabaseTable<EntitiesReputation> {
     fn get_entry(&self, addr: &Address) -> Result<Option<ReputationEntry>, ReputationError> {
         let addr_wrap: WrapAddress = (*addr).into();
 
@@ -61,13 +60,13 @@ impl<E: EnvironmentKind> ReputationEntryOp for DatabaseTable<E, EntitiesReputati
 #[cfg(test)]
 mod tests {
     use crate::{
-        database::{init_env, tables::EntitiesReputation, DatabaseTable},
+        database::tables::{EntitiesReputation, Tables},
         utils::tests::reputation_test_case,
-        Reputation,
+        DatabaseTable, Reputation,
     };
     use ethers::types::{Address, U256};
     use parking_lot::RwLock;
-    use reth_libmdbx::WriteMap;
+    use reth_db::{init_db, mdbx::DatabaseArguments};
     use silius_primitives::constants::validation::reputation::{
         BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
     };
@@ -76,13 +75,16 @@ mod tests {
 
     #[tokio::test]
     async fn database_reputation() {
-        let dir = TempDir::new("test-silius-db").unwrap();
+        let data_dir = TempDir::new("test-silius-db").unwrap();
+        let env = init_db(&data_dir, DatabaseArguments::default().with_default_tables(Some(false)))
+            .unwrap();
 
-        let env = init_env::<WriteMap>(dir.into_path()).unwrap();
-        env.create_tables().expect("Create mdbx database tables failed");
-        let env = Arc::new(env);
-        let entry: Box<DatabaseTable<WriteMap, EntitiesReputation>> =
-            Box::new(DatabaseTable::new(env.clone()));
+        for table in Tables::ALL {
+            env.create_table(table.name(), table.is_dupsort()).unwrap();
+        }
+
+        let entry: Box<DatabaseTable<EntitiesReputation>> =
+            Box::new(DatabaseTable::new(Arc::new(env)));
         let reputation = Reputation::new(
             MIN_INCLUSION_RATE_DENOMINATOR,
             THROTTLING_SLACK,
@@ -93,6 +95,7 @@ mod tests {
             Arc::new(RwLock::new(HashSet::<Address>::default())),
             entry,
         );
+
         reputation_test_case(reputation);
     }
 }

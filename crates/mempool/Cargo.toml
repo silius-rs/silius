@@ -21,8 +21,8 @@ alloy-chains = { workspace = true }
 ethers = { workspace = true }
 
 # reth
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a", optional = true }
-reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "aa6f2cb0610fb4fa0926b42cfed7f8ff51e0db8a", optional = true }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", rev = "15131c723ed1acce068a6f914386b9423b99494a", optional = true }
+reth-libmdbx = { git = "https://github.com/paradigmxyz/reth.git", rev = "15131c723ed1acce068a6f914386b9423b99494a", optional = true }
 
 # async
 async-trait = { workspace = true }
@@ -35,6 +35,7 @@ tokio = { workspace = true }
 
 # misc
 bin-layout = "7.1.0"
+bytes = { workspace = true }
 const-hex = "1.10.0"
 dyn-clone = "1.0.17"
 enumset = "1.1.3"

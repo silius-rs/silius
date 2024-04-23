@@ -3,8 +3,9 @@ use ethers::types::{Address, U256};
 use parking_lot::RwLock;
 use silius_contracts::EntryPoint;
 use silius_mempool::{
-    init_env, validate::validator::new_canonical, CodeHashes, DatabaseTable, Mempool, Reputation,
-    UoPoolBuilder, UserOperations, UserOperationsByEntity, UserOperationsBySender, WriteMap,
+    init_db, validate::validator::new_canonical, CodeHashes, DatabaseArguments, DatabaseTable,
+    Mempool, Reputation, Tables, UoPoolBuilder, UserOperations, UserOperationsByEntity,
+    UserOperationsBySender,
 };
 use silius_primitives::{
     constants::{
@@ -32,8 +33,16 @@ async fn main() -> eyre::Result<()> {
     if let Ok(provider_url) = env::var("PROVIDER_URL") {
         // initialize database env
         let dir = TempDir::new("silius-db").unwrap();
-        let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
-        env.create_tables().expect("Create mdbx database tables failed");
+        let env =
+            init_db(dir.into_path(), DatabaseArguments::default().with_default_tables(Some(false)))
+                .unwrap();
+
+        for table in Tables::ALL {
+            env.create_table(table.name(), table.is_dupsort()).unwrap();
+        }
+
+        let env = Arc::new(env);
+
         println!("Database uopool created!");
 
         let provider =
@@ -42,10 +51,10 @@ async fn main() -> eyre::Result<()> {
         let chain = Chain::dev();
         let entry_point = EntryPoint::new(provider.clone(), ep);
         let mempool = Mempool::new(
-            Box::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
-            Box::new(DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone())),
-            Box::new(DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone())),
-            Box::new(DatabaseTable::<WriteMap, CodeHashes>::new(env.clone())),
+            Box::new(DatabaseTable::<UserOperations>::new(env.clone())),
+            Box::new(DatabaseTable::<UserOperationsBySender>::new(env.clone())),
+            Box::new(DatabaseTable::<UserOperationsByEntity>::new(env.clone())),
+            Box::new(DatabaseTable::<CodeHashes>::new(env)),
         );
         let reputation = Reputation::new(
             MIN_INCLUSION_RATE_DENOMINATOR,

@@ -2,7 +2,7 @@ use bin_layout::{Decoder, Encoder};
 use ethers::{
     abi::{AbiDecode, AbiEncode},
     prelude::{EthAbiCodec, EthAbiType},
-    types::{Address, Bytes},
+    types::Address,
 };
 use reth_db::table::{Compress, Decode, Decompress, Encode};
 use serde::{Deserialize, Serialize};
@@ -21,13 +21,14 @@ macro_rules! construct_wrap_hash {
         pub struct $name($type);
 
         impl Decode for $name {
-            fn decode<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-                Ok(<$type>::from_slice(value.into().as_ref()).into())
+            fn decode<B: AsRef<[u8]>>(value: B) -> Result<Self, reth_db::DatabaseError> {
+                Ok(<$type>::from_slice(value.as_ref()).into())
             }
         }
 
         impl Encode for $name {
             type Encoded = [u8; $n_bytes];
+
             fn encode(self) -> Self::Encoded {
                 *self.0.as_fixed_bytes()
             }
@@ -46,15 +47,20 @@ macro_rules! construct_wrap_hash {
         }
 
         impl Compress for $name {
-            type Compressed = Bytes;
+            type Compressed = Vec<u8>;
+
             fn compress(self) -> Self::Compressed {
                 <Self as Encode>::encode(self).into()
+            }
+
+            fn compress_to_buf<B: bytes::BufMut + AsMut<[u8]>>(self, buf: &mut B) {
+                buf.put_slice(<Self as Encode>::encode(self).as_ref());
             }
         }
 
         impl Decompress for $name {
-            fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-                <Self as Decode>::decode(value.into()).map_err(|_e| reth_db::Error::DecodeError)
+            fn decompress<B: AsRef<[u8]>>(value: B) -> Result<Self, reth_db::DatabaseError> {
+                <Self as Decode>::decode(value).map_err(|_e| reth_db::DatabaseError::Decode)
             }
         }
     };
@@ -78,15 +84,20 @@ macro_rules! construct_wrap_struct {
         pub struct $name(pub $type);
 
         impl Compress for $name {
-            type Compressed = Bytes;
+            type Compressed = Vec<u8>;
+
             fn compress(self) -> Self::Compressed {
                 <Self as AbiEncode>::encode(self).into()
+            }
+
+            fn compress_to_buf<B: bytes::BufMut + AsMut<[u8]>>(self, buf: &mut B) {
+                buf.put_slice(<Self as AbiEncode>::encode(self).as_ref());
             }
         }
 
         impl Decompress for $name {
-            fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-                <Self as AbiDecode>::decode(value.into()).map_err(|_e| reth_db::Error::DecodeError)
+            fn decompress<B: AsRef<[u8]>>(value: B) -> Result<Self, reth_db::DatabaseError> {
+                <Self as AbiDecode>::decode(value).map_err(|_e| reth_db::DatabaseError::Decode)
             }
         }
 
@@ -173,14 +184,19 @@ impl From<WrapUserOpSet> for HashSet<WrapUserOperationHash> {
 
 impl Compress for WrapUserOpSet {
     type Compressed = Vec<u8>;
+
     fn compress(self) -> Self::Compressed {
         self.encode()
+    }
+
+    fn compress_to_buf<B: bytes::BufMut + AsMut<[u8]>>(self, buf: &mut B) {
+        buf.put_slice(self.encode().as_ref());
     }
 }
 
 impl Decompress for WrapUserOpSet {
-    fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-        Self::decode(value.into().as_ref()).map_err(|_| reth_db::Error::DecodeError)
+    fn decompress<B: AsRef<[u8]>>(value: B) -> Result<Self, reth_db::DatabaseError> {
+        Self::decode(value.as_ref()).map_err(|_| reth_db::DatabaseError::Decode)
     }
 }
 
@@ -200,16 +216,20 @@ impl From<WrapCodeHashVec> for Vec<WrapCodeHash> {
 }
 impl Compress for WrapCodeHashVec {
     type Compressed = Vec<u8>;
+
     fn compress(self) -> Self::Compressed {
         <Vec<WrapCodeHash> as Encoder>::encode(&self.0)
+    }
+
+    fn compress_to_buf<B: bytes::BufMut + AsMut<[u8]>>(self, buf: &mut B) {
+        buf.put_slice(<Vec<WrapCodeHash> as Encoder>::encode(&self.0).as_ref());
     }
 }
 
 impl Decompress for WrapCodeHashVec {
-    fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-        let v = value.into();
-        let decoded = <Vec<WrapCodeHash> as Decoder>::decode(v.as_ref())
-            .map_err(|_| reth_db::Error::DecodeError)?;
+    fn decompress<B: AsRef<[u8]>>(value: B) -> Result<Self, reth_db::DatabaseError> {
+        let decoded = <Vec<WrapCodeHash> as Decoder>::decode(value.as_ref())
+            .map_err(|_| reth_db::DatabaseError::Decode)?;
         Ok(decoded.into())
     }
 }

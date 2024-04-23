@@ -15,10 +15,10 @@ use silius_grpc::{
     uopool_service_run,
 };
 use silius_mempool::{
-    init_env,
+    init_db,
     validate::validator::{new_canonical, new_canonical_unsafe},
-    CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
-    UserOperationsByEntity, UserOperationsBySender, WriteMap,
+    CodeHashes, DatabaseArguments, DatabaseTable, EntitiesReputation, Mempool, Reputation, Tables,
+    UserOperations, UserOperationsByEntity, UserOperationsBySender,
 };
 use silius_metrics::{launch_metrics_exporter, mempool::MetricsHandler};
 use silius_primitives::{
@@ -249,17 +249,23 @@ where
 
     let (mempool, reputation) = match args.storage_type {
         StorageType::Database => {
-            let env = Arc::new(
-                init_env::<WriteMap>(datadir.join(DATABASE_FOLDER_NAME)).expect("Init mdbx failed"),
-            );
-            env.create_tables().expect("Create mdbx database tables failed");
+            let env = init_db(
+                datadir.join(DATABASE_FOLDER_NAME),
+                DatabaseArguments::default().with_default_tables(Some(false)),
+            )
+            .unwrap();
+
+            for table in Tables::ALL {
+                env.create_table(table.name(), table.is_dupsort()).unwrap();
+            }
+
+            let env = Arc::new(env);
+
             let mempool = Mempool::new(
-                Box::new(MetricsHandler::new(DatabaseTable::<WriteMap, UserOperations>::new(
-                    env.clone(),
-                ))),
-                Box::new(DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone())),
-                Box::new(DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone())),
-                Box::new(DatabaseTable::<WriteMap, CodeHashes>::new(env.clone())),
+                Box::new(MetricsHandler::new(DatabaseTable::<UserOperations>::new(env.clone()))),
+                Box::new(DatabaseTable::<UserOperationsBySender>::new(env.clone())),
+                Box::new(DatabaseTable::<UserOperationsByEntity>::new(env.clone())),
+                Box::new(DatabaseTable::<CodeHashes>::new(env.clone())),
             );
             let mut reputation = Reputation::new(
                 MIN_INCLUSION_RATE_DENOMINATOR,
@@ -269,7 +275,7 @@ where
                 MIN_UNSTAKE_DELAY.into(),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
                 Arc::new(RwLock::new(HashSet::<Address>::default())),
-                Box::new(MetricsHandler::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(
+                Box::new(MetricsHandler::new(DatabaseTable::<EntitiesReputation>::new(
                     env.clone(),
                 ))),
             );

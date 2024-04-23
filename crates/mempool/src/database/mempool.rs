@@ -1,5 +1,4 @@
 use super::{
-    env::DatabaseError,
     tables::{CodeHashes, UserOperations, UserOperationsByEntity, UserOperationsBySender},
     utils::{
         WrapAddress, WrapCodeHash, WrapCodeHashVec, WrapUserOpSet, WrapUserOperationHash,
@@ -12,18 +11,17 @@ use crate::{
         AddRemoveUserOp, AddRemoveUserOpHash, ClearOp, UserOperationAddrOp,
         UserOperationCodeHashOp, UserOperationOp,
     },
-    MempoolErrorKind,
+    DatabaseError, MempoolErrorKind,
 };
 use ethers::types::Address;
 use reth_db::{
     cursor::DbCursorRO,
     database::Database,
-    mdbx::EnvironmentKind,
     transaction::{DbTx, DbTxMut},
 };
 use silius_primitives::{simulation::CodeHash, UserOperation, UserOperationHash};
 
-impl<E: EnvironmentKind> AddRemoveUserOp for DatabaseTable<E, UserOperations> {
+impl AddRemoveUserOp for DatabaseTable<UserOperations> {
     fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
         let tx = self.env.tx_mut()?;
         let uo_hash_wrap: WrapUserOperationHash = uo.hash.into();
@@ -46,7 +44,7 @@ impl<E: EnvironmentKind> AddRemoveUserOp for DatabaseTable<E, UserOperations> {
 
 macro_rules! impl_add_remove_user_op_hash {
     ($table: ident) => {
-        impl<E: EnvironmentKind> AddRemoveUserOpHash for DatabaseTable<E, $table> {
+        impl AddRemoveUserOpHash for DatabaseTable<$table> {
             fn add(
                 &mut self,
                 address: &Address,
@@ -94,7 +92,7 @@ macro_rules! impl_add_remove_user_op_hash {
 impl_add_remove_user_op_hash!(UserOperationsBySender);
 impl_add_remove_user_op_hash!(UserOperationsByEntity);
 
-impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
+impl UserOperationOp for DatabaseTable<UserOperations> {
     fn get_by_uo_hash(
         &self,
         uo_hash: &UserOperationHash,
@@ -144,9 +142,10 @@ impl<E: EnvironmentKind> UserOperationOp for DatabaseTable<E, UserOperations> {
         Ok(res)
     }
 }
+
 macro_rules! impl_user_op_addr_op {
     ($table:ident) => {
-        impl<E: EnvironmentKind> UserOperationAddrOp for DatabaseTable<E, $table> {
+        impl UserOperationAddrOp for DatabaseTable<$table> {
             fn get_all_by_address(&self, address: &Address) -> Vec<UserOperationHash> {
                 let address_wrap: WrapAddress = (*address).into();
                 self.env
@@ -166,7 +165,7 @@ macro_rules! impl_user_op_addr_op {
 impl_user_op_addr_op!(UserOperationsBySender);
 impl_user_op_addr_op!(UserOperationsByEntity);
 
-impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes> {
+impl UserOperationCodeHashOp for DatabaseTable<CodeHashes> {
     fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         let uo_hash_wrap: WrapUserOperationHash = (*uo_hash).into();
 
@@ -222,7 +221,7 @@ impl<E: EnvironmentKind> UserOperationCodeHashOp for DatabaseTable<E, CodeHashes
 
 macro_rules! impl_clear {
     ($table: ident) => {
-        impl<E: EnvironmentKind> ClearOp for DatabaseTable<E, $table> {
+        impl ClearOp for DatabaseTable<$table> {
             fn clear(&mut self) {
                 self.env
                     .tx_mut()
@@ -244,32 +243,35 @@ impl_clear!(CodeHashes);
 mod tests {
     use crate::{
         database::{
-            init_env,
-            tables::{CodeHashes, UserOperations, UserOperationsByEntity, UserOperationsBySender},
+            tables::{
+                CodeHashes, Tables, UserOperations, UserOperationsByEntity, UserOperationsBySender,
+            },
             DatabaseTable,
         },
         utils::tests::mempool_test_case,
         Mempool,
     };
-    use reth_libmdbx::WriteMap;
+    use reth_db::{init_db, mdbx::DatabaseArguments};
     use std::sync::Arc;
     use tempdir::TempDir;
 
     #[allow(clippy::unit_cmp)]
     #[tokio::test]
     async fn database_mempool() {
-        let dir = TempDir::new("test-silius-db").unwrap();
+        let data_dir = TempDir::new("test-silius-db").unwrap();
+        let env = init_db(&data_dir, DatabaseArguments::default().with_default_tables(Some(false)))
+            .unwrap();
 
-        let env = init_env::<WriteMap>(dir.into_path()).unwrap();
-        env.create_tables().expect("Create mdbx database tables failed");
+        for table in Tables::ALL {
+            env.create_table(table.name(), table.is_dupsort()).unwrap();
+        }
+
         let env = Arc::new(env);
-        let uo_ops: DatabaseTable<WriteMap, UserOperations> = DatabaseTable::new(env.clone());
-        let uo_ops_sender: DatabaseTable<WriteMap, UserOperationsBySender> =
-            DatabaseTable::new(env.clone());
-        let uo_ops_entity: DatabaseTable<WriteMap, UserOperationsByEntity> =
-            DatabaseTable::new(env.clone());
-        let uo_ops_codehashes: DatabaseTable<WriteMap, CodeHashes> =
-            DatabaseTable::new(env.clone());
+
+        let uo_ops: DatabaseTable<UserOperations> = DatabaseTable::new(env.clone());
+        let uo_ops_sender: DatabaseTable<UserOperationsBySender> = DatabaseTable::new(env.clone());
+        let uo_ops_entity: DatabaseTable<UserOperationsByEntity> = DatabaseTable::new(env.clone());
+        let uo_ops_codehashes: DatabaseTable<CodeHashes> = DatabaseTable::new(env.clone());
         let mempool = Mempool::new(
             Box::new(uo_ops),
             Box::new(uo_ops_sender),

@@ -12,8 +12,8 @@ use ethers::{
 };
 use parking_lot::RwLock;
 use silius_mempool::{
-    init_env, CodeHashes, DatabaseTable, EntitiesReputation, Mempool, Reputation, UserOperations,
-    UserOperationsByEntity, UserOperationsBySender, WriteMap,
+    init_db, CodeHashes, DatabaseArguments, DatabaseTable, EntitiesReputation, Mempool, Reputation,
+    Tables, UserOperations, UserOperationsByEntity, UserOperationsBySender,
 };
 use silius_primitives::{
     reputation::ReputationEntry, simulation::CodeHash, UserOperationHash, UserOperationSigned,
@@ -155,14 +155,22 @@ pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Ht
 
 #[allow(clippy::type_complexity)]
 pub fn setup_database_mempool_reputation() -> (Mempool, Reputation) {
-    let dir = TempDir::new("test-silius-db").expect("create tmp");
-    let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
-    env.create_tables().expect("Create mdbx database tables failed");
+    let dir = TempDir::new("test-silius-db").unwrap();
+    let env =
+        init_db(dir.into_path(), DatabaseArguments::default().with_default_tables(Some(false)))
+            .unwrap();
+
+    for table in Tables::ALL {
+        env.create_table(table.name(), table.is_dupsort()).unwrap();
+    }
+
+    let env = Arc::new(env);
+
     let mempool = Mempool::new(
-        Box::new(DatabaseTable::<WriteMap, UserOperations>::new(env.clone())),
-        Box::new(DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone())),
-        Box::new(DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone())),
-        Box::new(DatabaseTable::<WriteMap, CodeHashes>::new(env.clone())),
+        Box::new(DatabaseTable::<UserOperations>::new(env.clone())),
+        Box::new(DatabaseTable::<UserOperationsBySender>::new(env.clone())),
+        Box::new(DatabaseTable::<UserOperationsByEntity>::new(env.clone())),
+        Box::new(DatabaseTable::<CodeHashes>::new(env.clone())),
     );
     let reputation = Reputation::new(
         10,
@@ -172,7 +180,7 @@ pub fn setup_database_mempool_reputation() -> (Mempool, Reputation) {
         1u64.into(),
         Arc::new(RwLock::new(HashSet::<Address>::default())),
         Arc::new(RwLock::new(HashSet::<Address>::default())),
-        Box::new(DatabaseTable::<WriteMap, EntitiesReputation>::new(env.clone())),
+        Box::new(DatabaseTable::<EntitiesReputation>::new(env.clone())),
     );
     (mempool, reputation)
 }

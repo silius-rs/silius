@@ -17,12 +17,12 @@ pub mod validate;
 pub use builder::UoPoolBuilder;
 #[cfg(feature = "mdbx")]
 pub use database::{
-    init_env,
+    init_db,
     tables::{
-        CodeHashes, EntitiesReputation, UserOperations, UserOperationsByEntity,
+        CodeHashes, EntitiesReputation, Tables, UserOperations, UserOperationsByEntity,
         UserOperationsBySender,
     },
-    DatabaseError, DatabaseTable, WriteMap,
+    DatabaseArguments, DatabaseEnv, DatabaseError, DatabaseTable, RethDatabaseError,
 };
 pub use error::{
     InvalidMempoolUserOperationError, MempoolError, MempoolErrorKind, ReputationError, SanityError,

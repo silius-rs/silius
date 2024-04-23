@@ -68,6 +68,7 @@ parking_lot = "0.12.1"
 tokio = { version = "1.35", features = ["full"] }
 
 # misc
+bytes = "1.5.0"
 expanded-pathbuf = "0.1.2"
 eyre = "0.6.11"
 jsonrpsee = { version = "0.21.0", features = ["server", "macros", "client"] }
@@ -79,7 +80,8 @@ thiserror = "1.0.53"
 tracing = "0.1.40"
 
 [patch]
-[patch.crates-io]
-revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }
 [patch."https://github.com/gakonst/ethers-rs"]
 ethers = { git = "https://github.com/Vid201/ethers-rs", branch = "feat/patch" }
+[patch."https://github.com/paradigmxyz/reth.git"]
+reth-db = { path = "../reth/crates/storage/db" }
+reth-libmdbx = { path = "../reth/crates/storage/libmdbx-rs" }

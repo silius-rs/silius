@@ -73,8 +73,8 @@ impl From<SimulationError> for MempoolErrorKind {
 }
 
 #[cfg(feature = "mdbx")]
-impl From<reth_db::Error> for MempoolErrorKind {
-    fn from(e: reth_db::Error) -> Self {
+impl From<reth_db::DatabaseError> for MempoolErrorKind {
+    fn from(e: reth_db::DatabaseError) -> Self {
         Self::Database(e.into())
     }
 }
@@ -123,8 +123,8 @@ pub enum ReputationError {
 }
 
 #[cfg(feature = "mdbx")]
-impl From<reth_db::Error> for ReputationError {
-    fn from(e: reth_db::Error) -> Self {
+impl From<reth_db::DatabaseError> for ReputationError {
+    fn from(e: reth_db::DatabaseError) -> Self {
         Self::Database(e.into())
     }
 }

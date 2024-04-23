@@ -5,8 +5,8 @@ use crate::bundler::{create_wallet, launch_bundler, launch_bundling, launch_rpc,
 use clap::{Parser, Subcommand};
 use ethers::types::Address;
 use silius_mempool::{
-    init_env, DatabaseTable, UserOperationAddrOp, UserOperationOp, UserOperations,
-    UserOperationsByEntity, UserOperationsBySender, WriteMap,
+    init_db, DatabaseArguments, DatabaseTable, UserOperationAddrOp, UserOperationOp,
+    UserOperations, UserOperationsByEntity, UserOperationsBySender,
 };
 use silius_metrics::ethers::MetricsMiddleware;
 use silius_primitives::provider::{
@@ -254,8 +254,10 @@ pub struct DumpUserOperations {
 
 impl DumpUserOperations {
     pub fn execute(self) -> eyre::Result<()> {
-        let env = Arc::new(init_env::<WriteMap>(self.data_dir).expect("Init mdbx failed"));
-        let table = DatabaseTable::<WriteMap, UserOperations>::new(env.clone());
+        let env =
+            init_db(self.data_dir, DatabaseArguments::default().with_default_tables(Some(false)))
+                .unwrap();
+        let table = DatabaseTable::<UserOperations>::new(Arc::new(env));
         let uo = table.get_all()?;
         serde_json::to_writer(std::io::stdout(), &uo)?;
         Ok(())
@@ -273,11 +275,14 @@ pub struct DumpUserOperationsBySender {
 }
 impl DumpUserOperationsBySender {
     pub fn execute(self) -> eyre::Result<()> {
-        let env = Arc::new(init_env::<WriteMap>(self.data_dir).expect("Init mdbx failed"));
-        let table = DatabaseTable::<WriteMap, UserOperationsBySender>::new(env.clone());
+        let env = Arc::new(
+            init_db(self.data_dir, DatabaseArguments::default().with_default_tables(Some(false)))
+                .unwrap(),
+        );
+        let table = DatabaseTable::<UserOperationsBySender>::new(env.clone());
         let mut uo = table.get_all_by_address(&self.address);
 
-        let table = DatabaseTable::<WriteMap, UserOperationsByEntity>::new(env.clone());
+        let table = DatabaseTable::<UserOperationsByEntity>::new(env.clone());
         let mut uo2 = table.get_all_by_address(&self.address);
         uo.append(&mut uo2);
         serde_json::to_writer(std::io::stdout(), &uo)?;
