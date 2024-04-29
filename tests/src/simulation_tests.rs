@@ -28,7 +28,7 @@ use silius_mempool::{
 };
 use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
-    unpack_init_code, UserOperation, UserOperationSigned,
+    unpack_factory_data, UserOperation, UserOperationSigned,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -227,7 +227,7 @@ where
     );
 
     let sender = Address::from_slice(address);
-    let (factory, factory_data) = unpack_init_code(&init_code);
+    let (factory, factory_data) = unpack_factory_data(&init_code);
 
     Ok(UserOperationSigned {
         sender,

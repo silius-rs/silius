@@ -5,9 +5,10 @@ use crate::{
 use alloy_chains::Chain;
 use enumset::{EnumSet, EnumSetType};
 use ethers::{providers::Middleware, types::U256};
-use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame, EntryPoint};
+use silius_contracts::{tracer::JsTracerFrame, EntryPoint};
 use silius_primitives::{
     constants::validation::entities::NUMBER_OF_LEVELS,
+    entrypoint::SimulateValidationResult,
     reputation::StakeInfo,
     simulation::{CodeHash, StorageMap},
     UserOperation, UserOperationHash,

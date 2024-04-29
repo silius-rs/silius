@@ -12,7 +12,7 @@ use ethers::{
 };
 use silius_contracts::EntryPoint;
 use silius_mempool::{validate::validator::new_canonical, UoPool};
-use silius_primitives::{unpack_init_code, UoPoolMode, UserOperationSigned, Wallet as UoWallet};
+use silius_primitives::{unpack_factory_data, UoPoolMode, UserOperationSigned, Wallet as UoWallet};
 use std::sync::Arc;
 
 async fn setup_basic() -> eyre::Result<(
@@ -78,7 +78,7 @@ async fn estimate_with_zero() -> eyre::Result<()> {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
-    let (factory, factory_data) = unpack_init_code(&init_code);
+    let (factory, factory_data) = unpack_factory_data(&init_code);
 
     let (gas_price, priority_fee) = client.estimate_eip1559_fees(None).await?;
     let nonce = client.get_transaction_count(address, None).await?;

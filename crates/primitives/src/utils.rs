@@ -14,7 +14,7 @@ where
     s.serialize_str(&to_checksum(val, None))
 }
 
-/// Converts bytes to checksum (first 20 bytes are address)
+/// Converts Option address to checksum
 pub fn as_checksum_addr_opt<S>(val: &Option<Address>, s: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -51,7 +51,7 @@ pub fn get_address(buf: &[u8]) -> Option<Address> {
     }
 }
 
-pub fn unpack_paymaster_fee_data(buf: &[u8]) -> (Address, U256, U256, Bytes) {
+pub fn unpack_paymaster_data(buf: &[u8]) -> (Address, U256, U256, Bytes) {
     if buf.len() >= 52 {
         let (paymaster_verification_gas_limit, paymaster_post_op_gas_limit) =
             unpack_uint128(&buf[20..52]);
@@ -66,7 +66,7 @@ pub fn unpack_paymaster_fee_data(buf: &[u8]) -> (Address, U256, U256, Bytes) {
     }
 }
 
-pub fn pack_paymaster_fee_data(
+pub fn pack_paymaster_data(
     addr: Address,
     paymaster_verification_gas_limit: U256,
     paymaster_post_op_gas_limit: U256,
@@ -80,7 +80,7 @@ pub fn pack_paymaster_fee_data(
     }
 }
 
-pub fn pack_init_code(factory: Address, factory_data: Bytes) -> Vec<u8> {
+pub fn pack_factory_data(factory: Address, factory_data: Bytes) -> Vec<u8> {
     if factory.is_zero() {
         vec![]
     } else {
@@ -88,7 +88,7 @@ pub fn pack_init_code(factory: Address, factory_data: Bytes) -> Vec<u8> {
     }
 }
 
-pub fn unpack_init_code(init_code: &[u8]) -> (Address, Bytes) {
+pub fn unpack_factory_data(init_code: &[u8]) -> (Address, Bytes) {
     if init_code.len() > 20 {
         (Address::from_slice(&init_code[0..20]), Bytes::from(init_code[20..].to_vec()))
     } else {
@@ -126,7 +126,7 @@ pub fn unpack_uint128(buf: &[u8]) -> (U256, U256) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        pack_init_code, unpack_init_code,
+        pack_factory_data, unpack_factory_data,
         utils::{pack_uint128, unpack_uint128},
     };
     use ethers::types::{Address, Bytes, U256};
@@ -142,12 +142,12 @@ mod tests {
     }
 
     #[test]
-    fn pack_init_code_unpack() {
+    fn pack_factory_data_unpack() {
         let addr: Address = "0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5".parse().unwrap();
         let data: Bytes = "0x12345678".parse().unwrap();
-        let packed: Bytes = pack_init_code(addr, data.clone()).into();
+        let packed: Bytes = pack_factory_data(addr, data.clone()).into();
         println!("packed {packed:?}");
-        let (new_addr, new_data) = unpack_init_code(&packed);
+        let (new_addr, new_data) = unpack_factory_data(&packed);
         assert_eq!(addr, new_addr, "addr work");
         assert_eq!(data, new_data, "data work");
     }

@@ -2,8 +2,10 @@ use crate::{
     validate::{SimulationCheck, SimulationHelper},
     SimulationError,
 };
-use silius_contracts::entry_point::SimulateValidationResult;
-use silius_primitives::{constants::validation::simulation::MIN_EXTRA_GAS, UserOperation};
+use silius_primitives::{
+    constants::validation::simulation::MIN_EXTRA_GAS, entrypoint::SimulateValidationResult,
+    UserOperation,
+};
 
 #[derive(Clone)]
 pub struct VerificationExtraGas;

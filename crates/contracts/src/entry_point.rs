@@ -13,11 +13,10 @@ use super::{
 };
 use crate::{
     error::decode_revert_error, executor_tracer::EXECUTOR_TRACER, gen::ExecutionResult,
-    simulation_codes::ENTRYPOINT_SIMULATION_CODE_STR,
+    simulation_codes::ENTRYPOINT_SIMULATION_CODE,
 };
 use ethers::{
-    abi::{AbiDecode, AbiError},
-    contract::{EthAbiCodec, EthAbiType},
+    abi::AbiDecode,
     prelude::{ContractError, Event},
     providers::{CallBuilder, Middleware, ProviderError, RawCall},
     types::{
@@ -25,73 +24,13 @@ use ethers::{
         GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TransactionRequest, U256,
     },
 };
-use silius_primitives::UserOperationSigned;
+use silius_primitives::{
+    entrypoint::{SimulateValidationResult, ValidationResult},
+    UserOperationSigned,
+};
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 
 const UINT96_MAX: u128 = 5192296858534827628530496329220095;
-
-#[derive(EthAbiCodec, EthAbiType, Debug, Clone, PartialEq, Eq)]
-pub struct StakeInfo {
-    pub stake: U256,
-    pub unstake_delay_sec: U256,
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReturnInfo {
-    pub pre_op_gas: U256,
-    pub prefund: U256,
-    pub account_validation_data: U256,
-    pub paymaster_validation_data: U256,
-    pub paymaster_context: Bytes,
-}
-
-impl ReturnInfo {
-    pub fn decode(data: &[u8]) -> Result<Self, AbiError> {
-        let pre_op_gas = <U256 as AbiDecode>::decode(&data[..32])?;
-        let prefund = <U256 as AbiDecode>::decode(&data[32..64])?;
-        let account_validation_data = <U256 as AbiDecode>::decode(&data[64..96])?;
-        let paymaster_validation_data = <U256 as AbiDecode>::decode(&data[96..128])?;
-        let bytes_length = <U256 as AbiDecode>::decode(&data[160..192])?;
-        let paymaster_context = Bytes::from_iter(&data[192..192 + bytes_length.as_usize()]);
-        Ok(Self {
-            pre_op_gas,
-            prefund,
-            account_validation_data,
-            paymaster_validation_data,
-            paymaster_context,
-        })
-    }
-}
-
-#[derive(EthAbiCodec, EthAbiType, Debug, Clone, PartialEq, Eq)]
-pub struct AggregatorStakeInfo {
-    pub aggregator: Address,
-    pub stake_info: StakeInfo,
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ValidationResult {
-    pub sender_info: StakeInfo,
-    pub factory_info: StakeInfo,
-    pub paymaster_info: StakeInfo,
-    pub aggresgator_info: AggregatorStakeInfo,
-    pub return_info: ReturnInfo,
-}
-
-impl AbiDecode for ValidationResult {
-    fn decode(data: impl AsRef<[u8]>) -> Result<Self, AbiError> {
-        let data = data.as_ref();
-        let sender_info = <StakeInfo as AbiDecode>::decode(&data[64..128])?;
-        let factory_info = <StakeInfo as AbiDecode>::decode(&data[128..192])?;
-        let paymaster_info = <StakeInfo as AbiDecode>::decode(&data[192..256])?;
-        let aggresgator_info = <AggregatorStakeInfo as AbiDecode>::decode(&data[256..352])?;
-        let return_info = ReturnInfo::decode(&data[352..])?;
-        Ok(Self { sender_info, factory_info, paymaster_info, aggresgator_info, return_info })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SimulateValidationResult {
-    ValidationResult(ValidationResult),
-}
 
 #[derive(Clone)]
 pub struct EntryPoint<M: Middleware + 'static> {
@@ -181,8 +120,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         let call_builder = CallBuilder::new(self.eth_client.provider(), &tx);
         let mut state = State::default();
         state.account(self.address).code(
-            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE_STR)
-                .expect("hard coded code should be correct"),
+            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE)
+                .expect("entrypoint simulation code should be valid"),
         );
         let call_builder = call_builder.state(&state);
         let res = call_builder.await;
@@ -197,8 +136,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         let call = self.entry_point_api.simulate_validation(uo.into());
         let mut state = State::default();
         state.account(self.address).code(
-            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE_STR)
-                .expect("hard coded code should be correct"),
+            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE)
+                .expect("entrypoint simulation code should be valid"),
         );
         let res = self
             .eth_client
@@ -240,8 +179,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         tx.set_gas(u64::MAX);
         let mut state = State::default();
         state.account(self.address).code(
-            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE_STR)
-                .expect("hard coded code should be correct"),
+            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE)
+                .expect("entrypoint simulation code should be valid"),
         );
         state.account(Address::zero()).balance(UINT96_MAX.into());
         let res = self
@@ -368,8 +307,8 @@ impl<M: Middleware + 'static> EntryPoint<M> {
         let call_builder = CallBuilder::new(self.eth_client.provider(), &call.tx);
         let mut state = State::default();
         state.account(self.address).code(
-            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE_STR)
-                .expect("hard coded code should be correct"),
+            Bytes::from_str(ENTRYPOINT_SIMULATION_CODE)
+                .expect("entrypoint simulation code should be valid"),
         );
         let call_builder = call_builder.state(&state);
         let res = call_builder.await;
@@ -393,7 +332,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn simulate_validation() {
-        let eth_client = Arc::new(Provider::try_from("http://192.168.1.218:8545").unwrap());
+        let eth_client = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let ep = EntryPoint::<Provider<Http>>::new(
             eth_client.clone(),
             "0x0000000071727De22E5E9d8BAf0edAc6f37da032".parse().unwrap(),

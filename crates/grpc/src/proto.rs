@@ -271,8 +271,8 @@ pub mod types {
             }
         }
     }
-    impl From<silius_primitives::RpcUserOperation> for UserOperationSigned {
-        fn from(user_operation: silius_primitives::RpcUserOperation) -> Self {
+    impl From<silius_primitives::UserOperationRpc> for UserOperationSigned {
+        fn from(user_operation: silius_primitives::UserOperationRpc) -> Self {
             Self {
                 sender: Some(user_operation.sender.into()),
                 nonce: Some(user_operation.nonce.into()),
@@ -300,7 +300,7 @@ pub mod types {
             }
         }
     }
-    impl From<UserOperationSigned> for silius_primitives::RpcUserOperation {
+    impl From<UserOperationSigned> for silius_primitives::UserOperationRpc {
         fn from(user_operation: UserOperationSigned) -> Self {
             Self {
                 sender: {

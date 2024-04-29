@@ -2,8 +2,7 @@ use crate::{
     validate::{utils::unpack_account_validation_data, SimulationCheck, SimulationHelper},
     SimulationError,
 };
-use silius_contracts::entry_point::SimulateValidationResult;
-use silius_primitives::UserOperation;
+use silius_primitives::{entrypoint::SimulateValidationResult, UserOperation};
 
 #[derive(Clone)]
 pub struct Signature;

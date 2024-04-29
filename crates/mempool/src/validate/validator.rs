@@ -24,12 +24,8 @@ use ethers::{
     providers::Middleware,
     types::{BlockNumber, GethTrace, U256},
 };
-use silius_contracts::{
-    entry_point::{EntryPointError, SimulateValidationResult},
-    tracer::JsTracerFrame,
-    EntryPoint,
-};
-use silius_primitives::UserOperation;
+use silius_contracts::{entry_point::EntryPointError, tracer::JsTracerFrame, EntryPoint};
+use silius_primitives::{entrypoint::SimulateValidationResult, UserOperation};
 use tracing::debug;
 
 pub type StandardValidator<M> = StandardUserOperationValidator<
