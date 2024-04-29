@@ -3,8 +3,8 @@ mod hash;
 mod request;
 
 use crate::{
-    pack_paymaster_fee_data, pack_uint128,
-    utils::{as_checksum_addr, pack_init_code},
+    pack_paymaster_data, pack_uint128,
+    utils::{as_checksum_addr, pack_factory_data},
 };
 use derive_more::{AsRef, Deref};
 use ethers::{
@@ -69,8 +69,11 @@ pub struct UserOperationSigned {
     /// Nonce (anti replay protection)
     pub nonce: U256,
 
+    /// factory address which could create sender contract. The value would be zero if factory is
+    /// supplied
     pub factory: Address,
 
+    /// factory call data
     pub factory_data: Bytes,
 
     /// The data that is passed to the sender during the main execution call
@@ -92,12 +95,16 @@ pub struct UserOperationSigned {
     /// Maximum priority fee per gas (similar to EIP-1559)
     pub max_priority_fee_per_gas: U256,
 
+    /// paymaster address . The value is zero if no paymaster is supplied.
     pub paymaster: Address,
 
+    /// paymaster verifacation gas limit on paymaster process
     pub paymaster_verification_gas_limit: U256,
 
+    /// paymaster post op gas limit on paymaster process
     pub paymaster_post_op_gas_limit: U256,
 
+    /// paymaster call data
     pub paymaster_data: Bytes,
 
     /// Data passed to the account along with the nonce during the verification step
@@ -119,14 +126,14 @@ struct UserOperationNoSignature {
 
 impl From<UserOperationSigned> for UserOperationNoSignature {
     fn from(value: UserOperationSigned) -> Self {
-        let paymaster_and_data: Bytes = pack_paymaster_fee_data(
+        let paymaster_and_data: Bytes = pack_paymaster_data(
             value.paymaster,
             value.paymaster_verification_gas_limit,
             value.paymaster_post_op_gas_limit,
             &value.paymaster_data,
         )
         .into();
-        let init_code: Bytes = pack_init_code(value.factory, value.factory_data).into();
+        let init_code: Bytes = pack_factory_data(value.factory, value.factory_data).into();
         let gas_fee = pack_uint128(value.max_priority_fee_per_gas, value.max_fee_per_gas).into();
         let account_gas_limit =
             pack_uint128(value.verification_gas_limit, value.call_gas_limit).into();
@@ -472,7 +479,7 @@ pub struct UserOperationReceipt {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcUserOperation {
+pub struct UserOperationRpc {
     /// Sender of the user operation
     #[serde(serialize_with = "as_checksum_addr")]
     pub sender: Address,
@@ -492,7 +499,7 @@ pub struct RpcUserOperation {
     pub signature: Bytes,
 }
 
-impl From<UserOperationSigned> for RpcUserOperation {
+impl From<UserOperationSigned> for UserOperationRpc {
     fn from(value: UserOperationSigned) -> Self {
         Self {
             sender: value.sender,
@@ -534,7 +541,7 @@ impl From<UserOperationSigned> for RpcUserOperation {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperationByHash {
-    pub user_operation: RpcUserOperation,
+    pub user_operation: UserOperationRpc,
     #[serde(serialize_with = "as_checksum_addr")]
     pub entry_point: Address,
     pub transaction_hash: H256,

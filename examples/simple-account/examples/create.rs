@@ -9,7 +9,7 @@ use examples_simple_account::{
 };
 use reqwest;
 use silius_primitives::{
-    constants::entry_point::ADDRESS, unpack_init_code, UserOperationSigned, Wallet as UoWallet,
+    constants::entry_point::ADDRESS, unpack_factory_data, UserOperationSigned, Wallet as UoWallet,
 };
 use silius_tests::common::gen::SimpleAccountFactory;
 use std::{env, sync::Arc, time::Duration};
@@ -55,7 +55,7 @@ async fn main() -> eyre::Result<()> {
         init_code.extend_from_slice(simple_account_factory_address.as_bytes());
         init_code.extend_from_slice(tx.data().unwrap().to_vec().as_slice());
         println!("init_code: {:?}", init_code);
-        let (factory, factory_data) = unpack_init_code(&init_code);
+        let (factory, factory_data) = unpack_factory_data(&init_code);
         let (gas_price, priority_fee) = provider.estimate_eip1559_fees(None).await?;
         println!("gas_price: {:?}, priority_fee: {:?}", gas_price, priority_fee);
 

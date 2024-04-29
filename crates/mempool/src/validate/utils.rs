@@ -1,8 +1,8 @@
 use ethers::types::{Address, U256};
-use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFrame};
+use silius_contracts::tracer::JsTracerFrame;
 use silius_primitives::{
-    constants::validation::entities::NUMBER_OF_LEVELS, reputation::StakeInfo,
-    simulation::StorageMap, UserOperation,
+    constants::validation::entities::NUMBER_OF_LEVELS, entrypoint::SimulateValidationResult,
+    reputation::StakeInfo, simulation::StorageMap, UserOperation,
 };
 
 #[derive(Debug)]

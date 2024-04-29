@@ -4,20 +4,20 @@ use ethers::{
     types::{Address, Bytes},
 };
 use silius_primitives::{
-    pack_init_code, pack_paymaster_fee_data, pack_uint128, unpack_init_code,
-    unpack_paymaster_fee_data, unpack_uint128, UserOperationSigned,
+    pack_factory_data, pack_paymaster_data, pack_uint128, unpack_factory_data,
+    unpack_paymaster_data, unpack_uint128, UserOperationSigned,
 };
 
 impl From<UserOperationSigned> for entry_point_api::PackedUserOperation {
     fn from(uo: UserOperationSigned) -> Self {
-        let paymaster_and_data = pack_paymaster_fee_data(
+        let paymaster_and_data = pack_paymaster_data(
             uo.paymaster,
             uo.paymaster_verification_gas_limit,
             uo.paymaster_post_op_gas_limit,
             &uo.paymaster_data,
         )
         .into();
-        let init_code = pack_init_code(uo.factory, uo.factory_data).into();
+        let init_code = pack_factory_data(uo.factory, uo.factory_data).into();
         Self {
             sender: uo.sender,
             nonce: uo.nonce,
@@ -41,8 +41,8 @@ impl From<entry_point_api::PackedUserOperation> for UserOperationSigned {
             paymaster_verification_gas_limit,
             paymaster_post_op_gas_limit,
             paymaster_data,
-        ) = unpack_paymaster_fee_data(&uo.paymaster_and_data);
-        let (factory, factory_data) = unpack_init_code(&uo.init_code);
+        ) = unpack_paymaster_data(&uo.paymaster_and_data);
+        let (factory, factory_data) = unpack_factory_data(&uo.init_code);
         Self {
             sender: uo.sender,
             nonce: uo.nonce,
