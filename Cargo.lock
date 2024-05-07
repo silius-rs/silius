@@ -2531,7 +2531,7 @@ dependencies = [
 
 [[package]]
 name = "examples-simple-account"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -2548,7 +2548,7 @@ dependencies = [
 
 [[package]]
 name = "examples-storage"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "ethers 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "examples-user-operation"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "ethers 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
  "eyre",
@@ -6890,7 +6890,7 @@ dependencies = [
 
 [[package]]
 name = "silius"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "async-trait",
@@ -6924,7 +6924,7 @@ dependencies = [
 
 [[package]]
 name = "silius-bundler"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -6947,7 +6947,7 @@ dependencies = [
 
 [[package]]
 name = "silius-contracts"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "ethers 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
  "ethers-solc 2.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6963,7 +6963,7 @@ dependencies = [
 
 [[package]]
 name = "silius-grpc"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "arrayref",
@@ -6994,7 +6994,7 @@ dependencies = [
 
 [[package]]
 name = "silius-mempool"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "async-trait",
@@ -7022,7 +7022,7 @@ dependencies = [
 
 [[package]]
 name = "silius-metrics"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "async-trait",
  "ethers 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
@@ -7043,7 +7043,7 @@ dependencies = [
 
 [[package]]
 name = "silius-p2p"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "async-trait",
@@ -7076,7 +7076,7 @@ dependencies = [
 
 [[package]]
 name = "silius-primitives"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "async-stream",
@@ -7098,7 +7098,7 @@ dependencies = [
 
 [[package]]
 name = "silius-rpc"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "async-trait",
  "ethers 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
@@ -7123,7 +7123,7 @@ dependencies = [
 
 [[package]]
 name = "silius-tests"
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 dependencies = [
  "alloy-chains",
  "ethers 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",

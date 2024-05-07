@@ -15,7 +15,7 @@ resolver = "2"
 default-members = ["bin/silius"]
 
 [workspace.package]
-version = "0.4.0-alpha"
+version = "0.5.0-alpha"
 authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -38,15 +38,15 @@ debug = true
 
 [workspace.dependencies]
 # workspace crates
-silius-bundler = { version = "0.4.0-alpha", path = "crates/bundler", default-features = false }
-silius-contracts = { version = "0.4.0-alpha", path = "crates/contracts", default-features = false }
-silius-grpc = { version = "0.4.0-alpha", path = "crates/grpc", default-features = false }
-silius-mempool = { version = "0.4.0-alpha", path = "crates/mempool", default-features = false }
-silius-metrics = { version = "0.4.0-alpha", path = "crates/metrics", default-features = false }
-silius-p2p = { version = "0.4.0-alpha", path = "crates/p2p", default-features = false }
-silius-primitives = { version = "0.4.0-alpha", path = "crates/primitives", default-features = false }
-silius-rpc = { version = "0.4.0-alpha", path = "crates/rpc", default-features = false }
-silius-tests = { version = "0.4.0-alpha", path = "tests", default-features = false }
+silius-bundler = { version = "0.5.0-alpha", path = "crates/bundler", default-features = false }
+silius-contracts = { version = "0.5.0-alpha", path = "crates/contracts", default-features = false }
+silius-grpc = { version = "0.5.0-alpha", path = "crates/grpc", default-features = false }
+silius-mempool = { version = "0.5.0-alpha", path = "crates/mempool", default-features = false }
+silius-metrics = { version = "0.5.0-alpha", path = "crates/metrics", default-features = false }
+silius-p2p = { version = "0.5.0-alpha", path = "crates/p2p", default-features = false }
+silius-primitives = { version = "0.5.0-alpha", path = "crates/primitives", default-features = false }
+silius-rpc = { version = "0.5.0-alpha", path = "crates/rpc", default-features = false }
+silius-tests = { version = "0.5.0-alpha", path = "tests", default-features = false }
 
 # eth
 alloy-chains = "0.1.14"
