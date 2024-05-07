@@ -21,7 +21,7 @@ ENV BUILD_PROFILE $BUILD_PROFILE
 RUN apt-get update && apt-get -y upgrade && apt-get install -y pkg-config libclang-dev libssl-dev
 
 # Install solc
-RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux"
+RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.23/solc-static-linux"
 RUN mv solc-static-linux /usr/local/bin/solc
 RUN chmod a+x /usr/local/bin/solc
 
