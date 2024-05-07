@@ -30,8 +30,8 @@ jobs:
       - name: Install cargo tools
         run: |
           curl -L https://github.com/DevinR528/cargo-sort/releases/download/v1.0.9/cargo-sort-x86_64-unknown-linux-gnu.tar.gz | tar -zxvf - -C ~/.cargo/bin/
-          curl -L https://github.com/est31/cargo-udeps/releases/download/v0.1.45/cargo-udeps-v0.1.45-x86_64-unknown-linux-gnu.tar.gz | tar -xzvf - -C /tmp/
-          mv /tmp/cargo-udeps-v0.1.45-x86_64-unknown-linux-gnu/cargo-udeps ~/.cargo/bin/
+          curl -L https://github.com/est31/cargo-udeps/releases/download/v0.1.47/cargo-udeps-v0.1.47-x86_64-unknown-linux-gnu.tar.gz | tar -xzvf - -C /tmp/
+          mv /tmp/cargo-udeps-v0.1.47-x86_64-unknown-linux-gnu/cargo-udeps ~/.cargo/bin/
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2

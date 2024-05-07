@@ -282,6 +282,7 @@ where
             ),
             &context.mempool,
             &context.reputation,
+            None,
             UserOperationValidatorMode::Simulation | UserOperationValidatorMode::SimulationTrace,
         )
         .await

@@ -9,7 +9,7 @@ use silius_contracts::{entry_point::SimulateValidationResult, tracer::JsTracerFr
 use silius_primitives::{
     constants::validation::entities::NUMBER_OF_LEVELS,
     reputation::StakeInfo,
-    simulation::{CodeHash, StorageMap},
+    simulation::{CodeHash, StorageMap, ValidationConfig},
     UserOperation, UserOperationHash,
 };
 
@@ -22,6 +22,8 @@ pub mod validator;
 /// The outcome of a user operation validation.
 #[derive(Debug, Clone, Default)]
 pub struct UserOperationValidationOutcome {
+    // which validation config was used
+    pub val_config: ValidationConfig,
     pub prev_hash: Option<UserOperationHash>,
     pub pre_fund: U256,
     pub verification_gas_limit: U256,
@@ -53,6 +55,7 @@ pub trait UserOperationValidator: Send + Sync {
         uo: &UserOperation,
         mempool: &Mempool,
         reputation: &Reputation,
+        val_config: Option<ValidationConfig>,
         mode: EnumSet<UserOperationValidatorMode>,
     ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>;
 }
@@ -61,6 +64,7 @@ pub trait UserOperationValidator: Send + Sync {
 pub struct SanityHelper<'a, M: Middleware + 'static> {
     entry_point: &'a EntryPoint<M>,
     chain: Chain,
+    val_config: ValidationConfig,
 }
 
 #[async_trait::async_trait]
@@ -151,6 +155,7 @@ sanity_check_impls! { A B C D F G I J K L }
 /// The [UserOperation] simulation check helper trait.
 pub struct SimulationHelper<'a> {
     simulate_validation_result: &'a SimulateValidationResult,
+    val_config: ValidationConfig,
     valid_after: Option<U256>,
 }
 
@@ -214,6 +219,7 @@ pub struct SimulationTraceHelper<'a, M: Middleware + Send + Sync + 'static> {
     chain: Chain,
     simulate_validation_result: &'a SimulateValidationResult,
     js_trace: &'a JsTracerFrame,
+    val_config: ValidationConfig,
     stake_info: Option<[StakeInfo; NUMBER_OF_LEVELS]>,
     code_hashes: Option<Vec<CodeHash>>,
 }

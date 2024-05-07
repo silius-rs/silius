@@ -25,8 +25,9 @@ use silius_contracts::{
 use silius_primitives::{
     constants::validation::reputation::THROTTLED_ENTITY_BUNDLE_COUNT,
     get_address,
+    p2p::NetworkMessage,
     reputation::{ReputationEntry, StakeInfo, StakeInfoResponse, Status},
-    simulation::StorageMap,
+    simulation::{StorageMap, ValidationConfig},
     UoPoolMode, UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt,
 };
@@ -57,21 +58,23 @@ pub struct UoPool<M: Middleware + 'static, V: UserOperationValidator> {
     pub max_verification_gas: U256,
     // The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
     pub chain: Chain,
-    // It would be None if p2p is not enabled
-    p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
+    // Connection to the p2p network (None if not enabled)
+    network: Option<UnboundedSender<NetworkMessage>>,
 }
 
 impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     /// Creates a new [UoPool](UoPool) object
     ///
     /// # Arguments
+    /// `mode` - The [UoPoolMode](UoPoolMode) object
     /// `entry_point` - The [EntryPoint](EntryPoint) contract object
     /// `validator` - The [UserOperationValidator](UserOperationValidator) object
     /// `mempool` - The [Mempool](Mempool) object
     /// `reputation` - The [Reputation](Reputation) object
-    /// `eth_client` - The Ethereum client [Middleware](ethers::providers::Middleware)
     /// `max_verification_gas` - The maximum gas limit for [UserOperation](UserOperation) gas
-    /// verification. `chain` - The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
+    /// verification.
+    /// `chain` - The [EIP-155](https://eips.ethereum.org/EIPS/eip-155) chain ID
+    /// `network` - Connection to the p2p network (None if not enabled)
     ///
     /// # Returns
     /// `Self` - The [UoPool](UoPool) object
@@ -84,7 +87,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         reputation: Reputation,
         max_verification_gas: U256,
         chain: Chain,
-        p2p_channel: Option<UnboundedSender<(UserOperation, U256)>>,
+        network: Option<UnboundedSender<NetworkMessage>>,
     ) -> Self {
         Self {
             id: mempool_id(&entry_point.address(), chain.id()),
@@ -95,7 +98,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             reputation,
             max_verification_gas,
             chain,
-            p2p_channel,
+            network,
         }
     }
 
@@ -161,6 +164,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     ///
     /// # Arguments
     /// `user_operations` - The array of [UserOperations](UserOperation) to add
+    /// `val_config` - The optional [ValidationConfig](ValidationConfig) object
     ///
     /// # Returns
     /// `Result<(), MempoolError>` - Ok if the [UserOperations](UserOperation) are added
@@ -168,9 +172,10 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     pub async fn add_user_operations(
         &mut self,
         user_operations: Vec<UserOperation>,
+        val_config: Option<ValidationConfig>,
     ) -> Result<(), MempoolError> {
         for uo in user_operations {
-            let res = self.validate_user_operation(&uo).await;
+            let res = self.validate_user_operation(&uo, val_config.clone()).await;
             self.add_user_operation(uo, res).await?;
         }
 
@@ -182,6 +187,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     ///
     /// # Arguments
     /// `uo` - The [UserOperation](UserOperation) to validate
+    /// `val_config` - The optional [ValidationConfig](ValidationConfig) object
     ///
     /// # Returns
     /// `Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError>` - The validation
@@ -189,12 +195,14 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
     pub async fn validate_user_operation(
         &self,
         uo: &UserOperation,
+        val_config: Option<ValidationConfig>,
     ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError> {
         self.validator
             .validate_user_operation(
                 uo,
                 &self.mempool,
                 &self.reputation,
+                val_config,
                 UserOperationValidatorMode::Sanity |
                     UserOperationValidatorMode::Simulation |
                     UserOperationValidatorMode::SimulationTrace,
@@ -238,10 +246,17 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         if let Some(uo_hash) = res.prev_hash {
             self.remove_user_operation(&uo_hash);
         }
-        if let Some(ref sd) = self.p2p_channel {
-            sd.unbounded_send((uo.clone(), res.verified_block))
+
+        if let Some(ref sender) = self.network {
+            sender
+                .unbounded_send(NetworkMessage::Publish {
+                    user_operation: uo.clone(),
+                    verified_at_block_hash: res.verified_block,
+                    validation_config: res.val_config,
+                })
                 .expect("Failed to send user operation to publish channel")
         };
+
         match self.mempool.add(uo.clone()) {
             Ok(uo_hash) => {
                 // TODO: find better way to do it atomically
@@ -357,6 +372,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                     &uo,
                     &self.mempool,
                     &self.reputation,
+                    None,
                     UserOperationValidatorMode::Simulation |
                         UserOperationValidatorMode::SimulationTrace,
                 )
@@ -720,7 +736,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
         };
         Ok(StakeInfoResponse {
             stake_info,
-            is_staked: self.reputation.verify_stake("", Some(stake_info)).is_ok(),
+            is_staked: self.reputation.verify_stake("", Some(stake_info), None, None).is_ok(),
         })
     }
 }

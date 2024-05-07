@@ -10,7 +10,7 @@ pub struct ChainSpec {
     pub chain: Chain,
     /// Block time/interval in milliseconds
     pub block_time: Duration,
-    /// List of canonicam mempools
+    /// List of canonical mempools
     pub canonical_mempools: Vec<String>,
 }
 
