@@ -29,7 +29,7 @@ use silius_contracts::{
     tracer::JsTracerFrame,
     EntryPoint,
 };
-use silius_primitives::UserOperation;
+use silius_primitives::{simulation::ValidationConfig, UserOperation};
 use tracing::debug;
 
 pub type StandardValidator<M> = StandardUserOperationValidator<
@@ -227,6 +227,7 @@ where
     /// `uo` - [UserOperation](UserOperation) to validate.
     /// `mempool` - [Mempool](Mempool) object.
     /// `reputation` - [Reputation](Reputation) object.
+    /// `val_config` - Optional [ValidationConfig](ValidationConfig) object.
     /// `mode` - [UserOperationValidatorMode](UserOperationValidatorMode) flag.
     ///
     /// # Returns
@@ -238,12 +239,27 @@ where
         uo: &UserOperation,
         mempool: &Mempool,
         reputation: &Reputation,
+        val_config: Option<ValidationConfig>,
         mode: EnumSet<UserOperationValidatorMode>,
     ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError> {
         let mut out: UserOperationValidationOutcome = Default::default();
 
+        if let Some(val_config) = val_config.clone() {
+            out.val_config = val_config;
+        } else {
+            out.val_config = ValidationConfig {
+                min_stake: Some(reputation.min_stake()),
+                min_unstake_delay: Some(reputation.min_unstake_delay()),
+                topic: None,
+            };
+        }
+
         if mode.contains(UserOperationValidatorMode::Sanity) {
-            let sanity_helper = SanityHelper { entry_point: &self.entry_point, chain: self.chain };
+            let sanity_helper = SanityHelper {
+                entry_point: &self.entry_point,
+                chain: self.chain,
+                val_config: val_config.clone().unwrap_or_default(),
+            };
 
             self.sanity_checks
                 .check_user_operation(uo, mempool, reputation, &sanity_helper)
@@ -257,8 +273,11 @@ where
         let sim_res = self.simulate_validation(uo).await?;
 
         if mode.contains(UserOperationValidatorMode::Simulation) {
-            let mut sim_helper =
-                SimulationHelper { simulate_validation_result: &sim_res, valid_after: None };
+            let mut sim_helper = SimulationHelper {
+                simulate_validation_result: &sim_res,
+                val_config: val_config.clone().unwrap_or_default(),
+                valid_after: None,
+            };
 
             self.simulation_checks.check_user_operation(uo, &mut sim_helper)?;
 
@@ -288,6 +307,7 @@ where
                 chain: self.chain,
                 simulate_validation_result: &sim_res,
                 js_trace: &js_trace,
+                val_config: val_config.unwrap_or_default(),
                 stake_info: None,
                 code_hashes: None,
             };

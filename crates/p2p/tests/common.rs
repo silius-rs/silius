@@ -61,10 +61,10 @@ async fn build_p2p_instance(bootnode: Option<Enr>) -> eyre::Result<Network> {
         bootnodes: if let Some(bootnode) = bootnode { vec![bootnode] } else { vec![] },
     };
 
-    let (_, rv) = unbounded();
-    let (sd, _) = unbounded();
+    let (_, receiver) = unbounded();
+    let (sender, _) = unbounded();
 
-    let network = Network::new(config, vec![(Default::default(), rv, sd)]).await?;
+    let network = Network::new(config, vec![(Default::default(), sender, receiver)]).await?;
 
     Ok(network)
 }

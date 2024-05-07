@@ -13,12 +13,15 @@ use ethers::{
 use futures::channel::mpsc::UnboundedSender;
 use futures_util::StreamExt;
 use silius_contracts::EntryPoint;
-use silius_primitives::{provider::BlockStream, UoPoolMode, UserOperation, UserOperationSigned};
+use silius_primitives::{
+    p2p::NetworkMessage, provider::BlockStream, UoPoolMode, UserOperation, UserOperationSigned,
+};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
 
 type StandardUoPool<M, SanCk, SimCk, SimTrCk> =
     UoPool<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>;
+
 pub struct UoPoolBuilder<M, SanCk, SimCk, SimTrCk>
 where
     M: Middleware + Clone + 'static,
@@ -28,14 +31,14 @@ where
 {
     mode: UoPoolMode,
     eth_client: Arc<M>,
-    entrypoint_addr: Address,
+    entrypoint: Address,
     chain: Chain,
     max_verification_gas: U256,
     mempool: Mempool,
     reputation: Reputation,
     validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
-    // It would be None if p2p is not enabled
-    publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
+    // Channel to publish to p2p network (None if not enabled)
+    network: Option<UnboundedSender<NetworkMessage>>,
 }
 
 impl<M, SanCk, SimCk, SimTrCk> UoPoolBuilder<M, SanCk, SimCk, SimTrCk>
@@ -49,24 +52,24 @@ where
     pub fn new(
         mode: UoPoolMode,
         eth_client: Arc<M>,
-        entrypoint_addr: Address,
+        entrypoint: Address,
         chain: Chain,
         max_verification_gas: U256,
         mempool: Mempool,
         reputation: Reputation,
         validator: StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>,
-        publish_sd: Option<UnboundedSender<(UserOperation, U256)>>,
+        network: Option<UnboundedSender<NetworkMessage>>,
     ) -> Self {
         Self {
             mode,
             eth_client,
-            entrypoint_addr,
+            entrypoint,
             chain,
             max_verification_gas,
             mempool,
             reputation,
             validator,
-            publish_sd,
+            network,
         }
     }
 
@@ -130,7 +133,7 @@ where
     }
 
     pub fn uopool(&self) -> StandardUoPool<M, SanCk, SimCk, SimTrCk> {
-        let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint_addr);
+        let entry_point = EntryPoint::<M>::new(self.eth_client.clone(), self.entrypoint);
 
         UoPool::<M, StandardUserOperationValidator<M, SanCk, SimCk, SimTrCk>>::new(
             self.mode,
@@ -140,7 +143,7 @@ where
             self.reputation.clone(),
             self.max_verification_gas,
             self.chain,
-            self.publish_sd.as_ref().cloned(),
+            self.network.as_ref().cloned(),
         )
     }
 }

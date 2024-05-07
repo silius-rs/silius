@@ -2,7 +2,7 @@
 
 use ethers::{
     prelude::{EthAbiCodec, EthAbiType},
-    types::{Address, H256},
+    types::{Address, H256, U256},
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,14 @@ lazy_static! {
         set.insert("PREVRANDAO".into());
         set
     };
+}
+
+/// Validaton config (you can override some validation values).
+#[derive(Debug, Clone, Default)]
+pub struct ValidationConfig {
+    pub min_stake: Option<U256>,
+    pub min_unstake_delay: Option<U256>,
+    pub topic: Option<String>,
 }
 
 /// Code hash - hash of the code of the contract

@@ -20,15 +20,19 @@ use crate::{
         protocol::InboundRequest,
         RPCEvent, RPC,
     },
-    service::{behaviour::BehaviourEvent, utils::save_private_key_to_file},
+    service::{
+        behaviour::BehaviourEvent,
+        utils::{fetch_mempool_config, save_private_key_to_file},
+    },
     types::{
         globals::NetworkGlobals,
         pubsub::{create_gossipsub, PubsubMessage},
         topics::topic,
     },
 };
+use alloy_chains::Chain;
 use discv5::Enr;
-use ethers::types::{Address, U256};
+use ethers::types::Address;
 use futures::channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot::Sender,
@@ -45,7 +49,9 @@ use libp2p::{
 use libp2p_mplex::{MaxBufferBehaviour, MplexConfig};
 use silius_primitives::{
     constants::p2p::{FIND_NODE_QUERY_CLOSEST_PEERS, MAX_IPFS_CID_LENGTH, MAX_SUPPORTED_MEMPOOLS},
-    UserOperation, VerifiedUserOperation,
+    p2p::NetworkMessage,
+    simulation::ValidationConfig,
+    MempoolConfig, UserOperation, VerifiedUserOperation,
 };
 use ssz_rs::{Deserialize, List, Serialize, Vector};
 use std::{
@@ -55,8 +61,10 @@ use std::{
 };
 use tracing::{debug, error, info, warn};
 
-pub type MempoolChannels =
-    Vec<(Address, UnboundedReceiver<(UserOperation, U256)>, UnboundedSender<UserOperation>)>; // entrypoint ...
+/// Channel for sending and receiving messages between p2p network and mempool (entry point
+/// address).
+pub type MempoolChannel =
+    (Address, UnboundedSender<NetworkMessage>, UnboundedReceiver<NetworkMessage>);
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -109,7 +117,9 @@ pub enum NetworkEvent {
 pub struct Network {
     swarm: Swarm<Behaviour>,
     network_globals: Arc<NetworkGlobals>,
-    mempool_channels: MempoolChannels,
+    // Each entry point address has its own mempool channel.
+    mempool_channels: Vec<MempoolChannel>,
+    mempool_configs: Vec<(TopicHash, MempoolConfig)>,
 }
 
 impl From<Network> for Swarm<Behaviour> {
@@ -119,7 +129,7 @@ impl From<Network> for Swarm<Behaviour> {
 }
 
 impl Network {
-    pub async fn new(config: Config, mempool_channels: MempoolChannels) -> eyre::Result<Self> {
+    pub async fn new(config: Config, mempool_channels: Vec<MempoolChannel>) -> eyre::Result<Self> {
         // Handle private key
         let key = if let Some(key) = load_private_key_from_file(&config.node_key_file) {
             key
@@ -154,6 +164,23 @@ impl Network {
         info!("Enr: {}", enr);
 
         let canonical_mempools = config.chain_spec.canonical_mempools.clone();
+        let mempool_configs = {
+            let mut m: Vec<(TopicHash, MempoolConfig)> = Vec::new();
+
+            for canonical_mempool in canonical_mempools.iter() {
+                let mempool_config = if config.chain_spec.chain == Chain::dev() {
+                    MempoolConfig::dev()
+                } else {
+                    fetch_mempool_config(canonical_mempool.clone()).await?
+                };
+                m.push((
+                    topic(canonical_mempool).into(),
+                    mempool_config.with_id(canonical_mempool.clone()),
+                ));
+            }
+
+            m
+        };
         let trusted_peers = config.bootnodes.iter().map(|x| x.public_key().as_peer_id()).collect();
 
         let network_globals = {
@@ -215,7 +242,7 @@ impl Network {
             .expect("building p2p behaviour failed")
             .build();
 
-        let mut network = Network { swarm, network_globals, mempool_channels };
+        let mut network = Network { swarm, network_globals, mempool_channels, mempool_configs };
 
         network.start(&config).await?;
 
@@ -253,29 +280,49 @@ impl Network {
     fn handle_gossipsub_event(&self, event: Box<gossipsub::Event>) -> Option<NetworkEvent> {
         match *event {
             gossipsub::Event::Message { propagation_source, message_id, message } => {
-                let user_op = match VerifiedUserOperation::deserialize(message.data.as_ref()) {
-                    Ok(user_op) => user_op,
+                let uo = match VerifiedUserOperation::deserialize(message.data.as_ref()) {
+                    Ok(uo) => uo,
                     Err(e) => {
                         debug!("Failed to deserialize user operations: {:?}", e);
                         return None;
                     }
                 };
-                self.mempool_channels.iter().find_map(|(ep, _, new_coming_uos_ch)| {
-                    if *ep == user_op.entry_point() {
-                        let uo = user_op.clone().user_operation();
-                        new_coming_uos_ch
-                            .unbounded_send(UserOperation::from_user_operation_signed(
-                                uo.hash(ep, self.network_globals.chain_spec().chain.id()),
-                                uo,
-                            ))
-                            .expect("new user operation channel should be open all the time");
+
+                self.mempool_channels.iter().find_map(|(ep, mempool_sender, _)| {
+                    if *ep == uo.entry_point() {
+                        self.mempool_configs.iter().find_map(|(topic, canonical_mempool_config)| {
+                            if topic == &message.topic {
+                                let uo = uo.clone().user_operation();
+
+                                mempool_sender
+                                    .unbounded_send(NetworkMessage::Validate {
+                                        user_operation: UserOperation::from_user_operation_signed(
+                                            uo.hash(ep, self.network_globals.chain_spec().chain.id()),
+                                            uo,
+                                        ),
+                                        validation_config: ValidationConfig {
+                                            min_stake: Some(canonical_mempool_config.min_stake),
+                                            min_unstake_delay: None,
+                                            topic: Some(message.topic.to_string()),
+                                        }
+                                    })
+                                    .expect("mempool channel should be open all the time");
+
+                                Some(())
+                            } else {
+                                warn!("User operation from p2p is using unsupported canonical mempool {}" , message.topic);
+                                None
+                            }
+                        });
+
                         Some(())
                     } else {
-                        warn!("Received unsupported entrypoint user operations {ep:?} from p2p");
+                        warn!("User operation from p2p is using unsupported entry point {ep:?}");
                         None
                     }
                 });
-                let message = PubsubMessage::UserOperation(user_op);
+
+                let message = PubsubMessage::UserOperation(uo);
 
                 Some(NetworkEvent::PubsubMessage {
                     source_peer: propagation_source,
@@ -367,34 +414,84 @@ impl Network {
     }
 
     pub fn poll_network(&mut self, cx: &mut Context) -> Poll<NetworkEvent> {
-        let mut uos_publish: Vec<VerifiedUserOperation> = Vec::new();
+        let mut uos_received: Vec<(VerifiedUserOperation, TopicHash)> = Vec::new();
 
-        for (ep, waiting_to_publish_ch, _) in self.mempool_channels.iter_mut() {
-            while let Ok(Some((user_op, verified_at_block_hash))) = waiting_to_publish_ch.try_next()
-            {
-                info!("Got user operation {user_op:?} from ep {ep:?} verified in {verified_at_block_hash:?} to publish to p2p network!");
-                let user_op =
-                    VerifiedUserOperation::new(user_op.user_operation, *ep, verified_at_block_hash);
-                uos_publish.push(user_op);
+        for (ep, mempool_sender, mempool_receiver) in self.mempool_channels.iter_mut() {
+            while let Ok(Some(message)) = mempool_receiver.try_next() {
+                match message {
+                    NetworkMessage::Publish {
+                        user_operation,
+                        verified_at_block_hash,
+                        validation_config,
+                    } => {
+                        info!("Received user {user_operation:?} from ep {ep:?} verified in {verified_at_block_hash:?} to gossip over p2p!");
+
+                        let user_op = VerifiedUserOperation::new(
+                            user_operation.user_operation.clone(),
+                            *ep,
+                            verified_at_block_hash,
+                        );
+
+                        if let Some(topic) = validation_config.topic {
+                            uos_received.push((user_op, TopicHash::from_raw(topic)));
+                        } else if let Some((first_mempool_topic, first_mempool_config)) =
+                            self.mempool_configs.first()
+                        {
+                            mempool_sender
+                                .unbounded_send(NetworkMessage::Validate {
+                                    user_operation,
+                                    validation_config: ValidationConfig {
+                                        min_stake: Some(first_mempool_config.min_stake),
+                                        min_unstake_delay: None,
+                                        topic: Some(first_mempool_topic.to_string()),
+                                    },
+                                })
+                                .expect("mempool channel should be open all the time");
+                        }
+                    }
+                    NetworkMessage::FindNewMempool { user_operation, topic } => {
+                        let mut next = false;
+
+                        for (canonical_mempool_topic, canonical_mempool_config) in
+                            self.mempool_configs.iter()
+                        {
+                            if next {
+                                mempool_sender
+                                    .unbounded_send(NetworkMessage::Validate {
+                                        user_operation,
+                                        validation_config: ValidationConfig {
+                                            min_stake: Some(canonical_mempool_config.min_stake),
+                                            min_unstake_delay: None,
+                                            topic: Some(canonical_mempool_topic.to_string()),
+                                        },
+                                    })
+                                    .expect("mempool channel should be open all the time");
+                                break;
+                            }
+
+                            if topic == canonical_mempool_topic.to_string() {
+                                next = true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
 
-        for uo in uos_publish.into_iter() {
-            for canonical_mempool in self.network_globals.chain_spec().canonical_mempools.iter() {
-                let topic_hash: TopicHash = topic(canonical_mempool).into();
-                match self.publish(uo.clone(), topic_hash) {
-                    Ok(_) => {}
-                    Err(err) => match err {
-                        PublishError::InsufficientPeers => {
-                            warn!("Currently no peers to publish message");
-                            self.swarm
-                                .behaviour_mut()
-                                .discovery
-                                .discover_peers(FIND_NODE_QUERY_CLOSEST_PEERS);
-                        }
-                        e => error!("Error in publish message {e:?}"),
-                    },
-                }
+        for (uo, topic) in uos_received {
+            match self.publish(uo.clone(), topic) {
+                Ok(_) => {}
+                Err(err) => match err {
+                    PublishError::InsufficientPeers => {
+                        warn!("Currently no peers to publish message");
+                        self.swarm
+                            .behaviour_mut()
+                            .discovery
+                            .discover_peers(FIND_NODE_QUERY_CLOSEST_PEERS);
+                    }
+                    e => error!("Error in publish message {e:?}"),
+                },
             }
         }
 

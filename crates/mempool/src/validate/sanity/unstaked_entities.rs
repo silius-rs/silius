@@ -99,7 +99,14 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
         // [UREP-010] - UserOperation with unstaked sender are only allowed up to
         // SAME_SENDER_MEMPOOL_COUNT times in the mempool
         let sender_stake = self.get_stake(&sender, helper).await?;
-        if reputation.verify_stake(SENDER, Some(sender_stake)).is_err() &&
+        if reputation
+            .verify_stake(
+                SENDER,
+                Some(sender_stake),
+                helper.val_config.min_stake,
+                helper.val_config.min_unstake_delay,
+            )
+            .is_err() &&
             mempool.get_number_by_sender(&uo.sender) >= SAME_SENDER_MEMPOOL_COUNT
         {
             return Err(ReputationError::UnstakedEntity {
@@ -123,7 +130,15 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
             }
 
             let factory_stake = self.get_stake(&factory, helper).await?;
-            if reputation.verify_stake(FACTORY, Some(factory_stake)).is_err() {
+            if reputation
+                .verify_stake(
+                    FACTORY,
+                    Some(factory_stake),
+                    helper.val_config.min_stake,
+                    helper.val_config.min_unstake_delay,
+                )
+                .is_err()
+            {
                 // [UREP-020] - for other entities
                 let entity = self.get_entity(&factory, helper, reputation)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);
@@ -151,7 +166,15 @@ impl<M: Middleware> SanityCheck<M> for UnstakedEntities {
             }
 
             let paymaster_stake = self.get_stake(&paymaster, helper).await?;
-            if reputation.verify_stake(PAYMASTER, Some(paymaster_stake)).is_err() {
+            if reputation
+                .verify_stake(
+                    PAYMASTER,
+                    Some(paymaster_stake),
+                    helper.val_config.min_stake,
+                    helper.val_config.min_unstake_delay,
+                )
+                .is_err()
+            {
                 // [UREP-020] - for other entities
                 let entity = self.get_entity(&paymaster, helper, reputation)?;
                 let uos_allowed = Self::calculate_allowed_user_operations(entity);

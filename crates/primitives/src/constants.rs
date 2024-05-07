@@ -184,4 +184,6 @@ pub mod p2p {
     pub const MESSAGE_DOMAIN_VALID_SNAPPY: [u8; 4] = [1, 0, 0, 0];
     /// The maximum length for the IPFS CID string.
     pub const MAX_IPFS_CID_LENGTH: usize = 256;
+    /// Public IPFS gateway.
+    pub const IPFS_GATEWAY: &str = "https://gateway.pinata.cloud/ipfs/";
 }

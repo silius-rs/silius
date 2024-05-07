@@ -2,6 +2,7 @@
 /target
 
 # IDE
+.idea
 .vscode
 
 # Node directories

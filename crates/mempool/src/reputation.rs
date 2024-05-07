@@ -352,6 +352,14 @@ impl Reputation {
         self.blacklist.is_in_list(addr)
     }
 
+    pub fn min_stake(&self) -> U256 {
+        self.min_stake
+    }
+
+    pub fn min_unstake_delay(&self) -> U256 {
+        self.min_unstake_delay
+    }
+
     /// Get an entity's reputation status
     ///
     /// # Arguments
@@ -407,6 +415,10 @@ impl Reputation {
     /// # Arguments
     /// * `entity` - The entity type
     /// * `info` - The entity's [stake information](StakeInfo)
+    /// * `min_stake` - Min stake required. If set, this value has higher priority than the struct's
+    ///   value.
+    /// * `min_unstake_delay` - Min unstake delay required. If set, this value has higher priority
+    ///   than the struct's value.
     ///
     /// # Returns
     /// * `Ok(())` if the entity's stake is valid
@@ -417,13 +429,25 @@ impl Reputation {
         &self,
         entity: &str,
         info: Option<StakeInfo>,
+        min_stake: Option<U256>,
+        min_unstake_delay: Option<U256>,
     ) -> Result<(), ReputationError> {
         if let Some(info) = info {
             if self.whitelist.is_in_list(&info.address) {
                 return Ok(());
             }
 
-            let err = if info.stake < self.min_stake {
+            let min_stake =
+                if let Some(min_stake) = min_stake { min_stake } else { self.min_stake };
+
+            // TODO: use this value below
+            let _min_unstake_delay = if let Some(min_unstake_delay) = min_unstake_delay {
+                min_unstake_delay
+            } else {
+                self.min_unstake_delay
+            };
+
+            let err = if info.stake < min_stake {
                 ReputationError::StakeTooLow {
                     entity: entity.into(),
                     address: info.address,
@@ -432,7 +456,7 @@ impl Reputation {
                 }
             } else if info.unstake_delay < U256::from(2)
             // TODO: remove this when spec tests are updated!!!!
-            /* self.min_unstake_delay */
+            /* min_unstake_delay */
             {
                 ReputationError::UnstakeDelayTooLow {
                     address: info.address,

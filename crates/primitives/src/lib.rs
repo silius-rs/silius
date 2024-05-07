@@ -16,7 +16,7 @@ mod wallet;
 
 pub use bundler::Mode as BundlerMode;
 pub use mempool::Mode as UoPoolMode;
-pub use p2p::VerifiedUserOperation;
+pub use p2p::{MempoolConfig, VerifiedUserOperation};
 pub use user_operation::{
     UserOperation, UserOperationByHash, UserOperationGasEstimation, UserOperationHash,
     UserOperationReceipt, UserOperationRequest, UserOperationSigned,

@@ -22,9 +22,9 @@ use silius_mempool::{
 use silius_metrics::grpc::MetricsLayer;
 use silius_p2p::{
     config::Config,
-    service::{MempoolChannels, Network},
+    service::{MempoolChannel, Network},
 };
-use silius_primitives::{provider::BlockStream, UoPoolMode, UserOperation};
+use silius_primitives::{p2p::NetworkMessage, provider::BlockStream, UoPoolMode};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tonic::{Code, Request, Response, Status};
 use tracing::{error, info};
@@ -87,7 +87,7 @@ where
 
         let res = {
             let uopool = self.get_uopool(&ep)?;
-            uopool.validate_user_operation(&uo).await
+            uopool.validate_user_operation(&uo, None).await
         };
 
         let mut uopool = self.get_uopool(&ep)?;
@@ -339,7 +339,7 @@ where
 
         let res = Response::new(AddMempoolResponse {
             res: match uopool
-                .add_user_operations(req.uos.into_iter().map(|uo| uo.into()).collect())
+                .add_user_operations(req.uos.into_iter().map(|uo| uo.into()).collect(), None)
                 .await
             {
                 Ok(_) => AddMempoolResult::AddedMempool as i32,
@@ -399,11 +399,13 @@ where
 
         // setup p2p
         if let Some(config) = p2p_config {
-            let mut mempool_channels: MempoolChannels = Vec::new();
+            let mut mempool_channels: Vec<MempoolChannel> = Vec::new();
 
             for (ep, block_stream) in eps.into_iter().zip(block_streams.into_iter()) {
                 let id = mempool_id(&ep, chain.id());
-                let (waiting_to_pub_sd, waiting_to_pub_rv) = unbounded::<(UserOperation, U256)>();
+
+                let (mempool_sender, mempool_receiver) = unbounded::<NetworkMessage>();
+
                 let uo_builder = UoPoolBuilder::new(
                     mode,
                     eth_client.clone(),
@@ -413,25 +415,34 @@ where
                     mempool.clone(),
                     reputation.clone(),
                     validator.clone(),
-                    Some(waiting_to_pub_sd),
+                    Some(mempool_sender),
                 );
                 uo_builder.register_block_updates(block_stream);
                 uo_builder.register_reputation_updates();
 
-                let (p2p_userop_sd, mut p2p_userop_rv) = unbounded::<UserOperation>();
+                let (network_sender, mut network_receiver) = unbounded::<NetworkMessage>();
                 let mut uo_pool = uo_builder.uopool();
-                // spawn a task which would consume the userop received from p2p network
+
+                // spawn a task which would consume user operations received from p2p network
                 tokio::spawn(async move {
-                    while let Some(user_op) = p2p_userop_rv.next().await {
-                        let res = uo_pool.validate_user_operation(&user_op).await;
-                        match uo_pool.add_user_operation(user_op, res).await {
-                            Ok(_) => {}
-                            Err(e) => error!("Failed to add user operation: {:?} from p2p", e),
+                    while let Some(msg) = network_receiver.next().await {
+                        if let NetworkMessage::Validate { user_operation, validation_config } = msg
+                        {
+                            let res = uo_pool
+                                .validate_user_operation(&user_operation, Some(validation_config))
+                                .await;
+                            match uo_pool.add_user_operation(user_operation, res).await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("Failed to add user operation: {:?} from p2p", e)
+                                }
+                            }
                         }
                     }
                 });
+
                 m_map.insert(id, uo_builder);
-                mempool_channels.push((ep, waiting_to_pub_rv, p2p_userop_sd))
+                mempool_channels.push((ep, network_sender, mempool_receiver))
             }
 
             if config.bootnodes.is_empty() {

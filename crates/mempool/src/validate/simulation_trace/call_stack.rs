@@ -154,7 +154,14 @@ impl<M: Middleware> SimulationTraceCheck<M> for CallStack {
                         // [EREP-050] - an unstaked paymaster may not return a context
                         // This will be removed in the future
                         if !context.is_empty() &&
-                            reputation.verify_stake(PAYMASTER, Some(*stake_info)).is_err()
+                            reputation
+                                .verify_stake(
+                                    PAYMASTER,
+                                    Some(*stake_info),
+                                    helper.val_config.min_stake,
+                                    helper.val_config.min_unstake_delay,
+                                )
+                                .is_err()
                         {
                             return Err(SimulationError::Unstaked {
                                 entity: PAYMASTER.into(),
