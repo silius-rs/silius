@@ -16,7 +16,7 @@ case $1 in
         --eth-client-address http://127.0.0.1:8545 \
         --mnemonic-file keys/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
         --beneficiary 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-        --entry-points 0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789 \
+        --entry-points 0x0000000071727De22E5E9d8BAf0edAc6f37da032 \
         --http \
         --http.addr 0.0.0.0 \
         --http.port 3000 \
