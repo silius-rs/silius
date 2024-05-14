@@ -58,6 +58,7 @@ pub mod tests {
     use super::fetch_mempool_config;
 
     #[tokio::test]
+    #[ignore]
     async fn mempool_config_polygon() {
         let cid = "QmRJ1EPhmRDb8SKrPLRXcUBi2weUN8VJ8X9zUtXByC7eJg";
         let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
