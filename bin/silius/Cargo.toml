@@ -39,6 +39,8 @@ tokio = { workspace = true }
 
 # misc
 async-trait = { workspace = true }
+cargo-sort = "1.0.9"
+cargo-udeps = "0.1.48"
 dirs = "5.0.1"
 expanded-pathbuf = { workspace = true }
 eyre = { workspace = true }

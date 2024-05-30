@@ -78,9 +78,6 @@ pub mod flashbots_relay_endpoints {
     pub const RSYNC_BUILDER: &str = "https://rsync-builder.xyz/";
     pub const LOKI_BUILDER: &str = "https://rpc.lokibuilder.xyz/";
 
-    // goerli
-    pub const FLASHBOTS_GOERLI: &str = "https://relay-goerli.flashbots.net";
-
     // sepolia
     pub const FLASHBOTS_SEPOLIA: &str = "https://relay-sepolia.flashbots.net";
 }
@@ -89,20 +86,15 @@ pub mod flashbots_relay_endpoints {
 pub mod supported_chains {
     use alloy_chains::NamedChain;
 
-    pub const CHAINS: [NamedChain; 15] = [
+    pub const CHAINS: [NamedChain; 10] = [
         NamedChain::Dev,
         NamedChain::Mainnet,
-        NamedChain::Goerli,
         NamedChain::Sepolia,
         NamedChain::Holesky,
         NamedChain::PolygonMumbai,
-        NamedChain::LineaGoerli,
-        NamedChain::OptimismGoerli,
         NamedChain::OptimismSepolia,
-        NamedChain::ArbitrumGoerli,
         NamedChain::ArbitrumSepolia,
         NamedChain::BinanceSmartChainTestnet,
-        NamedChain::BaseGoerli,
         NamedChain::BaseSepolia,
         NamedChain::AvalancheFuji,
     ];

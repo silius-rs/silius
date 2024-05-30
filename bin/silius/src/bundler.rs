@@ -174,18 +174,15 @@ where
         SendStrategy::Flashbots => {
             let relay_endpoints: Vec<String> = match chain_conn
                 .named()
-                .expect("Flashbots is only supported on Mainnet, Goerli and Sepolia")
+                .expect("Flashbots is only supported on Mainnet, and Sepolia")
             {
                 NamedChain::Mainnet => {
                     vec![flashbots_relay_endpoints::FLASHBOTS.into()]
                 }
-                NamedChain::Goerli => {
-                    vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.into()]
-                }
                 NamedChain::Sepolia => {
                     vec![flashbots_relay_endpoints::FLASHBOTS_SEPOLIA.into()]
                 }
-                _ => panic!("Flashbots is only supported on Mainnet, Goerli and Sepolia"),
+                _ => panic!("Flashbots is only supported on Mainnet, and Sepolia"),
             };
 
             let client = Arc::new(FlashbotsClient::new(

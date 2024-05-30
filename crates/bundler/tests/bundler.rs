@@ -108,65 +108,6 @@ async fn start_mock_server() -> eyre::Result<(ServerHandle, MockFlashbotsBlockBu
     Ok((handle, mock_relay))
 }
 
-#[tokio::test]
-#[ignore]
-async fn test_simulate_bundle_flashbots_goerli() -> eyre::Result<()> {
-    dotenv::dotenv().ok();
-    let eth_client_address = std::env::var("WS_RPC_URL").expect("WS_RPC_URL env var not set");
-    let eth_client = Arc::new(Provider::<Ws>::connect(eth_client_address).await?);
-    let dir = format!(
-        "{}/.silius/0x129D197b2a989C6798601A49D89a4AEC822A17a3",
-        std::env::var("HOME").unwrap()
-    );
-    let wallet = Wallet::from_file(dir.into(), 5, true)?;
-
-    let client = FlashbotsClient::new(
-        eth_client.clone(),
-        Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.into()]),
-        wallet.clone(),
-    )?;
-
-    let approve = approveCall {
-        // UniswapV2Router address
-        guy: alloy_Address::parse_checksummed("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", None)
-            .unwrap(),
-        wad: alloy_U256::MAX,
-    };
-    let approve_call_data = approve.abi_encode();
-
-    let address = wallet.signer.address();
-    let nonce = eth_client.get_transaction_count(address.clone(), None).await?;
-
-    let (max_fee_per_gas, max_priority_fee) = eth_client.estimate_eip1559_fees(None).await?;
-
-    let approve_tx_req = TypedTransaction::Eip1559(Eip1559TransactionRequest {
-        to: Some(NameOrAddress::Address(
-            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse::<H160>()?,
-        )),
-        from: Some(address),
-        data: Some(approve_call_data.into()),
-        chain_id: Some(U64::from(5)),
-        max_fee_per_gas: Some(max_fee_per_gas),
-        max_priority_fee_per_gas: Some(max_priority_fee),
-        gas: Some(U256::from(1000000u64)),
-        nonce: Some(nonce.clone()),
-        value: None,
-        access_list: Default::default(),
-    });
-
-    let sim_bundle_req = client.generate_bundle_req(vec![approve_tx_req.clone()], true).await?;
-    let pre_simulation_block = sim_bundle_req.simulation_block().unwrap();
-
-    let simulation_res = client.simulate_flashbots_bundle(&sim_bundle_req).await?;
-    let post_simulation_block = simulation_res.simulation_block;
-    let coinbase_diff = simulation_res.coinbase_diff;
-
-    assert_eq!(pre_simulation_block, post_simulation_block);
-    assert_ne!(coinbase_diff, U256::zero());
-
-    Ok(())
-}
-
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]
 async fn test_send_bundle_flashbots() -> eyre::Result<()> {
