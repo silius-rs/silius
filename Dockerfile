@@ -17,6 +17,9 @@ COPY --from=planner /app/recipe.json recipe.json
 ARG BUILD_PROFILE=release
 ENV BUILD_PROFILE $BUILD_PROFILE
 
+# Set the build target platform
+ARG TARGETPLATFORM
+
 # Install system dependencies
 RUN apt-get update && apt-get -y upgrade && apt-get install -y pkg-config libclang-dev libssl-dev
 
@@ -30,7 +33,8 @@ RUN cargo chef cook --profile $BUILD_PROFILE --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN cargo build --profile $BUILD_PROFILE --locked
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then JEMALLOC_SYS_WITH_LG_PAGE=16 ; fi && \
+    cargo build --profile $BUILD_PROFILE --locked
 
 # Copy application
 RUN cp /app/target/$BUILD_PROFILE/silius /app/silius
