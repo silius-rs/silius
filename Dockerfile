@@ -39,14 +39,11 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then JEMALLOC_SYS_WITH_LG_PAGE=16 
 # Copy application
 RUN cp /app/target/$BUILD_PROFILE/silius /app/silius
 
-# Use alpine as a runtime image
-FROM frolvlad/alpine-glibc:alpine-3.17 AS runtime
+# Use ubuntu as a runtime image
+FROM --platform=$TARGETPLATFORM ubuntu AS runtime
 
 # Create data folder
 RUN mkdir -p /data/silius
-
-# Install system dependencies
-RUN apk add openssl1.1-compat
 
 # Copy silus binary
 COPY --from=builder /app/silius /usr/local/bin/silius
