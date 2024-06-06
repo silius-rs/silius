@@ -23,7 +23,7 @@ ethers = { workspace = true }
 
 # rpc
 hyper = { version = "0.14.20" }
-hyper-tls = { version = "0.5.0" }
+hyper-tls = { version = "0.5.0", features = ["vendored"] }
 jsonrpsee = { workspace = true }
 tower = { version = "0.4.13" }
 tower-http = { version = "0.4.0", features = ["cors"] }

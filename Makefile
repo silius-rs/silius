@@ -71,3 +71,38 @@ clean:
 	cd crates/contracts/thirdparty/account-abstraction && yarn clean && cd ../..
 	cd tests/thirdparty/bundler && yarn clear && cd ../..
 	cargo clean
+
+# Heavily inspired by Lighthouse: https://github.com/sigp/lighthouse/blob/693886b94176faa4cb450f024696cb69cda2fe58/Makefile
+# docker image cross-platform build
+
+GIT_TAG = $(shell git describe --tags)
+BIN_DIR = dist/bin
+BUILD_PATH = target
+PROFILE = release
+
+DOCKER_IMAGE_NAME = ghcr.io/silius-rs/silius
+
+docker-build-push:
+	$(call docker_build_push)
+
+define docker_build_push
+	$(MAKE) fetch-thirdparty
+	$(MAKE) setup-thirdparty
+
+	RUSTFLAGS="-C link-arg=-lgcc -Clink-arg=-static-libgcc" \
+		cross build --target x86_64-unknown-linux-gnu --features "" --profile "$(PROFILE)"
+	mkdir -p $(BIN_DIR)/amd64
+	cp $(BUILD_PATH)/x86_64-unknown-linux-gnu/$(PROFILE)/silius $(BIN_DIR)/amd64/silius
+
+	RUSTFLAGS="-C link-arg=-lgcc -Clink-arg=-static-libgcc" JEMALLOC_SYS_WITH_LG_PAGE=16 \
+		cross build --target aarch64-unknown-linux-gnu --features "" --profile "$(PROFILE)"
+	mkdir -p $(BIN_DIR)/arm64
+	cp $(BUILD_PATH)/aarch64-unknown-linux-gnu/$(PROFILE)/silius $(BIN_DIR)/arm64/silius
+
+	docker buildx build --file ./Dockerfile.cross . \
+		--platform linux/amd64,linux/arm64 \
+		--tag $(DOCKER_IMAGE_NAME):$(GIT_TAG) \
+		--tag $(DOCKER_IMAGE_NAME):$(GIT_TAG) \
+		--provenance=false \
+		--push
+endef

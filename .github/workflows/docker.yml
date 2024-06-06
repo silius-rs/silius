@@ -3,24 +3,42 @@ on:
     branches:
       - main
 
-name: Create and publish a Docker image
+name: docker
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build_and_push_docker_image:
+  build:
+    name: build and push docker image
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       packages: write
-
+      contents: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # github action worker got about 14GB available space for building which is not enough
+      # remove some unused binary in the image to get more spaces
+      - name: Make more space to compilation
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.78.0
+      
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - uses: taiki-e/install-action@cross
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -29,51 +47,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get Git Tag
-        run: echo "tags=$(git describe --tags)" >> $GITHUB_OUTPUT
-        id: tag
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
       - name: Fetch third-party dependencies
         run: |
           make fetch-thirdparty
-  
+
       - name: Setup Yarn cache - submodule "thirdparty/account-abstraction"
         uses: actions/setup-node@v3
         with:
           node-version: '16.17'
           cache: 'yarn'
           cache-dependency-path: crates/contracts/thirdparty/account-abstraction
-  
+    
       - name: Setup Yarn cache - submodule "thirdparty/bundler"
         uses: actions/setup-node@v3
         with:
           node-version: '16.17'
           cache: 'yarn'
           cache-dependency-path: tests/thirdparty/bundler
-        
-      - name: Setup third-party dependencies
+
+      - name: Install solc
+        run: .github/scripts/install_solc.sh
+
+      - name: Set up Docker builder
         run: |
-          make setup-thirdparty
+          docker run --privileged --rm tonistiigi/binfmt --install arm64,amd64
+          docker buildx create --use --name cross-builder
 
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          provenance: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and push Silius image
+        run: make docker-build-push

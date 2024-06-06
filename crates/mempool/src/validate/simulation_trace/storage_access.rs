@@ -153,7 +153,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                                 uo.sender == stake_info_l.address &&
                                     stake_info[FACTORY_LEVEL].is_staked())
                             {
-                                slot_staked = slot.clone();
+                                slot_staked.clone_from(&slot);
                             }
                         } else if *addr == stake_info_l.address // [STO-031] - access the entity's own storage (if entity staked)
                             || self.associated_with_slot(&stake_info_l.address, &slot, &slots)? // [STO-032] - read/write Access to storage slots that is associated with the entity, in any non-entity contract (if entity staked)
@@ -161,7 +161,7 @@ impl<M: Middleware> SimulationTraceCheck<M> for StorageAccess {
                         // [STO-033] - read-only access to any storage in non-entity contract (if
                         // entity staked)
                         {
-                            slot_staked = slot.clone();
+                            slot_staked.clone_from(&slot);
                         } else {
                             return Err(SimulationError::StorageAccess { slot });
                         }

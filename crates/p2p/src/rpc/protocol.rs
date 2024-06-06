@@ -57,7 +57,7 @@ pub struct ProtocolId {
     /// The encoding of the RPC.
     pub encoding: Encoding,
 
-    ///
+    /// The protocol id.
     protocol_id: String,
 }
 

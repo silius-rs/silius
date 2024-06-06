@@ -1,9 +1,17 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.76.0 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.78.0 AS chef
 WORKDIR /app
 
 LABEL org.opencontainers.image.source=https://github.com/silius-rs/silius
 LABEL org.opencontainers.image.description="Silius - ERC-4337 (Account Abstraction) bundler implementation in Rust."
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
+
+# Install system dependencies
+RUN apt-get update && apt-get -y upgrade && apt-get install -y wget pkg-config libclang-dev libssl-dev
+
+# Install solc
+RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux"
+RUN mv solc-static-linux /usr/local/bin/solc
+RUN chmod a+x /usr/local/bin/solc
 
 # build cargo-chef plan
 FROM chef AS planner
@@ -17,30 +25,22 @@ COPY --from=planner /app/recipe.json recipe.json
 ARG BUILD_PROFILE=release
 ENV BUILD_PROFILE $BUILD_PROFILE
 
-# Set the build target platform
-ARG TARGETPLATFORM
-
-# Install system dependencies
-RUN apt-get update && apt-get -y upgrade && apt-get install -y pkg-config libclang-dev libssl-dev
-
-# Install solc
-RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux"
-RUN mv solc-static-linux /usr/local/bin/solc
-RUN chmod a+x /usr/local/bin/solc
+# Extra Cargo features
+ARG FEATURES=""
+ENV FEATURES $FEATURES
 
 # Builds dependencies
-RUN cargo chef cook --profile $BUILD_PROFILE --recipe-path recipe.json
+RUN cargo chef cook --profile $BUILD_PROFILE --features "$FEATURES" --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then JEMALLOC_SYS_WITH_LG_PAGE=16 ; fi && \
-    cargo build --profile $BUILD_PROFILE --locked
+RUN cargo build --profile $BUILD_PROFILE --features "$FEATURES" --locked
 
 # Copy application
 RUN cp /app/target/$BUILD_PROFILE/silius /app/silius
 
 # Use ubuntu as a runtime image
-FROM --platform=$TARGETPLATFORM ubuntu AS runtime
+FROM ubuntu:22.04 AS runtime
 
 # Create data folder
 RUN mkdir -p /data/silius

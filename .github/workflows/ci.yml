@@ -8,7 +8,7 @@ name: ci
 
 jobs:
   build_and_test:
-    name: Silius - ERC-4337 bundler in Rust
+    name: build and test Silius
     runs-on: ubuntu-latest
     steps:
       # github action worker got about 14GB available space for building which is not enough
@@ -22,8 +22,8 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Setup Rust toolchain (stable)
-        uses: dtolnay/rust-toolchain@1.76.0
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@1.78.0
         with:
           components: clippy
 
@@ -94,7 +94,7 @@ jobs:
           make lint
   
   bundler_spec_tests:
-    name: Run bundler spec tests
+    name: bundler spec tests
     runs-on: ubuntu-latest
     needs: build_and_test
     steps:
