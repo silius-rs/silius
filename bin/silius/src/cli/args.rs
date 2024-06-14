@@ -1,9 +1,9 @@
 use crate::utils::{
     parse_address, parse_duration, parse_enr, parse_label_value, parse_send_bundle_mode,
-    parse_u256, parse_uopool_mode,
+    parse_u256, parse_uopool_mode, validate_private_key,
 };
 use alloy_chains::{Chain, NamedChain};
-use clap::{Parser, ValueEnum};
+use clap::{ArgGroup, Parser, ValueEnum};
 use discv5::Enr;
 use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
@@ -37,6 +37,7 @@ pub enum StorageType {
 
 /// Bundler CLI args
 #[derive(Debug, Clone, Parser, PartialEq)]
+#[clap(group(ArgGroup::new("account").required(true).args(&["mnemonic_file", "private_key"])))]
 pub struct BundlerArgs {
     /// Bundler gRPC address to listen on.
     #[clap(long = "bundler.addr", default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
@@ -47,8 +48,16 @@ pub struct BundlerArgs {
     pub bundler_port: u16,
 
     /// Path to the mnemonic file.
-    #[clap(long)]
-    pub mnemonic_file: PathBuf,
+    #[clap(long, group = "account")]
+    pub mnemonic_file: Option<PathBuf>,
+
+    /// Private key for the wallet
+    #[clap(long, value_parser=validate_private_key, group = "account")]
+    pub private_key: Option<String>,
+
+    /// Flashbots private key
+    #[clap(long, value_parser=validate_private_key, conflicts_with = "mnemonic_file")]
+    pub flashbots_private_key: Option<String>,
 
     /// The bundler beneficiary address.
     #[clap(long, value_parser=parse_address)]
@@ -364,8 +373,97 @@ mod tests {
         ];
         assert_eq!(
             BundlerArgs {
-                mnemonic_file: PathBuf::from(
+                mnemonic_file: Some(PathBuf::from(
                     "~/.silius/0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990"
+                )),
+                private_key: None,
+                flashbots_private_key: None,
+                beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
+                    .unwrap(),
+                min_balance: U256::from(100000000000000000_u64),
+                bundle_interval: 10,
+                send_bundle_mode: SendStrategy::EthereumClient,
+                bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                bundler_port: 3002,
+                enable_access_list: false,
+            },
+            BundlerArgs::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn bundler_args_private_key() {
+        let args = vec![
+            "bundlerargs",
+            "--private-key",
+            "4c5e5d3076c425e8d8affe9c2a0da32b779820ef008fdda02d5c7b783674d8c4",
+            "--beneficiary",
+            "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
+            "--min-balance",
+            "100000000000000000",
+            "--bundler.addr",
+            "127.0.0.1",
+            "--bundler.port",
+            "3002",
+            "--bundle-interval",
+            "10",
+        ];
+        assert_eq!(
+            BundlerArgs {
+                mnemonic_file: None,
+                private_key: Some(
+                    String::from_str(
+                        "4c5e5d3076c425e8d8affe9c2a0da32b779820ef008fdda02d5c7b783674d8c4"
+                    )
+                    .unwrap()
+                ),
+                flashbots_private_key: None,
+                beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
+                    .unwrap(),
+                min_balance: U256::from(100000000000000000_u64),
+                bundle_interval: 10,
+                send_bundle_mode: SendStrategy::EthereumClient,
+                bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                bundler_port: 3002,
+                enable_access_list: false,
+            },
+            BundlerArgs::try_parse_from(args).unwrap()
+        );
+    }
+
+    #[test]
+    fn bundler_args_private_key_flashbots_private_key() {
+        let args = vec![
+            "bundlerargs",
+            "--private-key",
+            "4c5e5d3076c425e8d8affe9c2a0da32b779820ef008fdda02d5c7b783674d8c4",
+            "--flashbots-private-key",
+            "df218be02efd744fc91f93d7f3c49676fb99b296e99c1410fccd65be79d608a7",
+            "--beneficiary",
+            "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
+            "--min-balance",
+            "100000000000000000",
+            "--bundler.addr",
+            "127.0.0.1",
+            "--bundler.port",
+            "3002",
+            "--bundle-interval",
+            "10",
+        ];
+        assert_eq!(
+            BundlerArgs {
+                mnemonic_file: None,
+                private_key: Some(
+                    String::from_str(
+                        "4c5e5d3076c425e8d8affe9c2a0da32b779820ef008fdda02d5c7b783674d8c4"
+                    )
+                    .unwrap()
+                ),
+                flashbots_private_key: Some(
+                    String::from_str(
+                        "df218be02efd744fc91f93d7f3c49676fb99b296e99c1410fccd65be79d608a7"
+                    )
+                    .unwrap()
                 ),
                 beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
                     .unwrap(),
