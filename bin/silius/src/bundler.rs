@@ -121,15 +121,41 @@ where
     let chain_conn = Chain::from(chain_id);
 
     let wallet: Wallet;
-    if args.send_bundle_mode == SendStrategy::Flashbots {
-        wallet = Wallet::from_file(args.mnemonic_file.into(), chain_id, true)
-            .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
-        info!("Wallet Signer {:?}", wallet.signer);
-        info!("Flashbots Signer {:?}", wallet.flashbots_signer);
+
+    if let Some(mnemonic_file) = args.mnemonic_file {
+        if args.send_bundle_mode == SendStrategy::Flashbots {
+            wallet = Wallet::from_file(mnemonic_file.into(), chain_id, true)
+                .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
+            info!("Wallet Signer {:?}", wallet.signer);
+            info!("Flashbots Signer {:?}", wallet.flashbots_signer);
+        } else {
+            wallet = Wallet::from_file(mnemonic_file.into(), chain_id, false)
+                .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
+            info!("{:?}", wallet.signer);
+        }
+    } else if let Some(private_key) = args.private_key {
+        if args.send_bundle_mode == SendStrategy::Flashbots {
+            wallet = Wallet::from_private_key(
+                private_key.as_str(),
+                chain_id,
+                true,
+                args.flashbots_private_key.as_deref(),
+            )
+            .map_err(|error| {
+                eyre::format_err!("Could not load from private key or flashbots key: {}", error)
+            })?;
+            info!("Wallet Signer {:?}", wallet.signer);
+            info!("Flashbots Signer {:?}", wallet.flashbots_signer);
+        } else {
+            if args.flashbots_private_key.is_some() {
+                info!("Flashbots key is ignored since send bundle mode is not Flashbots");
+            }
+            wallet = Wallet::from_private_key(private_key.as_str(), chain_id, false, None)
+                .map_err(|error| eyre::format_err!("Could not load from private key: {}", error))?;
+            info!("{:?}", wallet.signer);
+        }
     } else {
-        wallet = Wallet::from_file(args.mnemonic_file.into(), chain_id, false)
-            .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
-        info!("{:?}", wallet.signer);
+        panic!("Neither mnemonic file nor private key was found");
     }
 
     info!("Connecting to uopool gRPC service...");

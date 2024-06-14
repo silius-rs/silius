@@ -2,7 +2,7 @@
 
 use crate::{UserOperation, UserOperationSigned};
 use ethers::{
-    prelude::{k256::ecdsa::SigningKey, rand},
+    prelude::{k256::ecdsa::SigningKey, rand, LocalWallet},
     signers::{coins_bip39::English, MnemonicBuilder, Signer},
     types::Address,
 };
@@ -137,6 +137,35 @@ impl Wallet {
             })
         } else {
             Ok(Self { signer: wallet.with_chain_id(chain_id), flashbots_signer: None })
+        }
+    }
+
+    /// Create a new wallet from the given private key
+    /// if `flashbots_key` is true, then `flashbots_private_key` must be provided
+    ///
+    /// # Arguments
+    /// * `private_key` - The private key
+    /// * `chain_id` - The chain id of the blockchain network to be used
+    /// * `flashbots_key` - Whether to create a Flashbots key
+    /// * `flashbots_private_key` - The private key for the Flashbots wallet
+    ///
+    /// # Returns
+    /// * `Self` - A new `Wallet` instance
+    pub fn from_private_key(
+        private_key: &str,
+        chain_id: u64,
+        flashbots_key: bool,
+        flashbots_private_key: Option<&str>,
+    ) -> eyre::Result<Self> {
+        let wallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id);
+        if flashbots_key {
+            let flashbots_wallet = flashbots_private_key
+                .expect("Flashbots private key is required")
+                .parse::<LocalWallet>()?
+                .with_chain_id(chain_id);
+            Ok(Self { signer: wallet, flashbots_signer: Some(flashbots_wallet) })
+        } else {
+            Ok(Self { signer: wallet, flashbots_signer: None })
         }
     }
 

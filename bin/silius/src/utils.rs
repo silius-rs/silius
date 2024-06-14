@@ -87,3 +87,19 @@ where
 
     Ok(())
 }
+
+pub fn validate_private_key(hex_string: &str) -> Result<String, String> {
+    let chars = hex_string.chars();
+
+    if chars.clone().count() != 64 {
+        return Err(format!("{hex_string} is not a valid private key"));
+    }
+
+    for c in chars {
+        if !c.is_ascii_hexdigit() {
+            return Err(format!("{hex_string} is not a valid hexadecimal string"));
+        }
+    }
+
+    Ok(String::from(hex_string))
+}
