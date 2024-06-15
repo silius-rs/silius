@@ -1,6 +1,6 @@
 use crate::utils::{
     parse_address, parse_duration, parse_enr, parse_label_value, parse_send_bundle_mode,
-    parse_u256, parse_uopool_mode, validate_private_key,
+    parse_u256, parse_uopool_mode,
 };
 use alloy_chains::{Chain, NamedChain};
 use clap::{ArgGroup, Parser, ValueEnum};
@@ -52,11 +52,11 @@ pub struct BundlerArgs {
     pub mnemonic_file: Option<PathBuf>,
 
     /// Private key for the wallet
-    #[clap(long, value_parser=validate_private_key, group = "account")]
+    #[clap(long, group = "account")]
     pub private_key: Option<String>,
 
     /// Flashbots private key
-    #[clap(long, value_parser=validate_private_key, conflicts_with = "mnemonic_file")]
+    #[clap(long, conflicts_with = "mnemonic_file")]
     pub flashbots_private_key: Option<String>,
 
     /// The bundler beneficiary address.
