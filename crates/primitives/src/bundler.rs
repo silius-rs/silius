@@ -24,4 +24,6 @@ pub enum SendStrategy {
     Flashbots,
     /// Send the bundle to the Ethereum execution client over conditional RPC method
     Conditional,
+    /// Sends the bundle to the Fastlane relay
+    Fastlane,
 }

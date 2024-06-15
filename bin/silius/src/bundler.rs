@@ -8,7 +8,7 @@ use crate::{
 use alloy_chains::{Chain, NamedChain};
 use ethers::{providers::Middleware, types::Address};
 use parking_lot::RwLock;
-use silius_bundler::{ConditionalClient, EthereumClient, FlashbotsClient};
+use silius_bundler::{ConditionalClient, EthereumClient, FastlaneClient, FlashbotsClient};
 use silius_contracts::EntryPoint;
 use silius_grpc::{
     bundler_client::BundlerClient, bundler_service_run, uo_pool_client::UoPoolClient,
@@ -24,7 +24,7 @@ use silius_metrics::{launch_metrics_exporter, mempool::MetricsHandler};
 use silius_primitives::{
     bundler::SendStrategy,
     constants::{
-        entry_point, flashbots_relay_endpoints,
+        entry_point, fastlane_relay_endpoints, flashbots_relay_endpoints,
         storage::DATABASE_FOLDER_NAME,
         supported_chains::CHAINS,
         validation::reputation::{
@@ -193,6 +193,32 @@ where
                 Some(relay_endpoints),
                 wallet.clone(),
             )?);
+            bundler_service_run(
+                SocketAddr::new(args.bundler_addr, args.bundler_port),
+                wallet,
+                entry_points,
+                chain_conn,
+                args.beneficiary,
+                args.min_balance,
+                args.bundle_interval,
+                eth_client,
+                client,
+                uopool_grpc_client,
+                metrics_args.enable_metrics,
+                args.enable_access_list,
+            );
+        }
+        SendStrategy::Fastlane => {
+            let relay_endpoints: Vec<String> =
+                match chain_conn.named().expect("Fastlane is only supported on Polygon") {
+                    NamedChain::Polygon => {
+                        vec![fastlane_relay_endpoints::FASTLANE_POLYGON.into()]
+                    }
+                    _ => panic!("Fastlane is only supported on Polygon"),
+                };
+
+            let client =
+                Arc::new(FastlaneClient::new(eth_client.clone(), relay_endpoints, wallet.clone()));
             bundler_service_run(
                 SocketAddr::new(args.bundler_addr, args.bundler_port),
                 wallet,
