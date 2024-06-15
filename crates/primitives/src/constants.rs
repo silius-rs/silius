@@ -85,6 +85,12 @@ pub mod flashbots_relay_endpoints {
     pub const FLASHBOTS_SEPOLIA: &str = "https://relay-sepolia.flashbots.net";
 }
 
+/// Fastlane relay endpoints
+pub mod fastlane_relay_endpoints {
+    // polygon
+    pub const FASTLANE_POLYGON: &str = "https://polygon-test-rpc.fastlane.xyz";
+}
+
 /// Supported chains
 pub mod supported_chains {
     use alloy_chains::NamedChain;

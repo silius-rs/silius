@@ -1,5 +1,4 @@
 use crate::bundler::SendBundleOp;
-use alloy_chains::{Chain, NamedChain};
 use ethers::{
     middleware::SignerMiddleware,
     providers::Middleware,
@@ -9,7 +8,7 @@ use ethers::{
             conditional::{AccountStorage, ConditionalOptions},
             eip2718::TypedTransaction,
         },
-        Address, H256,
+        Address, BlockNumber, H256,
     },
 };
 use silius_primitives::{simulation::StorageMap, Wallet};
@@ -18,10 +17,13 @@ use tracing::trace;
 
 /// A type alias for the Ethereum Conditional Signer client
 #[derive(Clone)]
-pub struct ConditionalClient<M>(pub SignerMiddleware<Arc<M>, LocalWallet>);
+pub struct FastlaneClient<M> {
+    pub client: SignerMiddleware<Arc<M>, LocalWallet>,
+    pub relay_endpoints: Vec<String>,
+}
 
 #[async_trait::async_trait]
-impl<M> SendBundleOp for ConditionalClient<M>
+impl<M> SendBundleOp for FastlaneClient<M>
 where
     M: Middleware + 'static,
 {
@@ -51,22 +53,25 @@ where
             known_accounts.insert(k, AccountStorage::SlotValues(v));
         }
 
-        let signed_tx = self.0.sign_transaction(bundle).await?;
+        let signed_tx = self.client.sign_transaction(bundle).await?;
 
-        let prefix: Option<String> =
-            if self.0.get_chainid().await? == Chain::from_named(NamedChain::Polygon).id().into() {
-                Some("bor".to_string())
-            } else {
-                None
-            };
+        let prefix: Option<String> = Some("pfl".to_string());
+        let block = self.client.get_block(BlockNumber::Latest).await?;
+
+        let mut options = ConditionalOptions { known_accounts, ..Default::default() };
+
+        if let Some(block) = block {
+            if let Some(block_number) = block.number {
+                options.block_number_min = Some(block_number.into());
+                options.block_number_max = Some((block_number + 100).into()); // around 10 minutes
+                options.timestamp_min = Some(block.timestamp.as_u64());
+                options.timestamp_max = Some(block.timestamp.as_u64() + 420); // around 15 minutes
+            }
+        }
 
         let tx = self
-            .0
-            .send_raw_transaction_conditional(
-                signed_tx,
-                prefix,
-                ConditionalOptions { known_accounts, ..Default::default() },
-            )
+            .client
+            .send_raw_transaction_conditional(signed_tx, prefix, options)
             .await?
             .interval(Duration::from_millis(75));
         let tx_hash = tx.tx_hash();
@@ -79,7 +84,7 @@ where
     }
 }
 
-impl<M> ConditionalClient<M>
+impl<M> FastlaneClient<M>
 where
     M: Middleware + 'static,
 {
@@ -91,8 +96,8 @@ where
     ///
     /// # Returns
     /// * `ConditionalClient` - A [Ethereum Signer Middleware](ConditionalClient)
-    pub fn new(eth_client: Arc<M>, wallet: Wallet) -> Self {
+    pub fn new(eth_client: Arc<M>, relay_endpoints: Vec<String>, wallet: Wallet) -> Self {
         let signer = SignerMiddleware::new(eth_client, wallet.signer);
-        Self(signer)
+        Self { client: signer, relay_endpoints }
     }
 }

@@ -1991,7 +1991,7 @@ dependencies = [
 [[package]]
 name = "ethers"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "ethers-addressbook 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
  "ethers-contract 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
@@ -2018,7 +2018,7 @@ dependencies = [
 [[package]]
 name = "ethers-addressbook"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "ethers-core 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
  "once_cell",
@@ -2048,7 +2048,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "const-hex",
  "ethers-contract-abigen 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
@@ -2090,7 +2090,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-abigen"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "Inflector",
  "const-hex",
@@ -2129,7 +2129,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-derive"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "Inflector",
  "const-hex",
@@ -2174,7 +2174,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "arrayvec",
  "bytes",
@@ -2245,7 +2245,7 @@ dependencies = [
 [[package]]
 name = "ethers-etherscan"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "chrono",
  "ethers-core 2.0.14 (git+https://github.com/Vid201/ethers-rs?branch=feat/patch)",
@@ -2322,7 +2322,7 @@ dependencies = [
 [[package]]
 name = "ethers-middleware"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -2385,7 +2385,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -2442,7 +2442,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -2492,7 +2492,7 @@ dependencies = [
 [[package]]
 name = "ethers-solc"
 version = "2.0.14"
-source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#c9de1525d69f601790e7d5ae44d34d85b615d62f"
+source = "git+https://github.com/Vid201/ethers-rs?branch=feat/patch#14d410da533c8cdc3dc647349eac2e2f3141da6c"
 dependencies = [
  "cfg-if",
  "const-hex",
@@ -3334,7 +3334,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -3393,7 +3393,7 @@ dependencies = [
  "iana-time-zone-haiku",
  "js-sys",
  "wasm-bindgen",
- "windows-core 0.52.0",
+ "windows-core 0.51.1",
 ]
 
 [[package]]
