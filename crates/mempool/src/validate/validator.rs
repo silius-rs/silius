@@ -251,6 +251,7 @@ where
                 min_stake: Some(reputation.min_stake()),
                 min_unstake_delay: Some(reputation.min_unstake_delay()),
                 topic: None,
+                ignore_prev: false,
             };
         }
 
@@ -269,6 +270,7 @@ where
         if let Some(uo) = mempool.get_prev_by_sender(uo) {
             out.prev_hash = Some(uo.hash);
         }
+
         debug!("Simulate user operation from {:?}", uo.sender);
         let sim_res = self.simulate_validation(uo).await?;
 
