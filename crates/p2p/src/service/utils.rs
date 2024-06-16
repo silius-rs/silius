@@ -48,7 +48,8 @@ pub fn save_private_key_to_file(key: &Keypair, path: &PathBuf) {
 
 /// Fetch mempool configuration from IPFS.
 pub async fn fetch_mempool_config(cid: String) -> Result<MempoolConfig> {
-    let body = reqwest::get(format!("{IPFS_GATEWAY}/{cid}")).await?.text().await?;
+    let body =
+        reqwest::Client::new().get(format!("{IPFS_GATEWAY}/{cid}")).send().await?.text().await?;
     let mempool_config: MempoolConfig = serde_yml::from_str(&body)?;
     Ok(mempool_config)
 }
