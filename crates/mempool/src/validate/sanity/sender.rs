@@ -51,11 +51,15 @@ impl<M: Middleware> SanityCheck<M> for Sender {
             return Ok(());
         }
 
-        let uo_prev = mempool
-            .get_all_by_sender(&uo.sender)
-            .iter()
-            .find(|uo_prev| uo_prev.nonce == uo.nonce)
-            .cloned();
+        let mut uo_prev: Option<UserOperation> = None;
+
+        if !helper.val_config.ignore_prev {
+            uo_prev = mempool
+                .get_all_by_sender(&uo.sender)
+                .iter()
+                .find(|uo_prev| uo_prev.nonce == uo.nonce)
+                .cloned();
+        }
 
         if let Some(uo_prev) = uo_prev {
             if uo.max_fee_per_gas <

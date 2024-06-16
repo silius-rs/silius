@@ -45,6 +45,7 @@ pub struct ValidationConfig {
     pub min_stake: Option<U256>,
     pub min_unstake_delay: Option<U256>,
     pub topic: Option<String>,
+    pub ignore_prev: bool,
 }
 
 /// Code hash - hash of the code of the contract

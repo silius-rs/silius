@@ -542,7 +542,7 @@ where
     if let Some(chain) = chain {
         if !CHAINS.contains(&chain) {
             warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            warn!("Chain {:?} is not officially supported yet! You could possibly meet a lot of problems with silius. Use at your own risk!!", chain);
+            warn!("Chain {:?} is not officially supported yet! You could possibly meet a lot of problems with Silius. Use at your own risk!", chain);
             warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         }
 

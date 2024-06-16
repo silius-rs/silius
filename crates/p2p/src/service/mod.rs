@@ -304,6 +304,7 @@ impl Network {
                                             min_stake: Some(canonical_mempool_config.min_stake),
                                             min_unstake_delay: None,
                                             topic: Some(message.topic.to_string()),
+                                            ignore_prev: false,
                                         }
                                     })
                                     .expect("mempool channel should be open all the time");
@@ -424,7 +425,7 @@ impl Network {
                         verified_at_block_hash,
                         validation_config,
                     } => {
-                        info!("Received user {user_operation:?} from ep {ep:?} verified in {verified_at_block_hash:?} to gossip over p2p!");
+                        info!("Received user operation (verified at {verified_at_block_hash:?}) to gossip over p2p: {user_operation:?}");
 
                         let user_op = VerifiedUserOperation::new(
                             user_operation.user_operation.clone(),
@@ -444,6 +445,7 @@ impl Network {
                                         min_stake: Some(first_mempool_config.min_stake),
                                         min_unstake_delay: None,
                                         topic: Some(first_mempool_topic.to_string()),
+                                        ignore_prev: true,
                                     },
                                 })
                                 .expect("mempool channel should be open all the time");
@@ -463,6 +465,7 @@ impl Network {
                                             min_stake: Some(canonical_mempool_config.min_stake),
                                             min_unstake_delay: None,
                                             topic: Some(canonical_mempool_topic.to_string()),
+                                            ignore_prev: true,
                                         },
                                     })
                                     .expect("mempool channel should be open all the time");
