@@ -1,7 +1,8 @@
 //! P2P primitives
 
 use crate::{
-    constants::entry_point, simulation::ValidationConfig, UserOperation, UserOperationSigned,
+    constants::entry_point, simulation::ValidationConfig, utils::deserialize_stringified_float,
+    UserOperation, UserOperationSigned,
 };
 use alloy_chains::Chain;
 use ethers::types::{Address, H160, U256 as EthersU256};
@@ -19,7 +20,7 @@ pub struct MempoolConfig {
     pub entry_point: Address,
     pub description: String,
     #[serde(rename = "minimumStake")]
-    #[serde(deserialize_with = "ethers::types::serde_helpers::deserialize_stringified_numeric")]
+    #[serde(deserialize_with = "deserialize_stringified_float")]
     pub min_stake: EthersU256,
     #[serde(skip_serializing, skip_deserializing)]
     pub id: String,

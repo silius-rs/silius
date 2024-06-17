@@ -57,12 +57,38 @@ pub async fn fetch_mempool_config(cid: String) -> Result<MempoolConfig> {
 #[cfg(test)]
 pub mod tests {
     use super::fetch_mempool_config;
+    use ethers::types::U256;
+
+    #[tokio::test]
+    async fn mempool_config_ethereum_sepolia() {
+        let cid = "QmdDwVFoEEcgv5qnaTB8ncnXGMnqrhnA5nYpRr4ouWe4AT";
+        let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
+        assert_eq!(mempool_config.min_stake, 0.into());
+    }
 
     #[tokio::test]
     #[ignore]
+    async fn mempool_config_arbitrum_sepolia() {
+        let cid = "QmVwhF77aVNzRUkMJNLDkeF9BtQMHLnfDY5ePpZ81uKLzA";
+        let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
+        assert_eq!(mempool_config.min_stake, 0.into());
+    }
+
+    #[tokio::test]
+    async fn mempool_config_polygon_mumbai() {
+        let cid = "QmQfRyE9iVTBqZ17hPSP4tuMzaez83Y5wD874ymyRtj9VE";
+        let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
+        assert_eq!(mempool_config.min_stake, 0.into());
+    }
+
+    #[tokio::test]
     async fn mempool_config_polygon() {
         let cid = "QmRJ1EPhmRDb8SKrPLRXcUBi2weUN8VJ8X9zUtXByC7eJg";
         let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
-        assert_eq!(mempool_config.min_stake, 500.into());
+        assert_eq!(mempool_config.min_stake, U256::from(500000000000000000000_u128));
+
+        let cid = "QmaHG3xiRYhxTth7vSTyZCyodBDrtj5hmEMz5DuzaJVKHH";
+        let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
+        assert_eq!(mempool_config.min_stake, U256::from(1000000000000000000000_u128));
     }
 }

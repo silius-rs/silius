@@ -4,6 +4,7 @@ use ethers::{
     types::{Address, Bytes, U256},
     utils::{hex, to_checksum},
 };
+use serde::Deserialize;
 
 /// Converts address to checksum address
 pub fn as_checksum_addr<S>(val: &Address, s: S) -> Result<S::Ok, S::Error>
@@ -42,6 +43,17 @@ where
     S: serde::Serializer,
 {
     serde_hex::SerHex::<serde_hex::StrictPfx>::serialize(val, s)
+}
+
+/// Helper to deserialize float string to U256
+pub fn deserialize_stringified_float<'de, D>(deserializer: D) -> Result<U256, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    let f: f64 = s.parse().unwrap_or(0.0);
+    let u = (f * 1e18).round() as u128;
+    Ok(U256::from(u))
 }
 
 /// If possible, parses address from the first 20 bytes

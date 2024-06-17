@@ -191,5 +191,5 @@ pub mod p2p {
     /// The maximum length for the IPFS CID string.
     pub const MAX_IPFS_CID_LENGTH: usize = 256;
     /// Public IPFS gateway.
-    pub const IPFS_GATEWAY: &str = "https://gateway.pinata.cloud/ipfs/";
+    pub const IPFS_GATEWAY: &str = "https://ipfs.io/ipfs";
 }
