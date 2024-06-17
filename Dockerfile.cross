@@ -4,6 +4,8 @@ LABEL org.opencontainers.image.source=https://github.com/silius-rs/silius
 LABEL org.opencontainers.image.description="Silius - ERC-4337 (Account Abstraction) bundler implementation in Rust."
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
+RUN apt-get update && apt-get -y upgrade && apt-get install -y ca-certificates
+
 ARG TARGETARCH
 
 COPY ./dist/bin/$TARGETARCH/silius /usr/local/bin/silius

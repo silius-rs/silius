@@ -6,7 +6,7 @@ LABEL org.opencontainers.image.description="Silius - ERC-4337 (Account Abstracti
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 # Install system dependencies
-RUN apt-get update && apt-get -y upgrade && apt-get install -y wget pkg-config libclang-dev libssl-dev
+RUN apt-get update && apt-get -y upgrade && apt-get install -y wget pkg-config libclang-dev libssl-dev ca-certificates
 
 # Install solc
 RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux"
