@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@1.78.0
+        uses: dtolnay/rust-toolchain@1.81.0
         with:
           components: clippy
 
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: eth-infinitism/bundler-spec-tests
-          ref: '08cbbfcb9e37b84c0ef9e546975f88fa638cac61'
+          ref: '4d6f66a95099bd79d1da1210212d8f517fbb9481'
           submodules: true
 
       - uses: actions/checkout@v4

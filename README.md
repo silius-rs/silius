@@ -22,7 +22,7 @@ For more information: <https://hackmd.io/@Vid201/aa-bundler-rust>
 
 **Prerequisites:**
 
-Rust version: 1.78.0
+Rust version: 1.81.0
 
 1. `libclang-dev`, `pkg-config` and `libssl-dev` on Debian/Ubuntu.
 2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.12.0](https://github.com/ethereum/go-ethereum/releases/tag/v1.12.0)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
@@ -136,7 +136,7 @@ make lint
 make test
 ```
 
-Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [08cbbfcb9e37b84c0ef9e546975f88fa638cac61](https://github.com/eth-infinitism/bundler-spec-tests/tree/08cbbfcb9e37b84c0ef9e546975f88fa638cac61)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
+Official [bundler spec tests](https://github.com/eth-infinitism/bundler-spec-tests) developed by the [eth-infinitism](https://github.com/eth-infinitism/) team are also included in the repo's CI pipeline (commit: [4d6f66a95099bd79d1da1210212d8f517fbb9481](https://github.com/eth-infinitism/bundler-spec-tests/tree/4d6f66a95099bd79d1da1210212d8f517fbb9481)). You can find more information on how to run tests [here](https://github.com/eth-infinitism/bundler-spec-tests). Make sure your contribution doesn't break the tests!
 
 ## Contact
 

@@ -20,7 +20,7 @@ authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/silius-rs/silius"
-rust-version = "1.78.0"
+rust-version = "1.81.0"
 keywords = [
     "silius",
     "primitives",

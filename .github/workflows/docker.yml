@@ -31,7 +31,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@1.78.0
+        uses: dtolnay/rust-toolchain@1.81.0
       
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
