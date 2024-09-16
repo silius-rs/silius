@@ -1,5 +1,3 @@
-version: "3"
-
 services:
   silius:
     image: ghcr.io/silius-rs/silius:latest

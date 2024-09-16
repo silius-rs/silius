@@ -9,7 +9,7 @@ case $1 in
 	;;
 
  start)
-	docker-compose up -d
+	docker compose up -d
     sleep 2
     silius node \
         --verbosity 4 \
@@ -30,7 +30,7 @@ case $1 in
     cd @account-abstraction && yarn deploy --network localhost
 	;;
  stop)
- 	docker-compose down
+ 	docker compose down
     kill $(cat bundler.pid)
     rm bundler.pid
 	;;
