@@ -78,11 +78,11 @@ where
         result_counter(self.inner().get_block_number().await, "silius_ethers_get_block_number")
     }
 
-    async fn send_transaction<T: Into<TypedTransaction> + Send + Sync>(
-        &self,
+    async fn send_transaction<'a, T: Into<TypedTransaction> + Send + Sync>(
+        &'a self,
         tx: T,
         block: Option<BlockId>,
-    ) -> Result<PendingTransaction<'_, Self::Provider>, Self::Error> {
+    ) -> Result<PendingTransaction<'a, Self::Provider>, Self::Error> {
         counter!("silius_ethers_send_transaction").increment(1);
         result_counter(
             self.inner().send_transaction(tx, block).await,
@@ -264,16 +264,18 @@ where
         result_counter(self.inner().watch(filter).await, "silius_ethers_watch")
     }
 
-    async fn watch_pending_transactions(
-        &self,
-    ) -> Result<FilterWatcher<'_, Self::Provider, H256>, Self::Error> {
+    async fn watch_pending_transactions<'a>(
+        &'a self,
+    ) -> Result<FilterWatcher<'a, Self::Provider, H256>, Self::Error> {
         counter!("silius_ethers_watch_pending_transactions").increment(1);
         result_counter(
             self.inner().watch_pending_transactions().await,
             "silius_ethers_watch_pending_transactions",
         )
     }
-    async fn watch_blocks(&self) -> Result<FilterWatcher<'_, Self::Provider, H256>, Self::Error> {
+    async fn watch_blocks<'a>(
+        &'a self,
+    ) -> Result<FilterWatcher<'a, Self::Provider, H256>, Self::Error> {
         counter!("silius_ethers_watch_blocks").increment(1);
         result_counter(self.inner().watch_blocks().await, "silius_ethers_watch_blocks")
     }
@@ -348,9 +350,9 @@ where
         )
     }
 
-    async fn subscribe_blocks(
-        &self,
-    ) -> Result<SubscriptionStream<'_, Self::Provider, Block<H256>>, Self::Error>
+    async fn subscribe_blocks<'a>(
+        &'a self,
+    ) -> Result<SubscriptionStream<'a, Self::Provider, Block<H256>>, Self::Error>
     where
         <Self as Middleware>::Provider: PubsubClient,
     {
@@ -358,9 +360,9 @@ where
         result_counter(self.inner().subscribe_blocks().await, "silius_ethers_subscribe_blocks")
     }
 
-    async fn subscribe_pending_txs(
-        &self,
-    ) -> Result<SubscriptionStream<'_, Self::Provider, H256>, Self::Error>
+    async fn subscribe_pending_txs<'a>(
+        &'a self,
+    ) -> Result<SubscriptionStream<'a, Self::Provider, H256>, Self::Error>
     where
         <Self as Middleware>::Provider: PubsubClient,
     {
@@ -371,9 +373,9 @@ where
         )
     }
 
-    async fn subscribe_full_pending_txs(
-        &self,
-    ) -> Result<SubscriptionStream<'_, Self::Provider, Transaction>, Self::Error>
+    async fn subscribe_full_pending_txs<'a>(
+        &'a self,
+    ) -> Result<SubscriptionStream<'a, Self::Provider, Transaction>, Self::Error>
     where
         <Self as Middleware>::Provider: PubsubClient,
     {

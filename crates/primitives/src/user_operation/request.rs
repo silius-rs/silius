@@ -76,13 +76,7 @@ impl From<UserOperationRequest> for UserOperationSigned {
                 }
             },
             paymaster_and_data: user_operation.paymaster_and_data,
-            signature: {
-                if let Some(signature) = user_operation.signature {
-                    signature
-                } else {
-                    Bytes::default()
-                }
-            },
+            signature: { user_operation.signature.unwrap_or_default() },
         }
     }
 }
