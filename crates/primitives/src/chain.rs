@@ -20,7 +20,6 @@ impl ChainSpec {
         match chain_id {
             1 => Self::mainnet(),
             1337 => Self::dev(),
-            5 => Self::goerli(),
             11155111 => Self::sepolia(),
             137 => Self::polygon(),
             80001 => Self::polygon_mumbai(),
@@ -44,15 +43,6 @@ impl ChainSpec {
             chain: Chain::from(NamedChain::Dev),
             block_time: Duration::from_secs(1),
             canonical_mempools: vec!["Qmf7P3CuhzSbpJa8LqXPwRzfPqsvoQ6RG7aXvthYTzGxb2".into()],
-        }
-    }
-
-    /// 'ChainSpec' for goerli
-    pub fn goerli() -> Self {
-        Self {
-            chain: Chain::from(NamedChain::Goerli),
-            block_time: Duration::from_secs(12),
-            canonical_mempools: vec!["QmTmj4cizhWpEFCCqk5dP67yws7R2PPgCtb2bd2RgVPCbF".into()],
         }
     }
 
