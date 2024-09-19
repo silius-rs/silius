@@ -110,7 +110,7 @@ async fn start_mock_server() -> eyre::Result<(ServerHandle, MockFlashbotsBlockBu
 
 #[tokio::test]
 #[ignore]
-async fn test_simulate_bundle_flashbots_goerli() -> eyre::Result<()> {
+async fn test_simulate_bundle_flashbots_sepolia() -> eyre::Result<()> {
     dotenv::dotenv().ok();
     let eth_client_address = std::env::var("WS_RPC_URL").expect("WS_RPC_URL env var not set");
     let eth_client = Arc::new(Provider::<Ws>::connect(eth_client_address).await?);
@@ -118,11 +118,11 @@ async fn test_simulate_bundle_flashbots_goerli() -> eyre::Result<()> {
         "{}/.silius/0x129D197b2a989C6798601A49D89a4AEC822A17a3",
         std::env::var("HOME").unwrap()
     );
-    let wallet = Wallet::from_file(dir.into(), 5, true)?;
+    let wallet = Wallet::from_file(dir.into(), 11155111, true)?;
 
     let client = FlashbotsClient::new(
         eth_client.clone(),
-        Some(vec![flashbots_relay_endpoints::FLASHBOTS_GOERLI.into()]),
+        Some(vec![flashbots_relay_endpoints::FLASHBOTS_SEPOLIA.into()]),
         wallet.clone(),
     )?;
 
@@ -145,7 +145,7 @@ async fn test_simulate_bundle_flashbots_goerli() -> eyre::Result<()> {
         )),
         from: Some(address),
         data: Some(approve_call_data.into()),
-        chain_id: Some(U64::from(5)),
+        chain_id: Some(U64::from(11155111)),
         max_fee_per_gas: Some(max_fee_per_gas),
         max_priority_fee_per_gas: Some(max_priority_fee),
         gas: Some(U256::from(1000000u64)),

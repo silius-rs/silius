@@ -79,13 +79,11 @@ Silius was tested on the following networks, and some public endpoints are avail
 | Chain         | Supported Status | Public RPC URL   |
 | :--------:    | :-------: | :-------: |
 | Ethereum | :heavy_check_mark:| <https://rpc.silius.xyz/api/v1/chain/ethereum-mainnet> |
-| Ethereum Goerli | :heavy_check_mark: |  <https://rpc.silius.xyz/api/v1/chain/ethereum-goerli> |
 | Ethereum Sepolia| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-sepolia> |
 | Ethereum Holesky| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-holesky> |
 | Polygon | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mainnet> |
 | Polygon Mumbai| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mumbai> |
 | Linea | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-mainnet> |
-| Linea Goerli | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-goerli> |
 | Optimism | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-mainnet> |
 | Optimism Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-sepolia> |
 | Arbitrum | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/arbitrum-mainnet> |
