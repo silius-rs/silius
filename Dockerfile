@@ -9,7 +9,7 @@ LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 RUN apt-get update && apt-get -y upgrade && apt-get install -y wget pkg-config libclang-dev libssl-dev ca-certificates
 
 # Install solc
-RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux"
+RUN wget -c "https://github.com/ethereum/solidity/releases/download/v0.8.27/solc-static-linux"
 RUN mv solc-static-linux /usr/local/bin/solc
 RUN chmod a+x /usr/local/bin/solc
 
