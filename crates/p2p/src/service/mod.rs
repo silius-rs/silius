@@ -151,15 +151,13 @@ impl Network {
         let combined_key = keypair_to_combined(&key).expect("keypair to combined key failed");
 
         // Handle ENR
-        let enr = if let Some(enr) = load_enr_from_file(&config.node_enr_file) {
-            enr
-        } else {
-            let enr = build_enr(&combined_key, &config).expect("enr building failed");
-
-            save_enr_to_file(&enr, &config.node_enr_file);
-
-            enr
-        };
+        let enr = load_enr_from_file(&config.node_enr_file)
+            .filter(|enr| enr.ip4() == config.ipv4_addr)
+            .unwrap_or_else(|| {
+                let enr = build_enr(&combined_key, &config).expect("enr building failed");
+                save_enr_to_file(&enr, &config.node_enr_file);
+                enr
+            });
 
         info!("Enr: {}", enr);
 
