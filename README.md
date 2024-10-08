@@ -25,7 +25,7 @@ For more information: <https://hackmd.io/@Vid201/aa-bundler-rust>
 Rust version: 1.81.0
 
 1. `libclang-dev`, `pkg-config` and `libssl-dev` on Debian/Ubuntu.
-2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.14.8](https://github.com/ethereum/go-ethereum/releases/tag/v1.14.8)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
+2. Ethereum execution client JSON-RPC API with enabled [`debug_traceCall`](https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug#debug_tracecall). For production, you can use [Geth](https://github.com/ethereum/go-ethereum) or [Erigon](https://github.com/ledgerwatch/erigon). For testing, we are using Geth dev mode (tested with [v1.14.11](https://github.com/ethereum/go-ethereum/releases/tag/v1.14.11)); so you need to install [Geth](https://geth.ethereum.org/docs/getting-started/installing-geth) for running tests.
 3. [`solc`](https://docs.soliditylang.org/en/v0.8.27/installing-solidity.html).
 4. [`cargo-sort`](https://crates.io/crates/cargo-sort) and [`cargo-udeps`](https://crates.io/crates/cargo-udeps).
 
