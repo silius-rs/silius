@@ -1,35 +1,32 @@
 services:
-  geth-dev:
+  eth-node:
     image: ethereum/client-go:v1.14.11
-    healthcheck:
-      test: [ "CMD-SHELL", "geth attach --exec eth.blockNumber" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     ports:
       - 8545:8545
       - 8546:8546
-    command:
-      - --miner.gaslimit=12000000
-      - --http
-      - --http.api=personal,eth,net,web3,debug
-      - --allow-insecure-unlock
-      - --rpc.allow-unprotected-txs
-      - --http.vhosts=*
-      - --http.corsdomain=*
-      - --http.addr=0.0.0.0
-      - --ws
-      - --ws.api=personal,eth,net,web3,debug
-      - --ws.origins=*
-      - --ws.addr=0.0.0.0
-      - --dev
-      - --nodiscover
-      - --maxpeers=0
-      - --mine
-      - --verbosity=2
+    command: --verbosity 1
+      --http.vhosts '*,localhost,host.docker.internal'
+      --http
+      --http.api eth,net,web3,debug
+      --http.corsdomain '*'
+      --http.addr "0.0.0.0"
+      --ws
+      --ws.api eth,net,web3,debug
+      --ws.origins '*'
+      --ws.addr "0.0.0.0"
+      --networkid 1337
+      --dev
+      --dev.period 0
+      --allow-insecure-unlock
+      --rpc.allow-unprotected-txs
+      --dev.gaslimit 20000000
   fund-signer:
-    image: ethereum/client-go:v1.14.11
-    entrypoint: 'geth --exec "eth.sendTransaction({from: eth.accounts[0], to: \"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266\", value: web3.toWei(10000, \"ether\")})" attach http://geth-dev:8545'
+    build: funder
+    environment:
+      - FUND=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - ETH_RPC_URL=http://eth-node:8545
+      - ENTRYPOINT=0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789
+    restart: on-failure:3
     depends_on:
-      geth-dev:
+      eth-node:
         condition: service_started
