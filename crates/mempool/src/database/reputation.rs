@@ -72,11 +72,11 @@ mod tests {
         BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, THROTTLING_SLACK,
     };
     use std::{collections::HashSet, sync::Arc};
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn database_reputation() {
-        let dir = TempDir::new("test-silius-db").unwrap();
+        let dir = TempDir::new().unwrap();
 
         let env = init_env::<WriteMap>(dir.into_path()).unwrap();
         env.create_tables().expect("Create mdbx database tables failed");

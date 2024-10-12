@@ -488,11 +488,11 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
             UoPoolMode::Standard => estimate_user_op_gas(&uo.user_operation, &self.entry_point)
                 .await
                 .map_err(|e| match e {
-                    EntryPointError::FailedOp(f) => MempoolError {
+                    EntryPointError::FailedOp(op) => MempoolError {
                         hash: uo.hash,
                         kind: MempoolErrorKind::InvalidUserOperation(
                             InvalidMempoolUserOperationError::Simulation(
-                                SimulationError::Validation { inner: format!("{f:?}") },
+                                SimulationError::Validation { inner: op.reason },
                             ),
                         ),
                     },
@@ -509,18 +509,18 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                     }
                     _ => MempoolError {
                         hash: uo.hash,
-                        kind: MempoolErrorKind::Other { inner: format!("{e:?}") },
+                        kind: MempoolErrorKind::Other { inner: e.to_string() },
                     },
                 })?,
             UoPoolMode::Unsafe => {
                 let ret =
                     self.entry_point.simulate_handle_op(uo.clone().user_operation).await.map_err(
                         |e| match e {
-                            EntryPointError::FailedOp(f) => MempoolError {
+                            EntryPointError::FailedOp(op) => MempoolError {
                                 hash: uo.hash,
                                 kind: MempoolErrorKind::InvalidUserOperation(
                                     InvalidMempoolUserOperationError::Simulation(
-                                        SimulationError::Validation { inner: format!("{f:?}") },
+                                        SimulationError::Validation { inner: op.reason },
                                     ),
                                 ),
                             },
@@ -538,7 +538,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                             },
                             _ => MempoolError {
                                 hash: uo.hash,
-                                kind: MempoolErrorKind::Other { inner: format!("{e:?}") },
+                                kind: MempoolErrorKind::Other { inner: e.to_string() },
                             },
                         },
                     )?;

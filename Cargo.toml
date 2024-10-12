@@ -75,6 +75,7 @@ metrics = "0.22.0"
 lazy_static = "1.4.0"
 serde = "1.0.193"
 serde_json = "1.0.109"
+tempfile = "3.13.0"
 thiserror = "1.0.53"
 tracing = "0.1.40"
 

@@ -253,12 +253,12 @@ mod tests {
     };
     use reth_libmdbx::WriteMap;
     use std::sync::Arc;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     #[allow(clippy::unit_cmp)]
     #[tokio::test]
     async fn database_mempool() {
-        let dir = TempDir::new("test-silius-db").unwrap();
+        let dir = TempDir::new().unwrap();
 
         let env = init_env::<WriteMap>(dir.into_path()).unwrap();
         env.create_tables().expect("Create mdbx database tables failed");

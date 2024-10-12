@@ -24,7 +24,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tempdir::TempDir;
+use tempfile::TempDir;
+
 pub mod gen;
 
 pub const SEED_PHRASE: &str = "test test test test test test test test test test test junk";
@@ -34,6 +35,7 @@ pub struct DeployedContract<C> {
     contract: C,
     pub address: Address,
 }
+
 impl<C> DeployedContract<C> {
     pub fn new(contract: C, addr: Address) -> Self {
         Self { contract, address: addr }
@@ -133,12 +135,12 @@ pub async fn deploy_test_coin<M: Middleware + 'static>(
 
 pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Http>)> {
     let chain_id: u64 = 1337;
-    let tmp_dir = TempDir::new("test_geth")?;
+    let tmp_dir = TempDir::new()?;
     let wallet = MnemonicBuilder::<English>::default().phrase(SEED_PHRASE).build()?;
 
     let geth = Geth::new().data_dir(tmp_dir.path().to_path_buf()).spawn();
     let provider =
-        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(5u64));
+        Provider::<Http>::try_from(geth.endpoint())?.interval(Duration::from_millis(10u64));
 
     let client = SignerMiddleware::new(provider.clone(), wallet.clone().with_chain_id(chain_id))
         .nonce_manager(wallet.address());
@@ -155,7 +157,7 @@ pub async fn setup_geth() -> eyre::Result<(GethInstance, ClientType, Provider<Ht
 
 #[allow(clippy::type_complexity)]
 pub fn setup_database_mempool_reputation() -> (Mempool, Reputation) {
-    let dir = TempDir::new("test-silius-db").expect("create tmp");
+    let dir = TempDir::new().expect("create tmp");
     let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
     env.create_tables().expect("Create mdbx database tables failed");
     let mempool = Mempool::new(

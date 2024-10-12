@@ -30,7 +30,7 @@ use silius_primitives::{
     constants::validation::entities::{FACTORY, PAYMASTER, SENDER},
     UserOperation, UserOperationSigned,
 };
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 struct TestContext<M>
 where
@@ -64,6 +64,7 @@ async fn setup_basic() -> eyre::Result<(
     let client = Arc::new(_client);
     let ep = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
+    
     ep.contract()
         .deposit_to(paymaster.address)
         .value(parse_units("0.1", "ether").unwrap())
@@ -82,16 +83,21 @@ async fn setup_basic() -> eyre::Result<(
         deploy_test_storage_account_factory(client.clone(), test_coin.address).await?;
     let rules_factory = deploy_test_rules_account_factory(client.clone()).await?;
 
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     let storage_account_call = rules_factory.contract().create("".into());
     let storage_account_address = storage_account_call.call().await?;
 
     storage_account_call.send().await?;
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     ep.contract()
         .deposit_to(storage_account_address)
         .value(parse_units("1", "ether").unwrap())
         .send()
         .await?;
+
     Ok((
         client.clone(),
         ep,
@@ -156,6 +162,7 @@ async fn setup_memory() -> eyre::Result<TestContext<ClientType>> {
         reputation,
     })
 }
+
 async fn create_storage_factory_init_code(
     salt: u64,
     init_func: String,
@@ -342,6 +349,7 @@ macro_rules! accept_plain_request {
         }
     };
 }
+
 accept_plain_request!(setup_database().await?, accept_plain_request_database);
 accept_plain_request!(setup_memory().await?, accept_plain_request_memory);
 
@@ -371,6 +379,7 @@ macro_rules! reject_unkown_rule {
         }
     };
 }
+
 reject_unkown_rule!(setup_database().await?, reject_unkown_rule_database);
 reject_unkown_rule!(setup_memory().await?, reject_unkown_rule_memory);
 
@@ -400,6 +409,7 @@ macro_rules! fail_with_bad_opcode_in_ctr {
         }
     };
 }
+
 fail_with_bad_opcode_in_ctr!(setup_database().await?, fail_with_bad_opcode_in_ctr_database);
 fail_with_bad_opcode_in_ctr!(setup_memory().await?, fail_with_bad_opcode_in_ctr_memory);
 
@@ -429,6 +439,7 @@ macro_rules! fail_with_bad_opcode_in_paymaster {
         }
     };
 }
+
 fail_with_bad_opcode_in_paymaster!(
     setup_database().await?,
     fail_with_bad_opcode_in_paymaster_database
@@ -462,6 +473,7 @@ macro_rules! fail_with_bad_opcode_in_validation {
         }
     };
 }
+
 fail_with_bad_opcode_in_validation!(
     setup_database().await?,
     fail_with_bad_opcode_in_validation_database
@@ -498,6 +510,7 @@ macro_rules!fail_if_create_too_many {
         }
     };
 }
+
 fail_if_create_too_many!(setup_database().await?, fail_if_create_too_many_database);
 fail_if_create_too_many!(setup_memory().await?, fail_if_create_too_many_memory);
 
@@ -550,6 +563,7 @@ test_existing_user_operation!(
     "balance-self".into(),
     "".into()
 );
+
 test_existing_user_operation!(
     setup_memory().await?,
     account_succeeds_referecing_its_own_balance_memory,
@@ -563,6 +577,7 @@ test_existing_user_operation!(
     "allowance-1-self".into(),
     "".into()
 );
+
 test_existing_user_operation!(
     setup_memory().await?,
     account_can_reference_its_own_allowance_on_other_contract_balance_memory,
@@ -576,6 +591,7 @@ test_existing_user_operation!(
     "struct-self".into(),
     "".into()
 );
+
 test_existing_user_operation!(
     setup_memory().await?,
     access_self_struct_data_memory,
@@ -589,6 +605,7 @@ test_existing_user_operation!(
     "balance-self".into(),
     "".into()
 );
+
 test_existing_user_operation!(
     setup_memory().await?,
     fail_if_referencing_self_token_balance_after_wallet_creation_memory,
@@ -634,11 +651,11 @@ macro_rules! fail_with_unstaked_paymaster_returning_context {
         }
     };
 }
+
 fail_with_unstaked_paymaster_returning_context!(
     setup_database().await?,
     fail_with_unstaked_paymaster_returning_context_database
 );
-
 fail_with_unstaked_paymaster_returning_context!(
     setup_memory().await?,
     fail_with_unstaked_paymaster_returning_context_memory
@@ -678,6 +695,7 @@ macro_rules! fail_with_validation_recursively_calls_handle_ops {
         }
     };
 }
+
 fail_with_validation_recursively_calls_handle_ops!(
     setup_database().await?,
     fail_with_validation_recursively_calls_handle_ops_database
@@ -709,6 +727,7 @@ macro_rules! succeed_with_inner_revert {
         }
     };
 }
+
 succeed_with_inner_revert!(setup_database().await?, succeed_with_inner_revert_database);
 succeed_with_inner_revert!(setup_memory().await?, succeed_with_inner_revert_memory);
 

@@ -24,14 +24,14 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     //  uopool needs connection to the execution client
     if let Ok(provider_url) = env::var("PROVIDER_URL") {
         // initialize database env
-        let dir = TempDir::new("silius-db").unwrap();
+        let dir = TempDir::new().unwrap();
         let env = Arc::new(init_env::<WriteMap>(dir.into_path()).expect("Init mdbx failed"));
         env.create_tables().expect("Create mdbx database tables failed");
         println!("Database uopool created!");

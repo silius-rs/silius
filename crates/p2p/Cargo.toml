@@ -70,5 +70,5 @@ unsigned-varint = { version = "0.8.0", features = ["codec"] }
 ethers = { workspace = true }
 
 # misc
-tempdir = "0.3.7"
+tempfile = { workspace = true }
 test-log = "0.2.14"

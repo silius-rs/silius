@@ -50,7 +50,7 @@ tracing = { workspace = true }
 silius-primitives = { workspace = true, features = ["test-utils"] }
 
 # misc
-tempdir = "0.3.7"
+tempfile = { workspace = true }
 
 [features]
 mdbx = ["dep:reth-db", "dep:reth-libmdbx"]

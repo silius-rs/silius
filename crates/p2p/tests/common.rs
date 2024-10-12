@@ -10,7 +10,7 @@ use std::{
     net::{Ipv4Addr, TcpListener},
     time::Duration,
 };
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 pub fn get_available_port() -> Option<u16> {
     let unused_port: u16;
@@ -31,7 +31,7 @@ pub fn get_available_port() -> Option<u16> {
 }
 
 async fn build_p2p_instance(bootnode: Option<Enr>) -> eyre::Result<Network> {
-    let dir = TempDir::new("test-silius-p2p").unwrap();
+    let dir = TempDir::new().unwrap();
     let node_key_file = dir.path().join("node_key");
     let node_enr_file = dir.path().join("node_enr");
 

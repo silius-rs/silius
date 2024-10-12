@@ -105,7 +105,9 @@ async fn estimate_with_zero() -> eyre::Result<()> {
         pre_verification_gas: estimate.pre_verification_gas,
         ..user_op.user_operation
     };
+
     let user_op = uo_wallet.sign_user_operation(&user_op, &entry_point.address, chain_id).await?;
     uopool.add_user_operations(vec![user_op], None).await.expect("handle done");
+
     Ok(())
 }
