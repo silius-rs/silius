@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: eth-infinitism/bundler-spec-tests
-          ref: '4d6f66a95099bd79d1da1210212d8f517fbb9481'
+          ref: '6209cdeaba48105cd7352468844be3882e7f3f23'
           submodules: true
 
       - uses: actions/checkout@v4
