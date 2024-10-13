@@ -64,7 +64,7 @@ async fn setup_basic() -> eyre::Result<(
     let client = Arc::new(_client);
     let ep = deploy_entry_point(client.clone()).await?;
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
-    
+
     ep.contract()
         .deposit_to(paymaster.address)
         .value(parse_units("0.1", "ether").unwrap())
