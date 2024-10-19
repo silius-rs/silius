@@ -22,7 +22,7 @@ use silius_mempool::{
 };
 use silius_metrics::{launch_metrics_exporter, mempool::MetricsHandler};
 use silius_primitives::{
-    bundler::SendStrategy,
+    bundler::BundleStrategy,
     constants::{
         entry_point, fastlane_relay_endpoints, flashbots_relay_endpoints,
         storage::DATABASE_FOLDER_NAME,
@@ -123,7 +123,7 @@ where
     let wallet: Wallet;
 
     if let Some(mnemonic_file) = args.mnemonic_file {
-        if args.send_bundle_mode == SendStrategy::Flashbots {
+        if args.bundle_strategy == BundleStrategy::Flashbots {
             wallet = Wallet::from_file(mnemonic_file.into(), chain_id, true)
                 .map_err(|error| eyre::format_err!("Could not load mnemonic file: {}", error))?;
             info!("Wallet Signer {:?}", wallet.signer);
@@ -134,7 +134,7 @@ where
             info!("{:?}", wallet.signer);
         }
     } else if let Some(private_key) = args.private_key {
-        if args.send_bundle_mode == SendStrategy::Flashbots {
+        if args.bundle_strategy == BundleStrategy::Flashbots {
             wallet = Wallet::from_private_key(
                 private_key.as_str(),
                 chain_id,
@@ -162,8 +162,10 @@ where
     let uopool_grpc_client = UoPoolClient::connect(uopool_grpc_listen_address).await?;
     info!("Connected to uopool gRPC service");
 
-    match args.send_bundle_mode {
-        SendStrategy::EthereumClient => {
+    let bundle_interval = if args.manual_bundle_mode { None } else { Some(args.bundle_interval) };
+
+    match args.bundle_strategy {
+        BundleStrategy::EthereumClient => {
             let client = Arc::new(EthereumClient::new(eth_client.clone(), wallet.clone()));
             bundler_service_run(
                 SocketAddr::new(args.bundler_addr, args.bundler_port),
@@ -172,7 +174,7 @@ where
                 chain_conn,
                 args.beneficiary,
                 args.min_balance,
-                args.bundle_interval,
+                bundle_interval,
                 eth_client,
                 client,
                 uopool_grpc_client,
@@ -180,7 +182,7 @@ where
                 args.enable_access_list,
             );
         }
-        SendStrategy::Conditional => {
+        BundleStrategy::Conditional => {
             let client = Arc::new(ConditionalClient::new(eth_client.clone(), wallet.clone()));
             bundler_service_run(
                 SocketAddr::new(args.bundler_addr, args.bundler_port),
@@ -189,7 +191,7 @@ where
                 chain_conn,
                 args.beneficiary,
                 args.min_balance,
-                args.bundle_interval,
+                bundle_interval,
                 eth_client,
                 client,
                 uopool_grpc_client,
@@ -197,7 +199,7 @@ where
                 args.enable_access_list,
             );
         }
-        SendStrategy::Flashbots => {
+        BundleStrategy::Flashbots => {
             let relay_endpoints: Vec<String> = match chain_conn
                 .named()
                 .expect("Flashbots is only supported on Mainnet and Sepolia")
@@ -223,7 +225,7 @@ where
                 chain_conn,
                 args.beneficiary,
                 args.min_balance,
-                args.bundle_interval,
+                bundle_interval,
                 eth_client,
                 client,
                 uopool_grpc_client,
@@ -231,7 +233,7 @@ where
                 args.enable_access_list,
             );
         }
-        SendStrategy::Fastlane => {
+        BundleStrategy::Fastlane => {
             let relay_endpoints: Vec<String> =
                 match chain_conn.named().expect("Fastlane is only supported on Polygon") {
                     NamedChain::Polygon => {
@@ -249,7 +251,7 @@ where
                 chain_conn,
                 args.beneficiary,
                 args.min_balance,
-                args.bundle_interval,
+                bundle_interval,
                 eth_client,
                 client,
                 uopool_grpc_client,

@@ -146,21 +146,21 @@ where
     M: Middleware + Clone + 'static,
     S: SendBundleOp + Clone + 'static,
 {
-    async fn set_bundler_mode(
+    async fn set_bundle_mode(
         &self,
-        req: Request<SetModeRequest>,
-    ) -> Result<Response<SetModeResponse>, Status> {
+        req: Request<SetBundleModeRequest>,
+    ) -> Result<Response<SetBundleModeResponse>, Status> {
         let req = req.into_inner();
 
         match req.mode() {
             Mode::Manual => {
                 self.stop_bundling();
-                Ok(Response::new(SetModeResponse { res: SetModeResult::Ok.into() }))
+                Ok(Response::new(SetBundleModeResponse { res: SetBundleModeResult::Ok.into() }))
             }
             Mode::Auto => {
                 let int = req.interval;
                 self.start_bundling(int);
-                Ok(Response::new(SetModeResponse { res: SetModeResult::Ok.into() }))
+                Ok(Response::new(SetBundleModeResponse { res: SetBundleModeResult::Ok.into() }))
             }
         }
     }
@@ -218,7 +218,7 @@ pub fn bundler_service_run<M, S>(
     chain: Chain,
     beneficiary: Address,
     min_balance: U256,
-    bundle_interval: u64,
+    bundle_interval: Option<u64>,
     eth_client: Arc<M>,
     client: Arc<S>,
     uopool_grpc_client: UoPoolClient<tonic::transport::Channel>,
@@ -245,7 +245,9 @@ pub fn bundler_service_run<M, S>(
         .collect();
 
     let bundler_service = BundlerService::new(bundlers, uopool_grpc_client);
-    bundler_service.start_bundling(bundle_interval);
+    if let Some(bundle_interval) = bundle_interval {
+        bundler_service.start_bundling(bundle_interval);
+    }
 
     tokio::spawn(async move {
         let mut builder = tonic::transport::Server::builder();

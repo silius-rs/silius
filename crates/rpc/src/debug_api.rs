@@ -4,7 +4,7 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use serde::{Deserialize, Serialize};
 use silius_primitives::{
     reputation::{ReputationEntry, StakeInfoResponse},
-    BundlerMode, UserOperationRequest,
+    BundleMode, UserOperationRequest,
 };
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -96,12 +96,12 @@ pub trait DebugApi {
     /// Set the bundling mode.
     ///
     /// # Arguments
-    /// * `mode: BundlerMode` - The [BundlerMode](BundlerMode) to be set.
+    /// * `mode: BundleMode` - The [BundleMode](BundleMode) to be set.
     ///
     /// # Returns
     /// * `RpcResult<ResponseSuccess>` - Ok
     #[method(name = "setBundlingMode")]
-    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<ResponseSuccess>;
+    async fn set_bundling_mode(&self, mode: BundleMode) -> RpcResult<ResponseSuccess>;
 
     /// Immediately send the current bundle of user operations.
     /// This is useful for testing or in situations where waiting for the next scheduled bundle is

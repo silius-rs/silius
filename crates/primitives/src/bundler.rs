@@ -3,9 +3,9 @@
 use serde::Deserialize;
 use strum_macros::{EnumString, EnumVariantNames};
 
-/// Bundler modes
+/// Bundle modes
 #[derive(Debug, Deserialize)]
-pub enum Mode {
+pub enum BundleMode {
     /// Sends bundles automatically every x seconds
     #[serde(rename = "auto")]
     Auto(u64),
@@ -17,7 +17,7 @@ pub enum Mode {
 /// Determines the mode how bundler sends the bundle
 #[derive(Clone, Copy, Debug, EnumString, EnumVariantNames, PartialEq, Eq)]
 #[strum(serialize_all = "kebab_case")]
-pub enum SendStrategy {
+pub enum BundleStrategy {
     /// Sends the bundle to the Ethereum execution client
     EthereumClient,
     /// Sends the bundle to the Flashbots relay
