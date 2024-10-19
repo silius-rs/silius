@@ -10,13 +10,13 @@ use jsonrpsee::{
 };
 use silius_grpc::{
     bundler_client::BundlerClient, uo_pool_client::UoPoolClient, AddMempoolRequest,
-    GetAllReputationRequest, GetAllRequest, GetStakeInfoRequest, Mode as GrpcMode, SetModeRequest,
-    SetReputationRequest, SetReputationResult,
+    GetAllReputationRequest, GetAllRequest, GetStakeInfoRequest, Mode as GrpcMode,
+    SetBundleModeRequest, SetReputationRequest, SetReputationResult,
 };
 use silius_primitives::{
     constants::bundler::BUNDLE_INTERVAL,
     reputation::{ReputationEntry, StakeInfoResponse},
-    BundlerMode, UserOperation, UserOperationRequest, UserOperationSigned,
+    BundleMode, UserOperation, UserOperationRequest, UserOperationSigned,
 };
 use tonic::Request;
 
@@ -208,19 +208,19 @@ impl DebugApiServer for DebugApiServerImpl {
     /// Set the bundling mode.
     ///
     /// # Arguments
-    /// * `mode: BundlerMode` - The [BundlerMode](BundlerMode) to be set.
+    /// * `mode: BundleMode` - The [BundleMode](BundleMode) to be set.
     ///
     /// # Returns
     /// * `RpcResult<ResponseSuccess>` - Ok
-    async fn set_bundling_mode(&self, mode: BundlerMode) -> RpcResult<ResponseSuccess> {
+    async fn set_bundling_mode(&self, mode: BundleMode) -> RpcResult<ResponseSuccess> {
         let mut bundler_grpc_client = self.bundler_grpc_client.clone();
 
-        let req = Request::new(SetModeRequest {
+        let req = Request::new(SetBundleModeRequest {
             mode: Into::<GrpcMode>::into(mode).into(),
             interval: BUNDLE_INTERVAL,
         });
 
-        match bundler_grpc_client.set_bundler_mode(req).await {
+        match bundler_grpc_client.set_bundle_mode(req).await {
             Ok(_) => Ok(ResponseSuccess::Ok),
             Err(s) => Err(JsonRpcError::from(s).into()),
         }

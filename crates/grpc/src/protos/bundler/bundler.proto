@@ -10,25 +10,25 @@ enum Mode {
     MANUAL = 1;
 }
 
-message SetModeRequest {
+message SetBundleModeRequest {
     Mode mode = 1;
     uint64 interval = 2;
 }
 
-enum SetModeResult{
+enum SetBundleModeResult {
     OK = 0;
 }
 
-message SetModeResponse{
-    SetModeResult res = 1;
+message SetBundleModeResponse {
+    SetBundleModeResult res = 1;
 }
 
-message SendBundleNowResponse{
+message SendBundleNowResponse {
     types.H256 res = 1;
 }
 
 service Bundler {
     // debug
-    rpc SetBundlerMode(SetModeRequest) returns (SetModeResponse);
+    rpc SetBundleMode(SetBundleModeRequest) returns (SetBundleModeResponse);
     rpc SendBundleNow(google.protobuf.Empty) returns (SendBundleNowResponse);
 }

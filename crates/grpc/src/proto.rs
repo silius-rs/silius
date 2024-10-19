@@ -429,11 +429,11 @@ pub mod uopool {
 }
 
 pub mod bundler {
-    use silius_primitives::BundlerMode;
+    use silius_primitives::BundleMode;
 
     tonic::include_proto!("bundler");
 
-    impl From<Mode> for BundlerMode {
+    impl From<Mode> for BundleMode {
         fn from(value: Mode) -> Self {
             match value {
                 Mode::Auto => Self::Auto(0),
@@ -442,11 +442,11 @@ pub mod bundler {
         }
     }
 
-    impl From<BundlerMode> for Mode {
-        fn from(value: BundlerMode) -> Self {
+    impl From<BundleMode> for Mode {
+        fn from(value: BundleMode) -> Self {
             match value {
-                BundlerMode::Auto(_) => Self::Auto,
-                BundlerMode::Manual => Self::Manual,
+                BundleMode::Auto(_) => Self::Auto,
+                BundleMode::Manual => Self::Manual,
             }
         }
     }

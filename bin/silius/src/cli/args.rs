@@ -1,6 +1,6 @@
 use crate::utils::{
-    parse_address, parse_duration, parse_enr, parse_label_value, parse_send_bundle_mode,
-    parse_u256, parse_uopool_mode,
+    parse_address, parse_bundle_strategy, parse_duration, parse_enr, parse_label_value, parse_u256,
+    parse_uopool_mode,
 };
 use alloy_chains::{Chain, NamedChain};
 use clap::{ArgGroup, Parser, ValueEnum};
@@ -13,7 +13,7 @@ use silius_p2p::{
     listen_addr::{ListenAddr, ListenAddress},
 };
 use silius_primitives::{
-    bundler::SendStrategy,
+    bundler::BundleStrategy,
     chain::ChainSpec,
     constants::{
         bundler::BUNDLE_INTERVAL,
@@ -69,17 +69,25 @@ pub struct BundlerArgs {
     #[clap(long, default_value = "100000000000000000", value_parser=parse_u256)]
     pub min_balance: U256,
 
+    /// Whether the bundler should send bundles manually.
+    ///
+    /// By default, this option is set to false.
+    /// - To enable: `--manual-bundle-mode`.
+    /// - To disable: no `--manual-bundle-mode` flag.
+    #[clap(long)]
+    pub manual_bundle_mode: bool,
+
     /// The bundle interval in seconds.
     ///
     /// By default the interval time is set to 10
     #[clap(long, default_value_t = BUNDLE_INTERVAL)]
     pub bundle_interval: u64,
 
-    /// Sets the send bundle mode.
+    /// Sets the bundle strategy.
     ///
     /// By default, this option is set to `ethereum-client`.
-    #[clap(long, default_value = "ethereum-client", value_parser=parse_send_bundle_mode)]
-    pub send_bundle_mode: SendStrategy,
+    #[clap(long, default_value = "ethereum-client", value_parser=parse_bundle_strategy)]
+    pub bundle_strategy: BundleStrategy,
 
     /// Indicates whether the access list is enabled.
     #[clap(long)]
@@ -381,8 +389,9 @@ mod tests {
                 beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
                     .unwrap(),
                 min_balance: U256::from(100000000000000000_u64),
+                manual_bundle_mode: false,
                 bundle_interval: 10,
-                send_bundle_mode: SendStrategy::EthereumClient,
+                bundle_strategy: BundleStrategy::EthereumClient,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
                 enable_access_list: false,
@@ -421,8 +430,9 @@ mod tests {
                 beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
                     .unwrap(),
                 min_balance: U256::from(100000000000000000_u64),
+                manual_bundle_mode: false,
                 bundle_interval: 10,
-                send_bundle_mode: SendStrategy::EthereumClient,
+                bundle_strategy: BundleStrategy::EthereumClient,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
                 enable_access_list: false,
@@ -447,8 +457,7 @@ mod tests {
             "127.0.0.1",
             "--bundler.port",
             "3002",
-            "--bundle-interval",
-            "10",
+            "--manual-bundle-mode",
         ];
         assert_eq!(
             BundlerArgs {
@@ -468,8 +477,9 @@ mod tests {
                 beneficiary: Address::from_str("0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990")
                     .unwrap(),
                 min_balance: U256::from(100000000000000000_u64),
+                manual_bundle_mode: true,
                 bundle_interval: 10,
-                send_bundle_mode: SendStrategy::EthereumClient,
+                bundle_strategy: BundleStrategy::EthereumClient,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
                 enable_access_list: false,

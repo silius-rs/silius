@@ -4,7 +4,7 @@ use ethers::types::{Address, U256};
 use expanded_pathbuf::ExpandedPathBuf;
 use pin_utils::pin_mut;
 use silius_metrics::label::LabelValue;
-use silius_primitives::{bundler::SendStrategy, UoPoolMode};
+use silius_primitives::{bundler::BundleStrategy, UoPoolMode};
 use std::{future::Future, str::FromStr, time::Duration};
 use tracing::info;
 
@@ -30,9 +30,9 @@ pub fn parse_u256(s: &str) -> Result<U256, String> {
     U256::from_str_radix(s, 10).map_err(|_| format!("String {s} is not a valid U256"))
 }
 
-/// Parses SendBundleMode from string
-pub fn parse_send_bundle_mode(s: &str) -> Result<SendStrategy, String> {
-    SendStrategy::from_str(s).map_err(|_| format!("String {s} is not a valid SendBundleMode"))
+/// Parses BundleStrategy from string
+pub fn parse_bundle_strategy(s: &str) -> Result<BundleStrategy, String> {
+    BundleStrategy::from_str(s).map_err(|_| format!("String {s} is not a valid BundleStrategy"))
 }
 
 /// Parses UoPoolMode from string
