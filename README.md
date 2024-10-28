@@ -9,7 +9,7 @@
 <p align="center">Silius - <a href="https://eips.ethereum.org/EIPS/eip-4337">ERC-4337 (Account Abstraction)</a> bundler implementation in Rust.</p>
 
 <p align="center">
-    <img src="./assets/silius-banner.png" width="450">
+    <img src="./assets/logo.png" width="450">
 </p>
 
 For more information: <https://hackmd.io/@Vid201/aa-bundler-rust>

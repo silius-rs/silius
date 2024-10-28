@@ -10,7 +10,7 @@ _Account Abstraction has for a long time been a dream of the Ethereum developer 
 
 __Silius__ is an <a href="https://eips.ethereum.org/EIPS/eip-4337">ERC-4337</a> (account abstraction) bundler implementation that is __modular and highly efficient, written in the memory sasfe programming language Rust.__
 
-<p align="center"><img src="https://raw.githubusercontent.com/silius-rs/silius/main/assets/silius-banner.png" style="border-radius: 20px" width="350px"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/silius-rs/silius/main/assets/logo.png" style="border-radius: 20px" width="350px"></p>
 
 ## What are the design goals?
 
