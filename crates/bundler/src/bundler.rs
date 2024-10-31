@@ -122,16 +122,21 @@ where
         };
         let estimated_gas = self.eth_client.estimate_gas(&tx, None).await?;
 
-        let (max_fee_per_gas, max_priority_fee) =
-            self.eth_client.estimate_eip1559_fees(None).await?;
+        let mut max_fee_per_gas: U256 = U256::zero();
+        let mut max_priority_fee_per_gas: U256 = U256::zero();
+
+        for uo in uos {
+            max_fee_per_gas += uo.max_fee_per_gas;
+            max_priority_fee_per_gas += uo.max_priority_fee_per_gas;
+        }
 
         tx = TypedTransaction::Eip1559(Eip1559TransactionRequest {
             to: tx.to().cloned(),
             from: Some(self.wallet.signer.address()),
             data: tx.data().cloned(),
             chain_id: Some(U64::from(self.chain.id())),
-            max_priority_fee_per_gas: Some(max_priority_fee),
-            max_fee_per_gas: Some(max_fee_per_gas),
+            max_priority_fee_per_gas: Some(max_priority_fee_per_gas / uos.len()),
+            max_fee_per_gas: Some(max_fee_per_gas / uos.len()),
             gas: Some(estimated_gas),
             nonce: Some(nonce),
             value: None,

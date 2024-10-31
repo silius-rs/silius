@@ -413,11 +413,11 @@ pub mod types {
             Self {
                 root_hashes: root_hashes
                     .into_iter()
-                    .map(|(k, v)| (format!("{:?}", k), format!("{:?}", v)))
+                    .map(|(k, v)| (format!("{k:?}"), format!("{v:?}")))
                     .collect(),
                 slots: slots
                     .into_iter()
-                    .map(|(k, v)| (format!("{:?}", k), StorageSlots { slots: v }))
+                    .map(|(k, v)| (format!("{k:?}"), StorageSlots { slots: v }))
                     .collect(),
             }
         }
