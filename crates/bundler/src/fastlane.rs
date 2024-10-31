@@ -1,7 +1,7 @@
 use crate::bundler::SendBundleOp;
 use ethers::{
     middleware::SignerMiddleware,
-    providers::Middleware,
+    providers::{Http, Middleware, Provider},
     signers::LocalWallet,
     types::{
         transaction::{
@@ -12,14 +12,14 @@ use ethers::{
     },
 };
 use silius_primitives::{simulation::StorageMap, Wallet};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 use tracing::trace;
 
 /// A type alias for the Ethereum Conditional Signer client
 #[derive(Clone)]
 pub struct FastlaneClient<M> {
     pub client: SignerMiddleware<Arc<M>, LocalWallet>,
-    pub relay_endpoints: Vec<String>,
+    pub relay_client: Provider<Http>,
 }
 
 #[async_trait::async_trait]
@@ -69,11 +69,8 @@ where
             }
         }
 
-        let tx = self
-            .client
-            .send_raw_transaction_conditional(signed_tx, prefix, options)
-            .await?
-            .interval(Duration::from_millis(75));
+        let tx =
+            self.relay_client.send_raw_transaction_conditional(signed_tx, prefix, options).await?;
         let tx_hash = tx.tx_hash();
 
         let tx_receipt = tx.await?;
@@ -92,12 +89,13 @@ where
     ///
     /// # Arguments
     /// * `eth_client` - Connection to the Ethereum execution client
+    /// * `relay_client` - Connection to the Fastlane relay client
     /// * `wallet` - A [Wallet](Wallet) instance
     ///
     /// # Returns
     /// * `ConditionalClient` - A [Ethereum Signer Middleware](ConditionalClient)
-    pub fn new(eth_client: Arc<M>, relay_endpoints: Vec<String>, wallet: Wallet) -> Self {
-        let signer = SignerMiddleware::new(eth_client, wallet.signer);
-        Self { client: signer, relay_endpoints }
+    pub fn new(eth_client: Arc<M>, relay_client: Provider<Http>, wallet: Wallet) -> Self {
+        let signer = SignerMiddleware::new(eth_client, wallet.clone().signer);
+        Self { client: signer, relay_client }
     }
 }

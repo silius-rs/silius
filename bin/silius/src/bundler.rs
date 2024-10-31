@@ -24,14 +24,16 @@ use silius_metrics::{launch_metrics_exporter, mempool::MetricsHandler};
 use silius_primitives::{
     bundler::BundleStrategy,
     constants::{
-        entry_point, fastlane_relay_endpoints, flashbots_relay_endpoints,
+        entry_point,
+        fastlane_relay_endpoints::FASTLANE_POLYGON,
+        flashbots_relay_endpoints,
         storage::DATABASE_FOLDER_NAME,
         supported_chains::CHAINS,
         validation::reputation::{
             BAN_SLACK, MIN_INCLUSION_RATE_DENOMINATOR, MIN_UNSTAKE_DELAY, THROTTLING_SLACK,
         },
     },
-    provider::BlockStream,
+    provider::{create_http_provider, BlockStream},
     reputation::ReputationEntry,
     simulation::CodeHash,
     UserOperationHash, UserOperationSigned, Wallet,
@@ -48,6 +50,7 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 use tracing::{info, warn};
 
@@ -234,16 +237,17 @@ where
             );
         }
         BundleStrategy::Fastlane => {
-            let relay_endpoints: Vec<String> =
+            let relay_endpoint: String =
                 match chain_conn.named().expect("Fastlane is only supported on Polygon") {
-                    NamedChain::Polygon => {
-                        vec![fastlane_relay_endpoints::FASTLANE_POLYGON.into()]
-                    }
+                    NamedChain::Polygon => FASTLANE_POLYGON.into(),
                     _ => panic!("Fastlane is only supported on Polygon"),
                 };
 
+            let relay_client =
+                create_http_provider(&relay_endpoint, Duration::from_millis(75)).await?;
             let client =
-                Arc::new(FastlaneClient::new(eth_client.clone(), relay_endpoints, wallet.clone()));
+                Arc::new(FastlaneClient::new(eth_client.clone(), relay_client, wallet.clone()));
+
             bundler_service_run(
                 SocketAddr::new(args.bundler_addr, args.bundler_port),
                 wallet,

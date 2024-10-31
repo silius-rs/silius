@@ -16,7 +16,6 @@ pub async fn create_http_provider(
     poll_interval: Duration,
 ) -> eyre::Result<Provider<Http>> {
     let provider = Provider::<Http>::try_from(addr)?;
-
     Ok(provider.interval(poll_interval))
 }
 
