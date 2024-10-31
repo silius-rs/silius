@@ -377,6 +377,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                         UserOperationValidatorMode::SimulationTrace,
                 )
                 .await;
+
             debug!("Second validation for userop {:?} result: {:?}", uo.hash, val_out);
 
             match val_out {
@@ -390,6 +391,7 @@ impl<M: Middleware + 'static, V: UserOperationValidator> UoPool<M, V> {
                             continue 'uos;
                         }
                     }
+
                     for addr in val_out.storage_map.slots.keys() {
                         if *addr != uo.sender && senders_all.contains(addr) {
                             continue 'uos;

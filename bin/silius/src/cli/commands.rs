@@ -43,8 +43,20 @@ impl NodeCommand {
                     .await?;
             let eth_client = Arc::new(MetricsMiddleware::new(http_client));
 
+            let eth_bundle_client = if let Some(eth_client_bundle_address) =
+                self.bundler.eth_client_bundle_address.clone()
+            {
+                let http_client_bundle =
+                    create_http_provider(&eth_client_bundle_address, self.common.poll_interval)
+                        .await?;
+                Arc::new(MetricsMiddleware::new(http_client_bundle))
+            } else {
+                eth_client.clone()
+            };
+
             let block_streams =
                 create_http_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
+
             launch_bundler(
                 self.bundler,
                 self.uopool,
@@ -52,24 +64,48 @@ impl NodeCommand {
                 self.rpc,
                 self.common.metrics,
                 eth_client,
+                eth_bundle_client,
                 block_streams,
             )
             .await?;
         } else {
-            let http_client = create_ws_provider(&self.common.eth_client_address).await?;
-            let eth_client = Arc::new(MetricsMiddleware::new(http_client));
+            let ws_client = create_ws_provider(&self.common.eth_client_address).await?;
+            let eth_client = Arc::new(MetricsMiddleware::new(ws_client));
+
             let block_streams =
                 create_ws_block_streams(eth_client.clone(), self.common.entry_points.len()).await;
-            launch_bundler(
-                self.bundler,
-                self.uopool,
-                self.common.clone(),
-                self.rpc,
-                self.common.metrics,
-                eth_client,
-                block_streams,
-            )
-            .await?;
+
+            if let Some(eth_client_bundle_address) = self.bundler.eth_client_bundle_address.clone()
+            {
+                let http_client_bundle =
+                    create_http_provider(&eth_client_bundle_address, self.common.poll_interval)
+                        .await?;
+                let eth_client_bundle = Arc::new(MetricsMiddleware::new(http_client_bundle));
+
+                launch_bundler(
+                    self.bundler,
+                    self.uopool,
+                    self.common.clone(),
+                    self.rpc,
+                    self.common.metrics,
+                    eth_client,
+                    eth_client_bundle,
+                    block_streams,
+                )
+                .await?;
+            } else {
+                launch_bundler(
+                    self.bundler,
+                    self.uopool,
+                    self.common.clone(),
+                    self.rpc,
+                    self.common.metrics,
+                    eth_client.clone(),
+                    eth_client,
+                    block_streams,
+                )
+                .await?;
+            }
         }
 
         pending().await
@@ -95,10 +131,17 @@ pub struct BundlerCommand {
 impl BundlerCommand {
     /// Execute the command
     pub async fn execute(self) -> eyre::Result<()> {
-        if self.common.eth_client_address.clone().starts_with("http") {
+        let eth_client_address = if let Some(eth_client_bundle_address) =
+            self.bundler.eth_client_bundle_address.clone()
+        {
+            eth_client_bundle_address
+        } else {
+            self.common.eth_client_address.clone()
+        };
+
+        if eth_client_address.clone().starts_with("http") {
             let eth_client = Arc::new(
-                create_http_provider(&self.common.eth_client_address, self.common.poll_interval)
-                    .await?,
+                create_http_provider(&eth_client_address, self.common.poll_interval).await?,
             );
             launch_bundling(
                 self.bundler,
@@ -110,7 +153,7 @@ impl BundlerCommand {
             )
             .await?;
         } else {
-            let eth_client = Arc::new(create_ws_provider(&self.common.eth_client_address).await?);
+            let eth_client = Arc::new(create_ws_provider(&eth_client_address).await?);
             launch_bundling(
                 self.bundler,
                 eth_client,

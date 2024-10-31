@@ -29,9 +29,15 @@ impl SimulationCheck for VerificationExtraGas {
 
         let extra_gas = uo.verification_gas_limit - (pre_op_gas - uo.pre_verification_gas);
 
-        if extra_gas.as_u64() < MIN_EXTRA_GAS {
+        // If account is not deployed, check against MIN_EXTRA_GAS, else MIN_EXTRA_GAS / 2
+        let extra_gas_check =
+            if uo.init_code.is_empty() { MIN_EXTRA_GAS / 2 } else { MIN_EXTRA_GAS };
+
+        if extra_gas.as_u64() < extra_gas_check {
             return Err(SimulationError::Validation {
-                inner: format!("Verification gas should have extra 2000 gas (has ${extra_gas})"),
+                inner: format!(
+                    "Verification gas should have extra ${extra_gas_check} gas (has ${extra_gas})"
+                ),
             });
         }
 

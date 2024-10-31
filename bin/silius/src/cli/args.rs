@@ -89,6 +89,12 @@ pub struct BundlerArgs {
     #[clap(long, default_value = "ethereum-client", value_parser=parse_bundle_strategy)]
     pub bundle_strategy: BundleStrategy,
 
+    /// Sets the different endpoint for sending bundles.
+    ///
+    /// By default, this will be the same as `eth-client-address`
+    #[clap(long)]
+    pub eth_client_bundle_address: Option<String>,
+
     /// Indicates whether the access list is enabled.
     #[clap(long)]
     pub enable_access_list: bool,
@@ -392,6 +398,7 @@ mod tests {
                 manual_bundle_mode: false,
                 bundle_interval: 10,
                 bundle_strategy: BundleStrategy::EthereumClient,
+                eth_client_bundle_address: None,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
                 enable_access_list: false,
@@ -433,6 +440,7 @@ mod tests {
                 manual_bundle_mode: false,
                 bundle_interval: 10,
                 bundle_strategy: BundleStrategy::EthereumClient,
+                eth_client_bundle_address: None,
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
                 enable_access_list: false,
@@ -458,6 +466,8 @@ mod tests {
             "--bundler.port",
             "3002",
             "--manual-bundle-mode",
+            "--eth-client-bundle-address",
+            "http://127.0.0.1:8545",
         ];
         assert_eq!(
             BundlerArgs {
@@ -480,6 +490,7 @@ mod tests {
                 manual_bundle_mode: true,
                 bundle_interval: 10,
                 bundle_strategy: BundleStrategy::EthereumClient,
+                eth_client_bundle_address: Some(String::from("http://127.0.0.1:8545")),
                 bundler_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 bundler_port: 3002,
                 enable_access_list: false,

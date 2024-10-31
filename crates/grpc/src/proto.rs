@@ -399,7 +399,7 @@ pub mod types {
                     .collect(),
                 slots: slots
                     .into_iter()
-                    .map(|(k, v)| (Address::from_str(&k).unwrap_or_default(), v.slots))
+                    .map(|(k, v)| (ethers::types::H160::from_str(&k).unwrap_or_default(), v.slots))
                     .collect(),
             }
         }
@@ -413,11 +413,11 @@ pub mod types {
             Self {
                 root_hashes: root_hashes
                     .into_iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .map(|(k, v)| (format!("{:?}", k), format!("{:?}", v)))
                     .collect(),
                 slots: slots
                     .into_iter()
-                    .map(|(k, v)| (k.to_string(), StorageSlots { slots: v }))
+                    .map(|(k, v)| (format!("{:?}", k), StorageSlots { slots: v }))
                     .collect(),
             }
         }

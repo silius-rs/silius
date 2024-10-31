@@ -54,21 +54,24 @@ use std::{
 };
 use tracing::{info, warn};
 
-pub async fn launch_bundler<M>(
+#[allow(clippy::too_many_arguments)]
+pub async fn launch_bundler<M, N>(
     bundler_args: BundlerArgs,
     uopool_args: UoPoolArgs,
     common_args: BundlerAndUoPoolArgs,
     rpc_args: RpcArgs,
     metrics_args: MetricsArgs,
     eth_client: Arc<M>,
+    eth_bundle_client: Arc<N>,
     block_streams: Vec<BlockStream>,
 ) -> eyre::Result<()>
 where
     M: Middleware + Clone + 'static,
+    N: Middleware + Clone + 'static,
 {
     launch_uopool(
         uopool_args.clone(),
-        eth_client.clone(),
+        eth_client,
         block_streams,
         common_args.chain,
         common_args.entry_points.clone(),
@@ -78,7 +81,7 @@ where
 
     launch_bundling(
         bundler_args.clone(),
-        eth_client.clone(),
+        eth_bundle_client,
         common_args.chain,
         common_args.entry_points,
         format!("http://{:?}:{:?}", uopool_args.uopool_addr, uopool_args.uopool_port),
