@@ -75,7 +75,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn mempool_config_polygon_mumbai() {
+    async fn mempool_config_polygon_amoy() {
         let cid = "QmQfRyE9iVTBqZ17hPSP4tuMzaez83Y5wD874ymyRtj9VE";
         let mempool_config = fetch_mempool_config(cid.to_string()).await.unwrap();
         assert_eq!(mempool_config.min_stake, 0.into());

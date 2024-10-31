@@ -82,7 +82,6 @@ Silius was tested on the following networks, and some public endpoints are avail
 | Ethereum Sepolia| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-sepolia> |
 | Ethereum Holesky| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/ethereum-holesky> |
 | Polygon | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mainnet> |
-| Polygon Mumbai| :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/polygon-mumbai> |
 | Linea | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/linea-mainnet> |
 | Optimism | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-mainnet> |
 | Optimism Sepolia | :heavy_check_mark: | <https://rpc.silius.xyz/api/v1/chain/optimism-sepolia> |

@@ -22,7 +22,7 @@ impl ChainSpec {
             1337 => Self::dev(),
             11155111 => Self::sepolia(),
             137 => Self::polygon(),
-            80001 => Self::polygon_mumbai(),
+            80002 => Self::polygon_amoy(),
             421614 => Self::arbitrum_sepolia(),
             _ => Self::default(chain_id),
         }
@@ -67,10 +67,10 @@ impl ChainSpec {
         }
     }
 
-    /// 'ChainSpec' for polygon mumbai
-    pub fn polygon_mumbai() -> Self {
+    /// 'ChainSpec' for polygon amoy
+    pub fn polygon_amoy() -> Self {
         Self {
-            chain: Chain::from(NamedChain::PolygonMumbai),
+            chain: Chain::from(NamedChain::PolygonAmoy),
             block_time: Duration::from_secs(2),
             canonical_mempools: vec!["QmQfRyE9iVTBqZ17hPSP4tuMzaez83Y5wD874ymyRtj9VE".into()],
         }

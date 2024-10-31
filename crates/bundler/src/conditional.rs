@@ -53,12 +53,14 @@ where
 
         let signed_tx = self.0.sign_transaction(bundle).await?;
 
-        let prefix: Option<String> =
-            if self.0.get_chainid().await? == Chain::from_named(NamedChain::Polygon).id().into() {
-                Some("bor".to_string())
-            } else {
-                None
-            };
+        let prefix: Option<String> = if self.0.get_chainid().await? ==
+            Chain::from_named(NamedChain::Polygon).id().into() ||
+            self.0.get_chainid().await? == Chain::from_named(NamedChain::PolygonAmoy).id().into()
+        {
+            Some("bor".to_string())
+        } else {
+            None
+        };
 
         let tx = self
             .0
