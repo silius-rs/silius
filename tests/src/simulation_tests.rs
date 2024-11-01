@@ -62,8 +62,12 @@ async fn setup_basic() -> eyre::Result<(
     let chain_id = 1337u64;
     let (geth, _client, _) = setup_geth().await?;
     let client = Arc::new(_client);
+
     let ep = deploy_entry_point(client.clone()).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     let paymaster = deploy_test_opcode_account(client.clone()).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     ep.contract()
         .deposit_to(paymaster.address)
@@ -78,18 +82,22 @@ async fn setup_basic() -> eyre::Result<(
         .await?;
 
     let test_coin = deploy_test_coin(client.clone()).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     let opcodes_factory = deploy_test_opcode_account_factory(client.clone()).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     let storage_factory =
         deploy_test_storage_account_factory(client.clone(), test_coin.address).await?;
-    let rules_factory = deploy_test_rules_account_factory(client.clone()).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
+    let rules_factory = deploy_test_rules_account_factory(client.clone()).await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let storage_account_call = rules_factory.contract().create("".into());
     let storage_account_address = storage_account_call.call().await?;
 
     storage_account_call.send().await?;
-
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     ep.contract()
@@ -97,6 +105,7 @@ async fn setup_basic() -> eyre::Result<(
         .value(parse_units("1", "ether").unwrap())
         .send()
         .await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     Ok((
         client.clone(),
