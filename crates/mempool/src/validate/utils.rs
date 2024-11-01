@@ -102,7 +102,9 @@ pub fn extract_storage_map(js_trace: &JsTracerFrame) -> StorageMap {
 
     for l in js_trace.calls_from_entry_point.iter() {
         for (addr, acc) in l.access.iter() {
-            storage_map.slots.insert(*addr, acc.reads.clone());
+            if !storage_map.slots.contains_key(addr) {
+                storage_map.slots.insert(*addr, acc.reads.clone());
+            }
         }
     }
 

@@ -61,12 +61,8 @@ where
         let mut options = ConditionalOptions { known_accounts, ..Default::default() };
 
         if let Some(block) = block {
-            if let Some(block_number) = block.number {
-                options.block_number_min = Some(block_number.into());
-                options.block_number_max = Some((block_number + 100).into()); // around 10 minutes
-                options.timestamp_min = Some(block.timestamp.as_u64());
-                options.timestamp_max = Some(block.timestamp.as_u64() + 420); // around 15 minutes
-            }
+            options.timestamp_min = Some(block.timestamp.as_u64());
+            options.timestamp_max = Some(block.timestamp.as_u64() + 420); // around 15 minutes
         }
 
         let tx =
