@@ -25,7 +25,7 @@ use silius_primitives::{
     bundler::BundleStrategy,
     constants::{
         entry_point,
-        fastlane_relay_endpoints::FASTLANE_POLYGON,
+        fastlane_relay_endpoints::{FASTLANE_POLYGON, POLYGON_NODE},
         flashbots_relay_endpoints,
         storage::DATABASE_FOLDER_NAME,
         supported_chains::CHAINS,
@@ -241,15 +241,21 @@ where
         }
         BundleStrategy::Fastlane => {
             let relay_endpoint: String =
-                match chain_conn.named().expect("Fastlane is only supported on Polygon") {
+                match chain_conn.named().expect("Fastlane is only supported on Polygon mainnet") {
                     NamedChain::Polygon => FASTLANE_POLYGON.into(),
-                    _ => panic!("Fastlane is only supported on Polygon"),
+                    _ => panic!("Fastlane is only supported on Polygon mainnet"),
                 };
 
             let relay_client =
                 create_http_provider(&relay_endpoint, Duration::from_millis(75)).await?;
-            let client =
-                Arc::new(FastlaneClient::new(eth_client.clone(), relay_client, wallet.clone()));
+            let polygon_client =
+                create_http_provider(POLYGON_NODE, Duration::from_millis(75)).await?;
+            let client = Arc::new(FastlaneClient::new(
+                eth_client.clone(),
+                polygon_client,
+                relay_client,
+                wallet.clone(),
+            ));
 
             bundler_service_run(
                 SocketAddr::new(args.bundler_addr, args.bundler_port),

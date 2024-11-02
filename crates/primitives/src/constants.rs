@@ -86,6 +86,8 @@ pub mod flashbots_relay_endpoints {
 pub mod fastlane_relay_endpoints {
     // polygon
     pub const FASTLANE_POLYGON: &str = "https://polygon-rpc.fastlane.xyz/";
+    pub const FASTLANE_VALIDATORS: &str = "https://www.fastlane.xyz/api/4337";
+    pub const POLYGON_NODE: &str = "https://polygon-rpc.com";
 }
 
 /// Supported chains

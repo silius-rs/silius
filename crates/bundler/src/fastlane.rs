@@ -11,7 +11,10 @@ use ethers::{
         Address, BlockNumber, H256,
     },
 };
-use silius_primitives::{simulation::StorageMap, Wallet};
+use serde::Deserialize;
+use silius_primitives::{
+    constants::fastlane_relay_endpoints::FASTLANE_VALIDATORS, simulation::StorageMap, Wallet,
+};
 use std::{collections::HashMap, sync::Arc};
 use tracing::trace;
 
@@ -19,7 +22,14 @@ use tracing::trace;
 #[derive(Clone)]
 pub struct FastlaneClient<M> {
     pub client: SignerMiddleware<Arc<M>, LocalWallet>,
+    pub polygon_client: Provider<Http>,
     pub relay_client: Provider<Http>,
+}
+
+/// Validators participating in the Fastlane relay network
+#[derive(Deserialize, Debug)]
+pub struct FastlaneValidators {
+    validators: Vec<Address>,
 }
 
 #[async_trait::async_trait]
@@ -65,6 +75,19 @@ where
             options.timestamp_max = Some(block.timestamp.as_u64() + 420); // around 15 minutes
         }
 
+        // check if the current validator is participating in the Fastlane protocol
+        let fastlane_validators =
+            reqwest::get(FASTLANE_VALIDATORS).await?.json::<FastlaneValidators>().await?;
+        let current_validator: Address =
+            self.polygon_client.request("bor_getCurrentProposer", ()).await?;
+
+        if !fastlane_validators.validators.contains(&current_validator) {
+            trace!("Current validator is not participating in the Fastlane protocol");
+            return Err(eyre::eyre!(
+                "Current validator is not participating in the Fastlane protocol"
+            ));
+        }
+
         let tx =
             self.relay_client.send_raw_transaction_conditional(signed_tx, prefix, options).await?;
         let tx_hash = tx.tx_hash();
@@ -85,13 +108,19 @@ where
     ///
     /// # Arguments
     /// * `eth_client` - Connection to the Ethereum execution client
+    /// * `polygon_client` - Connection to the Polygon execution client
     /// * `relay_client` - Connection to the Fastlane relay client
     /// * `wallet` - A [Wallet](Wallet) instance
     ///
     /// # Returns
     /// * `ConditionalClient` - A [Ethereum Signer Middleware](ConditionalClient)
-    pub fn new(eth_client: Arc<M>, relay_client: Provider<Http>, wallet: Wallet) -> Self {
+    pub fn new(
+        eth_client: Arc<M>,
+        polygon_client: Provider<Http>,
+        relay_client: Provider<Http>,
+        wallet: Wallet,
+    ) -> Self {
         let signer = SignerMiddleware::new(eth_client, wallet.clone().signer);
-        Self { client: signer, relay_client }
+        Self { client: signer, polygon_client, relay_client }
     }
 }

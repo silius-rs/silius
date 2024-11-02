@@ -23,7 +23,7 @@ alloy-sol-types = "0.5.4"
 ethers = { workspace = true }
 
 # rpc
-reqwest = { version = "0.11.4", features = ["json"] }
+reqwest = { workspace = true }
 
 # tokio
 tokio = { workspace = true }

@@ -6984,6 +6984,7 @@ dependencies = [
  "ethers-flashbots-test",
  "eyre",
  "jsonrpsee",
+ "reqwest",
  "serde",
  "silius-contracts",
  "silius-primitives",
