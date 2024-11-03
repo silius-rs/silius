@@ -312,6 +312,7 @@ pub trait UserOperationAct:
     AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync + DynClone
 {
 }
+
 dyn_clone::clone_trait_object!(UserOperationAct);
 impl<T> UserOperationAct for T where
     T: AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync + Clone
@@ -328,6 +329,7 @@ pub trait UserOperationAddrAct:
     AddRemoveUserOpHash + UserOperationAddrOp + ClearOp + Send + Sync + DynClone
 {
 }
+
 dyn_clone::clone_trait_object!(UserOperationAddrAct);
 impl<T> UserOperationAddrAct for T where
     T: AddRemoveUserOpHash + UserOperationAddrOp + ClearOp + Send + Sync + Clone
@@ -338,6 +340,7 @@ pub trait UserOperationCodeHashAct:
     UserOperationCodeHashOp + ClearOp + Send + Sync + DynClone
 {
 }
+
 dyn_clone::clone_trait_object!(UserOperationCodeHashAct);
 impl<T> UserOperationCodeHashAct for T where
     T: UserOperationCodeHashOp + ClearOp + Send + Sync + Clone
@@ -366,6 +369,7 @@ impl Mempool {
             user_operations_code_hashes,
         }
     }
+
     pub fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
         let (sender, factory, paymaster) = uo.get_entities();
         let uo_hash = uo.hash;
@@ -379,12 +383,14 @@ impl Mempool {
         }
         Ok(uo_hash)
     }
+
     pub fn get(
         &self,
         uo_hash: &UserOperationHash,
     ) -> Result<Option<UserOperation>, MempoolErrorKind> {
         self.user_operations.get_by_uo_hash(uo_hash)
     }
+
     pub fn get_all_by_sender(&self, addr: &Address) -> Vec<UserOperation> {
         let uos_by_sender = self.user_operations_by_sender.get_all_by_address(addr);
         uos_by_sender
@@ -393,12 +399,15 @@ impl Mempool {
             .flatten()
             .collect()
     }
+
     pub fn get_number_by_sender(&self, addr: &Address) -> usize {
         self.user_operations_by_sender.get_number_by_address(addr)
     }
+
     pub fn get_number_by_entity(&self, addr: &Address) -> usize {
         self.user_operations_by_entity.get_number_by_address(addr)
     }
+
     pub fn get_prev_by_sender(&self, uo: &UserOperation) -> Option<UserOperation> {
         self.user_operations_by_sender
             .get_all_by_address(&uo.sender)
@@ -408,9 +417,11 @@ impl Mempool {
             .filter(|uo_prev| uo_prev.nonce == uo.nonce)
             .max_by_key(|uo_prev| uo_prev.max_priority_fee_per_gas)
     }
+
     pub fn has_code_hashes(&self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         self.user_operations_code_hashes.has_code_hashes(uo_hash)
     }
+
     pub fn set_code_hashes(
         &mut self,
         uo_hash: &UserOperationHash,
@@ -418,12 +429,14 @@ impl Mempool {
     ) -> Result<(), MempoolErrorKind> {
         self.user_operations_code_hashes.set_code_hashes(uo_hash, hashes)
     }
+
     pub fn get_code_hashes(
         &self,
         uo_hash: &UserOperationHash,
     ) -> Result<Vec<CodeHash>, MempoolErrorKind> {
         self.user_operations_code_hashes.get_code_hashes(uo_hash)
     }
+
     pub fn remove(&mut self, uo_hash: &UserOperationHash) -> Result<bool, MempoolErrorKind> {
         let uo = if let Some(user_op) = self.user_operations.get_by_uo_hash(uo_hash)? {
             user_op
@@ -449,6 +462,7 @@ impl Mempool {
 
         Ok(true)
     }
+
     pub fn remove_by_entity(&mut self, entity: &Address) -> Result<(), MempoolErrorKind> {
         let uos = self.user_operations_by_entity.get_all_by_address(entity);
 
@@ -458,13 +472,16 @@ impl Mempool {
 
         Ok(())
     }
+
     // Get UserOperations sorted by max_priority_fee_per_gas without dup sender
     pub fn get_sorted(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.user_operations.get_sorted()
     }
+
     pub fn get_all(&self) -> Result<Vec<UserOperation>, MempoolErrorKind> {
         self.user_operations.get_all()
     }
+
     pub fn clear(&mut self) {
         self.user_operations.clear();
         self.user_operations_by_sender.clear();

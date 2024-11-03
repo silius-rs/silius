@@ -5,7 +5,7 @@ use crate::{
     UserOperation, UserOperationSigned,
 };
 use alloy_chains::Chain;
-use ethers::types::{Address, H160, U256 as EthersU256};
+use ethers::types::{Address, H160, H256, U256 as EthersU256};
 use ssz_rs::{Vector, U256};
 use ssz_rs_derive::Serializable;
 use std::str::FromStr;
@@ -59,6 +59,10 @@ pub enum NetworkMessage {
     Validate {
         user_operation: UserOperation,
         validation_config: ValidationConfig,
+    },
+    NewBlock {
+        block_hash: H256,
+        block_number: u64,
     },
 }
 

@@ -107,6 +107,7 @@ where
 
     pub fn register_block_updates(&self, mut block_stream: BlockStream) {
         let mut uopool = self.uopool();
+        let network = self.network.clone();
         tokio::spawn(async move {
             while let Some(hash) = block_stream.next().await {
                 if let Ok(hash) = hash {
@@ -114,6 +115,23 @@ where
                     let _ = Self::handle_block_update(h, &mut uopool)
                         .await
                         .map_err(|e| warn!("Failed to handle block update: {:?}", e));
+
+                    // update p2p latest block info
+                    if let Some(ref network) = network {
+                        if let Ok(block_number) =
+                            uopool.entry_point.eth_client().get_block_number().await.map_err(|e| {
+                                warn!("Failed to get block number: {:?}", e);
+                                e
+                            })
+                        {
+                            let _ = network
+                                .unbounded_send(NetworkMessage::NewBlock {
+                                    block_hash: hash,
+                                    block_number: block_number.as_u64(),
+                                })
+                                .map_err(|e| warn!("Failed to send new block message: {:?}", e));
+                        }
+                    }
                 }
             }
         });

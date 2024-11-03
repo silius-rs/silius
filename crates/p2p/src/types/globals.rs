@@ -1,5 +1,6 @@
 use crate::{discovery::enr_ext::EnrExt, peer_manager::peerdb::PeerDB, rpc::methods::MetaData};
 use discv5::Enr;
+use ethers::types::H256;
 use libp2p::{Multiaddr, PeerId};
 use parking_lot::RwLock;
 use silius_primitives::chain::ChainSpec;
@@ -17,6 +18,10 @@ pub struct NetworkGlobals {
     pub local_metadata: RwLock<MetaData>,
     /// Chain information.
     pub chain_spec: RwLock<ChainSpec>,
+    /// Latest block hash.
+    pub latest_block_hash: RwLock<H256>,
+    /// Latest block number.
+    pub latest_block_number: RwLock<u64>,
 }
 
 impl NetworkGlobals {
@@ -25,6 +30,8 @@ impl NetworkGlobals {
         local_metadata: MetaData,
         trusted_peers: Vec<PeerId>,
         chain_spec: ChainSpec,
+        latest_block_hash: H256,
+        latest_block_number: u64,
     ) -> Self {
         let peer_id = enr.peer_id();
         let multiaddrs = enr.multiaddr();
@@ -36,6 +43,8 @@ impl NetworkGlobals {
             peers: RwLock::new(PeerDB::new(trusted_peers)),
             local_metadata: RwLock::new(local_metadata),
             chain_spec: RwLock::new(chain_spec),
+            latest_block_hash: RwLock::new(latest_block_hash),
+            latest_block_number: RwLock::new(latest_block_number),
         }
     }
 
@@ -61,5 +70,13 @@ impl NetworkGlobals {
 
     pub fn connected_or_dialing_peers(&self) -> usize {
         self.peers.read().connected_or_dialing_peers().count()
+    }
+
+    pub fn latest_block_hash(&self) -> H256 {
+        *self.latest_block_hash.read()
+    }
+
+    pub fn latest_block_number(&self) -> u64 {
+        *self.latest_block_number.read()
     }
 }

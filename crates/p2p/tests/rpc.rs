@@ -3,7 +3,7 @@ mod common;
 use crate::common::build_connnected_p2p_pair;
 use silius_p2p::{
     rpc::{
-        methods::{RPCResponse, StatusMessage},
+        methods::{RPCResponse, Status},
         outbound::OutboundRequest,
     },
     service::NetworkEvent,
@@ -76,8 +76,8 @@ async fn rpc_case(request_case: OutboundRequest, response_case: RPCResponse) -> 
 #[tokio::test]
 async fn rpc_status() -> eyre::Result<()> {
     rpc_case(
-        OutboundRequest::Status(StatusMessage::default()),
-        RPCResponse::Status(StatusMessage::default()),
+        OutboundRequest::Status(Status { chain_id: 1337_u64, ..Default::default() }),
+        RPCResponse::Status(Status { chain_id: 1337_u64, ..Default::default() }),
     )
     .await?;
     Ok(())

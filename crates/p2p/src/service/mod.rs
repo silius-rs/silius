@@ -15,7 +15,7 @@ use crate::{
     },
     peer_manager::{PeerManager, PeerManagerEvent},
     rpc::{
-        methods::{MetaData, MetaDataRequest, Ping, RPCResponse, RequestId},
+        methods::{MetaData, MetaDataRequest, Ping, RPCResponse, RequestId, Status},
         outbound::OutboundRequest,
         protocol::InboundRequest,
         RPCEvent, RPC,
@@ -32,7 +32,7 @@ use crate::{
 };
 use alloy_chains::Chain;
 use discv5::Enr;
-use ethers::types::Address;
+use ethers::types::{Address, H256};
 use futures::channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot::Sender,
@@ -129,7 +129,11 @@ impl From<Network> for Swarm<Behaviour> {
 }
 
 impl Network {
-    pub async fn new(config: Config, mempool_channels: Vec<MempoolChannel>) -> eyre::Result<Self> {
+    pub async fn new(
+        config: Config,
+        latest_block: (H256, u64),
+        mempool_channels: Vec<MempoolChannel>,
+    ) -> eyre::Result<Self> {
         // Handle private key
         let key = if let Some(key) = load_private_key_from_file(&config.node_key_file) {
             key
@@ -205,6 +209,8 @@ impl Network {
                 metadata,
                 trusted_peers,
                 config.chain_spec.clone(),
+                latest_block.0,
+                latest_block.1,
             ))
         };
 
@@ -272,6 +278,14 @@ impl Network {
 
     pub fn metadata(&self) -> MetaData {
         self.network_globals.local_metadata()
+    }
+
+    pub fn status(&self) -> Status {
+        Status {
+            chain_id: self.network_globals.chain_spec().chain.id(),
+            block_hash: *self.network_globals.latest_block_hash().as_fixed_bytes(),
+            block_number: self.network_globals.latest_block_number(),
+        }
     }
 
     /// handle gossipsub event
@@ -355,6 +369,11 @@ impl Network {
                     sender
                         .send(RPCResponse::MetaData(self.metadata()))
                         .expect("channel should exist");
+                    None
+                }
+                InboundRequest::Status(_status) => {
+                    // TODO: verify status message
+                    sender.send(RPCResponse::Status(self.status())).expect("channel should exist");
                     None
                 }
                 InboundRequest::Goodbye(_) => None,
@@ -474,6 +493,13 @@ impl Network {
                                 next = true;
                             }
                         }
+                    }
+                    NetworkMessage::NewBlock { block_hash, block_number } => {
+                        let mut latest_block_hash = self.network_globals.latest_block_hash.write();
+                        *latest_block_hash = block_hash;
+                        let mut latest_block_number =
+                            self.network_globals.latest_block_number.write();
+                        *latest_block_number = block_number;
                     }
                     _ => {}
                 }

@@ -3,7 +3,7 @@ use crate::rpc::{
     methods::{
         GoodbyeReason, MetaData, MetaDataRequest, Ping, PooledUserOpHashesRequest,
         PooledUserOpHashesResponse, PooledUserOpsByHashRequest, PooledUserOpsByHashResponse,
-        RPCResponse, StatusMessage,
+        RPCResponse, Status,
     },
     outbound::OutboundRequest,
     protocol::{InboundRequest, Protocol, ProtocolId},
@@ -80,10 +80,8 @@ impl Decoder for SSZSnappyInboundCodec {
         let mut buffer = vec![];
         snap::read::FrameDecoder::<&[u8]>::new(src).read_to_end(&mut buffer)?;
 
-        trace!("Inbound request buffer {:?}", buffer);
-
         let request = match self.protocol.protocol {
-            Protocol::Status => InboundRequest::Status(StatusMessage::deserialize(&buffer)?),
+            Protocol::Status => InboundRequest::Status(Status::deserialize(&buffer)?),
             Protocol::Goodbye => InboundRequest::Goodbye(GoodbyeReason::deserialize(&buffer)?),
             Protocol::Ping => InboundRequest::Ping(Ping::deserialize(&buffer)?),
             Protocol::MetaData => InboundRequest::MetaData(MetaDataRequest::deserialize(&buffer)?),
@@ -156,8 +154,6 @@ impl Decoder for SSZSnappyOutboundCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        trace!("Outbound response buffer {:?}", src);
-
         // response_chunk ::= <result> | <encoding-dependent-header> | <encoded-payload>
 
         // TODO: response chunks
@@ -173,9 +169,7 @@ impl Decoder for SSZSnappyOutboundCodec {
         snap::read::FrameDecoder::<&[u8]>::new(src).read_to_end(&mut decompressed_data)?;
 
         let response = match self.protocol.protocol {
-            Protocol::Status => {
-                RPCResponse::Status(StatusMessage::deserialize(&decompressed_data)?)
-            }
+            Protocol::Status => RPCResponse::Status(Status::deserialize(&decompressed_data)?),
             Protocol::Goodbye => {
                 RPCResponse::Goodbye(GoodbyeReason::deserialize(&decompressed_data)?)
             }

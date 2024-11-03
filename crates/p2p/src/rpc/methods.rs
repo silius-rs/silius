@@ -14,10 +14,10 @@ pub struct MetaData {
 }
 
 #[derive(ssz_rs_derive::Serializable, Clone, Debug, PartialEq, Default)]
-pub struct StatusMessage {
-    chain_id: u64,
-    block_hash: [u8; 32],
-    block_number: u64,
+pub struct Status {
+    pub chain_id: u64,
+    pub block_hash: [u8; 32],
+    pub block_number: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -127,7 +127,7 @@ pub struct RequestId(pub(crate) u64);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RPCResponse {
-    Status(StatusMessage),
+    Status(Status),
     Goodbye(GoodbyeReason),
     Pong(Ping),
     MetaData(MetaData),

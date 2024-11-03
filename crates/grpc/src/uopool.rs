@@ -449,9 +449,24 @@ where
                 info!("Starting p2p mode without bootnodes");
             }
 
-            let mut p2p_network = Network::new(config.clone(), mempool_channels)
+            // fetch latest block information for p2p
+            let latest_block_number = eth_client
+                .get_block_number()
                 .await
-                .expect("p2p network init failed");
+                .expect("get block number failed (needed for p2p)");
+            let latest_block_hash = eth_client
+                .get_block(latest_block_number)
+                .await
+                .expect("get block hash failed (needed for p2p)")
+                .expect("get block hash failed (needed for p2p)");
+
+            let mut p2p_network = Network::new(
+                config.clone(),
+                (latest_block_hash.hash.unwrap_or_default(), latest_block_number.as_u64()),
+                mempool_channels,
+            )
+            .await
+            .expect("p2p network init failed");
 
             tokio::spawn(async move {
                 loop {

@@ -1,7 +1,7 @@
 use super::{
     methods::{
         GoodbyeReason, MetaDataRequest, Ping, PooledUserOpHashesRequest,
-        PooledUserOpsByHashRequest, StatusMessage,
+        PooledUserOpsByHashRequest, Status,
     },
     protocol::{InboundRequest, Protocol, ProtocolId},
 };
@@ -10,7 +10,7 @@ use libp2p::{core::UpgradeInfo, OutboundUpgrade, Stream};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OutboundRequest {
-    Status(StatusMessage),
+    Status(Status),
     Goodbye(GoodbyeReason),
     Ping(Ping),
     MetaData(MetaDataRequest),

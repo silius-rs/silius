@@ -1,7 +1,7 @@
 use super::{
     methods::{
         GoodbyeReason, MetaDataRequest, Ping, PooledUserOpHashesRequest,
-        PooledUserOpsByHashRequest, StatusMessage,
+        PooledUserOpsByHashRequest, Status,
     },
     outbound::OutboundRequest,
 };
@@ -99,7 +99,7 @@ impl Display for Encoding {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InboundRequest {
-    Status(StatusMessage),
+    Status(Status),
     Goodbye(GoodbyeReason),
     Ping(Ping),
     MetaData(MetaDataRequest),

@@ -193,8 +193,6 @@ impl RPCHandler {
                 bytes.clear();
                 codec.encode(response, &mut bytes)?;
 
-                trace!("Sending {:?} bytes", bytes.len());
-
                 socket.write_all(&bytes).await?;
                 socket.close().await?;
 
@@ -227,8 +225,6 @@ impl RPCHandler {
 
             let mut codec = SSZSnappyOutboundCodec::new(protocol_id);
             codec.encode(request, &mut bytes)?;
-
-            trace!("Sending {:?} bytes", bytes.len());
 
             socket.write_all(&bytes).await?;
             socket.close().await?;
