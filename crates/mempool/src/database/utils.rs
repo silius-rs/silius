@@ -20,16 +20,16 @@ macro_rules! construct_wrap_hash {
         )]
         pub struct $name($type);
 
-        impl Decode for $name {
-            fn decode<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
-                Ok(<$type>::from_slice(value.into().as_ref()).into())
-            }
-        }
-
         impl Encode for $name {
             type Encoded = [u8; $n_bytes];
             fn encode(self) -> Self::Encoded {
                 *self.0.as_fixed_bytes()
+            }
+        }
+
+        impl Decode for $name {
+            fn decode<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+                Ok(<$type>::from_slice(value.into().as_ref()).into())
             }
         }
 
@@ -111,23 +111,16 @@ construct_wrap_struct!(CodeHash, WrapCodeHash);
 construct_wrap_struct!(UserOperationSigned, WrapUserOperationSigned);
 construct_wrap_struct!(ReputationEntry, WrapReputationEntry);
 
-impl<'de> Decoder<'de> for WrapUserOperationHash {
-    fn decoder(data: &mut &'de [u8]) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let data: [u8; 32] = <[u8; 32]>::decoder(data)?;
-        Ok(WrapUserOperationHash(UserOperationHash::from_slice(&data)))
-    }
-}
-
 impl Encoder for WrapUserOperationHash {
     fn encoder(&self, write: &mut impl std::io::prelude::Write) -> std::io::Result<()> {
         self.0.as_fixed_bytes().encoder(write)
     }
 }
-impl<'de> Decoder<'de> for WrapCodeHash {
+
+impl<'de> Decoder<'de> for WrapUserOperationHash {
     fn decoder(data: &mut &'de [u8]) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let address = <[u8; 20]>::decoder(data)?.into();
-        let hash = <[u8; 32]>::decoder(data)?.into();
-        Ok(WrapCodeHash(CodeHash { address, hash }))
+        let data: [u8; 32] = <[u8; 32]>::decoder(data)?;
+        Ok(WrapUserOperationHash(UserOperationHash::from_slice(&data)))
     }
 }
 
@@ -138,10 +131,18 @@ impl Encoder for WrapCodeHash {
     }
 }
 
-#[derive(Decoder, Encoder, Default, Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct WrapUserOpSet(HashSet<WrapUserOperationHash>);
+impl<'de> Decoder<'de> for WrapCodeHash {
+    fn decoder(data: &mut &'de [u8]) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let address = <[u8; 20]>::decoder(data)?.into();
+        let hash = <[u8; 32]>::decoder(data)?.into();
+        Ok(WrapCodeHash(CodeHash { address, hash }))
+    }
+}
 
-impl WrapUserOpSet {
+#[derive(Decoder, Encoder, Default, Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct WrapUserOperationHashSet(HashSet<WrapUserOperationHash>);
+
+impl WrapUserOperationHashSet {
     pub fn insert(&mut self, value: WrapUserOperationHash) -> bool {
         self.0.insert(value)
     }
@@ -159,26 +160,26 @@ impl WrapUserOpSet {
     }
 }
 
-impl From<HashSet<WrapUserOperationHash>> for WrapUserOpSet {
+impl From<HashSet<WrapUserOperationHash>> for WrapUserOperationHashSet {
     fn from(value: HashSet<WrapUserOperationHash>) -> Self {
         Self(value)
     }
 }
 
-impl From<WrapUserOpSet> for HashSet<WrapUserOperationHash> {
-    fn from(value: WrapUserOpSet) -> Self {
+impl From<WrapUserOperationHashSet> for HashSet<WrapUserOperationHash> {
+    fn from(value: WrapUserOperationHashSet) -> Self {
         value.0
     }
 }
 
-impl Compress for WrapUserOpSet {
+impl Compress for WrapUserOperationHashSet {
     type Compressed = Vec<u8>;
     fn compress(self) -> Self::Compressed {
         self.encode()
     }
 }
 
-impl Decompress for WrapUserOpSet {
+impl Decompress for WrapUserOperationHashSet {
     fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
         Self::decode(value.into().as_ref()).map_err(|_| reth_db::Error::DecodeError)
     }
@@ -198,6 +199,7 @@ impl From<WrapCodeHashVec> for Vec<WrapCodeHash> {
         value.0
     }
 }
+
 impl Compress for WrapCodeHashVec {
     type Compressed = Vec<u8>;
     fn compress(self) -> Self::Compressed {
@@ -211,5 +213,66 @@ impl Decompress for WrapCodeHashVec {
         let decoded = <Vec<WrapCodeHash> as Decoder>::decode(v.as_ref())
             .map_err(|_| reth_db::Error::DecodeError)?;
         Ok(decoded.into())
+    }
+}
+
+#[derive(Default, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+pub struct WrapU64(u64);
+
+impl Encode for WrapU64 {
+    type Encoded = [u8; 8];
+    fn encode(self) -> Self::Encoded {
+        self.0.to_le_bytes()
+    }
+}
+
+impl Decode for WrapU64 {
+    fn decode<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        let v = value.into();
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(v.as_ref());
+        Ok(u64::from_le_bytes(bytes).into())
+    }
+}
+
+impl From<u64> for WrapU64 {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<WrapU64> for u64 {
+    fn from(value: WrapU64) -> Self {
+        value.0
+    }
+}
+
+impl Compress for WrapU64 {
+    type Compressed = Vec<u8>;
+    fn compress(self) -> Self::Compressed {
+        <u64 as Encoder>::encode(&self.0)
+    }
+}
+
+impl Decompress for WrapU64 {
+    fn decompress<B: Into<prost::bytes::Bytes>>(value: B) -> Result<Self, reth_db::Error> {
+        let v = value.into();
+        let decoded =
+            <u64 as Decoder>::decode(v.as_ref()).map_err(|_| reth_db::Error::DecodeError)?;
+        Ok(decoded.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prost::bytes::Bytes;
+
+    #[test]
+    fn wrap_u64_coder() {
+        let wrap_u64 = WrapU64(123456789);
+        let encoded = wrap_u64.clone().encode();
+        let decoded = WrapU64::decode(Bytes::copy_from_slice(&encoded)).unwrap();
+        assert_eq!(wrap_u64, decoded);
     }
 }

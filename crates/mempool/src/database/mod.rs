@@ -18,6 +18,7 @@ pub fn init_env<E: EnvironmentKind>(path: PathBuf) -> eyre::Result<Env<E>> {
     env.create_tables()?;
     Ok(env)
 }
+
 /// The database-based implementation of the [Mempool](crate::mempool::Mempool) trait.
 #[derive(Debug)]
 pub struct DatabaseTable<E: EnvironmentKind, Table> {

@@ -1,4 +1,5 @@
 use crate::MempoolErrorKind;
+use chrono::Utc;
 use dyn_clone::DynClone;
 use ethers::{
     abi::AbiEncode,
@@ -308,6 +309,59 @@ pub trait ClearOp {
     fn clear(&mut self);
 }
 
+impl<T: ClearOp> ClearOp for Arc<RwLock<T>> {
+    fn clear(&mut self) {
+        self.write().clear()
+    }
+}
+
+/// Trait for managing user operation timestamps in a memory pool.
+pub trait UserOperationTimestampOp {
+    fn add(&mut self, uo_hash: UserOperationHash, timestamp: u64) -> Result<(), MempoolErrorKind>;
+
+    fn get_timestamp(&self, uo_hash: &UserOperationHash) -> Result<u64, MempoolErrorKind>;
+
+    /// Retrieves all user operation hashes associated with the given timestamp.
+    fn get_all_by_timestamp(&self, timestamp: u64) -> Vec<UserOperationHash>;
+
+    /// Retrieves all user operation hashes within the given timestamp range.
+    fn get_range_by_timestamp(
+        &self,
+        start: Option<u64>,
+        end: Option<u64>,
+        size: Option<usize>,
+    ) -> Vec<UserOperationHash>;
+
+    fn remove(&mut self, uo_hash: &UserOperationHash, timestamp: u64) -> Result<(), MempoolErrorKind>;
+}
+
+impl<T: UserOperationTimestampOp> UserOperationTimestampOp for Arc<RwLock<T>> {
+    fn add(&mut self, uo_hash: UserOperationHash, timestamp: u64) -> Result<(), MempoolErrorKind> {
+        self.write().add(uo_hash, timestamp)
+    }
+
+    fn get_timestamp(&self, uo_hash: &UserOperationHash) -> Result<u64, MempoolErrorKind> {
+        self.read().get_timestamp(uo_hash)
+    }
+    
+    fn get_all_by_timestamp(&self, timestamp: u64) -> Vec<UserOperationHash> {
+        self.read().get_all_by_timestamp(timestamp)
+    }
+
+    fn get_range_by_timestamp(
+        &self,
+        start: Option<u64>,
+        end: Option<u64>,
+        size: Option<usize>,
+    ) -> Vec<UserOperationHash> {
+        self.read().get_range_by_timestamp(start, end, size)
+    }
+
+    fn remove(&mut self, uo_hash: &UserOperationHash, timestamp: u64) -> Result<(), MempoolErrorKind> {
+        self.write().remove(uo_hash, timestamp)
+    }
+}
+
 pub trait UserOperationAct:
     AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync + DynClone
 {
@@ -317,12 +371,6 @@ dyn_clone::clone_trait_object!(UserOperationAct);
 impl<T> UserOperationAct for T where
     T: AddRemoveUserOp + UserOperationOp + ClearOp + Send + Sync + Clone
 {
-}
-
-impl<T: ClearOp> ClearOp for Arc<RwLock<T>> {
-    fn clear(&mut self) {
-        self.write().clear()
-    }
 }
 
 pub trait UserOperationAddrAct:
@@ -347,12 +395,25 @@ impl<T> UserOperationCodeHashAct for T where
 {
 }
 
+pub trait UserOperationTimestampAct:
+    ClearOp + UserOperationTimestampOp + Send + Sync + DynClone
+{
+}
+
+dyn_clone::clone_trait_object!(UserOperationTimestampAct);
+impl<T> UserOperationTimestampAct for T where
+    T: ClearOp + UserOperationTimestampOp + Send + Sync + Clone
+{
+}
+
 #[derive(Clone)]
 pub struct Mempool {
     user_operations: Box<dyn UserOperationAct>,
     user_operations_by_sender: Box<dyn UserOperationAddrAct>,
     user_operations_by_entity: Box<dyn UserOperationAddrAct>,
     user_operations_code_hashes: Box<dyn UserOperationCodeHashAct>,
+    user_operations_timestamps: Box<dyn UserOperationTimestampAct>,
+    user_operations_by_timestamp: Box<dyn UserOperationTimestampAct>,
 }
 
 impl Mempool {
@@ -361,18 +422,23 @@ impl Mempool {
         user_operations_by_sender: Box<dyn UserOperationAddrAct>,
         user_operations_by_entity: Box<dyn UserOperationAddrAct>,
         user_operations_code_hashes: Box<dyn UserOperationCodeHashAct>,
+        user_operations_timestamps: Box<dyn UserOperationTimestampAct>,
+        user_operations_by_timestamp: Box<dyn UserOperationTimestampAct>,
     ) -> Self {
         Self {
             user_operations,
             user_operations_by_sender,
             user_operations_by_entity,
             user_operations_code_hashes,
+            user_operations_timestamps,
+            user_operations_by_timestamp,
         }
     }
 
     pub fn add(&mut self, uo: UserOperation) -> Result<UserOperationHash, MempoolErrorKind> {
         let (sender, factory, paymaster) = uo.get_entities();
         let uo_hash = uo.hash;
+        let timestamp = Utc::now().timestamp().unsigned_abs() % 10;
         self.user_operations.add(uo)?;
         self.user_operations_by_sender.add(&sender, uo_hash)?;
         if let Some(factory) = factory {
@@ -381,6 +447,8 @@ impl Mempool {
         if let Some(paymaster) = paymaster {
             self.user_operations_by_entity.add(&paymaster, uo_hash)?;
         }
+        self.user_operations_timestamps.add(uo_hash, timestamp)?;
+        self.user_operations_by_timestamp.add(uo_hash, timestamp)?;
         Ok(uo_hash)
     }
 
@@ -459,6 +527,12 @@ impl Mempool {
         }
 
         self.user_operations_code_hashes.remove_code_hashes(uo_hash)?;
+
+        let timestamp = self.user_operations_timestamps.get_timestamp(uo_hash)?;
+
+        self.user_operations_timestamps.remove(uo_hash, timestamp)?;
+
+        self.user_operations_by_timestamp.remove(uo_hash, timestamp)?;
 
         Ok(true)
     }

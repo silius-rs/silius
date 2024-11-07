@@ -2,8 +2,8 @@ use super::{
     env::DatabaseError,
     tables::{CodeHashes, UserOperations, UserOperationsByEntity, UserOperationsBySender},
     utils::{
-        WrapAddress, WrapCodeHash, WrapCodeHashVec, WrapUserOpSet, WrapUserOperationHash,
-        WrapUserOperationSigned,
+        WrapAddress, WrapCodeHash, WrapCodeHashVec, WrapUserOperationHash,
+        WrapUserOperationHashSet, WrapUserOperationSigned,
     },
     DatabaseTable,
 };
@@ -58,7 +58,7 @@ macro_rules! impl_add_remove_user_op_hash {
                     uo_hash_set.insert(uo_hash_wrap);
                     tx.put::<$table>(address.clone().into(), uo_hash_set)?;
                 } else {
-                    let mut uo_hash_set = WrapUserOpSet::default();
+                    let mut uo_hash_set = WrapUserOperationHashSet::default();
                     uo_hash_set.insert(uo_hash_wrap);
                     tx.put::<$table>(address.clone().into(), uo_hash_set)?;
                 }

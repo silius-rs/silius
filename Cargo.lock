@@ -7047,6 +7047,7 @@ dependencies = [
  "alloy-chains",
  "async-trait",
  "bin-layout",
+ "chrono",
  "const-hex",
  "dyn-clone",
  "enumset",

@@ -55,7 +55,7 @@ pub async fn fetch_mempool_config(cid: String) -> Result<MempoolConfig> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::fetch_mempool_config;
     use ethers::types::U256;
 

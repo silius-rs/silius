@@ -29,7 +29,7 @@ use tokio_util::{
     bytes::BytesMut,
     codec::{Decoder, Encoder},
 };
-use tracing::{trace, warn};
+use tracing::warn;
 
 /// Information about the inbound connection.
 pub struct InboundInfo {
@@ -169,8 +169,6 @@ impl RPCHandler {
             let socket = &mut socket;
             socket.take(REQUEST_SIZE_MAXIMUM).read_to_end(&mut data).await?;
 
-            trace!("Received {:?} bytes", data.len());
-
             let mut bytes = BytesMut::new();
             bytes.extend_from_slice(&data);
 
@@ -234,8 +232,6 @@ impl RPCHandler {
 
             bytes.clear();
             bytes.extend_from_slice(&data);
-
-            trace!("Received {:?} bytes", bytes.len());
 
             let response = codec.decode(&mut bytes)?.ok_or_else(|| {
                 io::Error::new(io::ErrorKind::InvalidData, "Failed to decode response")
