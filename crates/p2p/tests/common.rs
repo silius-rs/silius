@@ -59,6 +59,7 @@ async fn build_p2p_instance(bootnode: Option<Enr>) -> eyre::Result<Network> {
         chain_spec: chain_spec.clone(),
         target_peers: TARGET_PEERS,
         bootnodes: if let Some(bootnode) = bootnode { vec![bootnode] } else { vec![] },
+        peers_whitelist: vec![],
     };
 
     let (_, receiver) = unbounded();

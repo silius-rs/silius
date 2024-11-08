@@ -50,20 +50,34 @@ impl NetworkBehaviour for PeerManager {
     fn handle_established_inbound_connection(
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
-        _peer: PeerId,
+        peer_id: PeerId,
         _local_addr: &libp2p::Multiaddr,
         _remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
+        // check if whitelist exists and if the peer is in the whitelist
+        if !self.peers_whitelist.is_empty() &&
+            self.peers_whitelist.iter().filter(|enr| enr.peer_id() == peer_id).count() == 0
+        {
+            return Err(libp2p::swarm::ConnectionDenied::new("Peer not in the whitelist"));
+        }
+
         Ok(ConnectionHandler)
     }
 
     fn handle_established_outbound_connection(
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
-        _peer: PeerId,
+        peer_id: PeerId,
         _addr: &libp2p::Multiaddr,
         _role_override: libp2p::core::Endpoint,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
+        // check if whitelist exists and if the peer is in the whitelist
+        if !self.peers_whitelist.is_empty() &&
+            self.peers_whitelist.iter().filter(|enr| enr.peer_id() == peer_id).count() == 0
+        {
+            return Err(libp2p::swarm::ConnectionDenied::new("Peer not in the whitelist"));
+        }
+
         Ok(ConnectionHandler)
     }
 

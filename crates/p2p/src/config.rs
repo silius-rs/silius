@@ -57,6 +57,9 @@ pub struct Config {
 
     /// List of bootnodes.
     pub bootnodes: Vec<Enr>,
+
+    /// List of whitelisted peer ENRs
+    pub peers_whitelist: Vec<Enr>,
 }
 
 impl Default for Config {
@@ -85,6 +88,7 @@ impl Default for Config {
             chain_spec: ChainSpec::dev(),
             target_peers: TARGET_PEERS,
             bootnodes: vec![],
+            peers_whitelist: vec![],
         }
     }
 }
@@ -192,6 +196,12 @@ impl ConfigBuilder {
     /// Set the bootnodes.
     pub fn bootnodes(mut self, bootnodes: Vec<Enr>) -> Self {
         self.config.bootnodes = bootnodes;
+        self
+    }
+
+    /// Set the peers whitelist.
+    pub fn peers_whitelist(mut self, peers_whitelist: Vec<Enr>) -> Self {
+        self.config.peers_whitelist = peers_whitelist;
         self
     }
 }

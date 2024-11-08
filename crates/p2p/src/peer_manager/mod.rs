@@ -55,12 +55,14 @@ pub struct PeerManager {
     target_peers: usize,
     /// Peers needs to be dialed.
     peers_to_dial: Vec<Enr>,
+    /// The list of whitelisted ENRs.
+    peers_whitelist: Vec<Enr>,
     /// The heartbeat interval for peer management.
     heartbeat: tokio::time::Interval,
 }
 
 impl PeerManager {
-    pub fn new(network_globals: Arc<NetworkGlobals>) -> Self {
+    pub fn new(network_globals: Arc<NetworkGlobals>, peers_whitelist: Vec<Enr>) -> Self {
         Self {
             network_globals,
             events: Default::default(),
@@ -68,6 +70,7 @@ impl PeerManager {
             outbound_ping_peers: HashSetDelay::new(Duration::from_secs(PING_INTERVAL_OUTBOUND)),
             target_peers: TARGET_PEERS,
             peers_to_dial: Vec::new(),
+            peers_whitelist,
             heartbeat: tokio::time::interval(Duration::from_secs(HEARTBEAT_INTERVAL)),
         }
     }

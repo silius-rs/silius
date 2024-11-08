@@ -221,7 +221,8 @@ impl Network {
 
         let rpc = RPC::new();
 
-        let peer_manager = PeerManager::new(network_globals.clone());
+        let peer_manager =
+            PeerManager::new(network_globals.clone(), config.clone().peers_whitelist);
 
         let mut discovery =
             Discovery::new(combined_key, config.clone(), network_globals.clone()).await?;
