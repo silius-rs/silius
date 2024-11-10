@@ -23,7 +23,9 @@ impl ChainSpec {
             11155111 => Self::sepolia(),
             137 => Self::polygon(),
             80002 => Self::polygon_amoy(),
+            42161 => Self::arbitrum(),
             421614 => Self::arbitrum_sepolia(),
+            10 => Self::optimism(),
             _ => Self::default(chain_id),
         }
     }
@@ -33,7 +35,7 @@ impl ChainSpec {
         Self {
             chain: Chain::from(NamedChain::Mainnet),
             block_time: Duration::from_secs(12),
-            canonical_mempools: vec![],
+            canonical_mempools: vec!["QmVEt8BqyX7mbPhMNkmhnxL7fLxcXxsReMQcjYMBSHBfy7".into()],
         }
     }
 
@@ -76,12 +78,30 @@ impl ChainSpec {
         }
     }
 
+    /// 'ChainSpec' for arbitrum
+    pub fn arbitrum() -> Self {
+        Self {
+            chain: Chain::from(NamedChain::Arbitrum),
+            block_time: Duration::from_millis(250),
+            canonical_mempools: vec!["QmSpr2Q6cMfZ2CvXecH843KtvnG3tzvxZVy1jKphYKd6tf".into()],
+        }
+    }
+
     /// 'ChainSpec' for arbitrum sepolia
     pub fn arbitrum_sepolia() -> Self {
         Self {
             chain: Chain::from(NamedChain::ArbitrumSepolia),
             block_time: Duration::from_millis(250),
             canonical_mempools: vec!["QmVwhF77aVNzRUkMJNLDkeF9BtQMHLnfDY5ePpZ81uKLzA".into()],
+        }
+    }
+
+    /// 'ChainSpec' for optimism
+    pub fn optimism() -> Self {
+        Self {
+            chain: Chain::from(NamedChain::Optimism),
+            block_time: Duration::from_secs(2),
+            canonical_mempools: vec!["QmPkygym9oarrdiTeGBFQqbJcjpv4yHLLXrqQYGqKiXs7s".into()],
         }
     }
 
