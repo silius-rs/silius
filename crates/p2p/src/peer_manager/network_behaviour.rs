@@ -7,11 +7,11 @@ use libp2p::{
         behaviour::ConnectionEstablished,
         dial_opts::{DialOpts, PeerCondition},
         dummy::ConnectionHandler,
-        ConnectionClosed, DialFailure, FromSwarm, NetworkBehaviour, ToSwarm,
+        ConnectionClosed, ConnectionDenied, DialFailure, FromSwarm, NetworkBehaviour, ToSwarm,
     },
     PeerId,
 };
-use std::task::Poll;
+use std::{net::IpAddr, task::Poll};
 use tracing::error;
 
 impl NetworkBehaviour for PeerManager {
@@ -85,8 +85,28 @@ impl NetworkBehaviour for PeerManager {
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
         _local_addr: &libp2p::Multiaddr,
-        _remote_addr: &libp2p::Multiaddr,
+        remote_addr: &libp2p::Multiaddr,
     ) -> Result<(), libp2p::swarm::ConnectionDenied> {
+        // get the IP address to verify it's whitelisted
+        let ip = match remote_addr.iter().next() {
+            Some(libp2p::multiaddr::Protocol::Ip6(ip)) => IpAddr::V6(ip),
+            Some(libp2p::multiaddr::Protocol::Ip4(ip)) => IpAddr::V4(ip),
+            _ => {
+                return Err(ConnectionDenied::new(format!(
+                    "Connection to peer rejected: invalid multiaddr: {remote_addr}"
+                )))
+            }
+        };
+
+        // check if whitelist exists and if the IP is in the whitelist
+        if !self.ips_whitelist.is_empty() &&
+            self.ips_whitelist.iter().filter(|&&whitelist_ip| whitelist_ip == ip).count() == 0
+        {
+            return Err(ConnectionDenied::new(format!(
+                "Connection to peer rejected: IP {ip} not in the whitelist"
+            )));
+        }
+
         Ok(())
     }
 

@@ -10,7 +10,7 @@ use silius_primitives::{
     },
 };
 use std::{
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::PathBuf,
 };
 
@@ -60,6 +60,9 @@ pub struct Config {
 
     /// List of whitelisted peer ENRs
     pub peers_whitelist: Vec<Enr>,
+
+    /// List of whitelisted IP addresses
+    pub ips_whitelist: Vec<IpAddr>,
 }
 
 impl Default for Config {
@@ -89,6 +92,7 @@ impl Default for Config {
             target_peers: TARGET_PEERS,
             bootnodes: vec![],
             peers_whitelist: vec![],
+            ips_whitelist: vec![],
         }
     }
 }
@@ -202,6 +206,12 @@ impl ConfigBuilder {
     /// Set the peers whitelist.
     pub fn peers_whitelist(mut self, peers_whitelist: Vec<Enr>) -> Self {
         self.config.peers_whitelist = peers_whitelist;
+        self
+    }
+
+    /// Set the IPs whitelist.
+    pub fn ips_whitelist(mut self, ips_whitelist: Vec<IpAddr>) -> Self {
+        self.config.ips_whitelist = ips_whitelist;
         self
     }
 }

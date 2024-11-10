@@ -309,8 +309,13 @@ pub struct P2PArgs {
 
     /// List of whitelisted ENRs (for permissioned mempools).
     /// If empty, all ENRs are allowed.
-    #[clap(long = "p2p.whitelist", value_delimiter = ',', value_parser=parse_enr)]
+    #[clap(long = "p2p.whitelist-enrs", value_delimiter = ',', value_parser=parse_enr)]
     pub peers_whitelist: Vec<Enr>,
+
+    /// List of whitelisted IPs (for permissioned mempools).
+    /// If empty, all IPs are allowed.
+    #[clap(long = "p2p.whitelist-ips", value_delimiter = ',')]
+    pub ips_whitelist: Vec<IpAddr>,
 }
 
 impl P2PArgs {
@@ -340,6 +345,7 @@ impl P2PArgs {
             .chain_spec(ChainSpec::from_chain_id(chain.id()))
             .bootnodes(self.bootnodes.clone())
             .peers_whitelist(self.peers_whitelist.clone())
+            .ips_whitelist(self.ips_whitelist.clone())
             .gs_config(gossipsub_config())
             .discv5_config(discv5::ConfigBuilder::new(listen_addr.to_listen_config()).build());
 
@@ -784,7 +790,7 @@ mod tests {
             "~/.silius/p2p/node-key",
             "--nodeenr",
             "~/.silius/p2p/node-enr",
-            "--p2p.whitelist",
+            "--p2p.whitelist-enrs",
             &binding,
         ];
         assert_eq!(
@@ -798,6 +804,7 @@ mod tests {
                 node_key: Some(PathBuf::from("~/.silius/p2p/node-key")),
                 node_enr: Some(PathBuf::from("~/.silius/p2p/node-enr")),
                 peers_whitelist: vec![enr],
+                ips_whitelist: vec![],
             },
             P2PArgs::try_parse_from(args).unwrap()
         )

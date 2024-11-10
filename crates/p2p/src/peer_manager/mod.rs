@@ -14,7 +14,7 @@ use libp2p::{Multiaddr, PeerId};
 use silius_primitives::constants::p2p::{
     HEARTBEAT_INTERVAL, PING_INTERVAL_INBOUND, PING_INTERVAL_OUTBOUND, TARGET_PEERS,
 };
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{collections::VecDeque, net::IpAddr, sync::Arc, time::Duration};
 use tracing::debug;
 
 /// The events that the `PeerManager` outputs (requests).
@@ -57,12 +57,18 @@ pub struct PeerManager {
     peers_to_dial: Vec<Enr>,
     /// The list of whitelisted ENRs.
     peers_whitelist: Vec<Enr>,
+    /// The list of whitelisted IPs.
+    ips_whitelist: Vec<IpAddr>,
     /// The heartbeat interval for peer management.
     heartbeat: tokio::time::Interval,
 }
 
 impl PeerManager {
-    pub fn new(network_globals: Arc<NetworkGlobals>, peers_whitelist: Vec<Enr>) -> Self {
+    pub fn new(
+        network_globals: Arc<NetworkGlobals>,
+        peers_whitelist: Vec<Enr>,
+        ips_whitelist: Vec<IpAddr>,
+    ) -> Self {
         Self {
             network_globals,
             events: Default::default(),
@@ -71,6 +77,7 @@ impl PeerManager {
             target_peers: TARGET_PEERS,
             peers_to_dial: Vec::new(),
             peers_whitelist,
+            ips_whitelist,
             heartbeat: tokio::time::interval(Duration::from_secs(HEARTBEAT_INTERVAL)),
         }
     }
