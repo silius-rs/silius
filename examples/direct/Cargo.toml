@@ -1,0 +1,25 @@
+[package]
+name = "silius-direct-example" 
+version = "0.5.0-alpha"
+edition = "2021"
+
+[[bin]]
+name = "direct"
+path = "main.rs"
+
+[dependencies]
+silius-bundler = { path = "../../crates/bundler" }
+silius-contracts = { path = "../../crates/contracts" }
+silius-mempool = { path = "../../crates/mempool", features = ["mdbx"] }
+silius-primitives = { path = "../../crates/primitives" }
+silius-rpc = { path = "../../crates/rpc" }
+
+alloy-chains = { workspace = true }
+ethers = { workspace = true }
+parking_lot = { workspace = true }
+expanded-pathbuf = { workspace = true }
+
+eyre = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
