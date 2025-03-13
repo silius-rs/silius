@@ -244,22 +244,18 @@ where
     ) -> Result<UserOperationValidationOutcome, InvalidMempoolUserOperationError> {
         let mut out: UserOperationValidationOutcome = Default::default();
 
-        if let Some(val_config) = val_config.clone() {
-            out.val_config = val_config;
-        } else {
-            out.val_config = ValidationConfig {
-                min_stake: Some(reputation.min_stake()),
-                min_unstake_delay: Some(reputation.min_unstake_delay()),
-                topic: None,
-                ignore_prev: false,
-            };
-        }
+        out.val_config = val_config.clone().unwrap_or_else(|| ValidationConfig {
+            min_stake: Some(reputation.min_stake()),
+            min_unstake_delay: Some(reputation.min_unstake_delay()),
+            topic: None,
+            ignore_prev: false,
+        });
 
         if mode.contains(UserOperationValidatorMode::Sanity) {
             let sanity_helper = SanityHelper {
                 entry_point: &self.entry_point,
                 chain: self.chain,
-                val_config: val_config.clone().unwrap_or_default(),
+                val_config: out.val_config.clone(),
             };
 
             self.sanity_checks
@@ -267,8 +263,8 @@ where
                 .await?;
         }
 
-        if let Some(uo) = mempool.get_prev_by_sender(uo) {
-            out.prev_hash = Some(uo.hash);
+        if let Some(prev_uo) = mempool.get_prev_by_sender(uo) {
+            out.prev_hash = Some(prev_uo.hash);
         }
 
         debug!("Simulate user operation from {:?}", uo.sender);
@@ -277,12 +273,11 @@ where
         if mode.contains(UserOperationValidatorMode::Simulation) {
             let mut sim_helper = SimulationHelper {
                 simulate_validation_result: &sim_res,
-                val_config: val_config.clone().unwrap_or_default(),
+                val_config: out.val_config.clone(),
                 valid_after: None,
             };
 
             self.simulation_checks.check_user_operation(uo, &mut sim_helper)?;
-
             out.valid_after = sim_helper.valid_after;
         }
 
@@ -295,8 +290,14 @@ where
             .get_block(BlockNumber::Latest)
             .await
             .map_err(|e| SanityError::Provider { inner: e.to_string() })?
-            .expect("block should exist");
-        out.verified_block = U256::from(block_number.hash.expect("block hash should exist").0);
+            .ok_or(SanityError::Provider { inner: "Block not found".to_string() })?;
+
+        out.verified_block = U256::from(
+            block_number
+                .hash
+                .ok_or(SanityError::Provider { inner: "Block hash missing".to_string() })?
+                .0,
+        );
 
         if mode.contains(UserOperationValidatorMode::SimulationTrace) {
             debug!("Simulate user operation with trace from {:?}", uo.sender);
@@ -309,7 +310,7 @@ where
                 chain: self.chain,
                 simulate_validation_result: &sim_res,
                 js_trace: &js_trace,
-                val_config: val_config.unwrap_or_default(),
+                val_config: out.val_config.clone(),
                 stake_info: None,
                 code_hashes: None,
             };
