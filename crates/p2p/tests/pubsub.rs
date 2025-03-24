@@ -10,7 +10,7 @@ use silius_primitives::{chain::ChainSpec, constants::entry_point::ADDRESS, Verif
 use std::{str::FromStr, time::Duration};
 
 #[tokio::test]
-#[ignore = "0.7.0 is not supported yet"]
+#[ignore = "0.8.0 is not supported yet"]
 async fn pubsub_msg() -> eyre::Result<()> {
     let chain_spec = ChainSpec::dev();
     let (mut peer1, mut peer2) = build_connnected_p2p_pair().await?;

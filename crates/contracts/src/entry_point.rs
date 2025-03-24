@@ -335,7 +335,7 @@ mod tests {
         let eth_client = Arc::new(Provider::try_from("http://127.0.0.1:8545").unwrap());
         let ep = EntryPoint::<Provider<Http>>::new(
             eth_client.clone(),
-            "0x0000000071727De22E5E9d8BAf0edAc6f37da032".parse().unwrap(),
+            "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108".parse().unwrap(),
         );
 
         let max_priority_fee_per_gas = 1500000000_u64.into();

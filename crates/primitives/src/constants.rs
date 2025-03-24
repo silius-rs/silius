@@ -3,9 +3,9 @@
 /// Entry point smart contract
 pub mod entry_point {
     /// Address of the entry point smart contract
-    pub const ADDRESS: &str = "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
+    pub const ADDRESS: &str = "0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108";
     /// Version of the entry point smart contract
-    pub const VERSION: &str = "0.7.0";
+    pub const VERSION: &str = "0.8.0";
 }
 
 /// Bundler

@@ -638,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "0.7.0 is not supported yet"]
+    #[ignore = "0.8.0 is not supported yet"]
     fn user_operation_signed_ssz() {
         let uo = UserOperationSigned {
             sender:    "0x1F9090AAE28B8A3DCEADF281B0F12828E676C326".parse().unwrap(),
