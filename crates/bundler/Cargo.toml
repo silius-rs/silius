@@ -19,7 +19,7 @@ silius-primitives = { workspace = true }
 # eth
 alloy-chains = { workspace = true }
 ethers = { workspace = true }
-ethers-flashbots = { git = "https://github.com/qi-protocol/ethers-flashbots.git", rev = "1c6504cd2d1f4d67e4af2dd9a5ee676a284452f9" }
+ethers-flashbots = { git = "https://github.com/silius-rs/ethers-flashbots.git", branch = "main" }
 
 # async
 async-trait = { workspace = true }
@@ -39,7 +39,7 @@ url = "2.5.0"
 # eth
 alloy-primitives = "0.5.4"
 alloy-sol-types = "0.5.4"
-ethers-flashbots-test = { git = "https://github.com/da-bao-jian/ethers-flashbots.git", rev = "1eda9b7bb84e82f43f35b98c34d9066f9596b41d" }
+ethers-flashbots-test = { git = "https://github.com/silius-rs/ethers-flashbots.git", branch = "dev" }
 
 # rpc
 jsonrpsee = { version = "0.21.0", features = ["server", "macros", "client"] }

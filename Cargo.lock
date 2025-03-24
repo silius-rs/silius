@@ -2260,7 +2260,7 @@ dependencies = [
 [[package]]
 name = "ethers-flashbots"
 version = "0.14.0"
-source = "git+https://github.com/qi-protocol/ethers-flashbots.git?rev=1c6504cd2d1f4d67e4af2dd9a5ee676a284452f9#1c6504cd2d1f4d67e4af2dd9a5ee676a284452f9"
+source = "git+https://github.com/silius-rs/ethers-flashbots.git?branch=main#1c6504cd2d1f4d67e4af2dd9a5ee676a284452f9"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2278,7 +2278,7 @@ dependencies = [
 [[package]]
 name = "ethers-flashbots-test"
 version = "0.13.1"
-source = "git+https://github.com/da-bao-jian/ethers-flashbots.git?rev=1eda9b7bb84e82f43f35b98c34d9066f9596b41d#1eda9b7bb84e82f43f35b98c34d9066f9596b41d"
+source = "git+https://github.com/silius-rs/ethers-flashbots.git?branch=dev#1eda9b7bb84e82f43f35b98c34d9066f9596b41d"
 dependencies = [
  "async-trait",
  "chrono",
