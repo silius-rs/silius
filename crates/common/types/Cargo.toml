@@ -1,6 +1,5 @@
 [package]
-name = "silius"
-description = "A Rust implementation of the ERC-4337 account abstraction bundler."
+name = "silius-types"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,8 +9,6 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[[bin]]
-name = "silius"
-path = "src/main.rs"
-
 [dependencies]
+alloy-primitives.workspace = true
+alloy-sol-types.workspace = true

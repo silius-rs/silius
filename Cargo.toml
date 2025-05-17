@@ -1,87 +1,93 @@
 [workspace]
+default-members = ["bin/silius"]
 members = [
     "bin/silius",
-    "crates/bundler",
-    "crates/contracts",
-    "crates/grpc",
-    "crates/mempool",
-    "crates/p2p",
-    "crates/primitives",
-    "crates/rpc",
-    "examples/*",
-    "tests",
+    "crates/common/types",
+    # "bin/silius",
+    # "crates/bundler",
+    # "crates/contracts",
+    # "crates/grpc",
+    # "crates/mempool",
+    # "crates/p2p",
+    # "crates/primitives",
+    # "crates/rpc",
+    # "examples/*",
+    # "tests",
 ]
 resolver = "2"
-default-members = ["bin/silius"]
+# exclude = ["book/cli", "book/sources"]
 
 [workspace.package]
-version = "0.5.0-alpha"
-authors = ["Vid Kersic <vid.kersic@yahoo.com>"]
-edition = "2021"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/silius-rs/silius"
-rust-version = "1.81.0"
+authors = ["https://github.com/silius-rs/silius/graphs/contributors"]
+edition = "2024"
 keywords = [
-    "silius",
-    "primitives",
     "ethereum",
     "account abstraction",
     "erc-4337",
+    "bundler",
+    "blockchain",
+    "protocol",
+    "silius",
 ]
-categories = ["data-structures", "cryptography::cryptocurrencies"]
-description = "Silius - modular and efficient account abstraction (ERC-4337) bundler"
+license = "MIT OR Apache-2.0"
 homepage = "https://silius.rs"
-
-[profile.debug-fast]
-inherits = "release"
-debug = true
+repository = "https://github.com/silius-rs/silius"
+rust-version = "1.87.0"
+version = "0.6.0"
 
 [workspace.dependencies]
-# workspace crates
-silius-bundler = { version = "0.5.0-alpha", path = "crates/bundler", default-features = false }
-silius-contracts = { version = "0.5.0-alpha", path = "crates/contracts", default-features = false }
-silius-grpc = { version = "0.5.0-alpha", path = "crates/grpc", default-features = false }
-silius-mempool = { version = "0.5.0-alpha", path = "crates/mempool", default-features = false }
-silius-metrics = { version = "0.5.0-alpha", path = "crates/metrics", default-features = false }
-silius-p2p = { version = "0.5.0-alpha", path = "crates/p2p", default-features = false }
-silius-primitives = { version = "0.5.0-alpha", path = "crates/primitives", default-features = false }
-silius-rpc = { version = "0.5.0-alpha", path = "crates/rpc", default-features = false }
-silius-tests = { version = "0.5.0-alpha", path = "tests", default-features = false }
+alloy-primitives = { version = "1.1.0", features = ['serde'] }
+alloy-sol-types = { version = "1.1.0" }
 
-# eth
-alloy-chains = "0.1.14"
-discv5 = { version = "0.4.0", features = ["libp2p"] }
-ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "5394d899adca736a602e316e6f0c06fdb5aa64b9", features = [
-    "ws",
-] }
-ssz_rs = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
-ssz_rs_derive = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
+# silius dependencies
+silius-types = { path = "crates/common/types" }
 
-# async
-async-stream = "0.3.5"
-async-trait = "0.1.76"
-futures = "0.3.30"
-futures-util = "0.3.30"
-parking_lot = "0.12.1"
 
-# tokio
-tokio = { version = "1.35", features = ["full"] }
+# # workspace crates
+# silius-bundler = { version = "0.5.0-alpha", path = "crates/bundler", default-features = false }
+# silius-contracts = { version = "0.5.0-alpha", path = "crates/contracts", default-features = false }
+# silius-grpc = { version = "0.5.0-alpha", path = "crates/grpc", default-features = false }
+# silius-mempool = { version = "0.5.0-alpha", path = "crates/mempool", default-features = false }
+# silius-metrics = { version = "0.5.0-alpha", path = "crates/metrics", default-features = false }
+# silius-p2p = { version = "0.5.0-alpha", path = "crates/p2p", default-features = false }
+# silius-primitives = { version = "0.5.0-alpha", path = "crates/primitives", default-features = false }
+# silius-rpc = { version = "0.5.0-alpha", path = "crates/rpc", default-features = false }
+# silius-tests = { version = "0.5.0-alpha", path = "tests", default-features = false }
 
-# misc
-expanded-pathbuf = "0.1.2"
-eyre = "0.6.11"
-jsonrpsee = { version = "0.21.0", features = ["server", "macros", "client"] }
-metrics = "0.22.0"
-reqwest = { version = "0.11.4", features = ["json"] }
-lazy_static = "1.4.0"
-serde = "1.0.193"
-serde_json = "1.0.109"
-tempfile = "3.13.0"
-thiserror = "1.0.53"
-tracing = "0.1.40"
+# # eth
+# alloy-chains = "0.1.14"
+# discv5 = { version = "0.4.0", features = ["libp2p"] }
+# ethers = { git = "https://github.com/gakonst/ethers-rs", rev = "5394d899adca736a602e316e6f0c06fdb5aa64b9", features = [
+#     "ws",
+# ] }
+# ssz_rs = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
+# ssz_rs_derive = { git = "https://github.com/ralexstokes/ssz-rs.git", rev = "8640128ec83071094d24fb4511147d6b9dd029bb" }
 
-[patch]
-[patch.crates-io]
-revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }
-[patch."https://github.com/gakonst/ethers-rs"]
-ethers = { git = "https://github.com/Vid201/ethers-rs", branch = "feat/patch" }
+# # async
+# async-stream = "0.3.5"
+# async-trait = "0.1.76"
+# futures = "0.3.30"
+# futures-util = "0.3.30"
+# parking_lot = "0.12.1"
+
+# # tokio
+# tokio = { version = "1.35", features = ["full"] }
+
+# # misc
+# expanded-pathbuf = "0.1.2"
+# eyre = "0.6.11"
+# jsonrpsee = { version = "0.21.0", features = ["server", "macros", "client"] }
+# metrics = "0.22.0"
+# reqwest = { version = "0.11.4", features = ["json"] }
+# lazy_static = "1.4.0"
+# serde = "1.0.193"
+# serde_json = "1.0.109"
+# tempfile = "3.13.0"
+# thiserror = "1.0.53"
+# tracing = "0.1.40"
+
+# [patch]
+# [patch.crates-io]
+# revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "3d8ca6641d2e72448c23f4596f769c8fd1c784d1" }
+# [patch."https://github.com/gakonst/ethers-rs"]
+# ethers = { git = "https://github.com/Vid201/ethers-rs", branch = "feat/patch" }

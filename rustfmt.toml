@@ -1,8 +1,8 @@
-imports_granularity = "Crate"
-use_small_heuristics = "Max"
+binop_separator = "Front"
 comment_width = 100
-wrap_comments = true
-binop_separator = "Back"
 format_code_in_doc_comments = true
-doc_comment_code_block_width = 100
-group_imports = "One"
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+normalize_comments = true
+reorder_imports = true
+wrap_comments = true

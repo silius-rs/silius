@@ -1,0 +1,53 @@
+[package]
+name = "silius"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Silius - account abstraction (ERC-4337) bundler"
+homepage = "https://github.com/silius-rs/silius/tree/main/bin/silius"
+
+[dependencies]
+# workspace dependencies
+silius-bundler = { workspace = true }
+silius-contracts = { workspace = true }
+silius-grpc = { workspace = true }
+silius-mempool = { workspace = true, features = ["mdbx"] }
+silius-metrics = { workspace = true }
+silius-p2p = { workspace = true }
+silius-primitives = { workspace = true }
+silius-rpc = { workspace = true }
+
+# eth
+alloy-chains = { workspace = true }
+discv5 = { workspace = true }
+ethers = { workspace = true }
+
+# cli
+clap = { version = "4.4.12", features = ["derive"] }
+
+# async
+parking_lot = { workspace = true }
+pin-utils = "0.1.0"
+
+# tokio
+tokio = { workspace = true }
+
+# misc
+async-trait = { workspace = true }
+dirs = "5.0.1"
+expanded-pathbuf = { workspace = true }
+eyre = { workspace = true }
+log = "0.4.20"
+metrics = { workspace = true }
+metrics-exporter-prometheus = "0.13.0"
+metrics-util = "0.16.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
