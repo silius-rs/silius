@@ -1,8 +1,9 @@
 use std::sync::{Arc, LazyLock, OnceLock};
 
 use alloy_primitives::Address;
+use serde::Deserialize;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub enum Network {
     Mainnet,
 }
@@ -19,7 +20,7 @@ pub fn network_spec() -> Arc<NetworkSpec> {
     NETWORK_SPEC.get().expect("network spec not set").clone()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct NetworkSpec {
     pub network: Network,
     pub entry_point_address: Address,

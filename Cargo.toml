@@ -3,6 +3,7 @@ default-members = ["bin/silius"]
 members = [
     "bin/silius",
     "crates/common/types",
+    "crates/node/version",
     # "bin/silius",
     # "crates/bundler",
     # "crates/contracts",
@@ -38,8 +39,23 @@ version = "0.6.0"
 [workspace.dependencies]
 alloy-primitives = { version = "1.1.0", features = ['serde'] }
 alloy-sol-types = { version = "1.1.0" }
+clap = "4"
+serde = { version = '1.0', features = ['derive', "rc"] }
+serde_yaml = "0.9"
+tokio = { version = "1.42", features = [
+    "rt",
+    "rt-multi-thread",
+    "sync",
+    "signal",
+    "time",
+    "macros",
+] }
+tokio-util = { version = "0.7", features = ["compat"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # silius dependencies
+silius-node-version = { path = "crates/node/version" }
 silius-types = { path = "crates/common/types" }
 
 

@@ -1,5 +1,5 @@
 [package]
-name = "silius-types"
+name = "silius-node-version"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,7 +10,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-alloy-primitives.workspace = true
-alloy-sol-types.workspace = true
-serde.workspace = true
-serde_yaml.workspace = true
+
+[build-dependencies]
+vergen = { version = "9.0", features = ["build", "cargo", "emit_and_set", "rustc"] }
+vergen-git2 = "1.0"

@@ -15,3 +15,11 @@ name = "silius"
 path = "src/main.rs"
 
 [dependencies]
+clap = { workspace = true, features = ["derive", "env"] }
+tokio.workspace = true
+tracing = { workspace = true, features = ["log"] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# silius dependencies
+silius-types.workspace = true
+silius-node-version.workspace = true
