@@ -1,11 +1,18 @@
-use std::sync::Arc;
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use clap::{Parser, Subcommand};
 use silius_node_version::FULL_VERSION;
 use silius_types::{network_spec::NetworkSpec, utils::network_parser};
 
-const DEFAULT_HTTP_ADDRESS: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const DEFAULT_DISABLE_DISCOVERY: bool = false;
+const DEFAULT_DISCOVERY_PORT: u16 = 9000;
 const DEFAULT_NETWORK: &str = "mainnet";
+const DEFAULT_SOCKET_ADDRESS: IpAddr = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+const DEFAULT_SOCKET_PORT: u16 = 4000;
 
 #[derive(Debug, Parser)]
 #[command(author, version = FULL_VERSION, about, long_about = None)]
@@ -35,15 +42,35 @@ pub struct NodeConfig {
     )]
     pub network: Arc<NetworkSpec>,
 
-    #[arg(long, help = "Enable HTTP RPC", default_value_t = true)]
-    pub http: bool,
+    
 
-    #[arg(long, help = "Set HTTP address", default_value_t = DEFAULT_HTTP_ADDRESS)]
-    pub http_address: IpAddr,
+    #[arg(long, help = "Set P2P socket address", default_value_t = DEFAULT_SOCKET_ADDRESS)]
+    pub socket_address: IpAddr,
 
-    #[arg(long, help = "Set HTTP Port", default_value_t = DEFAULT_HTTP_PORT)]
-    pub http_port: u16,
+    #[arg(long, help = "Set P2P socket port (TCP)", default_value_t = DEFAULT_SOCKET_PORT)]
+    pub socket_port: u16,
 
-    #[arg(long, default_value_t = DEFAULT_HTTP_ALLOW_ORIGIN)]
-    pub http_allow_origin: bool,
+    #[arg(long, help = "Discovery 5 listening port (UDP)", default_value_t = DEFAULT_DISCOVERY_PORT)]
+    pub discovery_port: u16,
+
+    #[arg(long, help = "Disable Discv5", default_value_t = DEFAULT_DISABLE_DISCOVERY)]
+    pub disable_discovery: bool,
+
+    #[arg(
+        long,
+        help = "The directory for storing application data. If used together with --ephemeral, new child directory will be created."
+    )]
+    pub data_dir: Option<PathBuf>,
+
+    #[arg(
+        long,
+        short,
+        help = "Use new data directory, located in OS temporary directory. If used together with --data-dir, new directory will be created there instead."
+    )]
+    pub ephemeral: bool,
+
+    #[arg(long, help = "Purges the database.")]
+    pub purge_db: bool,
+
+
 }
