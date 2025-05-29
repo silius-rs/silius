@@ -1,5 +1,7 @@
 use alloy_primitives::{Address, B256, Bytes, U256};
 use alloy_sol_types::sol;
+use serde::{Deserialize, Serialize};
+use std::ops::{Deref, DerefMut};
 
 use crate::utils::{pack_address_and_data, pack_two_gas_values};
 
@@ -17,6 +19,7 @@ sol! {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserOperationBase {
     pub sender: Address,
     pub nonce: U256,
@@ -36,6 +39,10 @@ pub struct UserOperationBase {
 }
 
 impl UserOperationBase {
+    pub fn builder() -> UserOperationBaseBuilder {
+        UserOperationBaseBuilder::default()
+    }
+
     pub fn to_packed_user_operation(&self) -> PackedUserOperation {
         PackedUserOperation {
             sender: self.sender,
@@ -51,12 +58,6 @@ impl UserOperationBase {
             paymaster_and_data: pack_address_and_data(self.paymaster, self.paymaster_data.clone()),
             signature: self.signature.clone().unwrap_or_default(),
         }
-    }
-}
-
-impl UserOperationBase {
-    pub fn builder() -> UserOperationBaseBuilder {
-        UserOperationBaseBuilder::default()
     }
 }
 
@@ -185,12 +186,27 @@ impl UserOperationBaseBuilder {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserOperation {
     pub inner: UserOperationBase,
 
     // additional data
     pub signature: Bytes,
     pub hash: B256,
+}
+
+impl Deref for UserOperation {
+    type Target = UserOperationBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for UserOperation {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 #[cfg(test)]
