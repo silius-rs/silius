@@ -1,5 +1,5 @@
 use actix_web::{
-    Error, HttpResponse,
+    Error,
     web::{Bytes, Data},
 };
 use debug::debug_router;
@@ -14,9 +14,7 @@ pub mod debug;
 pub mod eth;
 pub mod web3;
 
-const CONTENT_TYPE: &str = "application/json";
-
-pub async fn rpc_router(body: Bytes, db: Data<SiliusDB>) -> Result<HttpResponse, Error> {
+pub async fn rpc_router(body: Bytes, db: Data<SiliusDB>) -> Result<Bytes, Error> {
     let request: Request = match serde_json::from_slice(body.as_ref()) {
         Ok(ok) => ok,
         Err(_) => {
@@ -26,7 +24,7 @@ pub async fn rpc_router(body: Bytes, db: Data<SiliusDB>) -> Result<HttpResponse,
                 error: Some(ErrorData::std(-32700)),
                 id: Value::Null,
             };
-            return Ok(HttpResponse::Ok().content_type(CONTENT_TYPE).body(r.dump()));
+            return Ok(r.dump().into());
         }
     };
 
@@ -40,9 +38,7 @@ pub async fn rpc_router(body: Bytes, db: Data<SiliusDB>) -> Result<HttpResponse,
         Err(e) => response.error = Some(e),
     }
 
-    Ok(HttpResponse::Ok()
-        .content_type(CONTENT_TYPE)
-        .body(response.dump()))
+    Ok(response.dump().into())
 }
 
 pub async fn rpc_select(

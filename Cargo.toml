@@ -41,6 +41,7 @@ version = "0.6.0"
 
 [workspace.dependencies]
 actix-web = "4.10.2"
+actix-ws = "0.3.0"
 alloy-primitives = { version = "1.1.0", features = ["serde"] }
 alloy-sol-types = { version = "1.1.0" }
 anyhow = "1.0"
@@ -48,6 +49,7 @@ bincode = { version = "2.0.1", features = ["serde"] }
 clap = "4"
 directories = { version = "6.0.0" }
 futures = "0.3"
+futures-util = "0.3.31"
 parking_lot = "0.12.3"
 redb = { version = "2.4.0" }
 serde = { version = "1.0", features = ["derive", "rc"] }

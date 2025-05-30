@@ -1,44 +1,12 @@
-use actix_web::{
-    App, HttpServer,
-    dev::ServerHandle,
-    middleware,
-    web::{self, Data},
-};
-use config::HttpRpcServerConfig;
-use routes::rpc_router;
-use silius_storage::db::SiliusDB;
-use tracing::info;
+use actix_web::dev::ServerHandle;
 
-pub mod config;
 pub mod handlers;
+pub mod http;
 pub mod routes;
 pub mod types;
+pub mod ws;
 
 pub const RPC_PATH: &str = "/rpc";
-
-pub async fn start_http_server(
-    server_config: HttpRpcServerConfig,
-    db: SiliusDB,
-) -> std::io::Result<()> {
-    info!(
-        "Starting HTTP server on {}",
-        server_config.http_socket_address
-    );
-    let stop_handle = Data::new(StopHandle::default());
-
-    let server = HttpServer::new(move || {
-        let stop_handle = stop_handle.clone();
-        App::new()
-            .wrap(middleware::Logger::default())
-            .app_data(stop_handle)
-            .app_data(Data::new(db.clone()))
-            .service(web::resource(RPC_PATH).route(web::post().to(rpc_router)))
-    })
-    .bind(server_config.http_socket_address)?
-    .run();
-
-    server.await
-}
 
 #[derive(Default)]
 struct StopHandle {

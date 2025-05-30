@@ -6,7 +6,10 @@ use silius::{
     utils::print_ascii_logo,
 };
 use silius_primitives::network_spec::set_network_spec;
-use silius_rpc::{config::HttpRpcServerConfig, start_http_server};
+use silius_rpc::{
+    http::{HttpRpcServerConfig, start_http_server},
+    ws::{WsRpcServerConfig, start_ws_server},
+};
 use silius_storage::{
     db::{SiliusDB, reset_db},
     dir::setup_data_dir,
@@ -61,17 +64,22 @@ async fn main() {
                 config.rpc_server_config.http_allow_origins,
             );
 
-            // let ws_server_config = WsRpcServerConfig::new(
-            //     config.rpc_server_config.ws_address,
-            //     config.rpc_server_config.ws_port,
-            //     config.rpc_server_config.ws_allow_origins,
-            // );
+            let ws_server_config = WsRpcServerConfig::new(
+                config.rpc_server_config.ws_address,
+                config.rpc_server_config.ws_port,
+                config.rpc_server_config.ws_allow_origins,
+            );
 
             let http_future = start_http_server(http_server_config, silius_db.clone());
+
+            let ws_future = start_ws_server(ws_server_config, silius_db.clone());
 
             tokio::select! {
                 _ = http_future => {
                     info!("HTTP server stopped");
+                }
+                _ = ws_future => {
+                    info!("WS server stopped");
                 }
             }
         }
