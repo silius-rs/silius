@@ -1,5 +1,5 @@
 [package]
-name = "silius-types"
+name = "silius-executor"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,7 +10,5 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-alloy-primitives.workspace = true
-alloy-sol-types.workspace = true
-serde.workspace = true
-serde_yaml.workspace = true
+futures.workspace = true
+tokio.workspace = true

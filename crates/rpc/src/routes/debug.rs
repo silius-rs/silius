@@ -1,11 +1,21 @@
-use actix_web::web::ServiceConfig;
+use serde_json::Value;
+use silius_storage::db::SiliusDB;
 
-pub fn register_debug_routes(cfg: &mut ServiceConfig) {
-    cfg.service(clear_state)
-        .service(dump_mempool)
-        .service(send_bundle_now)
-        .service(set_bundling_mode)
-        .service(set_reputation)
-        .service(dump_reputation)
-        .service(add_user_ops);
+use crate::types::error::ErrorData;
+
+pub async fn debug_router(
+    method: &str,
+    _params: Vec<Value>,
+    _db: &SiliusDB,
+) -> Result<Value, ErrorData> {
+    match method {
+        // "debug_clearState" => clear_state().await,
+        // "debug_dumpMempool" => dump_mempool().await,
+        // "debug_sendBundleNow" => send_bundle_now().await,
+        // "debug_setBundlingMode" => set_bundling_mode().await,
+        // "debug_setReputation" => set_reputation().await,
+        // "debug_dumpReputation" => dump_reputation().await,
+        // "debug_addUserOps" => add_user_ops().await,
+        _ => Err(ErrorData::std(-32601)),
+    }
 }

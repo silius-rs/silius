@@ -7,8 +7,10 @@ use crate::error::DatabaseError;
 
 use super::{Bincode, MultimapTable};
 
-pub const ENTITY_USER_OPERATION_TABLE: MultimapTableDefinition<Bincode<Address>, Bincode<B256>> =
-    MultimapTableDefinition::new("entity_user_operation");
+pub const ENTITY_USER_OPERATION_MULTIMAP_TABLE: MultimapTableDefinition<
+    Bincode<Address>,
+    Bincode<B256>,
+> = MultimapTableDefinition::new("entity_user_operation");
 
 pub struct EntityUserOperationMultimapTable {
     pub db: Arc<Database>,
@@ -25,7 +27,7 @@ impl MultimapTable for EntityUserOperationMultimapTable {
 
     fn get(&self, key: Self::Key) -> Result<Option<Self::GetValue>, DatabaseError> {
         let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_multimap_table(ENTITY_USER_OPERATION_TABLE)?;
+        let table = read_txn.open_multimap_table(ENTITY_USER_OPERATION_MULTIMAP_TABLE)?;
         let result = table.get(key)?;
         let mut values = HashSet::new();
         for value in result {
@@ -37,7 +39,7 @@ impl MultimapTable for EntityUserOperationMultimapTable {
     fn insert(&self, key: Self::Key, value: Self::InsertValue) -> Result<(), DatabaseError> {
         let mut write_txn = self.db.begin_write()?;
         write_txn.set_durability(Durability::Immediate);
-        let mut table = write_txn.open_multimap_table(ENTITY_USER_OPERATION_TABLE)?;
+        let mut table = write_txn.open_multimap_table(ENTITY_USER_OPERATION_MULTIMAP_TABLE)?;
         table.insert(key, value)?;
         drop(table);
         write_txn.commit()?;
@@ -47,7 +49,7 @@ impl MultimapTable for EntityUserOperationMultimapTable {
     fn remove(&self, key: Self::Key, value: Self::RemoveValue) -> Result<(), DatabaseError> {
         let mut write_txn = self.db.begin_write()?;
         write_txn.set_durability(Durability::Immediate);
-        let mut table = write_txn.open_multimap_table(ENTITY_USER_OPERATION_TABLE)?;
+        let mut table = write_txn.open_multimap_table(ENTITY_USER_OPERATION_MULTIMAP_TABLE)?;
         table.remove(key, value)?;
         drop(table);
         write_txn.commit()?;

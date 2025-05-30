@@ -21,5 +21,8 @@ tracing = { workspace = true, features = ["log"] }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # silius dependencies
-silius-types.workspace = true
+silius-executor.workspace = true
 silius-node-version.workspace = true
+silius-primitives.workspace = true
+silius-rpc.workspace = true
+silius-storage.workspace = true

@@ -1,66 +1,36 @@
-//! Misc utils
+use std::{fs, sync::Arc};
 
-use ethers::{
-    types::{Address, Bytes, U256},
-    utils::{hex, to_checksum},
-};
-use serde::Deserialize;
+use alloy_primitives::{Address, B256, Bytes, U256};
 
-/// Converts address to checksum address
-pub fn as_checksum_addr<S>(val: &Address, s: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    s.serialize_str(&to_checksum(val, None))
-}
+use crate::network_spec::{MAINNET, NetworkSpec};
 
-/// Converts bytes to checksum (first 20 bytes are address)
-pub fn as_checksum_bytes<S>(val: &Bytes, s: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let mut str = hex::encode_prefixed(val);
-    s.serialize_str(if val.len() >= 20 {
-        let addr = Address::from_slice(&val[0..20]);
-        str.replace_range(0..42, &to_checksum(&addr, None));
-        &str
+pub fn pack_address_and_data(address: Option<Address>, data: Option<Bytes>) -> Bytes {
+    if let (Some(address), Some(data)) = (address, data) {
+        let mut result = Vec::with_capacity(20 + data.len());
+        result.extend_from_slice(address.as_slice());
+        result.extend_from_slice(&data);
+        Bytes::from(result)
     } else {
-        &str
-    })
+        Bytes::new()
+    }
 }
 
-/// Serializes U256 as u64
-pub fn as_u64<S>(val: &U256, s: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    s.serialize_str(&val.as_u64().to_string())
+pub fn pack_two_gas_values(gas_1: U256, gas_2: U256) -> B256 {
+    let mut result = [0u8; 32];
+    result[0..16].copy_from_slice(&gas_1.to_le_bytes_vec());
+    result[16..32].copy_from_slice(&gas_2.to_le_bytes_vec());
+    B256::from(result)
 }
 
-/// Serializes u64 as hex string
-pub fn as_hex_string<S>(val: &u64, s: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serde_hex::SerHex::<serde_hex::StrictPfx>::serialize(val, s)
-}
-
-/// Helper to deserialize float string to U256
-pub fn deserialize_stringified_float<'de, D>(deserializer: D) -> Result<U256, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    let f: f64 = s.parse().unwrap_or(0.0);
-    let u = (f * 1e18).round() as u128;
-    Ok(U256::from(u))
-}
-
-/// If possible, parses address from the first 20 bytes
-pub fn get_address(buf: &[u8]) -> Option<Address> {
-    if buf.len() >= 20 {
-        Some(Address::from_slice(&buf[0..20]))
-    } else {
-        None
+pub fn network_parser(network_string: &str) -> Result<Arc<NetworkSpec>, String> {
+    match network_string {
+        "mainnet" => Ok(MAINNET.clone()),
+        _ => {
+            let contents = fs::read_to_string(network_string)
+                .map_err(|err| format!("Failed to read file: {err}"))?;
+            Ok(Arc::new(serde_yaml::from_str(&contents).map_err(
+                |err| format!("Failed to parse YAML from: {err}"),
+            )?))
+        }
     }
 }

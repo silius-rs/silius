@@ -1,6 +1,11 @@
-use actix_web::{App, HttpServer, dev::ServerHandle, middleware, web::Data};
+use actix_web::{
+    App, HttpServer,
+    dev::ServerHandle,
+    middleware,
+    web::{self, Data},
+};
 use config::HttpRpcServerConfig;
-use routes::register_routers;
+use routes::rpc_router;
 use silius_storage::db::SiliusDB;
 use tracing::info;
 
@@ -8,6 +13,8 @@ pub mod config;
 pub mod handlers;
 pub mod routes;
 pub mod types;
+
+pub const RPC_PATH: &str = "/rpc";
 
 pub async fn start_http_server(
     server_config: HttpRpcServerConfig,
@@ -25,7 +32,7 @@ pub async fn start_http_server(
             .wrap(middleware::Logger::default())
             .app_data(stop_handle)
             .app_data(Data::new(db.clone()))
-            .configure(register_routers)
+            .service(web::resource(RPC_PATH).route(web::post().to(rpc_router)))
     })
     .bind(server_config.http_socket_address)?
     .run();

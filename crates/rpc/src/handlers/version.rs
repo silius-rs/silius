@@ -1,23 +1,8 @@
-use actix_web::{HttpResponse, Responder, get};
-use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use silius_node_version::silius_node_version;
 
-use crate::types::{error::ApiError, response::DataResponse};
+use crate::types::error::ErrorData;
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct Version {
-    version: String,
-}
-
-impl Version {
-    pub fn new() -> Self {
-        Self {
-            version: silius_node_version(),
-        }
-    }
-}
-
-#[get("/node/version")]
-pub async fn client_version() -> Result<impl Responder, ApiError> {
-    Ok(HttpResponse::Ok().json(DataResponse::new(Version::new())))
+pub async fn client_version() -> Result<Value, ErrorData> {
+    Ok(Value::from(silius_node_version()))
 }

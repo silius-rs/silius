@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alloy_primitives::B256;
 use redb::{Database, Durability, TableDefinition};
-use silius_types::user_operation::UserOperation;
+use silius_primitives::user_operation::UserOperation;
 
 use crate::error::DatabaseError;
 

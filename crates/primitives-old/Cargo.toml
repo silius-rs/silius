@@ -1,0 +1,40 @@
+[package]
+name = "silius-primitives"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Account abstraction (ERC-4337) primitive types"
+homepage = "https://github.com/silius-rs/silius/tree/main/crates/primitives"
+
+[dependencies]
+# eth
+alloy-chains = { workspace = true }
+ethers = { workspace = true }
+ssz_rs = { workspace = true }
+ssz_rs_derive = { workspace = true }
+
+# async
+async-stream = { workspace = true }
+futures-util = { workspace = true }
+
+# tokio
+tokio = { workspace = true }
+
+# misc
+derive_more = "0.99.17"
+expanded-pathbuf = { workspace = true }
+eyre = { workspace = true }
+lazy_static = { workspace = true }
+rustc-hex = "2.1.0"
+serde = { workspace = true }
+serde-hex = "0.1.0"
+strum = "0.25.0"
+strum_macros = "0.25.3"
+
+[features]
+test-utils = []
