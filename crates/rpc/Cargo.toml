@@ -10,4 +10,11 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-
+actix-web.workspace = true
+actix-web-lab.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+silius-node-version.workspace = true
+silius-storage.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
