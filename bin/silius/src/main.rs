@@ -14,6 +14,7 @@ use silius_storage::{
     db::{SiliusDB, reset_db},
     dir::setup_data_dir,
 };
+use silius_wallet::{KeySource, Wallet};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -57,6 +58,19 @@ async fn main() {
             let silius_db = SiliusDB::new(silius_dir).expect("Unable to init Silius database");
 
             info!("Silius database initialized!");
+
+            let wallet = {
+                if let Some(wallet_path) = config.bundler_config.wallet_path {
+                    Wallet::from_key_source(&KeySource::File(wallet_path))
+                } else if let Some(wallet) = config.bundler_config.wallet {
+                    Wallet::from_key_source(&KeySource::Argument(wallet))
+                } else {
+                    Wallet::new()
+                }
+            }
+            .expect("Unable to create wallet");
+
+            info!("Bundler's wallet address: {:?}", wallet.signer().address());
 
             let http_server_config = HttpRpcServerConfig::new(
                 config.rpc_server_config.http_address,

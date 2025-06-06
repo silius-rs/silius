@@ -1,0 +1,15 @@
+[package]
+name = "silius-wallet"
+authors.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy-signer-local.workspace = true
+anyhow.workspace = true
+home.workspace = true

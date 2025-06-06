@@ -7,6 +7,7 @@ members = [
     "crates/primitives",
     "crates/rpc",
     "crates/storage",
+    "crates/wallet",
     # "bin/silius",
     # "crates/bundler",
     # "crates/contracts",
@@ -43,6 +44,7 @@ version = "0.6.0"
 actix-web = "4.10.2"
 actix-ws = "0.3.0"
 alloy-primitives = { version = "1.1.0", features = ["serde"] }
+alloy-signer-local = { version = "1.0.9", features = ["mnemonic"] }
 alloy-sol-types = { version = "1.1.0" }
 anyhow = "1.0"
 bincode = { version = "2.0.1", features = ["serde"] }
@@ -50,6 +52,7 @@ clap = "4"
 directories = { version = "6.0.0" }
 futures = "0.3"
 futures-util = "0.3.31"
+home = "0.5.11"
 parking_lot = "0.12.3"
 redb = { version = "2.4.0" }
 serde = { version = "1.0", features = ["derive", "rc"] }
@@ -75,7 +78,7 @@ silius-node-version = { path = "crates/node/version" }
 silius-primitives = { path = "crates/primitives" }
 silius-rpc = { path = "crates/rpc" }
 silius-storage = { path = "crates/storage" }
-
+silius-wallet = { path = "crates/wallet" }
 
 # # workspace crates
 # silius-bundler = { version = "0.5.0-alpha", path = "crates/bundler", default-features = false }

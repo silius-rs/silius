@@ -6,12 +6,12 @@ const DEFAULT_HTTP_ADDRESS: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
 const DEFAULT_HTTP_ALLOW_ORIGINS: &str = "*";
 const DEFAULT_HTTP_API_MODULE: &str = "eth,web3";
 const DEFAULT_HTTP_ENABLED: bool = true;
-const DEFAULT_HTTP_PORT: u16 = 4337;
+const DEFAULT_HTTP_PORT: u16 = 3000;
 const DEFAULT_WS_ADDRESS: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
 const DEFAULT_WS_ALLOW_ORIGINS: &str = "*";
 const DEFAULT_WS_API_MODULE: &str = "eth,web3";
 const DEFAULT_WS_ENABLED: bool = true;
-const DEFAULT_WS_PORT: u16 = 4338;
+const DEFAULT_WS_PORT: u16 = 3001;
 
 #[derive(Debug, Parser)]
 pub struct RpcServerConfig {
