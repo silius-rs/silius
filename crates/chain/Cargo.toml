@@ -1,5 +1,5 @@
 [package]
-name = "silius-bundler"
+name = "silius-chain"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,3 +10,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-contract.workspace = true
+alloy-primitives.workspace = true
+alloy-provider.workspace = true
+alloy-sol-types.workspace = true

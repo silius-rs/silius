@@ -13,3 +13,4 @@ version.workspace = true
 alloy-signer-local.workspace = true
 anyhow.workspace = true
 home.workspace = true
+tracing.workspace = true

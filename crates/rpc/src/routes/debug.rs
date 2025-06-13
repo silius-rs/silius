@@ -1,15 +1,15 @@
 use serde_json::Value;
 use silius_storage::db::SiliusDB;
 
-use crate::types::error::ErrorData;
+use crate::{handlers::mempool::clear_state, types::error::ErrorData};
 
 pub async fn debug_router(
     method: &str,
     _params: Vec<Value>,
-    _db: &SiliusDB,
+    db: &SiliusDB,
 ) -> Result<Value, ErrorData> {
     match method {
-        // "debug_clearState" => clear_state().await,
+        "debug_bundler_clearState" => clear_state(db).await,
         // "debug_dumpMempool" => dump_mempool().await,
         // "debug_sendBundleNow" => send_bundle_now().await,
         // "debug_setBundlingMode" => set_bundling_mode().await,

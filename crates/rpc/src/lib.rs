@@ -6,7 +6,7 @@ pub mod routes;
 pub mod types;
 pub mod ws;
 
-pub const RPC_PATH: &str = "/rpc";
+pub const RPC_PATH: &str = "/";
 
 #[derive(Default)]
 struct StopHandle {

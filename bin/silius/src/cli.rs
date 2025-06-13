@@ -33,7 +33,7 @@ pub struct NodeConfig {
 
     #[arg(
         long,
-        help = "Choose mainnet, or provide a path to a YAML config file",
+        help = "Choose mainnet, dev, or provide a path to a YAML config file",
         default_value = DEFAULT_NETWORK,
         value_parser = network_parser
     )]

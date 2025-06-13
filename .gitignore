@@ -1,10 +1,13 @@
 # Rust
-/target
+target/
 
 # IDE
 .idea
 .vscode
 
+# redb
+*.redb
+
 # bundler-spec-tests
-./bundler-spec-tests/account-abstraction
-./bundler-spec-tests/bundler-spec-tests
+bundler-spec-tests/account-abstraction/
+bundler-spec-tests/bundler-spec-tests/

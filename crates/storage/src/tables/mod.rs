@@ -22,6 +22,8 @@ pub trait Table {
     fn insert(&self, key: Self::Key, value: Self::Value) -> Result<(), DatabaseError>;
 
     fn remove(&self, key: Self::Key) -> Result<(), DatabaseError>;
+
+    fn clear(&self) -> Result<(), DatabaseError>;
 }
 
 #[allow(clippy::result_large_err)]
@@ -39,6 +41,8 @@ pub trait MultimapTable {
     fn insert(&self, key: Self::Key, value: Self::InsertValue) -> Result<(), DatabaseError>;
 
     fn remove(&self, key: Self::Key, value: Self::RemoveValue) -> Result<(), DatabaseError>;
+
+    fn remove_all(&self, key: Self::Key) -> Result<(), DatabaseError>;
 }
 
 #[derive(Debug)]

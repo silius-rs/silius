@@ -90,4 +90,31 @@ impl Table for UserOperationTable {
         write_txn.commit()?;
         Ok(())
     }
+
+    fn clear(&self) -> Result<(), DatabaseError> {
+        let sender_user_operation_table = SenderUserOperationMultimapTable {
+            db: self.db.clone(),
+        };
+        let entity_user_operation_table = EntityUserOperationMultimapTable {
+            db: self.db.clone(),
+        };
+
+        let mut write_txn = self.db.begin_write()?;
+        write_txn.set_durability(Durability::Immediate);
+        let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
+        table.extract_if(|_, value| {
+            let _ = sender_user_operation_table.remove_all(value.sender);
+            let _ = entity_user_operation_table.remove_all(value.sender);
+            if let Some(factory) = value.factory {
+                let _ = entity_user_operation_table.remove_all(factory);
+            }
+            if let Some(paymaster) = value.paymaster {
+                let _ = entity_user_operation_table.remove_all(paymaster);
+            }
+            true
+        })?;
+        drop(table);
+        write_txn.commit()?;
+        Ok(())
+    }
 }

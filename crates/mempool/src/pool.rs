@@ -1,5 +1,5 @@
 use silius_storage::db::SiliusDB;
 
-pub struct Reputation {
+pub struct UserOperationPool {
     pub db: SiliusDB,
 }

@@ -1,5 +1,5 @@
 [package]
-name = "silius-bundler"
+name = "silius-node-builder"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,3 +10,4 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+

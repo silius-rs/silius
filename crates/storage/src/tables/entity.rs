@@ -55,4 +55,14 @@ impl MultimapTable for EntityUserOperationMultimapTable {
         write_txn.commit()?;
         Ok(())
     }
+
+    fn remove_all(&self, key: Self::Key) -> Result<(), DatabaseError> {
+        let mut write_txn = self.db.begin_write()?;
+        write_txn.set_durability(Durability::Immediate);
+        let mut table = write_txn.open_multimap_table(ENTITY_USER_OPERATION_MULTIMAP_TABLE)?;
+        table.remove_all(key)?;
+        drop(table);
+        write_txn.commit()?;
+        Ok(())
+    }
 }

@@ -1,0 +1,48 @@
+[package]
+name = "silius-bundler"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+description = "Account abstraction (ERC-4337) bundling implementation"
+homepage = "https://github.com/silius-rs/silius/tree/main/crates/bundler"
+
+[dependencies]
+# workspace dependencies
+silius-contracts = { workspace = true }
+silius-primitives = { workspace = true }
+
+# eth
+alloy-chains = { workspace = true }
+ethers = { workspace = true }
+ethers-flashbots = { git = "https://github.com/silius-rs/ethers-flashbots.git", branch = "main" }
+
+# async
+async-trait = { workspace = true }
+
+# tokio
+tokio = { workspace = true }
+
+# misc
+bytes = "1.5.0"
+eyre = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+url = "2.5.0"
+
+[dev-dependencies]
+# eth
+alloy-primitives = "0.5.4"
+alloy-sol-types = "0.5.4"
+ethers-flashbots-test = { git = "https://github.com/silius-rs/ethers-flashbots.git", branch = "dev" }
+
+# rpc
+jsonrpsee = { version = "0.21.0", features = ["server", "macros", "client"] }
+
+# misc
+dotenv = "0.15.0"

@@ -6,6 +6,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub enum Network {
     Mainnet,
+    Dev,
 }
 
 static NETWORK_SPEC: OnceLock<Arc<NetworkSpec>> = OnceLock::new();
@@ -30,6 +31,7 @@ impl NetworkSpec {
     pub fn chain_id(&self) -> u64 {
         match self.network {
             Network::Mainnet => 1,
+            Network::Dev => 1337,
         }
     }
 }
@@ -37,6 +39,15 @@ impl NetworkSpec {
 pub static MAINNET: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
     Arc::new(NetworkSpec {
         network: Network::Mainnet,
+        entry_point_address: "0x4337084d9e255ff0702461cf8895ce9e3b5ff108"
+            .parse()
+            .unwrap(),
+    })
+});
+
+pub static DEV: LazyLock<Arc<NetworkSpec>> = LazyLock::new(|| {
+    Arc::new(NetworkSpec {
+        network: Network::Dev,
         entry_point_address: "0x4337084d9e255ff0702461cf8895ce9e3b5ff108"
             .parse()
             .unwrap(),
