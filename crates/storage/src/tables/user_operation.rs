@@ -4,12 +4,11 @@ use alloy_primitives::B256;
 use redb::{Database, Durability, TableDefinition};
 use silius_primitives::user_operation::UserOperation;
 
-use crate::error::DatabaseError;
-
 use super::{
     Bincode, MultimapTable, Table, entity::EntityUserOperationMultimapTable,
     sender::SenderUserOperationMultimapTable,
 };
+use crate::error::DatabaseError;
 
 pub const USER_OPERATION_TABLE: TableDefinition<Bincode<B256>, Bincode<UserOperation>> =
     TableDefinition::new("user_operation");
@@ -51,7 +50,7 @@ impl Table for UserOperationTable {
         }
 
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
+        write_txn.set_durability(Durability::Eventual);
         let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
         table.insert(key, value)?;
         drop(table);
@@ -83,7 +82,7 @@ impl Table for UserOperationTable {
         }
 
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
+        write_txn.set_durability(Durability::Eventual);
         let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
         table.remove(key)?;
         drop(table);
@@ -100,7 +99,7 @@ impl Table for UserOperationTable {
         };
 
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
+        write_txn.set_durability(Durability::Eventual);
         let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
         table.extract_if(|_, value| {
             let _ = sender_user_operation_table.remove_all(value.sender);

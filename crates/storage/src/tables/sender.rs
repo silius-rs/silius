@@ -3,9 +3,8 @@ use std::{collections::HashSet, sync::Arc};
 use alloy_primitives::{Address, B256};
 use redb::{Database, Durability, MultimapTableDefinition};
 
-use crate::error::DatabaseError;
-
 use super::{Bincode, MultimapTable};
+use crate::error::DatabaseError;
 
 pub const SENDER_USER_OPERATION_MULTIMAP_TABLE: MultimapTableDefinition<
     Bincode<Address>,
@@ -38,7 +37,7 @@ impl MultimapTable for SenderUserOperationMultimapTable {
 
     fn insert(&self, key: Self::Key, value: Self::InsertValue) -> Result<(), DatabaseError> {
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
+        write_txn.set_durability(Durability::Eventual);
         let mut table = write_txn.open_multimap_table(SENDER_USER_OPERATION_MULTIMAP_TABLE)?;
         table.insert(key, value)?;
         drop(table);
@@ -48,7 +47,7 @@ impl MultimapTable for SenderUserOperationMultimapTable {
 
     fn remove(&self, key: Self::Key, value: Self::RemoveValue) -> Result<(), DatabaseError> {
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
+        write_txn.set_durability(Durability::Eventual);
         let mut table = write_txn.open_multimap_table(SENDER_USER_OPERATION_MULTIMAP_TABLE)?;
         table.remove(key, value)?;
         drop(table);
@@ -58,7 +57,7 @@ impl MultimapTable for SenderUserOperationMultimapTable {
 
     fn remove_all(&self, key: Self::Key) -> Result<(), DatabaseError> {
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Immediate);
+        write_txn.set_durability(Durability::Eventual);
         let mut table = write_txn.open_multimap_table(SENDER_USER_OPERATION_MULTIMAP_TABLE)?;
         table.remove_all(key)?;
         drop(table);

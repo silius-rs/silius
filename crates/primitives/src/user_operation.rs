@@ -1,7 +1,8 @@
+use std::ops::{Deref, DerefMut};
+
 use alloy_primitives::{Address, B256, Bytes, U256};
 use alloy_sol_types::sol;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 use crate::utils::{pack_address_and_data, pack_two_gas_values};
 
