@@ -1,5 +1,5 @@
 [package]
-name = "silius-executor"
+name = "silius-manager"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,6 +10,8 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-futures.workspace = true
-tokio.workspace = true
-tracing.workspace = true
+anyhow.workspace = true
+
+# silius dependencies
+silius-builder.workspace = true
+silius-mempool.workspace = true

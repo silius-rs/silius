@@ -2,9 +2,10 @@
 default-members = ["bin/silius"]
 members = [
     "bin/silius",
-    "crates/bundler",
+    "crates/builder",
     "crates/chain",
     "crates/executor",
+    "crates/manager",
     "crates/mempool",
     "crates/network",
     "crates/node/builder",
@@ -13,6 +14,7 @@ members = [
     "crates/primitives",
     "crates/rpc",
     "crates/storage",
+    "crates/validation",
     "crates/wallet",
     # "bin/silius",
     # "crates/bundler",
@@ -81,9 +83,10 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 
 # silius dependencies
-silius-bundler = { path = "crates/bundler" }
+silius-builder = { path = "crates/builder" }
 silius-chain = { path = "crates/chain" }
 silius-executor = { path = "crates/executor" }
+silius-manager = { path = "crates/manager" }
 silius-mempool = { path = "crates/mempool" }
 silius-network = { path = "crates/network" }
 silius-node-builder = { path = "crates/node/builder" }
@@ -92,6 +95,7 @@ silius-node-version = { path = "crates/node/version" }
 silius-primitives = { path = "crates/primitives" }
 silius-rpc = { path = "crates/rpc" }
 silius-storage = { path = "crates/storage" }
+silius-validation = { path = "crates/validation" }
 silius-wallet = { path = "crates/wallet" }
 
 # # workspace crates

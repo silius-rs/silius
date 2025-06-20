@@ -1,10 +1,12 @@
-use std::env;
+use std::{env, sync::Arc};
 
 use clap::Parser;
 use silius::{
     cli::{Cli, Commands},
     utils::print_ascii_logo,
 };
+use silius_builder::{Builder, basic::BasicBuilder, noop::NoopBuilder};
+use silius_executor::SiliusExecutor;
 use silius_primitives::network_spec::set_network_spec;
 use silius_rpc::{
     http::{HttpRpcServerConfig, start_http_server},
@@ -34,9 +36,7 @@ async fn main() {
 
     let cli = Cli::parse();
 
-    // let async_executor = SiliusExecutor::new().expect("Failed to create executor");
-
-    // let main_executor = SiliusExecutor::new().expect("Failed to create executor");
+    let executor = SiliusExecutor::new().expect("Failed to create executor");
 
     match cli.command {
         Commands::Node(config) => {
@@ -59,18 +59,28 @@ async fn main() {
 
             info!("Silius database initialized!");
 
-            let wallet = {
-                if let Some(wallet_path) = config.bundler_config.wallet_path {
-                    Wallet::from_key_source(&KeySource::File(wallet_path))
-                } else if let Some(wallet) = config.bundler_config.wallet {
-                    Wallet::from_key_source(&KeySource::Argument(wallet))
-                } else {
-                    Wallet::new()
-                }
-            }
-            .expect("Unable to create wallet");
+            let builder: Arc<dyn Builder> = if config.builder_config.disable_builder {
+                info!("Builder is disabled");
 
-            info!("Bundler's wallet address: {:?}", wallet.signer().address());
+                Arc::new(NoopBuilder {})
+            } else {
+                let wallet = {
+                    if let Some(wallet_path) = config.builder_config.wallet_path {
+                        Wallet::from_key_source(&KeySource::File(wallet_path))
+                    } else if let Some(wallet) = config.builder_config.wallet {
+                        Wallet::from_key_source(&KeySource::Argument(wallet))
+                    } else {
+                        Wallet::new()
+                    }
+                }
+                .expect("Unable to create wallet");
+
+                info!("Bundler's wallet address: {:?}", wallet.signer().address());
+
+                Arc::new(BasicBuilder {})
+            };
+
+            let manager = SiliusManager::new(builder).await?;
 
             let http_server_config = HttpRpcServerConfig::new(
                 config.rpc_server_config.http_address,

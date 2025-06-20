@@ -1,5 +1,5 @@
 [package]
-name = "silius-executor"
+name = "silius-builder"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,6 +10,3 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-futures.workspace = true
-tokio.workspace = true
-tracing.workspace = true

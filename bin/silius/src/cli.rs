@@ -5,7 +5,7 @@ use silius_node_version::FULL_VERSION;
 use silius_primitives::{network_spec::NetworkSpec, utils::network_parser};
 
 use crate::config::{
-    bundler::BundlerConfig, mempool::MempoolConfig, metrics::MetricsConfig, network::NetworkConfig,
+    builder::BuilderConfig, mempool::MempoolConfig, metrics::MetricsConfig, network::NetworkConfig,
     rpc_server::RpcServerConfig,
 };
 
@@ -40,7 +40,7 @@ pub struct NodeConfig {
     pub network: Arc<NetworkSpec>,
 
     #[clap(flatten)]
-    pub bundler_config: BundlerConfig,
+    pub builder_config: BuilderConfig,
 
     #[clap(flatten)]
     pub mempool_config: MempoolConfig,

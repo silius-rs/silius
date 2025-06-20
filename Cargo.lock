@@ -3890,7 +3890,9 @@ name = "silius"
 version = "0.6.0"
 dependencies = [
  "clap",
+ "silius-builder",
  "silius-executor",
+ "silius-manager",
  "silius-node-version",
  "silius-primitives",
  "silius-rpc",
@@ -3902,7 +3904,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "silius-bundler"
+name = "silius-builder"
 version = "0.6.0"
 
 [[package]]
@@ -3921,6 +3923,16 @@ version = "0.6.0"
 dependencies = [
  "futures",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "silius-manager"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "silius-builder",
+ "silius-mempool",
 ]
 
 [[package]]
@@ -3993,6 +4005,10 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
 ]
+
+[[package]]
+name = "silius-validation"
+version = "0.6.0"
 
 [[package]]
 name = "silius-wallet"
