@@ -1,15 +1,16 @@
+use alloy_provider::Provider;
 use serde_json::Value;
-use silius_storage::db::SiliusDB;
+use silius_manager::SiliusManager;
 
 use crate::{
     handlers::config::{chain_id, supported_entry_points},
     types::error::ErrorData,
 };
 
-pub async fn eth_router(
+pub async fn eth_router<P: Provider + Clone + 'static>(
     method: &str,
     _params: Vec<Value>,
-    _db: &SiliusDB,
+    _manager: &SiliusManager<P>,
 ) -> Result<Value, ErrorData> {
     match method {
         // "eth_sendUserOperation" => send_user_operation().await,

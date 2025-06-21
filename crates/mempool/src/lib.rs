@@ -1,7 +1,8 @@
 use silius_storage::db::SiliusDB;
 
-use crate::{pool::UserOperationPool, reputation::Reputation};
+use crate::{error::MempoolError, pool::UserOperationPool, reputation::Reputation};
 
+mod error;
 mod pool;
 mod reputation;
 
@@ -16,5 +17,11 @@ impl Mempool {
             user_operation_pool: UserOperationPool::new(db.clone()),
             reputation: Reputation::new(db),
         }
+    }
+
+    pub fn clear(&self) -> Result<(), MempoolError> {
+        self.user_operation_pool.clear()?;
+        self.reputation.clear()?;
+        Ok(())
     }
 }

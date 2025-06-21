@@ -3915,9 +3915,11 @@ name = "silius-chain"
 version = "0.6.0"
 dependencies = [
  "alloy-contract",
- "alloy-primitives",
  "alloy-provider",
  "alloy-sol-types",
+ "anyhow",
+ "silius-primitives",
+ "tracing",
 ]
 
 [[package]]
@@ -3946,6 +3948,7 @@ name = "silius-mempool"
 version = "0.6.0"
 dependencies = [
  "silius-storage",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -3985,13 +3988,14 @@ dependencies = [
  "actix-web",
  "actix-ws",
  "alloy-primitives",
+ "alloy-provider",
  "futures-util",
  "parking_lot",
  "serde",
  "serde_json",
+ "silius-manager",
  "silius-node-version",
  "silius-primitives",
- "silius-storage",
  "thiserror 2.0.12",
  "tracing",
 ]

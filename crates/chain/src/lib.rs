@@ -1,6 +1,7 @@
-use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
+use silius_primitives::network_spec::network_spec;
+use tracing::info;
 
 use crate::IEntryPoint::IEntryPointInstance;
 
@@ -15,10 +16,37 @@ pub struct Chain<P: Provider + 'static> {
 }
 
 impl<P: Provider + 'static> Chain<P> {
-    pub fn new(provider: P, entry_point_address: Address) -> Self {
-        Self {
-            entry_point: IEntryPoint::new(entry_point_address, provider),
+    pub async fn new(provider: P) -> anyhow::Result<Self> {
+        let chain_id = provider.get_chain_id().await?;
+        if chain_id != network_spec().chain_id() {
+            anyhow::bail!(
+                "Chain id mismatch: expected {}, got {}",
+                network_spec().chain_id(),
+                chain_id
+            );
         }
+        info!(
+            "Connected to chain with chain id: {}",
+            provider.get_chain_id().await?
+        );
+
+        let code = provider
+            .get_code_at(network_spec().entry_point_address)
+            .await?;
+        if code.is_empty() {
+            anyhow::bail!(
+                "Entry point contract is not deployed at address: {}",
+                network_spec().entry_point_address
+            );
+        }
+        info!(
+            "Entry point contract is deployed at address: {}",
+            network_spec().entry_point_address
+        );
+
+        Ok(Self {
+            entry_point: IEntryPoint::new(network_spec().entry_point_address, provider),
+        })
     }
 
     pub fn provider(&self) -> &P {

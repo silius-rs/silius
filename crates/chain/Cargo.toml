@@ -11,6 +11,10 @@ version.workspace = true
 
 [dependencies]
 alloy-contract.workspace = true
-alloy-primitives.workspace = true
 alloy-provider.workspace = true
 alloy-sol-types.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+# silius dependencies
+silius-primitives.workspace = true

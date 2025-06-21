@@ -18,7 +18,7 @@ clean:
 
 lint:
   cargo +nightly fmt --all
-  cargo clippy --all --all-targets --features "$(FEATURES)" --no-deps -- --deny warnings
+  cargo clippy --all --all-targets {{FEATURES}} --no-deps -- --deny warnings
   cargo sort --grouped
 
 clean-deps:

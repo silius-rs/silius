@@ -6,12 +6,12 @@ use silius_chain::Chain;
 use silius_mempool::Mempool;
 use tokio::sync::mpsc;
 
+#[derive(Clone)]
 pub struct SiliusManager<P: Provider + 'static> {
     pub builder: Arc<dyn Builder>,
     pub mempool: Arc<Mempool>,
     pub chain: Arc<Chain<P>>,
     network_sender: mpsc::UnboundedSender<()>,
-    network_receiver: mpsc::UnboundedReceiver<()>,
 }
 
 impl<P: Provider + 'static> SiliusManager<P> {
@@ -20,16 +20,18 @@ impl<P: Provider + 'static> SiliusManager<P> {
         mempool: Arc<Mempool>,
         chain: Arc<Chain<P>>,
         network_sender: mpsc::UnboundedSender<()>,
-        network_receiver: mpsc::UnboundedReceiver<()>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             builder,
             mempool,
             chain,
             network_sender,
-            network_receiver,
         })
     }
 
-    pub async fn start(&self) {}
+    pub async fn start(&self, network_receiver: mpsc::UnboundedReceiver<()>) {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        }
+    }
 }

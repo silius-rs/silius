@@ -1,4 +1,7 @@
-use std::sync::{Arc, LazyLock, OnceLock};
+use std::{
+    fmt::Display,
+    sync::{Arc, LazyLock, OnceLock},
+};
 
 use alloy_primitives::Address;
 use serde::Deserialize;
@@ -33,6 +36,18 @@ impl NetworkSpec {
             Network::Mainnet => 1,
             Network::Dev => 1337,
         }
+    }
+}
+
+impl Display for NetworkSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NetworkSpec {{ network: {:?}, chain_id: {:?}, entry_point_address: {:?} }}",
+            format!("{:?}", self.network).to_lowercase(),
+            self.chain_id(),
+            self.entry_point_address
+        )
     }
 }
 

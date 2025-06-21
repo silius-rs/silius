@@ -10,4 +10,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+thiserror.workspace = true
+
+# silius dependencies
 silius-storage.workspace = true

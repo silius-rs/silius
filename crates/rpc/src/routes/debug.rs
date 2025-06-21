@@ -1,15 +1,16 @@
+use alloy_provider::Provider;
 use serde_json::Value;
-use silius_storage::db::SiliusDB;
+use silius_manager::SiliusManager;
 
 use crate::{handlers::mempool::clear_state, types::error::ErrorData};
 
-pub async fn debug_router(
+pub async fn debug_router<P: Provider + Clone + 'static>(
     method: &str,
     _params: Vec<Value>,
-    db: &SiliusDB,
+    manager: &SiliusManager<P>,
 ) -> Result<Value, ErrorData> {
     match method {
-        "debug_bundler_clearState" => clear_state(db).await,
+        "debug_bundler_clearState" => clear_state(manager).await,
         // "debug_dumpMempool" => dump_mempool().await,
         // "debug_sendBundleNow" => send_bundle_now().await,
         // "debug_setBundlingMode" => set_bundling_mode().await,

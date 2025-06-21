@@ -13,12 +13,15 @@ version.workspace = true
 actix-web.workspace = true
 actix-ws.workspace = true
 alloy-primitives.workspace = true
+alloy-provider.workspace = true
 futures-util.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-silius-node-version.workspace = true
-silius-primitives.workspace = true
-silius-storage.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+
+# silius dependencies
+silius-manager.workspace = true
+silius-node-version.workspace = true
+silius-primitives.workspace = true
