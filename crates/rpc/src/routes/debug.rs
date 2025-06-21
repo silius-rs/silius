@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use alloy_provider::Provider;
 use serde_json::Value;
 use silius_manager::SiliusManager;
@@ -7,7 +9,7 @@ use crate::{handlers::mempool::clear_state, types::error::ErrorData};
 pub async fn debug_router<P: Provider + Clone + 'static>(
     method: &str,
     _params: Vec<Value>,
-    manager: &SiliusManager<P>,
+    manager: &Arc<SiliusManager<P>>,
 ) -> Result<Value, ErrorData> {
     match method {
         "debug_bundler_clearState" => clear_state(manager).await,

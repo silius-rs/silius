@@ -41,7 +41,7 @@ pub async fn ws_handler<P: Provider + Clone + 'static>(
     request: HttpRequest,
     stream: web::Payload,
     api_modules: Data<Vec<String>>,
-    manager: Data<SiliusManager<P>>,
+    manager: Data<Arc<SiliusManager<P>>>,
 ) -> Result<HttpResponse, Error> {
     let (res, mut session, stream) = handle(&request, stream)?;
 

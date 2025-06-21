@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_web::{
     Error,
     web::{Bytes, Data},
@@ -18,7 +20,7 @@ pub mod web3;
 pub async fn rpc_router<P: Provider + Clone + 'static>(
     body: Bytes,
     api_modules: Data<Vec<String>>,
-    manager: Data<SiliusManager<P>>,
+    manager: Data<Arc<SiliusManager<P>>>,
 ) -> Result<Bytes, Error> {
     let request: Request = match serde_json::from_slice(body.as_ref()) {
         Ok(ok) => ok,
@@ -42,7 +44,7 @@ pub async fn rpc_router<P: Provider + Clone + 'static>(
         request.method.as_str(),
         request.params,
         api_modules,
-        &manager,
+        manager,
     )
     .await
     {
@@ -57,7 +59,7 @@ pub async fn rpc_select<P: Provider + Clone + 'static>(
     method: &str,
     params: Vec<Value>,
     api_modules: Data<Vec<String>>,
-    manager: &SiliusManager<P>,
+    manager: Data<Arc<SiliusManager<P>>>,
 ) -> Result<Value, ErrorData> {
     let module = method.split('_').next().unwrap_or_default();
     if !api_modules.contains(&module.to_string()) {
@@ -65,9 +67,11 @@ pub async fn rpc_select<P: Provider + Clone + 'static>(
     }
 
     match method {
-        method if method.starts_with("web3") => web3_router(method, params, manager).await,
-        method if method.starts_with("eth") => eth_router(method, params, manager).await,
-        method if method.starts_with("debug") => debug_router(method, params, manager).await,
+        method if method.starts_with("web3") => web3_router(method, params, manager.as_ref()).await,
+        method if method.starts_with("eth") => eth_router(method, params, manager.as_ref()).await,
+        method if method.starts_with("debug") => {
+            debug_router(method, params, manager.as_ref()).await
+        }
         _ => Err(ErrorData::std(-32601)),
     }
 }

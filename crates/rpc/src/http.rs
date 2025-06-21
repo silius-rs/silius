@@ -40,7 +40,7 @@ impl HttpRpcServerConfig {
 pub async fn http_handler<P: Provider + Clone + 'static>(
     body: Bytes,
     api_modules: Data<Vec<String>>,
-    manager: Data<SiliusManager<P>>,
+    manager: Data<Arc<SiliusManager<P>>>,
 ) -> Result<HttpResponse, Error> {
     let response = rpc_router(body, api_modules, manager).await?;
     Ok(HttpResponse::Ok().content_type(CONTENT_TYPE).body(response))

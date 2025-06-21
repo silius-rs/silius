@@ -1,5 +1,4 @@
-use silius_storage::db::SiliusDB;
-use silius_storage::tables::Table;
+use silius_storage::{db::SiliusDB, tables::Table};
 
 use crate::error::MempoolError;
 
