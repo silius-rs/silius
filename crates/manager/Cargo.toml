@@ -10,8 +10,11 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-provider.workspace = true
 anyhow.workspace = true
+tokio.workspace = true
 
 # silius dependencies
 silius-builder.workspace = true
+silius-chain.workspace = true
 silius-mempool.workspace = true

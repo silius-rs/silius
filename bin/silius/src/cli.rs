@@ -10,6 +10,7 @@ use crate::config::{
 };
 
 const DEFAULT_NETWORK: &str = "mainnet";
+const DEFAULT_PROVIDER_URL: &str = "http://localhost:8545";
 
 #[derive(Debug, Parser)]
 #[command(author, version = FULL_VERSION, about, long_about = None)]
@@ -38,6 +39,9 @@ pub struct NodeConfig {
         value_parser = network_parser
     )]
     pub network: Arc<NetworkSpec>,
+
+    #[arg(long, help = "Set the URL to the chain provider", default_value = DEFAULT_PROVIDER_URL)]
+    pub provider_url: String,
 
     #[clap(flatten)]
     pub builder_config: BuilderConfig,

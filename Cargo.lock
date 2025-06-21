@@ -3889,10 +3889,13 @@ dependencies = [
 name = "silius"
 version = "0.6.0"
 dependencies = [
+ "alloy-provider",
  "clap",
  "silius-builder",
+ "silius-chain",
  "silius-executor",
  "silius-manager",
+ "silius-mempool",
  "silius-node-version",
  "silius-primitives",
  "silius-rpc",
@@ -3930,9 +3933,12 @@ dependencies = [
 name = "silius-manager"
 version = "0.6.0"
 dependencies = [
+ "alloy-provider",
  "anyhow",
  "silius-builder",
+ "silius-chain",
  "silius-mempool",
+ "tokio",
 ]
 
 [[package]]

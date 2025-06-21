@@ -15,6 +15,7 @@ name = "silius"
 path = "src/main.rs"
 
 [dependencies]
+alloy-provider.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 tokio.workspace = true
 tracing = { workspace = true, features = ["log"] }
@@ -22,8 +23,10 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 # silius dependencies
 silius-builder.workspace = true
+silius-chain.workspace = true
 silius-executor.workspace = true
 silius-manager.workspace = true
+silius-mempool.workspace = true
 silius-node-version.workspace = true
 silius-primitives.workspace = true
 silius-rpc.workspace = true

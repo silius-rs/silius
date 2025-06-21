@@ -1,27 +1,35 @@
-use std::sync::{Arc, mpsc};
+use std::sync::Arc;
 
+use alloy_provider::Provider;
 use silius_builder::Builder;
+use silius_chain::Chain;
 use silius_mempool::Mempool;
+use tokio::sync::mpsc;
 
-pub struct SiliusManager<B: Builder> {
-    pub builder: Arc<B>,
+pub struct SiliusManager<P: Provider + 'static> {
+    pub builder: Arc<dyn Builder>,
     pub mempool: Arc<Mempool>,
-    network_sender: mpsc::Sender<()>,
-    network_receiver: mpsc::Receiver<()>,
+    pub chain: Arc<Chain<P>>,
+    network_sender: mpsc::UnboundedSender<()>,
+    network_receiver: mpsc::UnboundedReceiver<()>,
 }
 
-impl<B: Builder> SiliusManager<B> {
+impl<P: Provider + 'static> SiliusManager<P> {
     pub async fn new(
-        builder: Arc<B>,
+        builder: Arc<dyn Builder>,
         mempool: Arc<Mempool>,
-        network_sender: mpsc::Sender<()>,
-        network_receiver: mpsc::Receiver<()>,
+        chain: Arc<Chain<P>>,
+        network_sender: mpsc::UnboundedSender<()>,
+        network_receiver: mpsc::UnboundedReceiver<()>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             builder,
             mempool,
+            chain,
             network_sender,
             network_receiver,
         })
     }
+
+    pub async fn start(&self) {}
 }

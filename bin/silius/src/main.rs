@@ -1,12 +1,16 @@
 use std::{env, sync::Arc};
 
+use alloy_provider::{ProviderBuilder, WsConnect};
 use clap::Parser;
 use silius::{
     cli::{Cli, Commands},
     utils::print_ascii_logo,
 };
 use silius_builder::{Builder, basic::BasicBuilder, noop::NoopBuilder};
+use silius_chain::Chain;
 use silius_executor::SiliusExecutor;
+use silius_manager::SiliusManager;
+use silius_mempool::Mempool;
 use silius_primitives::network_spec::set_network_spec;
 use silius_rpc::{
     http::{HttpRpcServerConfig, start_http_server},
@@ -17,6 +21,7 @@ use silius_storage::{
     dir::setup_data_dir,
 };
 use silius_wallet::{KeySource, Wallet};
+use tokio::sync::mpsc;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -80,7 +85,36 @@ async fn main() {
                 Arc::new(BasicBuilder {})
             };
 
-            let manager = SiliusManager::new(builder).await?;
+            let mempool = Arc::new(Mempool::new(silius_db.clone()));
+
+            let chain = if config.provider_url.starts_with("http") {
+                let provider = ProviderBuilder::new().connect_http(
+                    config
+                        .provider_url
+                        .parse()
+                        .expect("Cannot parse HTTP provider URL"),
+                );
+                Arc::new(Chain::new(provider, config.network.entry_point_address))
+            } else if config.provider_url.starts_with("ws") {
+                let provider = ProviderBuilder::new()
+                    .connect_ws(WsConnect::new(config.provider_url))
+                    .await
+                    .expect("Failed to connect to WebSocket provider");
+                Arc::new(Chain::new(provider, config.network.entry_point_address))
+            } else {
+                panic!("Transport not supported");
+            };
+
+            let (network_sender, network_receiver) = mpsc::unbounded_channel();
+
+            let manager =
+                SiliusManager::new(builder, mempool, chain, network_sender, network_receiver)
+                    .await
+                    .expect("Failed to create manager");
+
+            let manager_future = executor.spawn(async move {
+                manager.start().await;
+            });
 
             let http_server_config = HttpRpcServerConfig::new(
                 config.rpc_server_config.http_address,
@@ -94,11 +128,17 @@ async fn main() {
                 config.rpc_server_config.ws_allow_origins,
             );
 
-            let http_future = start_http_server(http_server_config, silius_db.clone());
+            let silius_db_clone = silius_db.clone();
+            let http_future = executor
+                .spawn(async move { start_http_server(http_server_config, silius_db_clone).await });
 
-            let ws_future = start_ws_server(ws_server_config, silius_db.clone());
+            let ws_future = executor
+                .spawn(async move { start_ws_server(ws_server_config, silius_db.clone()).await });
 
             tokio::select! {
+                _ = manager_future => {
+                    info!("Manager stopped");
+                }
                 _ = http_future => {
                     info!("HTTP server stopped");
                 }
