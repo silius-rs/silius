@@ -10,7 +10,11 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-eips.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 serde.workspace = true
 serde_yaml.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

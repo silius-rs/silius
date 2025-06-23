@@ -20,6 +20,7 @@ use silius_storage::{
     db::{SiliusDB, reset_db},
     dir::setup_data_dir,
 };
+use silius_validation::validator::Validator;
 use silius_wallet::{KeySource, Wallet};
 use tokio::sync::mpsc;
 use tracing::info;
@@ -104,7 +105,7 @@ pub async fn run_silius_node(config: NodeConfig, executor: SiliusExecutor) {
         Arc::new(BasicBuilder {})
     };
 
-    let mempool = Arc::new(Mempool::new(silius_db.clone()));
+    let mempool = Arc::new(Mempool::new(silius_db.clone(), Validator::new()));
 
     let chain = if config.provider_url.starts_with("http") {
         let provider = ProviderBuilder::new().connect_http(

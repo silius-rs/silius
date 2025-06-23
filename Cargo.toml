@@ -52,6 +52,7 @@ version = "0.6.0"
 actix-web = "4.10.2"
 actix-ws = "0.3.0"
 alloy-contract = { version = "1.0.9" }
+alloy-eips = { version = "1.0.12", features = ["serde"] }
 alloy-primitives = { version = "1.1.0", features = ["serde"] }
 alloy-provider = { version = "1.0.9", features = ["pubsub", "ws"] }
 alloy-signer-local = { version = "1.0.9", features = ["mnemonic"] }

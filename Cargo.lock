@@ -369,9 +369,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-eips"
-version = "1.0.9"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3056872f6da48046913e76edb5ddced272861f6032f09461aea1a2497be5ae5d"
+checksum = "4f853de9ca1819f54de80de5d03bfc1bb7c9fafcf092b480a654447141bc354d"
 dependencies = [
  "alloy-eip2124",
  "alloy-eip2930",
@@ -454,9 +454,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-primitives"
-version = "1.1.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a12fe11d0b8118e551c29e1a67ccb6d01cc07ef08086df30f07487146de6fa1"
+checksum = "6177ed26655d4e84e00b65cb494d4e0b8830e7cae7ef5d63087d445a2600fb55"
 dependencies = [
  "alloy-rlp",
  "bytes",
@@ -3900,6 +3900,7 @@ dependencies = [
  "silius-primitives",
  "silius-rpc",
  "silius-storage",
+ "silius-validation",
  "silius-wallet",
  "tokio",
  "tracing",
@@ -3947,7 +3948,9 @@ dependencies = [
 name = "silius-mempool"
 version = "0.6.0"
 dependencies = [
+ "silius-primitives",
  "silius-storage",
+ "silius-validation",
  "thiserror 2.0.12",
 ]
 
@@ -3975,9 +3978,11 @@ dependencies = [
 name = "silius-primitives"
 version = "0.6.0"
 dependencies = [
+ "alloy-eips",
  "alloy-primitives",
  "alloy-sol-types",
  "serde",
+ "serde_json",
  "serde_yaml",
 ]
 

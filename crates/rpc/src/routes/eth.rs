@@ -1,21 +1,37 @@
 use std::sync::Arc;
 
+use alloy_primitives::Address;
 use alloy_provider::Provider;
 use serde_json::Value;
 use silius_manager::SiliusManager;
+use silius_primitives::user_operation::UserOperationBase;
 
 use crate::{
-    handlers::config::{chain_id, supported_entry_points},
+    handlers::{
+        config::{chain_id, supported_entry_points},
+        mempool::send_user_operation,
+    },
     types::error::ErrorData,
 };
 
 pub async fn eth_router<P: Provider + Clone + 'static>(
     method: &str,
-    _params: Vec<Value>,
-    _manager: &Arc<SiliusManager<P>>,
+    params: Vec<Value>,
+    manager: &Arc<SiliusManager<P>>,
 ) -> Result<Value, ErrorData> {
     match method {
-        // "eth_sendUserOperation" => send_user_operation().await,
+        "eth_sendUserOperation" => {
+            if params.len() != 2 {
+                return Err(ErrorData::std(-32602));
+            }
+
+            let user_operation: UserOperationBase =
+                serde_json::from_value(params[0].clone()).map_err(|_| ErrorData::std(-32602))?;
+            let entry_point_address: Address =
+                serde_json::from_value(params[1].clone()).map_err(|_| ErrorData::std(-32602))?;
+
+            send_user_operation(user_operation, entry_point_address, manager).await
+        }
         // "eth_estimateUserOperationGas" => estimate_user_operation_gas().await,
         // "eth_getUserOperationByHash" => get_user_operation_by_hash().await,
         // "eth_getUserOperationReceipt" => get_user_operation_receipt().await,

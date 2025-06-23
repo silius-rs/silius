@@ -31,4 +31,5 @@ silius-node-version.workspace = true
 silius-primitives.workspace = true
 silius-rpc.workspace = true
 silius-storage.workspace = true
+silius-validation.workspace = true
 silius-wallet.workspace = true

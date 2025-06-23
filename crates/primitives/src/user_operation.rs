@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, B256, Bytes, U256};
 use alloy_sol_types::sol;
 use serde::{Deserialize, Serialize};
@@ -21,10 +22,13 @@ sol! {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserOperationBase {
     pub sender: Address,
     pub nonce: U256,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub factory: Option<Address>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub factory_data: Option<Bytes>,
     pub call_data: Bytes,
     pub call_gas_limit: U256,
@@ -32,11 +36,18 @@ pub struct UserOperationBase {
     pub pre_verification_gas: U256,
     pub max_fee_per_gas: U256,
     pub max_priority_fee_per_gas: U256,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster: Option<Address>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_verification_gas_limit: Option<U256>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_post_op_gas_limit: Option<U256>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_data: Option<Bytes>,
-    pub signature: Option<Bytes>,
+    pub signature: Bytes,
+    // EIP-7702 signed authorization tuple
+    #[serde(rename = "eip7702Auth", skip_serializing_if = "Option::is_none")]
+    pub signed_authorization: Option<SignedAuthorization>,
 }
 
 impl UserOperationBase {
@@ -57,7 +68,7 @@ impl UserOperationBase {
             pre_verification_gas: self.pre_verification_gas,
             gas_fees: pack_two_gas_values(self.max_fee_per_gas, self.max_priority_fee_per_gas),
             paymaster_and_data: pack_address_and_data(self.paymaster, self.paymaster_data.clone()),
-            signature: self.signature.clone().unwrap_or_default(),
+            signature: self.signature.clone(),
         }
     }
 }
@@ -79,6 +90,7 @@ pub struct UserOperationBaseBuilder {
     pub paymaster_post_op_gas_limit: Option<U256>,
     pub paymaster_data: Option<Bytes>,
     pub signature: Option<Bytes>,
+    pub signed_authorization: Option<SignedAuthorization>,
 }
 
 impl UserOperationBaseBuilder {
@@ -160,6 +172,11 @@ impl UserOperationBaseBuilder {
         self
     }
 
+    pub fn signed_authorization(mut self, signed_authorization: SignedAuthorization) -> Self {
+        self.signed_authorization = Some(signed_authorization);
+        self
+    }
+
     pub fn build(self) -> UserOperationBase {
         UserOperationBase {
             sender: self.sender.expect("sender is required"),
@@ -182,7 +199,8 @@ impl UserOperationBaseBuilder {
             paymaster_verification_gas_limit: self.paymaster_verification_gas_limit,
             paymaster_post_op_gas_limit: self.paymaster_post_op_gas_limit,
             paymaster_data: self.paymaster_data,
-            signature: self.signature.clone(),
+            signature: self.signature.expect("signature is required"),
+            signed_authorization: self.signed_authorization,
         }
     }
 }
@@ -212,6 +230,41 @@ impl DerefMut for UserOperation {
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::{Address, Bytes, U256};
+
+    use crate::user_operation::UserOperationBase;
+
+    #[test]
+    fn test_user_operation_base_deserialize() {
+        let user_operation = r#"
+        {
+            "sender": "0x452D8Fa4640d78100215c35c85A20fAE171B6B01",
+            "nonce": "0x0",
+            "callData": "0xa9e966b7000000000000000000000000000000000000000000000000000000000010f447",
+            "callGasLimit": "0x493e0",
+            "verificationGasLimit": "0xf4240",
+            "preVerificationGas": "0x61a80",
+            "maxFeePerGas": "0xee6b2800",
+            "maxPriorityFeePerGas": "0xb2d05e00",
+            "signature": "0xface"
+        }"#;
+        let user_operation: UserOperationBase = serde_json::from_str(user_operation).unwrap();
+        assert_eq!(
+            user_operation.sender,
+            "0x452D8Fa4640d78100215c35c85A20fAE171B6B01"
+                .parse::<Address>()
+                .unwrap()
+        );
+        assert_eq!(user_operation.nonce, U256::ZERO);
+        assert_eq!(
+            user_operation.call_data,
+            "0xa9e966b7000000000000000000000000000000000000000000000000000000000010f447"
+                .parse::<Bytes>()
+                .unwrap()
+        );
+        assert_eq!(user_operation.call_gas_limit, U256::from(300_000));
+    }
+
     #[test]
     fn test_user_operation_hash() {
         // set_network_spec(MAINNET.clone());
