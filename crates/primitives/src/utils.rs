@@ -17,8 +17,8 @@ pub fn pack_address_and_data(address: Option<Address>, data: Option<Bytes>) -> B
 
 pub fn pack_two_gas_values(gas_1: U256, gas_2: U256) -> B256 {
     let mut result = [0u8; 32];
-    result[0..16].copy_from_slice(&gas_1.to_le_bytes_vec());
-    result[16..32].copy_from_slice(&gas_2.to_le_bytes_vec());
+    result[16..32].copy_from_slice(&gas_1.to_be_bytes_vec()[16..32]);
+    result[0..16].copy_from_slice(&gas_2.to_be_bytes_vec()[16..32]);
     B256::from(result)
 }
 

@@ -13,7 +13,7 @@ sol! {
         uint256 nonce;
         bytes init_code;
         bytes call_data;
-        bytes32 accounts_gas_limit;
+        bytes32 account_gas_limit;
         uint256 pre_verification_gas;
         bytes32 gas_fees;
         bytes paymaster_and_data;
@@ -61,9 +61,9 @@ impl UserOperationBase {
             nonce: self.nonce,
             init_code: pack_address_and_data(self.factory, self.factory_data.clone()),
             call_data: self.call_data.clone(),
-            accounts_gas_limit: pack_two_gas_values(
-                self.verification_gas_limit,
+            account_gas_limit: pack_two_gas_values(
                 self.call_gas_limit,
+                self.verification_gas_limit,
             ),
             pre_verification_gas: self.pre_verification_gas,
             gas_fees: pack_two_gas_values(self.max_fee_per_gas, self.max_priority_fee_per_gas),
@@ -210,8 +210,16 @@ pub struct UserOperation {
     pub inner: UserOperationBase,
 
     // additional data
-    pub signature: Bytes,
     pub hash: B256,
+}
+
+impl UserOperation {
+    pub fn new(user_operation_base: UserOperationBase, hash: B256) -> Self {
+        Self {
+            inner: user_operation_base,
+            hash,
+        }
+    }
 }
 
 impl Deref for UserOperation {
@@ -230,7 +238,7 @@ impl DerefMut for UserOperation {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::{Address, Bytes, U256};
+    use alloy_primitives::{Address, B256, Bytes, U256, hex::FromHex};
 
     use crate::user_operation::UserOperationBase;
 
@@ -266,34 +274,61 @@ mod tests {
     }
 
     #[test]
-    fn test_user_operation_hash() {
-        // set_network_spec(MAINNET.clone());
-        // let user_operation = UserOperationBuilder::default()
-        //     .with_sender(
-        //         "0x9c5754De1443984659E1b3a8d1931D83475ba29C"
-        //             .parse()
-        //             .unwrap(),
-        //     )
-        //     .with_nonce(U256::ZERO)
-        //     .with_factory(
-        //         "0x9406cc6185a346906296840746125a0e44976454"
-        //             .parse()
-        //             .unwrap(),
-        //     )
-        //     .with_factory_data("5fbfb9cf000000000000000000000000ce0fefa6f7979c4c9b5373e0f5105b7259092c6d0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap())
-        //     .with_call_data("0xb61d27f60000000000000000000000009c5754de1443984659e1b3a8d1931d83475ba29c00000000000000000000000000000000000000000000000000005af3107a400000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000".parse().unwrap())
-        //     .with_call_gas_limit(U256::from(33_100))
-        //     .with_verification_gas_limit(U256::from(361_460))
-        //     .with_pre_verification_gas(U256::from(44_980))
-        //     .with_max_fee_per_gas(U256::from(1_695_000_030))
-        //     .with_max_priority_fee_per_gas(U256::from(1_695_000_000))
-        //     .with_signature("0xebfd4657afe1f1c05c1ec65f3f9cc992a3ac083c424454ba61eab93152195e1400d74df01fc9fa53caadcb83a891d478b713016bcc0c64307c1ad3d7ea2e2d921b".parse().unwrap())
-        //     .build();
-        // assert_eq!(
-        //     user_operation.hash,
-        //     "0x95418c07086df02ff6bc9e8bdc150b380cb761beecc098630440bcec6e862702"
-        //         .parse::<B256>()
-        //         .unwrap()
-        // );
+    fn test_user_operation_base_packed() {
+        let user_operation = r#"
+        {
+            "sender": "0x3C9f140494B8aa32f53279326AbD5B132b63a32b",
+            "nonce": "0x0",
+            "callData": "0xa9e966b7000000000000000000000000000000000000000000000000000000000010f447",
+            "callGasLimit": "0x493e0",
+            "verificationGasLimit": "0xf4240",
+            "preVerificationGas": "0x61a80",
+            "maxFeePerGas": "0xee6b2800",
+            "maxPriorityFeePerGas": "0xb2d05e00",
+            "signature": "0xface"
+        }"#;
+        let user_operation: UserOperationBase = serde_json::from_str(user_operation).unwrap();
+        let user_operation_packed = user_operation.to_packed_user_operation();
+        assert_eq!(
+            user_operation_packed.sender,
+            "0x3C9f140494B8aa32f53279326AbD5B132b63a32b"
+                .parse::<Address>()
+                .unwrap()
+        );
+        assert_eq!(user_operation_packed.nonce, U256::ZERO);
+        assert_eq!(
+            user_operation_packed.init_code,
+            Bytes::from_hex("0x").unwrap()
+        );
+        assert_eq!(
+            user_operation_packed.call_data,
+            "0xa9e966b7000000000000000000000000000000000000000000000000000000000010f447"
+                .parse::<Bytes>()
+                .unwrap()
+        );
+        assert_eq!(
+            user_operation_packed.account_gas_limit,
+            "0x000000000000000000000000000f4240000000000000000000000000000493e0"
+                .parse::<B256>()
+                .unwrap()
+        );
+        assert_eq!(
+            user_operation_packed.pre_verification_gas,
+            U256::from(400_000)
+        );
+        assert_eq!(
+            user_operation_packed.gas_fees,
+            "0x000000000000000000000000b2d05e00000000000000000000000000ee6b2800"
+                .parse::<B256>()
+                .unwrap()
+        );
+        assert_eq!(
+            user_operation_packed.paymaster_and_data,
+            Bytes::from_hex("0x").unwrap()
+        );
+        assert_eq!(
+            user_operation_packed.signature,
+            "0xface".parse::<Bytes>().unwrap()
+        );
     }
 }

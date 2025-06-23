@@ -25,12 +25,12 @@ pub async fn eth_router<P: Provider + Clone + 'static>(
                 return Err(ErrorData::std(-32602));
             }
 
-            let user_operation: UserOperationBase =
+            let user_operation_base: UserOperationBase =
                 serde_json::from_value(params[0].clone()).map_err(|_| ErrorData::std(-32602))?;
             let entry_point_address: Address =
                 serde_json::from_value(params[1].clone()).map_err(|_| ErrorData::std(-32602))?;
 
-            send_user_operation(user_operation, entry_point_address, manager).await
+            send_user_operation(user_operation_base, entry_point_address, manager).await
         }
         // "eth_estimateUserOperationGas" => estimate_user_operation_gas().await,
         // "eth_getUserOperationByHash" => get_user_operation_by_hash().await,

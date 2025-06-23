@@ -3916,6 +3916,7 @@ name = "silius-chain"
 version = "0.6.0"
 dependencies = [
  "alloy-contract",
+ "alloy-primitives",
  "alloy-provider",
  "alloy-sol-types",
  "anyhow",

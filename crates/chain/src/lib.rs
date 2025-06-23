@@ -1,6 +1,7 @@
+use alloy_primitives::B256;
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
-use silius_primitives::network_spec::network_spec;
+use silius_primitives::{network_spec::network_spec, user_operation::PackedUserOperation};
 use tracing::info;
 
 use crate::IEntryPoint::IEntryPointInstance;
@@ -10,6 +11,22 @@ sol!(
     IEntryPoint,
     "resources/entry_point_v08.json"
 );
+
+impl From<PackedUserOperation> for IEntryPoint::PackedUserOperation {
+    fn from(packed_user_operation: PackedUserOperation) -> Self {
+        Self {
+            sender: packed_user_operation.sender,
+            nonce: packed_user_operation.nonce,
+            initCode: packed_user_operation.init_code,
+            callData: packed_user_operation.call_data,
+            accountGasLimits: packed_user_operation.account_gas_limit,
+            preVerificationGas: packed_user_operation.pre_verification_gas,
+            gasFees: packed_user_operation.gas_fees,
+            paymasterAndData: packed_user_operation.paymaster_and_data,
+            signature: packed_user_operation.signature,
+        }
+    }
+}
 
 pub struct Chain<P: Provider + 'static> {
     entry_point: IEntryPointInstance<P>,
@@ -55,5 +72,16 @@ impl<P: Provider + 'static> Chain<P> {
 
     pub fn entry_point(&self) -> &IEntryPointInstance<P> {
         &self.entry_point
+    }
+
+    pub async fn get_user_operation_hash(
+        &self,
+        packed_user_operation: PackedUserOperation,
+    ) -> anyhow::Result<B256> {
+        self.entry_point
+            .getUserOpHash(packed_user_operation.into())
+            .call()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to get user operation hash: {}", e))
     }
 }
