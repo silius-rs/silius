@@ -6,7 +6,7 @@ use silius::{
     cli::{Cli, Commands, NodeConfig},
     utils::print_ascii_logo,
 };
-use silius_builder::{Builder, basic::BasicBuilder, noop::NoopBuilder};
+use silius_builder::{Builder, noop::NoopSubmitter, transaction::TransactionSubmitter};
 use silius_chain::Chain;
 use silius_executor::SiliusExecutor;
 use silius_manager::SiliusManager;
@@ -84,29 +84,6 @@ pub async fn run_silius_node(config: NodeConfig, executor: SiliusExecutor) {
 
     info!("Silius database initialized!");
 
-    let builder: Arc<dyn Builder> = if config.builder_config.disable_builder {
-        info!("Builder is disabled");
-
-        Arc::new(NoopBuilder {})
-    } else {
-        let wallet = {
-            if let Some(wallet_path) = config.builder_config.wallet_path {
-                Wallet::from_key_source(&KeySource::File(wallet_path))
-            } else if let Some(wallet) = config.builder_config.wallet {
-                Wallet::from_key_source(&KeySource::Argument(wallet))
-            } else {
-                Wallet::new()
-            }
-        }
-        .expect("Unable to create wallet");
-
-        info!("Bundler's wallet address: {:?}", wallet.signer().address());
-
-        Arc::new(BasicBuilder {})
-    };
-
-    let mempool = Arc::new(Mempool::new(silius_db.clone(), Validator::new()));
-
     let chain = if config.provider_url.starts_with("http") {
         let provider = ProviderBuilder::new().connect_http(
             config
@@ -132,6 +109,35 @@ pub async fn run_silius_node(config: NodeConfig, executor: SiliusExecutor) {
     } else {
         panic!("Transport not supported");
     };
+
+    let wallet = {
+        if let Some(wallet_path) = config.builder_config.wallet_path {
+            Wallet::from_key_source(&KeySource::File(wallet_path))
+        } else if let Some(wallet) = config.builder_config.wallet {
+            Wallet::from_key_source(&KeySource::Argument(wallet))
+        } else {
+            Wallet::new()
+        }
+    }
+    .expect("Unable to create wallet");
+
+    let builder = if config.builder_config.disable_builder {
+        info!("Builder is disabled");
+
+        Builder::new(chain.clone(), wallet, Arc::new(NoopSubmitter {}))
+    } else {
+        info!("Bundler's wallet address: {:?}", wallet.signer().address());
+
+        Builder::new(
+            chain.clone(),
+            wallet,
+            Arc::new(TransactionSubmitter {
+                chain: chain.clone(),
+            }),
+        )
+    };
+
+    let mempool = Arc::new(Mempool::new(silius_db.clone(), Validator::new()));
 
     let (network_sender, network_receiver) = mpsc::unbounded_channel();
 

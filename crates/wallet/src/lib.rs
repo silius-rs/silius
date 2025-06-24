@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use alloy_consensus::{Signed, TypedTransaction};
+use alloy_network::TxSigner;
 use alloy_signer_local::PrivateKeySigner;
 use home::home_dir;
 
@@ -13,6 +15,7 @@ pub enum KeySource {
     File(PathBuf),
 }
 
+#[derive(Clone)]
 pub struct Wallet {
     inner: PrivateKeySigner,
 }
@@ -35,5 +38,14 @@ impl Wallet {
 
     pub fn signer(&self) -> &PrivateKeySigner {
         &self.inner
+    }
+
+    pub async fn sign_transaction(
+        &self,
+        transaction: TypedTransaction,
+    ) -> anyhow::Result<Signed<TypedTransaction>> {
+        let mut transaction = transaction;
+        let signature = self.inner.sign_transaction(&mut transaction).await?;
+        Ok(Signed::new_unhashed(transaction, signature))
     }
 }

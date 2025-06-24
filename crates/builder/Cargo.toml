@@ -10,3 +10,13 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-consensus.workspace = true
+alloy-primitives.workspace = true
+alloy-provider.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+
+# silius dependencies
+silius-chain.workspace = true
+silius-primitives.workspace = true
+silius-wallet.workspace = true

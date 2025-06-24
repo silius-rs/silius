@@ -10,6 +10,8 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-consensus.workspace = true
+alloy-network.workspace = true
 alloy-signer-local.workspace = true
 anyhow.workspace = true
 home.workspace = true

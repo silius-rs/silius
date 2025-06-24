@@ -2,12 +2,16 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+const DEFAULT_BUILDER_TYPE: &str = "transaction";
 const DEFAULT_DISABLE_BUILDER: bool = false;
 
 #[derive(Debug, Parser)]
 pub struct BuilderConfig {
     #[arg(long, help = "Disable the builder", default_value_t = DEFAULT_DISABLE_BUILDER)]
     pub disable_builder: bool,
+
+    #[arg(long, help = "Type of builder to use", default_value = DEFAULT_BUILDER_TYPE, value_parser = ["transaction"])]
+    pub builder_type: String,
 
     #[arg(
         long,

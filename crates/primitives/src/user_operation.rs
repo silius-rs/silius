@@ -220,6 +220,10 @@ impl UserOperation {
             hash,
         }
     }
+
+    pub fn to_packed_user_operation(&self) -> PackedUserOperation {
+        self.inner.to_packed_user_operation()
+    }
 }
 
 impl Deref for UserOperation {

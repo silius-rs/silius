@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct SiliusManager<P: Provider + 'static> {
-    pub builder: Arc<dyn Builder>,
+    pub builder: Builder<P>,
     pub mempool: Arc<Mempool>,
     pub chain: Arc<Chain<P>>,
     network_sender: mpsc::UnboundedSender<()>,
@@ -16,7 +16,7 @@ pub struct SiliusManager<P: Provider + 'static> {
 
 impl<P: Provider + 'static> SiliusManager<P> {
     pub async fn new(
-        builder: Arc<dyn Builder>,
+        builder: Builder<P>,
         mempool: Arc<Mempool>,
         chain: Arc<Chain<P>>,
         network_sender: mpsc::UnboundedSender<()>,

@@ -4,7 +4,10 @@ use alloy_provider::Provider;
 use serde_json::Value;
 use silius_manager::SiliusManager;
 
-use crate::{handlers::{bundler::send_bundle_now, mempool::clear_state}, types::error::ErrorData};
+use crate::{
+    handlers::{bundler::send_bundle_now, mempool::clear_state},
+    types::error::ErrorData,
+};
 
 pub async fn debug_router<P: Provider + Clone + 'static>(
     method: &str,

@@ -1,4 +1,5 @@
-use alloy_primitives::B256;
+use alloy_consensus::TypedTransaction;
+use alloy_primitives::{Address, B256};
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
 use silius_primitives::{network_spec::network_spec, user_operation::PackedUserOperation};
@@ -28,6 +29,7 @@ impl From<PackedUserOperation> for IEntryPoint::PackedUserOperation {
     }
 }
 
+#[derive(Clone)]
 pub struct Chain<P: Provider + 'static> {
     entry_point: IEntryPointInstance<P>,
 }
@@ -72,6 +74,24 @@ impl<P: Provider + 'static> Chain<P> {
 
     pub fn entry_point(&self) -> &IEntryPointInstance<P> {
         &self.entry_point
+    }
+
+    pub async fn create_handle_ops_transaction(
+        &self,
+        packed_user_operations: Vec<PackedUserOperation>,
+        beneficiary: Address,
+    ) -> anyhow::Result<TypedTransaction> {
+        self.entry_point
+            .handleOps(
+                packed_user_operations
+                    .into_iter()
+                    .map(|p| p.into())
+                    .collect(),
+                beneficiary,
+            )
+            .into_transaction_request()
+            .build_consensus_tx()
+            .map_err(|e| anyhow::anyhow!("Failed to create handle ops transaction: {:?}", e))
     }
 
     pub async fn get_user_operation_hash(

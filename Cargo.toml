@@ -51,13 +51,16 @@ version = "0.6.0"
 [workspace.dependencies]
 actix-web = "4.10.2"
 actix-ws = "0.3.0"
+alloy-consensus = { version = "1.0.12" }
 alloy-contract = { version = "1.0.9" }
 alloy-eips = { version = "1.0.12", features = ["serde"] }
+alloy-network = { version = "1.0.12" }
 alloy-primitives = { version = "1.1.0", features = ["serde"] }
 alloy-provider = { version = "1.0.9", features = ["pubsub", "ws"] }
 alloy-signer-local = { version = "1.0.9", features = ["mnemonic"] }
 alloy-sol-types = { version = "1.1.0", features = ["json"] }
 anyhow = "1.0"
+async-trait = "0.1.86"
 bincode = { version = "2.0.1", features = ["serde"] }
 clap = "4"
 directories = { version = "6.0.0" }
