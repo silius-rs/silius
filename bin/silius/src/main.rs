@@ -181,7 +181,11 @@ pub async fn run_silius_node(config: NodeConfig, executor: SiliusExecutor) {
         })
     };
 
-    let manager_future = executor.spawn(async move { manager.start(network_receiver).await });
+    let manager_future = executor.spawn(async move {
+        manager
+            .start(config.builder_config.builder_interval, network_receiver)
+            .await
+    });
 
     tokio::select! {
         _ = http_future => {

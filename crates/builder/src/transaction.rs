@@ -14,13 +14,11 @@ pub struct TransactionSubmitter<P: Provider + 'static> {
 #[async_trait::async_trait]
 impl<P: Provider + 'static> BundleSubmitter for TransactionSubmitter<P> {
     async fn submit_bundle(&self, bundle: Signed<TypedTransaction>) -> anyhow::Result<TxHash> {
-        let tx_hash = self
+        let pending_tx = self
             .chain
             .provider()
             .send_raw_transaction(&bundle.encoded_2718())
-            .await?
-            .watch()
             .await?;
-        Ok(tx_hash)
+        Ok(pending_tx.tx_hash().clone())
     }
 }

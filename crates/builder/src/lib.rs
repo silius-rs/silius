@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use alloy_consensus::{Signed, Transaction, TxEip1559, TypedTransaction};
+use alloy_consensus::{Signed, TxEip1559, TypedTransaction};
 use alloy_primitives::{TxHash, U256};
 use alloy_provider::Provider;
 use silius_chain::Chain;
@@ -19,6 +19,7 @@ pub trait BundleSubmitter: Send + Sync {
 pub struct Builder<P: Provider + 'static> {
     pub chain: Arc<Chain<P>>,
     pub wallet: Wallet,
+    pub is_active: bool,
     pub submitter: Arc<dyn BundleSubmitter>,
 }
 
@@ -27,8 +28,17 @@ impl<P: Provider + 'static> Builder<P> {
         Self {
             chain,
             wallet,
+            is_active: false,
             submitter,
         }
+    }
+
+    pub fn start(&mut self) {
+        self.is_active = true;
+    }
+
+    pub fn stop(&mut self) {
+        self.is_active = false;
     }
 
     pub async fn create_bundle(
@@ -46,7 +56,7 @@ impl<P: Provider + 'static> Builder<P> {
                     .collect(),
                 address,
             )
-            .await?;
+            .await;
 
         let chain_id = network_spec().chain_id();
         let nonce = self.chain.provider().get_transaction_count(address).await?;
@@ -63,11 +73,11 @@ impl<P: Provider + 'static> Builder<P> {
             .iter()
             .map(|u| u.max_priority_fee_per_gas)
             .sum::<U256>();
-        let input = transaction.input().clone();
+        let input = transaction.clone().input.input.unwrap_or_default();
         let access_list = self
             .chain
             .provider()
-            .create_access_list(&transaction.into())
+            .create_access_list(&transaction)
             .await?;
 
         let transaction = TypedTransaction::Eip1559(TxEip1559 {

@@ -27,6 +27,10 @@ impl Mempool {
         Ok(())
     }
 
+    pub fn get_user_operations(&self) -> Result<Vec<UserOperation>, MempoolError> {
+        self.user_operation_pool.get_user_operations()
+    }
+
     pub fn clear(&self) -> Result<(), MempoolError> {
         self.user_operation_pool.clear()?;
         self.reputation.clear()?;

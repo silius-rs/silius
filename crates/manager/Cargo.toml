@@ -10,9 +10,11 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-primitives.workspace = true
 alloy-provider.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 
 # silius dependencies
 silius-builder.workspace = true

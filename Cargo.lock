@@ -604,9 +604,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-eth"
-version = "1.0.9"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcaf7dff0fdd756a714d58014f4f8354a1706ebf9fa2cf73431e0aeec3c9431e"
+checksum = "1826285e4ffc2372a8c061d5cc145858e67a0be3309b768c5b77ddb6b9e6cbc7"
 dependencies = [
  "alloy-consensus",
  "alloy-consensus-any",
@@ -3938,10 +3938,10 @@ dependencies = [
 name = "silius-chain"
 version = "0.6.0"
 dependencies = [
- "alloy-consensus",
  "alloy-contract",
  "alloy-primitives",
  "alloy-provider",
+ "alloy-rpc-types-eth",
  "alloy-sol-types",
  "anyhow",
  "silius-primitives",
@@ -3961,12 +3961,14 @@ dependencies = [
 name = "silius-manager"
 version = "0.6.0"
 dependencies = [
+ "alloy-primitives",
  "alloy-provider",
  "anyhow",
  "silius-builder",
  "silius-chain",
  "silius-mempool",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

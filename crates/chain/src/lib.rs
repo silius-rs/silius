@@ -1,6 +1,6 @@
-use alloy_consensus::TypedTransaction;
 use alloy_primitives::{Address, B256};
 use alloy_provider::Provider;
+use alloy_rpc_types_eth::TransactionRequest;
 use alloy_sol_types::sol;
 use silius_primitives::{network_spec::network_spec, user_operation::PackedUserOperation};
 use tracing::info;
@@ -80,7 +80,7 @@ impl<P: Provider + 'static> Chain<P> {
         &self,
         packed_user_operations: Vec<PackedUserOperation>,
         beneficiary: Address,
-    ) -> anyhow::Result<TypedTransaction> {
+    ) -> TransactionRequest {
         self.entry_point
             .handleOps(
                 packed_user_operations
@@ -90,8 +90,6 @@ impl<P: Provider + 'static> Chain<P> {
                 beneficiary,
             )
             .into_transaction_request()
-            .build_consensus_tx()
-            .map_err(|e| anyhow::anyhow!("Failed to create handle ops transaction: {:?}", e))
     }
 
     pub async fn get_user_operation_hash(

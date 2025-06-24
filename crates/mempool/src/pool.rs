@@ -17,8 +17,12 @@ impl UserOperationPool {
     pub fn insert_user_operation(&self, user_operation: UserOperation) -> Result<(), MempoolError> {
         self.db
             .user_operation_provider()
-            .insert(user_operation.hash, user_operation)?;
+            .insert(user_operation.hash, user_operation.inner)?;
         Ok(())
+    }
+
+    pub fn get_user_operations(&self) -> Result<Vec<UserOperation>, MempoolError> {
+        Ok(self.db.user_operation_provider().get_all()?)
     }
 
     pub fn clear(&self) -> Result<(), MempoolError> {

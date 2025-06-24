@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+const DEFAULT_BUILDER_INTERVAL: u64 = 5000;
 const DEFAULT_BUILDER_TYPE: &str = "transaction";
 const DEFAULT_DISABLE_BUILDER: bool = false;
 
@@ -12,6 +13,13 @@ pub struct BuilderConfig {
 
     #[arg(long, help = "Type of builder to use", default_value = DEFAULT_BUILDER_TYPE, value_parser = ["transaction"])]
     pub builder_type: String,
+
+    #[arg(
+        long,
+        help = "Interval between bundle submissions in milliseconds",
+        default_value_t = DEFAULT_BUILDER_INTERVAL
+    )]
+    pub builder_interval: u64,
 
     #[arg(
         long,

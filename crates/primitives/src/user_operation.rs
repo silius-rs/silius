@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::utils::{pack_address_and_data, pack_two_gas_values};
 
 sol! {
+    #[derive(Debug)]
     struct PackedUserOperation {
         address sender;
         uint256 nonce;
@@ -26,9 +27,7 @@ sol! {
 pub struct UserOperationBase {
     pub sender: Address,
     pub nonce: U256,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub factory: Option<Address>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub factory_data: Option<Bytes>,
     pub call_data: Bytes,
     pub call_gas_limit: U256,
@@ -36,17 +35,12 @@ pub struct UserOperationBase {
     pub pre_verification_gas: U256,
     pub max_fee_per_gas: U256,
     pub max_priority_fee_per_gas: U256,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster: Option<Address>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_verification_gas_limit: Option<U256>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_post_op_gas_limit: Option<U256>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub paymaster_data: Option<Bytes>,
     pub signature: Bytes,
     // EIP-7702 signed authorization tuple
-    #[serde(rename = "eip7702Auth", skip_serializing_if = "Option::is_none")]
     pub signed_authorization: Option<SignedAuthorization>,
 }
 

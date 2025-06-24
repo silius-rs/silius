@@ -27,7 +27,12 @@ pub async fn send_user_operation<P: Provider + Clone + 'static>(
         .map_err(|e| ErrorData::new(-32600, &e.to_string()))?;
     let user_operation = UserOperation::new(user_operation_base, user_operation_hash);
 
-    Ok(user_operation.hash.to_string().into())
+    manager
+        .mempool
+        .insert_user_operation(user_operation)
+        .map_err(|e| ErrorData::new(-32603, &e.to_string()))?;
+
+    Ok(user_operation_hash.to_string().into())
 }
 
 pub async fn clear_state<P: Provider + Clone + 'static>(

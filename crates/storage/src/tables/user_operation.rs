@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use alloy_primitives::B256;
-use redb::{Database, Durability, TableDefinition};
-use silius_primitives::user_operation::UserOperation;
+use redb::{Database, Durability, ReadableTable, TableDefinition};
+use silius_primitives::user_operation::{UserOperation, UserOperationBase};
 
 use super::{
     Bincode, MultimapTable, Table, entity::EntityUserOperationMultimapTable,
@@ -10,7 +10,7 @@ use super::{
 };
 use crate::error::DatabaseError;
 
-pub const USER_OPERATION_TABLE: TableDefinition<Bincode<B256>, Bincode<UserOperation>> =
+pub const USER_OPERATION_TABLE: TableDefinition<Bincode<B256>, Bincode<UserOperationBase>> =
     TableDefinition::new("user_operation");
 
 pub struct UserOperationTable {
@@ -20,7 +20,7 @@ pub struct UserOperationTable {
 impl Table for UserOperationTable {
     type Key = B256;
 
-    type Value = UserOperation;
+    type Value = UserOperationBase;
 
     fn get(&self, key: Self::Key) -> Result<Option<Self::Value>, DatabaseError> {
         let read_txn = self.db.begin_read()?;
@@ -50,7 +50,7 @@ impl Table for UserOperationTable {
         }
 
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Eventual);
+        write_txn.set_durability(Durability::Immediate);
         let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
         table.insert(key, value)?;
         drop(table);
@@ -82,7 +82,7 @@ impl Table for UserOperationTable {
         }
 
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Eventual);
+        write_txn.set_durability(Durability::Immediate);
         let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
         table.remove(key)?;
         drop(table);
@@ -99,7 +99,7 @@ impl Table for UserOperationTable {
         };
 
         let mut write_txn = self.db.begin_write()?;
-        write_txn.set_durability(Durability::Eventual);
+        write_txn.set_durability(Durability::Immediate);
         let mut table = write_txn.open_table(USER_OPERATION_TABLE)?;
         table.extract_if(|_, value| {
             let _ = sender_user_operation_table.remove_all(value.sender);
@@ -115,5 +115,18 @@ impl Table for UserOperationTable {
         drop(table);
         write_txn.commit()?;
         Ok(())
+    }
+}
+
+impl UserOperationTable {
+    pub fn get_all(&self) -> Result<Vec<UserOperation>, DatabaseError> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(USER_OPERATION_TABLE)?;
+        let mut iter = table.iter()?;
+        let mut user_operations = Vec::new();
+        while let Some(Ok(item)) = iter.next() {
+            user_operations.push(UserOperation::new(item.1.value(), item.0.value()));
+        }
+        Ok(user_operations)
     }
 }
