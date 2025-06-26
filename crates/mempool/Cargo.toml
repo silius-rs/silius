@@ -15,4 +15,4 @@ thiserror.workspace = true
 # silius dependencies
 silius-primitives.workspace = true
 silius-storage.workspace = true
-silius-validation.workspace = true
+silius-validator.workspace = true

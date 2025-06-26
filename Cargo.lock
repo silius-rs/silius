@@ -3913,7 +3913,7 @@ dependencies = [
  "silius-primitives",
  "silius-rpc",
  "silius-storage",
- "silius-validation",
+ "silius-validator",
  "silius-wallet",
  "tokio",
  "tracing",
@@ -3977,7 +3977,7 @@ version = "0.6.0"
 dependencies = [
  "silius-primitives",
  "silius-storage",
- "silius-validation",
+ "silius-validator",
  "thiserror 2.0.12",
 ]
 
@@ -4049,8 +4049,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "silius-validation"
+name = "silius-validator"
 version = "0.6.0"
+dependencies = [
+ "silius-primitives",
+]
 
 [[package]]
 name = "silius-wallet"

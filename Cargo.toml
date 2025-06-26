@@ -14,7 +14,7 @@ members = [
     "crates/primitives",
     "crates/rpc",
     "crates/storage",
-    "crates/validation",
+    "crates/validator",
     "crates/wallet",
     # "bin/silius",
     # "crates/bundler",
@@ -100,7 +100,7 @@ silius-node-version = { path = "crates/node/version" }
 silius-primitives = { path = "crates/primitives" }
 silius-rpc = { path = "crates/rpc" }
 silius-storage = { path = "crates/storage" }
-silius-validation = { path = "crates/validation" }
+silius-validator = { path = "crates/validator" }
 silius-wallet = { path = "crates/wallet" }
 
 # # workspace crates

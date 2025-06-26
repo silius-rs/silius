@@ -1,6 +1,6 @@
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::db::SiliusDB;
-use silius_validation::validator::Validator;
+use silius_validator::validator::Validator;
 
 use crate::{error::MempoolError, pool::UserOperationPool, reputation::Reputation};
 

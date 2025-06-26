@@ -1,8 +1,8 @@
-## Bundler spec tests
+# Bundler spec tests
 
 Requirements:
 
-Check instructions: https://github.com/eth-infinitism/bundler-spec-tests
+Check instructions: [https://github.com/eth-infinitism/bundler-spec-tests](https://github.com/eth-infinitism/bundler-spec-tests)
 
 Setup geth node and fund addresses:
 

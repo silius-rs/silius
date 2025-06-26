@@ -1,5 +1,5 @@
 [package]
-name = "silius-validation"
+name = "silius-validator"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -10,4 +10,5 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-
+# silius dependencies
+silius-primitives.workspace = true
