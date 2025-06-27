@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types_eth::TransactionRequest;
 use alloy_sol_types::sol;
@@ -74,6 +74,10 @@ impl<P: Provider + 'static> Chain<P> {
 
     pub fn entry_point(&self) -> &IEntryPointInstance<P> {
         &self.entry_point
+    }
+
+    pub async fn get_base_fee_per_gas(&self) -> anyhow::Result<U256> {
+        Ok(U256::from(self.provider().get_gas_price().await?))
     }
 
     pub async fn create_handle_ops_transaction(

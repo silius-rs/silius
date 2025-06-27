@@ -13,7 +13,7 @@ use tracing::{info, trace};
 
 pub struct SiliusManager<P: Provider + 'static> {
     pub builder: Mutex<Builder<P>>,
-    pub mempool: Arc<Mempool>,
+    pub mempool: Arc<Mempool<P>>,
     pub chain: Arc<Chain<P>>,
     network_sender: mpsc::UnboundedSender<()>,
 }
@@ -21,7 +21,7 @@ pub struct SiliusManager<P: Provider + 'static> {
 impl<P: Provider + 'static> SiliusManager<P> {
     pub async fn new(
         builder: Builder<P>,
-        mempool: Arc<Mempool>,
+        mempool: Arc<Mempool<P>>,
         chain: Arc<Chain<P>>,
         network_sender: mpsc::UnboundedSender<()>,
     ) -> anyhow::Result<Self> {

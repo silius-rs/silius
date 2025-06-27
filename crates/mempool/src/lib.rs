@@ -1,3 +1,4 @@
+use alloy_provider::Provider;
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::db::SiliusDB;
 use silius_validator::validator::Validator;
@@ -8,13 +9,13 @@ mod error;
 mod pool;
 mod reputation;
 
-pub struct Mempool {
-    pub user_operation_pool: UserOperationPool,
+pub struct Mempool<P: Provider> {
+    pub user_operation_pool: UserOperationPool<P>,
     pub reputation: Reputation,
 }
 
-impl Mempool {
-    pub fn new(db: SiliusDB, validator: Validator) -> Self {
+impl<P: Provider> Mempool<P> {
+    pub fn new(db: SiliusDB, validator: Validator<P>) -> Self {
         Self {
             user_operation_pool: UserOperationPool::new(db.clone(), validator),
             reputation: Reputation::new(db),

@@ -1,3 +1,4 @@
+pub mod config;
 pub mod error;
 pub mod sanity_checks;
 pub mod simulation_checks;

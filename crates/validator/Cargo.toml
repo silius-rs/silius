@@ -10,5 +10,13 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-provider.workspace = true
+alloy-primitives.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+
 # silius dependencies
+silius-chain.workspace = true
 silius-primitives.workspace = true
+silius-storage.workspace = true

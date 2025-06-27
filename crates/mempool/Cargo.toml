@@ -10,6 +10,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+alloy-provider.workspace = true
 thiserror.workspace = true
 
 # silius dependencies

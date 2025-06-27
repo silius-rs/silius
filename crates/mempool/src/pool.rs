@@ -1,16 +1,17 @@
+use alloy_provider::Provider;
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::{db::SiliusDB, tables::Table};
 use silius_validator::validator::Validator;
 
 use crate::error::MempoolError;
 
-pub struct UserOperationPool {
+pub struct UserOperationPool<P: Provider> {
     pub db: SiliusDB,
-    pub validator: Validator,
+    pub validator: Validator<P>,
 }
 
-impl UserOperationPool {
-    pub fn new(db: SiliusDB, validator: Validator) -> Self {
+impl<P: Provider> UserOperationPool<P> {
+    pub fn new(db: SiliusDB, validator: Validator<P>) -> Self {
         Self { db, validator }
     }
 

@@ -20,7 +20,7 @@ use silius_storage::{
     db::{SiliusDB, reset_db},
     dir::setup_data_dir,
 };
-use silius_validator::validator::Validator;
+use silius_validator::{config::ValidatorConfig, validator::Validator};
 use silius_wallet::{KeySource, Wallet};
 use tokio::sync::mpsc;
 use tracing::info;
@@ -137,7 +137,10 @@ pub async fn run_silius_node(config: NodeConfig, executor: SiliusExecutor) {
         )
     };
 
-    let mempool = Arc::new(Mempool::new(silius_db.clone(), Validator::new()));
+    let mempool = Arc::new(Mempool::new(
+        silius_db.clone(),
+        Validator::standard(ValidatorConfig::default()),
+    ));
 
     let (network_sender, network_receiver) = mpsc::unbounded_channel();
 
