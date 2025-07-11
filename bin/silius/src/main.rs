@@ -139,6 +139,7 @@ pub async fn run_silius_node(config: NodeConfig, executor: SiliusExecutor) {
 
     let mempool = Arc::new(Mempool::new(
         silius_db.clone(),
+        chain.clone(),
         Validator::standard(ValidatorConfig::default()),
     ));
 

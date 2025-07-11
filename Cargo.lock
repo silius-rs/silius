@@ -3976,6 +3976,7 @@ name = "silius-mempool"
 version = "0.6.0"
 dependencies = [
  "alloy-provider",
+ "silius-chain",
  "silius-primitives",
  "silius-storage",
  "silius-validator",

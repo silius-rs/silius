@@ -6,6 +6,7 @@ use silius_storage::db::SiliusDB;
 use crate::config::ValidatorConfig;
 use crate::error::ValidationError;
 use crate::sanity_checks::SanityCheck;
+use crate::sanity_checks::max_fee::MaxFeeCheck;
 use crate::simulation_checks::SimulationCheck;
 use crate::tracing_check::TracingCheck;
 
@@ -29,7 +30,7 @@ impl<P: Provider> Validator<P> {
     pub fn standard(config: ValidatorConfig) -> Self {
         Self {
             config,
-            sanity_checks: vec![],
+            sanity_checks: vec![Box::new(MaxFeeCheck)],
             simulation_checks: vec![],
             tracing_checks: vec![],
         }

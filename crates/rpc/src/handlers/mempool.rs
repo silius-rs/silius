@@ -30,6 +30,7 @@ pub async fn send_user_operation<P: Provider + Clone + 'static>(
     manager
         .mempool
         .insert_user_operation(user_operation)
+        .await
         .map_err(|e| ErrorData::new(-32603, &e.to_string()))?;
 
     Ok(user_operation_hash.to_string().into())

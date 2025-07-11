@@ -14,6 +14,7 @@ alloy-provider.workspace = true
 thiserror.workspace = true
 
 # silius dependencies
+silius-chain.workspace = true
 silius-primitives.workspace = true
 silius-storage.workspace = true
 silius-validator.workspace = true

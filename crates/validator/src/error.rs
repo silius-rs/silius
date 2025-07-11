@@ -1,11 +1,17 @@
+use thiserror::Error;
+
 use crate::{
     sanity_checks::error::SanityCheckError, simulation_checks::error::SimulationCheckError,
     tracing_check::error::TracingCheckError,
 };
 
+#[derive(Error, Debug)]
 pub enum ValidationError {
+    #[error("{0}")]
     SanityError(SanityCheckError),
+    #[error("{0}")]
     SimulationError(SimulationCheckError),
+    #[error("{0}")]
     TracingError(TracingCheckError),
 }
 
