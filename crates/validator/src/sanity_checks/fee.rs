@@ -8,10 +8,10 @@ use crate::{
     sanity_checks::{SanityCheck, error::SanityCheckError},
 };
 
-pub struct MaxFeeCheck;
+pub struct FeeCheck;
 
 #[async_trait::async_trait]
-impl<P: Provider> SanityCheck<P> for MaxFeeCheck {
+impl<P: Provider> SanityCheck<P> for FeeCheck {
     async fn check_user_operation(
         &self,
         user_operation: &UserOperation,

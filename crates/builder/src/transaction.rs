@@ -19,6 +19,6 @@ impl<P: Provider + 'static> BundleSubmitter for TransactionSubmitter<P> {
             .provider()
             .send_raw_transaction(&bundle.encoded_2718())
             .await?;
-        Ok(pending_tx.tx_hash().clone())
+        Ok(*pending_tx.tx_hash())
     }
 }

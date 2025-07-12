@@ -15,7 +15,7 @@ alloy-primitives.workspace = true
 alloy-provider.workspace = true
 alloy-rpc-types-eth.workspace = true
 alloy-sol-types.workspace = true
-anyhow.workspace = true
+thiserror.workspace = true
 tracing.workspace = true
 
 # silius dependencies

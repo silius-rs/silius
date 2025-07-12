@@ -3943,8 +3943,8 @@ dependencies = [
  "alloy-provider",
  "alloy-rpc-types-eth",
  "alloy-sol-types",
- "anyhow",
  "silius-primitives",
+ "thiserror 2.0.12",
  "tracing",
 ]
 
@@ -3975,6 +3975,7 @@ dependencies = [
 name = "silius-mempool"
 version = "0.6.0"
 dependencies = [
+ "alloy-primitives",
  "alloy-provider",
  "silius-chain",
  "silius-primitives",

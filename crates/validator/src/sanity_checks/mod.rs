@@ -6,7 +6,11 @@ use silius_storage::db::SiliusDB;
 use crate::{config::ValidatorConfig, sanity_checks::error::SanityCheckError};
 
 pub mod error;
-pub mod max_fee;
+pub mod fee;
+pub mod local;
+pub mod reputation;
+pub mod staked_entities;
+pub mod unstaked_entities;
 
 #[async_trait::async_trait]
 pub trait SanityCheck<P: Provider> {

@@ -1,3 +1,4 @@
+use silius_chain::error::ChainError;
 use silius_storage::error::DatabaseError;
 use silius_validator::error::ValidationError;
 use thiserror::Error;
@@ -5,8 +6,11 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum MempoolError {
     #[error("Validation error: {0}")]
-    ValidationError(#[from] ValidationError),
+    Validation(#[from] ValidationError),
+
+    #[error("Chain error: {0}")]
+    Chain(#[from] ChainError),
 
     #[error("Database error: {0}")]
-    DatabaseError(#[from] DatabaseError),
+    Database(#[from] DatabaseError),
 }

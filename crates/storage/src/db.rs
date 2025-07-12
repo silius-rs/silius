@@ -7,6 +7,7 @@ use crate::{
     error::DatabaseError,
     tables::{
         entity::{ENTITY_USER_OPERATION_MULTIMAP_TABLE, EntityUserOperationMultimapTable},
+        reputation::ReputationTable,
         sender::{SENDER_USER_OPERATION_MULTIMAP_TABLE, SenderUserOperationMultimapTable},
         user_operation::{USER_OPERATION_TABLE, UserOperationTable},
     },
@@ -51,6 +52,12 @@ impl SiliusDB {
 
     pub fn sender_user_operation_multimap_provider(&self) -> SenderUserOperationMultimapTable {
         SenderUserOperationMultimapTable {
+            db: self.db.clone(),
+        }
+    }
+
+    pub fn reputation_provider(&self) -> ReputationTable {
+        ReputationTable {
             db: self.db.clone(),
         }
     }

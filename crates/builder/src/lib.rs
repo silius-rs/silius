@@ -51,7 +51,7 @@ impl<P: Provider + 'static> Builder<P> {
             .chain
             .create_handle_ops_transaction(
                 user_operations
-                    .into_iter()
+                    .iter()
                     .map(|u| u.to_packed_user_operation())
                     .collect(),
                 address,
@@ -63,7 +63,7 @@ impl<P: Provider + 'static> Builder<P> {
         let gas_limit = self
             .chain
             .provider()
-            .estimate_gas(transaction.clone().into())
+            .estimate_gas(transaction.clone())
             .await?;
         let max_fee_per_gas = user_operations
             .iter()
@@ -93,7 +93,7 @@ impl<P: Provider + 'static> Builder<P> {
             input,
         });
 
-        Ok(self.wallet.sign_transaction(transaction).await?)
+        self.wallet.sign_transaction(transaction).await
     }
 
     pub async fn submit_bundle(&self, bundle: Signed<TypedTransaction>) -> anyhow::Result<TxHash> {

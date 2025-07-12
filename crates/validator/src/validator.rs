@@ -3,12 +3,13 @@ use silius_chain::Chain;
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::db::SiliusDB;
 
-use crate::config::ValidatorConfig;
-use crate::error::ValidationError;
-use crate::sanity_checks::SanityCheck;
-use crate::sanity_checks::max_fee::MaxFeeCheck;
-use crate::simulation_checks::SimulationCheck;
-use crate::tracing_check::TracingCheck;
+use crate::{
+    config::ValidatorConfig,
+    error::ValidationError,
+    sanity_checks::{SanityCheck, fee::FeeCheck},
+    simulation_checks::SimulationCheck,
+    tracing_check::TracingCheck,
+};
 
 pub struct Validator<P: Provider> {
     pub config: ValidatorConfig,
@@ -30,7 +31,7 @@ impl<P: Provider> Validator<P> {
     pub fn standard(config: ValidatorConfig) -> Self {
         Self {
             config,
-            sanity_checks: vec![Box::new(MaxFeeCheck)],
+            sanity_checks: vec![Box::new(FeeCheck)],
             simulation_checks: vec![],
             tracing_checks: vec![],
         }

@@ -3,20 +3,22 @@ use silius_chain::Chain;
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::db::SiliusDB;
 
-use crate::{config::ValidatorConfig, tracing_check::error::TracingCheckError};
+use crate::{
+    config::ValidatorConfig,
+    sanity_checks::{SanityCheck, error::SanityCheckError},
+};
 
-pub mod code;
-pub mod error;
-pub mod opcode;
-pub mod storage;
+pub struct UnstakedEntitiesCheck;
 
 #[async_trait::async_trait]
-pub trait TracingCheck<P: Provider> {
+impl<P: Provider> SanityCheck<P> for UnstakedEntitiesCheck {
     async fn check_user_operation(
         &self,
         user_operation: &UserOperation,
         config: &ValidatorConfig,
-        db: &SiliusDB,
+        _db: &SiliusDB,
         chain: &Chain<P>,
-    ) -> Result<(), TracingCheckError>;
+    ) -> Result<(), SanityCheckError> {
+        Ok(())
+    }
 }
