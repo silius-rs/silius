@@ -1,3 +1,4 @@
+use silius_chain::error::ChainError;
 use thiserror::Error;
 
 use crate::{
@@ -13,6 +14,8 @@ pub enum ValidationError {
     SimulationError(SimulationCheckError),
     #[error("{0}")]
     TracingError(TracingCheckError),
+    #[error("{0}")]
+    ChainError(ChainError),
 }
 
 impl From<SanityCheckError> for ValidationError {
@@ -30,5 +33,11 @@ impl From<SimulationCheckError> for ValidationError {
 impl From<TracingCheckError> for ValidationError {
     fn from(error: TracingCheckError) -> Self {
         ValidationError::TracingError(error)
+    }
+}
+
+impl From<ChainError> for ValidationError {
+    fn from(error: ChainError) -> Self {
+        ValidationError::ChainError(error)
     }
 }

@@ -8,7 +8,7 @@ use crate::{
     error::ValidationError,
     sanity_checks::{SanityCheck, fee::FeeCheck},
     simulation_checks::SimulationCheck,
-    tracing_check::TracingCheck,
+    tracing_check::{TracingCheck, opcode::OpcodeCheck},
 };
 
 pub struct Validator<P: Provider> {
@@ -33,7 +33,7 @@ impl<P: Provider> Validator<P> {
             config,
             sanity_checks: vec![Box::new(FeeCheck)],
             simulation_checks: vec![],
-            tracing_checks: vec![],
+            tracing_checks: vec![Box::new(OpcodeCheck)],
         }
     }
 
@@ -64,10 +64,14 @@ impl<P: Provider> Validator<P> {
                 .await?;
         }
 
-        for tracing_check in &self.tracing_checks {
-            tracing_check
-                .check_user_operation(user_operation, &self.config, db, chain)
-                .await?;
+        if !self.tracing_checks.is_empty() {
+            let frame = chain.trace_handle_ops(user_operation).await?;
+
+            for tracing_check in &self.tracing_checks {
+                tracing_check
+                    .check_user_operation(user_operation, &self.config, db, chain)
+                    .await?;
+            }
         }
 
         Ok(())

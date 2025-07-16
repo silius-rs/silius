@@ -49,11 +49,8 @@ impl<P: Provider + 'static> Builder<P> {
 
         let transaction = self
             .chain
-            .create_handle_ops_transaction(
-                user_operations
-                    .iter()
-                    .map(|u| u.to_packed_user_operation())
-                    .collect(),
+            .create_handle_ops_transaction_request(
+                user_operations,
                 address,
             )
             .await;

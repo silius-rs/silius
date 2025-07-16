@@ -45,20 +45,26 @@ keywords = [
 license = "MIT OR Apache-2.0"
 homepage = "https://silius.rs"
 repository = "https://github.com/silius-rs/silius"
-rust-version = "1.87.0"
+rust-version = "1.88.0"
 version = "0.6.0"
 
 [workspace.dependencies]
 actix-web = "4.10.2"
 actix-ws = "0.3.0"
 alloy-consensus = { version = "1.0.12" }
-alloy-contract = { version = "1.0.9" }
+alloy-contract = { version = "1.0.12" }
 alloy-eips = { version = "1.0.12", features = ["serde"] }
 alloy-network = { version = "1.0.12" }
 alloy-primitives = { version = "1.1.0", features = ["serde"] }
-alloy-provider = { version = "1.0.9", features = ["pubsub", "ws"] }
+alloy-provider = { version = "1.0.12", features = [
+    "pubsub",
+    "ws",
+    "debug-api",
+] }
+alloy-rpc-types-debug = { version = "1.0.12" }
 alloy-rpc-types-eth = { version = "1.0.12" }
-alloy-signer-local = { version = "1.0.9", features = ["mnemonic"] }
+alloy-rpc-types-trace = { version = "1.0.12" }
+alloy-signer-local = { version = "1.0.12", features = ["mnemonic"] }
 alloy-sol-types = { version = "1.1.0", features = ["json"] }
 anyhow = "1.0"
 async-trait = "0.1.86"
@@ -102,6 +108,10 @@ silius-rpc = { path = "crates/rpc" }
 silius-storage = { path = "crates/storage" }
 silius-validator = { path = "crates/validator" }
 silius-wallet = { path = "crates/wallet" }
+
+[patch]
+[patch.crates-io]
+alloy-rpc-types-trace = { git = "https://github.com/Vid201/alloy", branch = "feat/7562_tracer_variant" }
 
 # # workspace crates
 # silius-bundler = { version = "0.5.0-alpha", path = "crates/bundler", default-features = false }

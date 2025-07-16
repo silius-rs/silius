@@ -1,8 +1,14 @@
-use alloy_primitives::{Address, B256, U256};
-use alloy_provider::Provider;
-use alloy_rpc_types_eth::TransactionRequest;
+use alloy_primitives::{Address, B256, U256, address};
+use alloy_provider::{Provider, ext::DebugApi};
+use alloy_rpc_types_eth::{BlockId, TransactionRequest};
+use alloy_rpc_types_trace::geth::{
+    GethDebugBuiltInTracerType, GethDebugTracingCallOptions, GethDebugTracingOptions,
+    erc7562::Erc7562Frame,
+};
 use silius_primitives::{
-    network_spec::network_spec, reputation::DepositInfo, user_operation::PackedUserOperation,
+    network_spec::network_spec,
+    reputation::DepositInfo,
+    user_operation::{PackedUserOperation, UserOperation},
 };
 use tracing::info;
 
@@ -70,20 +76,35 @@ impl<P: Provider + 'static> Chain<P> {
         ))
     }
 
-    pub async fn create_handle_ops_transaction(
+    pub async fn create_handle_ops_transaction_request(
         &self,
-        packed_user_operations: Vec<PackedUserOperation>,
+        user_operations: &[UserOperation],
         beneficiary: Address,
     ) -> TransactionRequest {
-        self.entry_point
+        let mut authorization_list = Vec::new();
+
+        for user_operation in user_operations.iter() {
+            if let Some(signed_authorization) = &user_operation.signed_authorization {
+                authorization_list.push(signed_authorization.clone());
+            }
+        }
+
+        let mut transaction_request = self
+            .entry_point
             .handleOps(
-                packed_user_operations
+                user_operations
                     .into_iter()
-                    .map(|p| p.into())
+                    .map(|p| p.to_packed_user_operation().into())
                     .collect(),
                 beneficiary,
             )
-            .into_transaction_request()
+            .into_transaction_request();
+
+        if !authorization_list.is_empty() {
+            transaction_request.authorization_list = Some(authorization_list);
+        }
+
+        transaction_request
     }
 
     pub async fn get_user_operation_hash(
@@ -103,6 +124,39 @@ impl<P: Provider + 'static> Chain<P> {
             .call()
             .await
             .map(|deposit_info| deposit_info.into())
+            .map_err(|e| ChainError::Provider(e.to_string()))
+    }
+
+    pub async fn trace_handle_ops(
+        &self,
+        user_operation: &UserOperation,
+    ) -> Result<Erc7562Frame, ChainError> {
+        let gas_limit = user_operation.pre_verification_gas
+            + user_operation.verification_gas_limit
+            + user_operation
+                .paymaster_verification_gas_limit
+                .unwrap_or_default();
+
+        let mut transaction_request = self
+            .create_handle_ops_transaction_request(
+                &[user_operation.clone()],
+                address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"), // random address :)
+            )
+            .await;
+
+        transaction_request.gas = Some(gas_limit.to::<u64>());
+
+        self.provider()
+            .debug_trace_call(
+                transaction_request,
+                BlockId::latest(),
+                GethDebugTracingCallOptions::new(GethDebugTracingOptions::new_tracer(
+                    GethDebugBuiltInTracerType::Erc7562Tracer,
+                )),
+            )
+            .await
+            .map_err(|e| ChainError::Provider(e.to_string()))?
+            .try_into_erc7562_frame()
             .map_err(|e| ChainError::Provider(e.to_string()))
     }
 }

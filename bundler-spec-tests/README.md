@@ -37,3 +37,5 @@ pdm test --entry-point 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 --url http://1
 pdm run pytest -rA -W ignore::DeprecationWarning -v tests/single/rpc/test_eth_supportedEntryPoints.py::test_eth_supportedEntryPoints[] --entry-point 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 --url http://127.0.0.1:3000 --ethereum-node http://127.0.0.1:8545
 ```
 tests/single/bundle/test_bundle.py::test_max_allowed_ops_unstaked_sender
+tests/single/opbanning/test_op_banning.py
+tests/single/opbanning/test_op_banning.py::test_account_banned_opcode[COINBASE-]
