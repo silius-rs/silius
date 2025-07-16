@@ -4,7 +4,10 @@ use alloy_provider::Provider;
 use serde_json::Value;
 use silius_manager::SiliusManager;
 
-use crate::{handlers::version::client_version, types::error::ErrorData};
+use crate::{
+    handlers::version::client_version,
+    types::{codes::METHOD_NOT_FOUND, error::ErrorData},
+};
 
 pub async fn web3_router<P: Provider + Clone + 'static>(
     method: &str,
@@ -13,6 +16,6 @@ pub async fn web3_router<P: Provider + Clone + 'static>(
 ) -> Result<Value, ErrorData> {
     match method {
         "web3_clientVersion" => client_version().await,
-        _ => Err(ErrorData::std(-32601)),
+        _ => Err(ErrorData::std(METHOD_NOT_FOUND)),
     }
 }

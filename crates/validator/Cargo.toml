@@ -12,8 +12,10 @@ version.workspace = true
 [dependencies]
 alloy-provider.workspace = true
 alloy-primitives.workspace = true
+alloy-rpc-types-trace.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
+revm-bytecode.workspace = true
 thiserror.workspace = true
 
 # silius dependencies

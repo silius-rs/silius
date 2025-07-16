@@ -23,5 +23,7 @@ tracing.workspace = true
 
 # silius dependencies
 silius-manager.workspace = true
+silius-mempool.workspace = true
 silius-node-version.workspace = true
 silius-primitives.workspace = true
+silius-validator.workspace = true

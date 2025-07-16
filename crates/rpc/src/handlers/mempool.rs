@@ -9,7 +9,10 @@ use silius_primitives::{
     user_operation::{UserOperation, UserOperationBase},
 };
 
-use crate::types::error::ErrorData;
+use crate::types::{
+    codes::{INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST},
+    error::ErrorData,
+};
 
 pub async fn send_user_operation<P: Provider + Clone + 'static>(
     user_operation_base: UserOperationBase,
@@ -17,21 +20,23 @@ pub async fn send_user_operation<P: Provider + Clone + 'static>(
     manager: &Arc<SiliusManager<P>>,
 ) -> Result<Value, ErrorData> {
     if entry_point_address != network_spec().entry_point_address {
-        return Err(ErrorData::new(-32602, "Entry point address not supported"));
+        return Err(ErrorData::new(
+            INVALID_PARAMS,
+            "Entry point address not supported",
+        ));
     }
 
     let user_operation_hash = manager
         .chain
         .get_user_operation_hash(user_operation_base.to_packed_user_operation())
         .await
-        .map_err(|e| ErrorData::new(-32600, &e.to_string()))?;
+        .map_err(|e| ErrorData::new(INVALID_REQUEST, &e.to_string()))?;
     let user_operation = UserOperation::new(user_operation_base, user_operation_hash);
 
     manager
         .mempool
         .insert_user_operation(user_operation)
-        .await
-        .map_err(|e| ErrorData::new(-32603, &e.to_string()))?;
+        .await?;
 
     Ok(user_operation_hash.to_string().into())
 }
@@ -42,6 +47,6 @@ pub async fn clear_state<P: Provider + Clone + 'static>(
     manager
         .mempool
         .clear()
-        .map_err(|e| ErrorData::new(-32603, &e.to_string()))?;
+        .map_err(|e| ErrorData::new(INTERNAL_ERROR, &e.to_string()))?;
     Ok(json!("ok"))
 }

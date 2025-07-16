@@ -2,6 +2,12 @@ use std::{error, fmt};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use silius_mempool::error::MempoolError;
+use silius_validator::{error::ValidationError, tracing_check::error::TracingCheckError};
+
+use crate::types::codes::{
+    BLOCKED_OPCODE, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorData {
@@ -21,11 +27,11 @@ impl ErrorData {
 
     pub fn std(code: i32) -> Self {
         match code {
-            -32700 => ErrorData::new(-32700, "Parse error"),
-            -32600 => ErrorData::new(-32600, "Invalid Request"),
-            -32601 => ErrorData::new(-32601, "Method not found"),
-            -32602 => ErrorData::new(-32602, "Invalid params"),
-            -32603 => ErrorData::new(-32603, "Internal error"),
+            PARSE_ERROR => ErrorData::new(PARSE_ERROR, "Parse error"),
+            INVALID_REQUEST => ErrorData::new(INVALID_REQUEST, "Invalid Request"),
+            METHOD_NOT_FOUND => ErrorData::new(METHOD_NOT_FOUND, "Method not found"),
+            INVALID_PARAMS => ErrorData::new(INVALID_PARAMS, "Invalid params"),
+            INTERNAL_ERROR => ErrorData::new(INTERNAL_ERROR, "Internal error"),
             _ => panic!("Undefined pre-defined error codes"),
         }
     }
@@ -40,5 +46,23 @@ impl error::Error for ErrorData {}
 impl fmt::Display for ErrorData {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {}, {})", self.code, self.message, self.data)
+    }
+}
+
+impl From<MempoolError> for ErrorData {
+    fn from(error: MempoolError) -> Self {
+        match error {
+            MempoolError::Validation(e) => match e {
+                ValidationError::TracingError(e) => match e {
+                    TracingCheckError::BannedOpcode(_) => {
+                        ErrorData::new(BLOCKED_OPCODE, &e.to_string())
+                    }
+                    _ => ErrorData::new(INTERNAL_ERROR, &e.to_string()), // TODO: expand errors
+                },
+                _ => ErrorData::new(INTERNAL_ERROR, &e.to_string()), // TODO: expand errors
+            },
+            MempoolError::Chain(e) => ErrorData::new(INTERNAL_ERROR, &e.to_string()),
+            MempoolError::Database(e) => ErrorData::new(INTERNAL_ERROR, &e.to_string()),
+        }
     }
 }

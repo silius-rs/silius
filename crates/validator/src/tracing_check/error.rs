@@ -3,6 +3,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TracingCheckError {
+    #[error("account uses banned opcode: {0}")]
+    BannedOpcode(String),
+
     #[error("{0}")]
     Check(String),
 

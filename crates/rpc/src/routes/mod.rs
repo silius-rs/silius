@@ -27,7 +27,7 @@ pub async fn rpc_router<P: Provider + Clone + 'static>(
         Err(_) => {
             let r = Response {
                 jsonrpc: String::from(JSONRPC_VERSION),
-                result: Value::Null,
+                result: None,
                 error: Some(ErrorData::std(-32700)),
                 id: Value::Null,
             };
@@ -35,12 +35,7 @@ pub async fn rpc_router<P: Provider + Clone + 'static>(
         }
     };
 
-    let mut response = Response {
-        id: request.id.clone(),
-        ..Response::default()
-    };
-
-    match rpc_select(
+    let response = match rpc_select(
         request.method.as_str(),
         request.params,
         api_modules,
@@ -48,9 +43,9 @@ pub async fn rpc_router<P: Provider + Clone + 'static>(
     )
     .await
     {
-        Ok(ok) => response.result = ok,
-        Err(e) => response.error = Some(e),
-    }
+        Ok(ok) => Response::default().with_result(ok),
+        Err(e) => Response::default().with_error(e),
+    };
 
     Ok(response.dump().into())
 }

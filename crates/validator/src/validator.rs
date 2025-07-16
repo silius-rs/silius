@@ -1,4 +1,5 @@
 use alloy_provider::Provider;
+use alloy_rpc_types_trace::geth::erc7562::Erc7562Frame;
 use silius_chain::Chain;
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::db::SiliusDB;
@@ -66,12 +67,30 @@ impl<P: Provider> Validator<P> {
 
         if !self.tracing_checks.is_empty() {
             let frame = chain.trace_handle_ops(user_operation).await?;
+            self._tracing_check_recursive(user_operation, &self.config, db, chain, &frame)
+                .await?;
+        }
 
-            for tracing_check in &self.tracing_checks {
-                tracing_check
-                    .check_user_operation(user_operation, &self.config, db, chain)
-                    .await?;
-            }
+        Ok(())
+    }
+
+    async fn _tracing_check_recursive(
+        &self,
+        user_operation: &UserOperation,
+        config: &ValidatorConfig,
+        db: &SiliusDB,
+        chain: &Chain<P>,
+        frame: &Erc7562Frame,
+    ) -> Result<(), ValidationError> {
+        for tracing_check in &self.tracing_checks {
+            tracing_check
+                .check_user_operation(user_operation, config, db, chain, frame)
+                .await?;
+        }
+
+        for call in frame.calls.iter() {
+            Box::pin(self._tracing_check_recursive(user_operation, config, db, chain, call))
+                .await?;
         }
 
         Ok(())

@@ -1,4 +1,5 @@
 use alloy_provider::Provider;
+use alloy_rpc_types_trace::geth::erc7562::Erc7562Frame;
 use silius_chain::Chain;
 use silius_primitives::user_operation::UserOperation;
 use silius_storage::db::SiliusDB;
@@ -18,5 +19,6 @@ pub trait TracingCheck<P: Provider> {
         config: &ValidatorConfig,
         db: &SiliusDB,
         chain: &Chain<P>,
+        frame: &Erc7562Frame,
     ) -> Result<(), TracingCheckError>;
 }

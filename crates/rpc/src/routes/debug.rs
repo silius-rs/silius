@@ -6,7 +6,7 @@ use silius_manager::SiliusManager;
 
 use crate::{
     handlers::{bundler::send_bundle_now, mempool::clear_state},
-    types::error::ErrorData,
+    types::{codes::METHOD_NOT_FOUND, error::ErrorData},
 };
 
 pub async fn debug_router<P: Provider + Clone + 'static>(
@@ -22,6 +22,6 @@ pub async fn debug_router<P: Provider + Clone + 'static>(
         // "debug_bundler_setReputation" => set_reputation().await,
         // "debug_bundler_dumpReputation" => dump_reputation().await,
         // "debug_bundler_addUserOps" => add_user_ops().await,
-        _ => Err(ErrorData::std(-32601)),
+        _ => Err(ErrorData::std(METHOD_NOT_FOUND)),
     }
 }
