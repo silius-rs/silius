@@ -38,4 +38,5 @@ pdm run pytest -rA -W ignore::DeprecationWarning -v tests/single/rpc/test_eth_su
 ```
 tests/single/bundle/test_bundle.py::test_max_allowed_ops_unstaked_sender
 tests/single/opbanning/test_op_banning.py
+tests/single/bundle/test_storage_rules.py
 tests/single/opbanning/test_op_banning.py::test_account_banned_opcode[COINBASE-]

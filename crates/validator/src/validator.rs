@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use alloy_provider::Provider;
 use alloy_rpc_types_trace::geth::erc7562::Erc7562Frame;
 use silius_chain::Chain;
@@ -9,7 +11,7 @@ use crate::{
     error::ValidationError,
     sanity_checks::{SanityCheck, fee::FeeCheck},
     simulation_checks::SimulationCheck,
-    tracing_check::{TracingCheck, opcode::OpcodeCheck},
+    tracing_check::{TracingCheck, TracingContext, opcode::OpcodeCheck, storage::StorageCheck},
 };
 
 pub struct Validator<P: Provider> {
@@ -34,7 +36,7 @@ impl<P: Provider> Validator<P> {
             config,
             sanity_checks: vec![Box::new(FeeCheck)],
             simulation_checks: vec![],
-            tracing_checks: vec![Box::new(OpcodeCheck)],
+            tracing_checks: vec![Box::new(OpcodeCheck), Box::new(StorageCheck)],
         }
     }
 
@@ -53,6 +55,25 @@ impl<P: Provider> Validator<P> {
         db: &SiliusDB,
         chain: &Chain<P>,
     ) -> Result<(), ValidationError> {
+        // TODO: check if ok to use is_staked or multiply stake amount and price of asset (more than 1000 USD)
+        let mut entity_staked = HashMap::new();
+        entity_staked.insert(
+            user_operation.sender,
+            chain
+                .get_deposit_info(user_operation.sender)
+                .await?
+                .is_staked(),
+        );
+        if let Some(paymaster) = user_operation.paymaster {
+            entity_staked.insert(
+                paymaster,
+                chain.get_deposit_info(paymaster).await?.is_staked(),
+            );
+        }
+        if let Some(factory) = user_operation.factory {
+            entity_staked.insert(factory, chain.get_deposit_info(factory).await?.is_staked());
+        }
+
         for sanity_check in &self.sanity_checks {
             sanity_check
                 .check_user_operation(user_operation, &self.config, db, chain)
@@ -67,8 +88,20 @@ impl<P: Provider> Validator<P> {
 
         if !self.tracing_checks.is_empty() {
             let frame = chain.trace_handle_ops(user_operation).await?;
-            self._tracing_check_recursive(user_operation, &self.config, db, chain, &frame)
-                .await?;
+
+            let mut context = TracingContext::default();
+            context.entity_staked = entity_staked;
+            context.keccak = frame.keccak.clone();
+
+            self._tracing_check_recursive(
+                user_operation,
+                &self.config,
+                db,
+                chain,
+                &frame,
+                &mut context,
+            )
+            .await?;
         }
 
         Ok(())
@@ -81,16 +114,26 @@ impl<P: Provider> Validator<P> {
         db: &SiliusDB,
         chain: &Chain<P>,
         frame: &Erc7562Frame,
+        context: &mut TracingContext,
     ) -> Result<(), ValidationError> {
+        context.update(user_operation, frame);
+
         for tracing_check in &self.tracing_checks {
             tracing_check
-                .check_user_operation(user_operation, config, db, chain, frame)
+                .check_user_operation(user_operation, config, db, chain, frame, context)
                 .await?;
         }
 
         for call in frame.calls.iter() {
-            Box::pin(self._tracing_check_recursive(user_operation, config, db, chain, call))
-                .await?;
+            Box::pin(self._tracing_check_recursive(
+                user_operation,
+                config,
+                db,
+                chain,
+                call,
+                context,
+            ))
+            .await?;
         }
 
         Ok(())

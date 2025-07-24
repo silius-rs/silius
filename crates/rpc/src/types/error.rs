@@ -6,7 +6,8 @@ use silius_mempool::error::MempoolError;
 use silius_validator::{error::ValidationError, tracing_check::error::TracingCheckError};
 
 use crate::types::codes::{
-    BLOCKED_OPCODE, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+    INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, OPCODE_STORAGE_VALIDATION,
+    PARSE_ERROR,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,8 +55,10 @@ impl From<MempoolError> for ErrorData {
         match error {
             MempoolError::Validation(e) => match e {
                 ValidationError::TracingError(e) => match e {
-                    TracingCheckError::BannedOpcode(_) => {
-                        ErrorData::new(BLOCKED_OPCODE, &e.to_string())
+                    TracingCheckError::BannedOpcode(_)
+                    | TracingCheckError::ForbiddenSlotAccess(_, _, _, _, _)
+                    | TracingCheckError::UnstakedEntitySlotAccess(_, _, _) => {
+                        ErrorData::new(OPCODE_STORAGE_VALIDATION, &e.to_string())
                     }
                     _ => ErrorData::new(INTERNAL_ERROR, &e.to_string()), // TODO: expand errors
                 },

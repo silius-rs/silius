@@ -49,3 +49,9 @@ pub struct DepositInfo {
     pub unstake_delay_sec: u32,
     pub withdraw_time: U48,
 }
+
+impl DepositInfo {
+    pub fn is_staked(&self) -> bool {
+        self.staked && self.stake >= U112::from(1) && self.unstake_delay_sec >= 1
+    }
+}

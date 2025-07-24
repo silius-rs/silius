@@ -5,4 +5,4 @@ pub const INVALID_PARAMS: i32 = -32602;
 pub const INTERNAL_ERROR: i32 = -32603;
 
 // bundler specific error codes
-pub const BLOCKED_OPCODE: i32 = -32502;
+pub const OPCODE_STORAGE_VALIDATION: i32 = -32502;
