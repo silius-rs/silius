@@ -56,6 +56,7 @@ impl From<MempoolError> for ErrorData {
             MempoolError::Validation(e) => match e {
                 ValidationError::TracingError(e) => match e {
                     TracingCheckError::BannedOpcode(_)
+                    | TracingCheckError::UndeployedContractAccess(_, _, _)
                     | TracingCheckError::ForbiddenSlotAccess(_, _, _, _, _)
                     | TracingCheckError::UnstakedEntitySlotAccess(_, _, _) => {
                         ErrorData::new(OPCODE_STORAGE_VALIDATION, &e.to_string())

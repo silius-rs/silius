@@ -70,8 +70,8 @@ impl<P: Provider> TracingCheck<P> for StorageCheck {
             let is_entity = to == context.current_entity_address;
             let is_entity_associated =
                 _associated_with(slot, &context.current_entity_address, &address_slots);
-            let is_read_only_access = frame.accessed_slots.writes.is_empty()
-                && frame.accessed_slots.transient_writes.is_empty();
+            let is_read_only_access = !frame.accessed_slots.writes.contains_key(slot)
+                && !frame.accessed_slots.transient_writes.contains_key(slot);
 
             let is_allowed_entity_staked = is_entity || is_entity_associated || is_read_only_access;
             let is_allowed_factory_staked = is_sender_associated && is_factory;
@@ -161,11 +161,10 @@ fn _associated_with(
         return false;
     };
 
-    let slot_number = U256::from_be_bytes(slot.0);
+    let slot_number: U256 = (*slot).into();
 
     for slot in slots {
-        let slot_num = U256::from_be_bytes(slot.0);
-
+        let slot_num: U256 = (*slot).into();
         if slot_number >= slot_num && slot_number < (slot_num + U256::from(128)) {
             return true;
         }

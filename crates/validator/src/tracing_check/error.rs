@@ -8,6 +8,9 @@ pub enum TracingCheckError {
     #[error("account uses banned opcode: {0}")]
     BannedOpcode(String),
 
+    #[error("{0} accesses undeployed contract address {1} with opcode {2}")]
+    UndeployedContractAccess(Entity, Address, String),
+
     #[error("unstaked {0} accessed {1} slot {2}")]
     UnstakedEntitySlotAccess(Entity, Address, B256),
 
