@@ -8,7 +8,7 @@ use silius_storage::db::SiliusDB;
 
 use crate::{
     config::ValidatorConfig,
-    tracing_check::{TracingCheck, TracingContext, error::TracingCheckError},
+    tracing_checks::{TracingCheck, TracingContext, error::TracingCheckError},
 };
 
 pub const BLOCKED_OPCODES: [OpCode; 13] = [
@@ -40,15 +40,17 @@ impl<P: Provider> TracingCheck<P> for OpcodeCheck {
         frame: &Erc7562Frame,
         context: &TracingContext,
     ) -> Result<(), TracingCheckError> {
-        if let Some(to) = frame.to
-            && to != network_spec().entry_point_address
-        {
+        if frame.to != Some(network_spec().entry_point_address) {
             for opcode in frame.used_opcodes.keys() {
                 let opcode = OpCode::new(*opcode).unwrap_or_default();
                 if BLOCKED_OPCODES.contains(&opcode) {
                     return Err(TracingCheckError::BannedOpcode(opcode.to_string()));
                 }
             }
+        }
+
+        if frame.out_of_gas {
+            return Err(TracingCheckError::OutOfGas(context.current_entity));
         }
 
         for (address, contract_size) in frame.contract_size.iter() {
@@ -70,6 +72,10 @@ impl<P: Provider> TracingCheck<P> for OpcodeCheck {
                         .to_string(),
                 ));
             }
+
+            if _is_forbidden_precompile(&address) {
+                return Err(TracingCheckError::IllegalPrecompileAccess(address));
+            }
         }
 
         Ok(())
@@ -77,6 +83,11 @@ impl<P: Provider> TracingCheck<P> for OpcodeCheck {
 }
 
 fn _is_precompile(address: &Address) -> bool {
-    let address: U160 = (*address).into();
-    address >= U160::from(1) && address < U160::from(1000)
+    let address_num: U160 = (*address).into();
+    address_num >= U160::from(1) && address_num < U160::from(1000)
+}
+
+fn _is_forbidden_precompile(address: &Address) -> bool {
+    let address_num: U160 = (*address).into();
+    _is_precompile(address) && address_num > U160::from(9)
 }

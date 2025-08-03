@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, B256, U256, address};
+use alloy_primitives::{Address, B256, U256};
 use alloy_provider::{Provider, ext::DebugApi};
 use alloy_rpc_types_eth::{BlockId, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
@@ -138,10 +138,7 @@ impl<P: Provider + 'static> Chain<P> {
                 .unwrap_or_default();
 
         let mut transaction_request = self
-            .create_handle_ops_transaction_request(
-                &[user_operation.clone()],
-                address!("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"), // random address :)
-            )
+            .create_handle_ops_transaction_request(&[user_operation.clone()], Address::ZERO)
             .await;
 
         transaction_request.gas = Some(gas_limit.to::<u64>());

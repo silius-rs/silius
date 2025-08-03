@@ -4,15 +4,24 @@ use alloy_primitives::{Address, B256, Bytes, U256};
 
 use crate::network_spec::{DEV, MAINNET, NetworkSpec};
 
-pub fn pack_address_and_data(address: Option<Address>, data: Option<Bytes>) -> Bytes {
-    if let (Some(address), Some(data)) = (address, data) {
-        let mut result = Vec::with_capacity(20 + data.len());
-        result.extend_from_slice(address.as_slice());
-        result.extend_from_slice(&data);
-        Bytes::from(result)
-    } else {
-        Bytes::new()
-    }
+pub fn pack_address_and_data(address: Address, data: Bytes) -> Bytes {
+    let mut result = Vec::with_capacity(20 + data.len());
+    result.extend_from_slice(address.as_slice());
+    result.extend_from_slice(&data);
+    Bytes::from(result)
+}
+
+pub fn pack_address_two_gas_and_data(
+    address: Address,
+    gas_1: U256,
+    gas_2: U256,
+    data: Bytes,
+) -> Bytes {
+    let mut result = Vec::with_capacity(20 + 32 + 32 + data.len());
+    result.extend_from_slice(address.as_slice());
+    result.extend_from_slice(pack_two_gas_values(gas_1, gas_2).as_slice());
+    result.extend_from_slice(&data);
+    Bytes::from(result)
 }
 
 pub fn pack_two_gas_values(gas_1: U256, gas_2: U256) -> B256 {

@@ -5,7 +5,7 @@ use alloy_primitives::{Address, B256, Bytes, U256};
 use alloy_sol_types::sol;
 use serde::{Deserialize, Serialize};
 
-use crate::utils::{pack_address_and_data, pack_two_gas_values};
+use crate::utils::{pack_address_and_data, pack_address_two_gas_and_data, pack_two_gas_values};
 
 sol! {
     #[derive(Debug)]
@@ -53,7 +53,13 @@ impl UserOperationBase {
         PackedUserOperation {
             sender: self.sender,
             nonce: self.nonce,
-            init_code: pack_address_and_data(self.factory, self.factory_data.clone()),
+            init_code: if let (Some(factory), Some(factory_data)) =
+                (self.factory, self.factory_data.clone())
+            {
+                pack_address_and_data(factory, factory_data)
+            } else {
+                Bytes::new()
+            },
             call_data: self.call_data.clone(),
             account_gas_limit: pack_two_gas_values(
                 self.call_gas_limit,
@@ -61,7 +67,26 @@ impl UserOperationBase {
             ),
             pre_verification_gas: self.pre_verification_gas,
             gas_fees: pack_two_gas_values(self.max_fee_per_gas, self.max_priority_fee_per_gas),
-            paymaster_and_data: pack_address_and_data(self.paymaster, self.paymaster_data.clone()),
+            paymaster_and_data: if let (
+                Some(paymaster),
+                Some(paymaster_verification_gas_limit),
+                Some(paymaster_post_op_gas_limit),
+                Some(paymaster_data),
+            ) = (
+                self.paymaster,
+                self.paymaster_verification_gas_limit,
+                self.paymaster_post_op_gas_limit,
+                self.paymaster_data.clone(),
+            ) {
+                pack_address_two_gas_and_data(
+                    paymaster,
+                    paymaster_verification_gas_limit,
+                    paymaster_post_op_gas_limit,
+                    paymaster_data,
+                )
+            } else {
+                Bytes::new()
+            },
             signature: self.signature.clone(),
         }
     }

@@ -8,8 +8,14 @@ pub enum TracingCheckError {
     #[error("account uses banned opcode: {0}")]
     BannedOpcode(String),
 
+    #[error("{0} internally reverts on oog")]
+    OutOfGas(Entity),
+
     #[error("{0} accesses undeployed contract address {1} with opcode {2}")]
     UndeployedContractAccess(Entity, Address, String),
+
+    #[error("Illegal code to forbidden precompile: {0}")]
+    IllegalPrecompileAccess(Address),
 
     #[error("unstaked {0} accessed {1} slot {2}")]
     UnstakedEntitySlotAccess(Entity, Address, B256),

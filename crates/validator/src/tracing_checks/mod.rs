@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use alloy_primitives::{Address, Bytes};
 use alloy_provider::Provider;
 use alloy_rpc_types_trace::geth::erc7562::Erc7562Frame;
@@ -9,18 +7,21 @@ use silius_primitives::{
 };
 use silius_storage::db::SiliusDB;
 
-use crate::{config::ValidatorConfig, tracing_check::error::TracingCheckError};
+use crate::{
+    config::ValidatorConfig, tracing_checks::error::TracingCheckError, types::ValidationResult,
+};
 
 pub mod code;
 pub mod error;
 pub mod opcode;
 pub mod storage;
+pub mod utils;
 
 #[derive(Default)]
 pub struct TracingContext {
     pub current_entity: Entity,
     pub current_entity_address: Address,
-    pub entity_staked: HashMap<Address, bool>,
+    pub validation_result: ValidationResult,
     pub keccak: Vec<Bytes>,
 }
 
@@ -58,7 +59,11 @@ impl TracingContext {
     }
 
     pub fn is_entity_staked(&self, address: Address) -> bool {
-        self.entity_staked.get(&address).copied().unwrap_or(false)
+        self.validation_result
+            .entity_staked
+            .get(&address)
+            .copied()
+            .unwrap_or(false)
     }
 }
 

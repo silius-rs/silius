@@ -3,21 +3,25 @@ use std::collections::HashMap;
 use alloy_provider::Provider;
 use alloy_rpc_types_trace::geth::erc7562::Erc7562Frame;
 use silius_chain::Chain;
-use silius_primitives::user_operation::UserOperation;
+use silius_primitives::{network_spec::network_spec, user_operation::UserOperation};
 use silius_storage::db::SiliusDB;
 
 use crate::{
     config::ValidatorConfig,
     error::ValidationError,
     sanity_checks::{SanityCheck, fee::FeeCheck},
-    simulation_checks::SimulationCheck,
-    tracing_check::{TracingCheck, TracingContext, opcode::OpcodeCheck, storage::StorageCheck},
+    tracing_checks::{
+        TracingCheck, TracingContext, opcode::OpcodeCheck, storage::StorageCheck,
+        utils::extract_validation_result,
+    },
+    types::ValidationResult,
 };
+
+pub const VALID_UNTIL_SECONDS_IN_FUTURE: u64 = 30; // 30 seconds
 
 pub struct Validator<P: Provider> {
     pub config: ValidatorConfig,
     pub sanity_checks: Vec<Box<dyn SanityCheck<P> + Send + Sync>>,
-    pub simulation_checks: Vec<Box<dyn SimulationCheck<P> + Send + Sync>>,
     pub tracing_checks: Vec<Box<dyn TracingCheck<P> + Send + Sync>>,
 }
 
@@ -26,7 +30,6 @@ impl<P: Provider> Validator<P> {
         Self {
             config,
             sanity_checks: vec![],
-            simulation_checks: vec![],
             tracing_checks: vec![],
         }
     }
@@ -35,7 +38,6 @@ impl<P: Provider> Validator<P> {
         Self {
             config,
             sanity_checks: vec![Box::new(FeeCheck)],
-            simulation_checks: vec![],
             tracing_checks: vec![Box::new(OpcodeCheck), Box::new(StorageCheck)],
         }
     }
@@ -43,8 +45,7 @@ impl<P: Provider> Validator<P> {
     pub fn _unsafe(config: ValidatorConfig) -> Self {
         Self {
             config,
-            sanity_checks: vec![],
-            simulation_checks: vec![],
+            sanity_checks: vec![Box::new(FeeCheck)],
             tracing_checks: vec![],
         }
     }
@@ -74,23 +75,20 @@ impl<P: Provider> Validator<P> {
             entity_staked.insert(factory, chain.get_deposit_info(factory).await?.is_staked());
         }
 
+        // TODO: add preverification gas check
+
         for sanity_check in &self.sanity_checks {
             sanity_check
                 .check_user_operation(user_operation, &self.config, db, chain)
                 .await?;
         }
 
-        for simulation_check in &self.simulation_checks {
-            simulation_check
-                .check_user_operation(user_operation, &self.config, db, chain)
-                .await?;
-        }
-
-        if !self.tracing_checks.is_empty() {
+        let validation_result = if !self.tracing_checks.is_empty() {
             let frame = chain.trace_handle_ops(user_operation).await?;
+            let validation_result = extract_validation_result(&frame);
 
             let mut context = TracingContext::default();
-            context.entity_staked = entity_staked;
+            context.validation_result = validation_result.clone();
             context.keccak = frame.keccak.clone();
 
             self._tracing_check_recursive(
@@ -102,6 +100,52 @@ impl<P: Provider> Validator<P> {
                 &mut context,
             )
             .await?;
+
+            validation_result
+        } else {
+
+
+            ValidationResult::default()
+        };
+
+        self._validate_validation_result(validation_result)?;
+
+        Ok(())
+    }
+
+    fn _validate_validation_result(&self, result: ValidationResult) -> Result<(), ValidationError> {
+        // TODO: check preverfication gas (this is second time, add first time as well)
+
+        if result.sig_failed {
+            return Err(ValidationError::SignatureError);
+        }
+
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| ValidationError::Other(e.to_string()))?
+            .as_secs();
+
+        if result.valid_after > current_time {
+            return Err(ValidationError::NotInTimeRange(format!(
+                "time range in the future: current time {} is before valid after {}",
+                current_time, result.valid_after
+            )));
+        }
+
+        if result.valid_until != 0 && result.valid_until < current_time {
+            return Err(ValidationError::NotInTimeRange(format!(
+                "time range in the past: current time {} is after valid until {}",
+                current_time, result.valid_until
+            )));
+        }
+
+        if result.valid_until != 0
+            && result.valid_until < current_time + VALID_UNTIL_SECONDS_IN_FUTURE
+        {
+            return Err(ValidationError::NotInTimeRange(format!(
+                "time range too short: current time {} is after valid until {}, allowed {} seconds in the future",
+                current_time, result.valid_until, VALID_UNTIL_SECONDS_IN_FUTURE
+            )));
         }
 
         Ok(())
@@ -116,6 +160,12 @@ impl<P: Provider> Validator<P> {
         frame: &Erc7562Frame,
         context: &mut TracingContext,
     ) -> Result<(), ValidationError> {
+        if frame.from == network_spec().entry_point_address
+            && frame.to == Some(network_spec().entry_point_address)
+        {
+            return Ok(());
+        }
+
         context.update(user_operation, frame);
 
         for tracing_check in &self.tracing_checks {

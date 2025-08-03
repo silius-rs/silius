@@ -9,7 +9,7 @@ use silius_storage::db::SiliusDB;
 
 use crate::{
     config::ValidatorConfig,
-    tracing_check::{TracingCheck, TracingContext, error::TracingCheckError},
+    tracing_checks::{TracingCheck, TracingContext, error::TracingCheckError},
 };
 
 pub struct StorageCheck;

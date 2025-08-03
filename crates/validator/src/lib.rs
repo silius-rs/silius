@@ -3,6 +3,6 @@
 pub mod config;
 pub mod error;
 pub mod sanity_checks;
-pub mod simulation_checks;
-pub mod tracing_check;
+pub mod tracing_checks;
+pub mod types;
 pub mod validator;

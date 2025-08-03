@@ -3,7 +3,7 @@ use std::{error, fmt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use silius_mempool::error::MempoolError;
-use silius_validator::{error::ValidationError, tracing_check::error::TracingCheckError};
+use silius_validator::{error::ValidationError, tracing_checks::error::TracingCheckError};
 
 use crate::types::codes::{
     INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, OPCODE_STORAGE_VALIDATION,
@@ -56,7 +56,9 @@ impl From<MempoolError> for ErrorData {
             MempoolError::Validation(e) => match e {
                 ValidationError::TracingError(e) => match e {
                     TracingCheckError::BannedOpcode(_)
+                    | TracingCheckError::OutOfGas(_)
                     | TracingCheckError::UndeployedContractAccess(_, _, _)
+                    | TracingCheckError::IllegalPrecompileAccess(_)
                     | TracingCheckError::ForbiddenSlotAccess(_, _, _, _, _)
                     | TracingCheckError::UnstakedEntitySlotAccess(_, _, _) => {
                         ErrorData::new(OPCODE_STORAGE_VALIDATION, &e.to_string())
