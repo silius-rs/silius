@@ -30,7 +30,7 @@ impl<P: Provider + 'static> Chain<P> {
         let chain_id = provider
             .get_chain_id()
             .await
-            .map_err(|e| ChainError::Provider(e.to_string()))?;
+            .map_err(|error| ChainError::Provider(error.to_string()))?;
         if chain_id != network_spec().chain_id() {
             return Err(ChainError::ChainIdMismatch {
                 expected: network_spec().chain_id(),
@@ -42,7 +42,7 @@ impl<P: Provider + 'static> Chain<P> {
         let code = provider
             .get_code_at(network_spec().entry_point_address)
             .await
-            .map_err(|e| ChainError::Provider(e.to_string()))?;
+            .map_err(|error| ChainError::Provider(error.to_string()))?;
         if code.is_empty() {
             return Err(ChainError::Provider(format!(
                 "Entry point contract is not deployed at address: {}",
@@ -68,12 +68,9 @@ impl<P: Provider + 'static> Chain<P> {
     }
 
     pub async fn get_base_fee_per_gas(&self) -> Result<U256, ChainError> {
-        Ok(U256::from(
-            self.provider()
-                .get_gas_price()
-                .await
-                .map_err(|e| ChainError::Provider(e.to_string()))?,
-        ))
+        Ok(U256::from(self.provider().get_gas_price().await.map_err(
+            |error| ChainError::Provider(error.to_string()),
+        )?))
     }
 
     pub async fn create_handle_ops_transaction_request(
@@ -94,7 +91,7 @@ impl<P: Provider + 'static> Chain<P> {
             .handleOps(
                 user_operations
                     .into_iter()
-                    .map(|p| p.to_packed_user_operation().into())
+                    .map(|user_operation| user_operation.to_packed_user_operation().into())
                     .collect(),
                 beneficiary,
             )
@@ -115,7 +112,7 @@ impl<P: Provider + 'static> Chain<P> {
             .getUserOpHash(packed_user_operation.into())
             .call()
             .await
-            .map_err(|e| ChainError::Provider(e.to_string()))
+            .map_err(|error| ChainError::Provider(error.to_string()))
     }
 
     pub async fn get_deposit_info(&self, address: Address) -> Result<DepositInfo, ChainError> {
@@ -124,7 +121,7 @@ impl<P: Provider + 'static> Chain<P> {
             .call()
             .await
             .map(|deposit_info| deposit_info.into())
-            .map_err(|e| ChainError::Provider(e.to_string()))
+            .map_err(|error| ChainError::Provider(error.to_string()))
     }
 
     pub async fn trace_handle_ops(
@@ -152,8 +149,45 @@ impl<P: Provider + 'static> Chain<P> {
                 )),
             )
             .await
-            .map_err(|e| ChainError::Provider(e.to_string()))?
+            .map_err(|error| ChainError::Provider(error.to_string()))?
             .try_into_erc7562_frame()
-            .map_err(|e| ChainError::Provider(e.to_string()))
+            .map_err(|error| ChainError::Provider(error.to_string()))
+    }
+
+    pub async fn simulate_handle_ops(
+        &self,
+        user_operation: &UserOperation,
+    ) -> Result<(), ChainError> {
+        let user_operations = vec![user_operation.clone()];
+        let gas_limit = user_operation.pre_verification_gas
+            + user_operation.verification_gas_limit
+            + user_operation
+                .paymaster_verification_gas_limit
+                .unwrap_or_default();
+
+        // TODO: set authorization list
+        let result = self
+            .entry_point
+            .handleOps(
+                user_operations
+                    .into_iter()
+                    .map(|user_operation| user_operation.to_packed_user_operation().into())
+                    .collect(),
+                Address::ZERO,
+            )
+            .gas(gas_limit.to::<u64>())
+            .call()
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                if let Some(revert_data) = error.as_revert_data() {
+                    Err(ChainError::Revert(revert_data))
+                } else {
+                    Err(ChainError::Provider(error.to_string()))
+                }
+            }
+        }
     }
 }

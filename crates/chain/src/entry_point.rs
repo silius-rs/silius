@@ -2,6 +2,7 @@ use alloy_sol_types::sol;
 use silius_primitives::{reputation::DepositInfo, user_operation::PackedUserOperation};
 
 sol!(
+    #[derive(Debug)]
     #[sol(rpc)]
     IEntryPoint,
     "resources/entry_point_v08.json"

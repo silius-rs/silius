@@ -6,8 +6,8 @@ use silius_mempool::error::MempoolError;
 use silius_validator::{error::ValidationError, tracing_checks::error::TracingCheckError};
 
 use crate::types::codes::{
-    INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, OPCODE_STORAGE_VALIDATION,
-    PARSE_ERROR,
+    INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, INVALID_SIGNATURE, METHOD_NOT_FOUND,
+    OPCODE_STORAGE_VALIDATION, PARSE_ERROR,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +54,7 @@ impl From<MempoolError> for ErrorData {
     fn from(error: MempoolError) -> Self {
         match error {
             MempoolError::Validation(e) => match e {
+                ValidationError::Signature(e) => ErrorData::new(INVALID_SIGNATURE, &e),
                 ValidationError::TracingError(e) => match e {
                     TracingCheckError::BannedOpcode(_)
                     | TracingCheckError::OutOfGas(_)

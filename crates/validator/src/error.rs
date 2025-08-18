@@ -5,8 +5,8 @@ use crate::{sanity_checks::error::SanityCheckError, tracing_checks::error::Traci
 
 #[derive(Error, Debug)]
 pub enum ValidationError {
-    #[error("Invalid user operation signature or paymaster signature")]
-    SignatureError,
+    #[error("{0}")]
+    Signature(String),
     #[error("{0}")]
     NotInTimeRange(String),
     #[error("{0}")]

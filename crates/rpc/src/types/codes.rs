@@ -6,3 +6,4 @@ pub const INTERNAL_ERROR: i32 = -32603;
 
 // bundler specific error codes
 pub const OPCODE_STORAGE_VALIDATION: i32 = -32502;
+pub const INVALID_SIGNATURE: i32 = -32507;
